@@ -1,0 +1,983 @@
+{
+  "bundles": {
+    "frontdesk": [
+      "abha.link",
+      "appointment.book",
+      "handover",
+      "patient.find",
+      "patient.register"
+    ],
+    "nurse": [
+      "abha.link",
+      "appointment.book",
+      "assessment.record",
+      "handover",
+      "patient.find",
+      "patient.register",
+      "vitals.record"
+    ],
+    "mo": [
+      "assessment.record",
+      "encounter.document",
+      "handover",
+      "lab.order",
+      "patient.find",
+      "reporting.view",
+      "rx.prescribe"
+    ],
+    "lab": [
+      "handover",
+      "lab.result.enter",
+      "patient.find"
+    ],
+    "lab_incharge": [
+      "handover",
+      "lab.result.enter",
+      "lab.result.validate",
+      "patient.find"
+    ],
+    "pharmacist": [
+      "handover",
+      "patient.find",
+      "pharmacy.dispense"
+    ],
+    "asha": [
+      "abha.link",
+      "appointment.book",
+      "assessment.record",
+      "patient.find",
+      "patient.register",
+      "visit.household"
+    ],
+    "anm": [
+      "abha.link",
+      "appointment.book",
+      "assessment.record",
+      "patient.find",
+      "patient.register",
+      "visit.household",
+      "vitals.record"
+    ],
+    "cho": [
+      "abha.link",
+      "appointment.book",
+      "assessment.record",
+      "encounter.document",
+      "lab.order",
+      "patient.find",
+      "patient.register",
+      "rx.prescribe",
+      "visit.household",
+      "vitals.record"
+    ]
+  },
+  "patients": [
+    {
+      "name": "Lakshmi Devi",
+      "age": 52,
+      "sex": "F",
+      "village": "Yadiki",
+      "note": "Hypertension, 4 years",
+      "flags": [
+        "abha.pending",
+        "registered"
+      ],
+      "station": "nurse",
+      "actions": {
+        "frontdesk": [
+          {
+            "id": "phc.op.abha-link",
+            "tool": "propose_abha_link",
+            "title": "Create or link an ABHA for this patient",
+            "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
+            "station": "reception",
+            "capability": "abha.link",
+            "instrument": "form",
+            "irreversibility": "irreversible",
+            "verified": "unverified",
+            "preconditions": [
+              "registered",
+              "not abha.linked"
+            ],
+            "kind": "write"
+          }
+        ],
+        "nurse": [
+          {
+            "id": "phc.op.vitals-record",
+            "tool": "propose_vitals_record",
+            "title": "Record vitals and triage",
+            "summary": "Measure and record blood pressure, oxygen saturation, weight and the other basic readings, and flag anything abnormal for the doctor.\n",
+            "station": "nurse",
+            "capability": "vitals.record",
+            "instrument": "device",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered",
+              "not vitals.recorded"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.abha-link",
+            "tool": "propose_abha_link",
+            "title": "Create or link an ABHA for this patient",
+            "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
+            "station": "reception",
+            "capability": "abha.link",
+            "instrument": "form",
+            "irreversibility": "irreversible",
+            "verified": "unverified",
+            "preconditions": [
+              "registered",
+              "not abha.linked"
+            ],
+            "kind": "write"
+          }
+        ],
+        "mo": [
+          {
+            "id": "phc.op.consult-document",
+            "tool": "propose_consult_document",
+            "title": "Document a consultation",
+            "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
+            "station": "doctor",
+            "capability": "encounter.document",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ],
+        "lab": [],
+        "lab_incharge": [],
+        "pharmacist": [],
+        "asha": [
+          {
+            "id": "phc.op.abha-link",
+            "tool": "propose_abha_link",
+            "title": "Create or link an ABHA for this patient",
+            "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
+            "station": "reception",
+            "capability": "abha.link",
+            "instrument": "form",
+            "irreversibility": "irreversible",
+            "verified": "unverified",
+            "preconditions": [
+              "registered",
+              "not abha.linked"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.household-visit",
+            "tool": "propose_household_visit",
+            "title": "Record a household visit",
+            "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+            "station": "community",
+            "capability": "visit.household",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ],
+        "anm": [
+          {
+            "id": "phc.op.vitals-record",
+            "tool": "propose_vitals_record",
+            "title": "Record vitals and triage",
+            "summary": "Measure and record blood pressure, oxygen saturation, weight and the other basic readings, and flag anything abnormal for the doctor.\n",
+            "station": "nurse",
+            "capability": "vitals.record",
+            "instrument": "device",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered",
+              "not vitals.recorded"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.abha-link",
+            "tool": "propose_abha_link",
+            "title": "Create or link an ABHA for this patient",
+            "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
+            "station": "reception",
+            "capability": "abha.link",
+            "instrument": "form",
+            "irreversibility": "irreversible",
+            "verified": "unverified",
+            "preconditions": [
+              "registered",
+              "not abha.linked"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.household-visit",
+            "tool": "propose_household_visit",
+            "title": "Record a household visit",
+            "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+            "station": "community",
+            "capability": "visit.household",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ],
+        "cho": [
+          {
+            "id": "phc.op.vitals-record",
+            "tool": "propose_vitals_record",
+            "title": "Record vitals and triage",
+            "summary": "Measure and record blood pressure, oxygen saturation, weight and the other basic readings, and flag anything abnormal for the doctor.\n",
+            "station": "nurse",
+            "capability": "vitals.record",
+            "instrument": "device",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered",
+              "not vitals.recorded"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.abha-link",
+            "tool": "propose_abha_link",
+            "title": "Create or link an ABHA for this patient",
+            "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
+            "station": "reception",
+            "capability": "abha.link",
+            "instrument": "form",
+            "irreversibility": "irreversible",
+            "verified": "unverified",
+            "preconditions": [
+              "registered",
+              "not abha.linked"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.consult-document",
+            "tool": "propose_consult_document",
+            "title": "Document a consultation",
+            "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
+            "station": "doctor",
+            "capability": "encounter.document",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.household-visit",
+            "tool": "propose_household_visit",
+            "title": "Record a household visit",
+            "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+            "station": "community",
+            "capability": "visit.household",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Lakshmamma G",
+      "age": 61,
+      "sex": "F",
+      "village": "Tadipatri",
+      "note": "Osteoarthritis. Shares a household phone",
+      "flags": [
+        "abha.pending",
+        "registered",
+        "vitals.flagged",
+        "vitals.recorded"
+      ],
+      "station": "doctor",
+      "actions": {
+        "frontdesk": [
+          {
+            "id": "phc.op.abha-link",
+            "tool": "propose_abha_link",
+            "title": "Create or link an ABHA for this patient",
+            "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
+            "station": "reception",
+            "capability": "abha.link",
+            "instrument": "form",
+            "irreversibility": "irreversible",
+            "verified": "unverified",
+            "preconditions": [
+              "registered",
+              "not abha.linked"
+            ],
+            "kind": "write"
+          }
+        ],
+        "nurse": [
+          {
+            "id": "phc.op.abha-link",
+            "tool": "propose_abha_link",
+            "title": "Create or link an ABHA for this patient",
+            "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
+            "station": "reception",
+            "capability": "abha.link",
+            "instrument": "form",
+            "irreversibility": "irreversible",
+            "verified": "unverified",
+            "preconditions": [
+              "registered",
+              "not abha.linked"
+            ],
+            "kind": "write"
+          }
+        ],
+        "mo": [
+          {
+            "id": "phc.op.consult-document",
+            "tool": "propose_consult_document",
+            "title": "Document a consultation",
+            "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
+            "station": "doctor",
+            "capability": "encounter.document",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ],
+        "lab": [],
+        "lab_incharge": [],
+        "pharmacist": [],
+        "asha": [
+          {
+            "id": "phc.op.abha-link",
+            "tool": "propose_abha_link",
+            "title": "Create or link an ABHA for this patient",
+            "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
+            "station": "reception",
+            "capability": "abha.link",
+            "instrument": "form",
+            "irreversibility": "irreversible",
+            "verified": "unverified",
+            "preconditions": [
+              "registered",
+              "not abha.linked"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.household-visit",
+            "tool": "propose_household_visit",
+            "title": "Record a household visit",
+            "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+            "station": "community",
+            "capability": "visit.household",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ],
+        "anm": [
+          {
+            "id": "phc.op.abha-link",
+            "tool": "propose_abha_link",
+            "title": "Create or link an ABHA for this patient",
+            "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
+            "station": "reception",
+            "capability": "abha.link",
+            "instrument": "form",
+            "irreversibility": "irreversible",
+            "verified": "unverified",
+            "preconditions": [
+              "registered",
+              "not abha.linked"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.household-visit",
+            "tool": "propose_household_visit",
+            "title": "Record a household visit",
+            "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+            "station": "community",
+            "capability": "visit.household",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ],
+        "cho": [
+          {
+            "id": "phc.op.consult-document",
+            "tool": "propose_consult_document",
+            "title": "Document a consultation",
+            "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
+            "station": "doctor",
+            "capability": "encounter.document",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.abha-link",
+            "tool": "propose_abha_link",
+            "title": "Create or link an ABHA for this patient",
+            "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
+            "station": "reception",
+            "capability": "abha.link",
+            "instrument": "form",
+            "irreversibility": "irreversible",
+            "verified": "unverified",
+            "preconditions": [
+              "registered",
+              "not abha.linked"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.household-visit",
+            "tool": "propose_household_visit",
+            "title": "Record a household visit",
+            "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+            "station": "community",
+            "capability": "visit.household",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Lakshman Rao",
+      "age": 38,
+      "sex": "M",
+      "village": "Yadiki",
+      "note": "Type 2 diabetes. Sulfa allergy",
+      "flags": [
+        "abha.linked",
+        "consult.documented",
+        "registered",
+        "rx.confirmed",
+        "vitals.recorded"
+      ],
+      "station": "pharmacy",
+      "actions": {
+        "frontdesk": [],
+        "nurse": [],
+        "mo": [
+          {
+            "id": "phc.op.consult-document",
+            "tool": "propose_consult_document",
+            "title": "Document a consultation",
+            "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
+            "station": "doctor",
+            "capability": "encounter.document",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.lab-order",
+            "tool": "propose_lab_order",
+            "title": "Order an investigation",
+            "summary": "Ask the laboratory to run a test for this patient.",
+            "station": "doctor",
+            "capability": "lab.order",
+            "instrument": "form",
+            "irreversibility": "reversible",
+            "verified": "unverified",
+            "preconditions": [
+              "consult.documented"
+            ],
+            "kind": "write"
+          }
+        ],
+        "lab": [],
+        "lab_incharge": [],
+        "pharmacist": [
+          {
+            "id": "phc.op.pharmacy-dispense",
+            "tool": "propose_pharmacy_dispense",
+            "title": "Dispense against a confirmed prescription",
+            "summary": "Give the patient the medicines a doctor prescribed, record what they actually received, and take that quantity out of facility stock.\n",
+            "station": "pharmacy",
+            "capability": "pharmacy.dispense",
+            "instrument": "form",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "rx.confirmed",
+              "not dispensed.complete"
+            ],
+            "kind": "write"
+          }
+        ],
+        "asha": [
+          {
+            "id": "phc.op.household-visit",
+            "tool": "propose_household_visit",
+            "title": "Record a household visit",
+            "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+            "station": "community",
+            "capability": "visit.household",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ],
+        "anm": [
+          {
+            "id": "phc.op.household-visit",
+            "tool": "propose_household_visit",
+            "title": "Record a household visit",
+            "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+            "station": "community",
+            "capability": "visit.household",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ],
+        "cho": [
+          {
+            "id": "phc.op.consult-document",
+            "tool": "propose_consult_document",
+            "title": "Document a consultation",
+            "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
+            "station": "doctor",
+            "capability": "encounter.document",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.lab-order",
+            "tool": "propose_lab_order",
+            "title": "Order an investigation",
+            "summary": "Ask the laboratory to run a test for this patient.",
+            "station": "doctor",
+            "capability": "lab.order",
+            "instrument": "form",
+            "irreversibility": "reversible",
+            "verified": "unverified",
+            "preconditions": [
+              "consult.documented"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.household-visit",
+            "tool": "propose_household_visit",
+            "title": "Record a household visit",
+            "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+            "station": "community",
+            "capability": "visit.household",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Sarojamma K",
+      "age": 29,
+      "sex": "F",
+      "village": "Peddavadugur",
+      "note": "Pregnancy, 26 weeks. Anaemia",
+      "flags": [
+        "abha.linked",
+        "consult.documented",
+        "lab.ordered",
+        "registered",
+        "vitals.recorded"
+      ],
+      "station": "lab",
+      "actions": {
+        "frontdesk": [],
+        "nurse": [],
+        "mo": [
+          {
+            "id": "phc.op.consult-document",
+            "tool": "propose_consult_document",
+            "title": "Document a consultation",
+            "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
+            "station": "doctor",
+            "capability": "encounter.document",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.lab-order",
+            "tool": "propose_lab_order",
+            "title": "Order an investigation",
+            "summary": "Ask the laboratory to run a test for this patient.",
+            "station": "doctor",
+            "capability": "lab.order",
+            "instrument": "form",
+            "irreversibility": "reversible",
+            "verified": "unverified",
+            "preconditions": [
+              "consult.documented"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.rx-prescribe",
+            "tool": "propose_rx_prescribe",
+            "title": "Write a prescription",
+            "summary": "Prescribe medicines for this patient, with what the pharmacy actually has in view.",
+            "station": "doctor",
+            "capability": "rx.prescribe",
+            "instrument": "form",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "consult.documented",
+              "not rx.confirmed"
+            ],
+            "kind": "write"
+          }
+        ],
+        "lab": [
+          {
+            "id": "phc.op.lab-result-enter",
+            "tool": "propose_lab_result_enter",
+            "title": "Enter a laboratory result",
+            "summary": "Record the value a bench test produced, against the investigation a doctor ordered for this patient.\n",
+            "station": "lab",
+            "capability": "lab.result.enter",
+            "instrument": "form",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "lab.ordered",
+              "not lab.resulted"
+            ],
+            "kind": "write"
+          }
+        ],
+        "lab_incharge": [
+          {
+            "id": "phc.op.lab-result-enter",
+            "tool": "propose_lab_result_enter",
+            "title": "Enter a laboratory result",
+            "summary": "Record the value a bench test produced, against the investigation a doctor ordered for this patient.\n",
+            "station": "lab",
+            "capability": "lab.result.enter",
+            "instrument": "form",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "lab.ordered",
+              "not lab.resulted"
+            ],
+            "kind": "write"
+          }
+        ],
+        "pharmacist": [],
+        "asha": [
+          {
+            "id": "phc.op.household-visit",
+            "tool": "propose_household_visit",
+            "title": "Record a household visit",
+            "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+            "station": "community",
+            "capability": "visit.household",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ],
+        "anm": [
+          {
+            "id": "phc.op.household-visit",
+            "tool": "propose_household_visit",
+            "title": "Record a household visit",
+            "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+            "station": "community",
+            "capability": "visit.household",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ],
+        "cho": [
+          {
+            "id": "phc.op.consult-document",
+            "tool": "propose_consult_document",
+            "title": "Document a consultation",
+            "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
+            "station": "doctor",
+            "capability": "encounter.document",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.lab-order",
+            "tool": "propose_lab_order",
+            "title": "Order an investigation",
+            "summary": "Ask the laboratory to run a test for this patient.",
+            "station": "doctor",
+            "capability": "lab.order",
+            "instrument": "form",
+            "irreversibility": "reversible",
+            "verified": "unverified",
+            "preconditions": [
+              "consult.documented"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.rx-prescribe",
+            "tool": "propose_rx_prescribe",
+            "title": "Write a prescription",
+            "summary": "Prescribe medicines for this patient, with what the pharmacy actually has in view.",
+            "station": "doctor",
+            "capability": "rx.prescribe",
+            "instrument": "form",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "consult.documented",
+              "not rx.confirmed"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.household-visit",
+            "tool": "propose_household_visit",
+            "title": "Record a household visit",
+            "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+            "station": "community",
+            "capability": "visit.household",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Ramesh Naidu",
+      "age": 44,
+      "sex": "M",
+      "village": "Yadiki",
+      "note": "Pulmonary TB, month 3 of 6",
+      "flags": [
+        "abha.linked",
+        "consult.documented",
+        "dispensed.complete",
+        "registered",
+        "rx.confirmed",
+        "vitals.recorded"
+      ],
+      "station": null,
+      "actions": {
+        "frontdesk": [],
+        "nurse": [],
+        "mo": [
+          {
+            "id": "phc.op.consult-document",
+            "tool": "propose_consult_document",
+            "title": "Document a consultation",
+            "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
+            "station": "doctor",
+            "capability": "encounter.document",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.lab-order",
+            "tool": "propose_lab_order",
+            "title": "Order an investigation",
+            "summary": "Ask the laboratory to run a test for this patient.",
+            "station": "doctor",
+            "capability": "lab.order",
+            "instrument": "form",
+            "irreversibility": "reversible",
+            "verified": "unverified",
+            "preconditions": [
+              "consult.documented"
+            ],
+            "kind": "write"
+          }
+        ],
+        "lab": [],
+        "lab_incharge": [],
+        "pharmacist": [],
+        "asha": [
+          {
+            "id": "phc.op.household-visit",
+            "tool": "propose_household_visit",
+            "title": "Record a household visit",
+            "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+            "station": "community",
+            "capability": "visit.household",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ],
+        "anm": [
+          {
+            "id": "phc.op.household-visit",
+            "tool": "propose_household_visit",
+            "title": "Record a household visit",
+            "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+            "station": "community",
+            "capability": "visit.household",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ],
+        "cho": [
+          {
+            "id": "phc.op.consult-document",
+            "tool": "propose_consult_document",
+            "title": "Document a consultation",
+            "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
+            "station": "doctor",
+            "capability": "encounter.document",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.lab-order",
+            "tool": "propose_lab_order",
+            "title": "Order an investigation",
+            "summary": "Ask the laboratory to run a test for this patient.",
+            "station": "doctor",
+            "capability": "lab.order",
+            "instrument": "form",
+            "irreversibility": "reversible",
+            "verified": "unverified",
+            "preconditions": [
+              "consult.documented"
+            ],
+            "kind": "write"
+          },
+          {
+            "id": "phc.op.household-visit",
+            "tool": "propose_household_visit",
+            "title": "Record a household visit",
+            "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+            "station": "community",
+            "capability": "visit.household",
+            "instrument": "scribe",
+            "irreversibility": "correctable",
+            "verified": "unverified",
+            "preconditions": [
+              "registered"
+            ],
+            "kind": "write"
+          }
+        ]
+      }
+    }
+  ]
+}
