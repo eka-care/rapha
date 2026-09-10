@@ -71,6 +71,24 @@
       "vitals.record"
     ]
   },
+  "capabilities": [
+    "abha.link",
+    "appointment.book",
+    "assessment.record",
+    "encounter.document",
+    "facility.admin",
+    "handover",
+    "lab.order",
+    "lab.result.enter",
+    "lab.result.validate",
+    "patient.find",
+    "patient.register",
+    "pharmacy.dispense",
+    "reporting.view",
+    "rx.prescribe",
+    "visit.household",
+    "vitals.record"
+  ],
   "patients": [
     {
       "name": "Lakshmi Devi",
@@ -83,11 +101,26 @@
         "registered"
       ],
       "station": "nurse",
+      "team": [],
+      "audit": [],
+      "agent": "Registered and in the queue. Vitals are the next thing.",
+      "nudges": {
+        "frontdesk": "Search is the default surface. ABHA creation is irreversible, so the confirm is explicit and un-prefilled, never automatic.",
+        "nurse": "Vitals are discrete values. Unedited speech recognition shows about 7.4% error, deletions and substitutions dominating. Form or device, never ambient scribe.",
+        "mo": "Read scope is the widest of any cadre; write is confined to documentation, prescription, orders and referral. No master access.",
+        "lab": "Manual entry uses per-analyte range validation. Out of range blocks the commit and requires an override with a reason.",
+        "lab_incharge": "Releasing a result is a separate capability from entering one, and the person who entered it does not hold it.",
+        "pharmacist": "Dispense stays blocked until a prescription is confirmed. The precondition lives in the operation catalogue, not the UI.",
+        "asha": "Narrative goes to scribe; assessment items go to a form. Scoring is computed by rule, never model generated.",
+        "anm": "Narrative goes to scribe; assessment items go to a form. Scoring is computed by rule, never model generated.",
+        "cho": "Prescribing here is bounded by an approved formulary and protocol set. That bound is declared and is not yet enforced."
+      },
       "actions": {
         "frontdesk": [
           {
             "id": "phc.op.abha-link",
             "tool": "propose_abha_link",
+            "short": "Link ABHA",
             "title": "Create or link an ABHA for this patient",
             "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
             "station": "reception",
@@ -106,6 +139,7 @@
           {
             "id": "phc.op.vitals-record",
             "tool": "propose_vitals_record",
+            "short": "Vitals",
             "title": "Record vitals and triage",
             "summary": "Measure and record blood pressure, oxygen saturation, weight and the other basic readings, and flag anything abnormal for the doctor.\n",
             "station": "nurse",
@@ -122,6 +156,7 @@
           {
             "id": "phc.op.abha-link",
             "tool": "propose_abha_link",
+            "short": "Link ABHA",
             "title": "Create or link an ABHA for this patient",
             "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
             "station": "reception",
@@ -140,6 +175,7 @@
           {
             "id": "phc.op.consult-document",
             "tool": "propose_consult_document",
+            "short": "Scribe",
             "title": "Document a consultation",
             "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
             "station": "doctor",
@@ -160,6 +196,7 @@
           {
             "id": "phc.op.abha-link",
             "tool": "propose_abha_link",
+            "short": "Link ABHA",
             "title": "Create or link an ABHA for this patient",
             "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
             "station": "reception",
@@ -176,6 +213,7 @@
           {
             "id": "phc.op.household-visit",
             "tool": "propose_household_visit",
+            "short": "Scribe visit",
             "title": "Record a household visit",
             "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
             "station": "community",
@@ -193,6 +231,7 @@
           {
             "id": "phc.op.vitals-record",
             "tool": "propose_vitals_record",
+            "short": "Vitals",
             "title": "Record vitals and triage",
             "summary": "Measure and record blood pressure, oxygen saturation, weight and the other basic readings, and flag anything abnormal for the doctor.\n",
             "station": "nurse",
@@ -209,6 +248,7 @@
           {
             "id": "phc.op.abha-link",
             "tool": "propose_abha_link",
+            "short": "Link ABHA",
             "title": "Create or link an ABHA for this patient",
             "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
             "station": "reception",
@@ -225,6 +265,7 @@
           {
             "id": "phc.op.household-visit",
             "tool": "propose_household_visit",
+            "short": "Scribe visit",
             "title": "Record a household visit",
             "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
             "station": "community",
@@ -242,6 +283,7 @@
           {
             "id": "phc.op.vitals-record",
             "tool": "propose_vitals_record",
+            "short": "Vitals",
             "title": "Record vitals and triage",
             "summary": "Measure and record blood pressure, oxygen saturation, weight and the other basic readings, and flag anything abnormal for the doctor.\n",
             "station": "nurse",
@@ -258,6 +300,7 @@
           {
             "id": "phc.op.abha-link",
             "tool": "propose_abha_link",
+            "short": "Link ABHA",
             "title": "Create or link an ABHA for this patient",
             "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
             "station": "reception",
@@ -274,6 +317,7 @@
           {
             "id": "phc.op.consult-document",
             "tool": "propose_consult_document",
+            "short": "Scribe",
             "title": "Document a consultation",
             "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
             "station": "doctor",
@@ -289,6 +333,7 @@
           {
             "id": "phc.op.household-visit",
             "tool": "propose_household_visit",
+            "short": "Scribe visit",
             "title": "Record a household visit",
             "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
             "station": "community",
@@ -317,11 +362,43 @@
         "vitals.recorded"
       ],
       "station": "doctor",
+      "team": [
+        [
+          "SM",
+          "Suneetha M",
+          "Vitals"
+        ]
+      ],
+      "audit": [
+        [
+          "09:12",
+          "phc.op.patient-register",
+          "Lalitha G"
+        ],
+        [
+          "09:31",
+          "phc.op.vitals-record",
+          "Suneetha M"
+        ]
+      ],
+      "agent": "Vitals are in. Documentation is unblocked.",
+      "nudges": {
+        "frontdesk": "Search is the default surface. ABHA creation is irreversible, so the confirm is explicit and un-prefilled, never automatic.",
+        "nurse": "Vitals are discrete values. Unedited speech recognition shows about 7.4% error, deletions and substitutions dominating. Form or device, never ambient scribe.",
+        "mo": "Read scope is the widest of any cadre; write is confined to documentation, prescription, orders and referral. No master access.",
+        "lab": "Manual entry uses per-analyte range validation. Out of range blocks the commit and requires an override with a reason.",
+        "lab_incharge": "Releasing a result is a separate capability from entering one, and the person who entered it does not hold it.",
+        "pharmacist": "Dispense stays blocked until a prescription is confirmed. The precondition lives in the operation catalogue, not the UI.",
+        "asha": "Narrative goes to scribe; assessment items go to a form. Scoring is computed by rule, never model generated.",
+        "anm": "Narrative goes to scribe; assessment items go to a form. Scoring is computed by rule, never model generated.",
+        "cho": "Prescribing here is bounded by an approved formulary and protocol set. That bound is declared and is not yet enforced."
+      },
       "actions": {
         "frontdesk": [
           {
             "id": "phc.op.abha-link",
             "tool": "propose_abha_link",
+            "short": "Link ABHA",
             "title": "Create or link an ABHA for this patient",
             "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
             "station": "reception",
@@ -340,6 +417,7 @@
           {
             "id": "phc.op.abha-link",
             "tool": "propose_abha_link",
+            "short": "Link ABHA",
             "title": "Create or link an ABHA for this patient",
             "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
             "station": "reception",
@@ -358,6 +436,7 @@
           {
             "id": "phc.op.consult-document",
             "tool": "propose_consult_document",
+            "short": "Scribe",
             "title": "Document a consultation",
             "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
             "station": "doctor",
@@ -378,6 +457,7 @@
           {
             "id": "phc.op.abha-link",
             "tool": "propose_abha_link",
+            "short": "Link ABHA",
             "title": "Create or link an ABHA for this patient",
             "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
             "station": "reception",
@@ -394,6 +474,7 @@
           {
             "id": "phc.op.household-visit",
             "tool": "propose_household_visit",
+            "short": "Scribe visit",
             "title": "Record a household visit",
             "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
             "station": "community",
@@ -411,6 +492,7 @@
           {
             "id": "phc.op.abha-link",
             "tool": "propose_abha_link",
+            "short": "Link ABHA",
             "title": "Create or link an ABHA for this patient",
             "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
             "station": "reception",
@@ -427,6 +509,7 @@
           {
             "id": "phc.op.household-visit",
             "tool": "propose_household_visit",
+            "short": "Scribe visit",
             "title": "Record a household visit",
             "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
             "station": "community",
@@ -444,6 +527,7 @@
           {
             "id": "phc.op.consult-document",
             "tool": "propose_consult_document",
+            "short": "Scribe",
             "title": "Document a consultation",
             "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
             "station": "doctor",
@@ -459,6 +543,7 @@
           {
             "id": "phc.op.abha-link",
             "tool": "propose_abha_link",
+            "short": "Link ABHA",
             "title": "Create or link an ABHA for this patient",
             "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
             "station": "reception",
@@ -475,6 +560,7 @@
           {
             "id": "phc.op.household-visit",
             "tool": "propose_household_visit",
+            "short": "Scribe visit",
             "title": "Record a household visit",
             "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
             "station": "community",
@@ -504,6 +590,57 @@
         "vitals.recorded"
       ],
       "station": "pharmacy",
+      "team": [
+        [
+          "SM",
+          "Suneetha M",
+          "Vitals"
+        ],
+        [
+          "AR",
+          "Dr Anitha R",
+          "Treating doctor"
+        ]
+      ],
+      "audit": [
+        [
+          "08:54",
+          "phc.op.patient-register",
+          "Lalitha G"
+        ],
+        [
+          "08:58",
+          "phc.op.abha-link",
+          "Lalitha G"
+        ],
+        [
+          "09:20",
+          "phc.op.vitals-record",
+          "Suneetha M"
+        ],
+        [
+          "09:41",
+          "phc.op.consult-document",
+          "Dr Anitha R"
+        ],
+        [
+          "09:46",
+          "phc.op.rx-prescribe",
+          "Dr Anitha R"
+        ]
+      ],
+      "agent": "Prescription confirmed. Pharmacy is unblocked.",
+      "nudges": {
+        "frontdesk": "Search is the default surface. ABHA creation is irreversible, so the confirm is explicit and un-prefilled, never automatic.",
+        "nurse": "Vitals are discrete values. Unedited speech recognition shows about 7.4% error, deletions and substitutions dominating. Form or device, never ambient scribe.",
+        "mo": "Read scope is the widest of any cadre; write is confined to documentation, prescription, orders and referral. No master access.",
+        "lab": "Manual entry uses per-analyte range validation. Out of range blocks the commit and requires an override with a reason.",
+        "lab_incharge": "Releasing a result is a separate capability from entering one, and the person who entered it does not hold it.",
+        "pharmacist": "Dispense stays blocked until a prescription is confirmed. The precondition lives in the operation catalogue, not the UI.",
+        "asha": "Narrative goes to scribe; assessment items go to a form. Scoring is computed by rule, never model generated.",
+        "anm": "Narrative goes to scribe; assessment items go to a form. Scoring is computed by rule, never model generated.",
+        "cho": "Prescribing here is bounded by an approved formulary and protocol set. That bound is declared and is not yet enforced."
+      },
       "actions": {
         "frontdesk": [],
         "nurse": [],
@@ -511,6 +648,7 @@
           {
             "id": "phc.op.consult-document",
             "tool": "propose_consult_document",
+            "short": "Scribe",
             "title": "Document a consultation",
             "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
             "station": "doctor",
@@ -526,6 +664,7 @@
           {
             "id": "phc.op.lab-order",
             "tool": "propose_lab_order",
+            "short": "Order",
             "title": "Order an investigation",
             "summary": "Ask the laboratory to run a test for this patient.",
             "station": "doctor",
@@ -545,6 +684,7 @@
           {
             "id": "phc.op.pharmacy-dispense",
             "tool": "propose_pharmacy_dispense",
+            "short": "Dispense",
             "title": "Dispense against a confirmed prescription",
             "summary": "Give the patient the medicines a doctor prescribed, record what they actually received, and take that quantity out of facility stock.\n",
             "station": "pharmacy",
@@ -563,6 +703,7 @@
           {
             "id": "phc.op.household-visit",
             "tool": "propose_household_visit",
+            "short": "Scribe visit",
             "title": "Record a household visit",
             "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
             "station": "community",
@@ -580,6 +721,7 @@
           {
             "id": "phc.op.household-visit",
             "tool": "propose_household_visit",
+            "short": "Scribe visit",
             "title": "Record a household visit",
             "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
             "station": "community",
@@ -597,6 +739,7 @@
           {
             "id": "phc.op.consult-document",
             "tool": "propose_consult_document",
+            "short": "Scribe",
             "title": "Document a consultation",
             "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
             "station": "doctor",
@@ -612,6 +755,7 @@
           {
             "id": "phc.op.lab-order",
             "tool": "propose_lab_order",
+            "short": "Order",
             "title": "Order an investigation",
             "summary": "Ask the laboratory to run a test for this patient.",
             "station": "doctor",
@@ -627,6 +771,7 @@
           {
             "id": "phc.op.household-visit",
             "tool": "propose_household_visit",
+            "short": "Scribe visit",
             "title": "Record a household visit",
             "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
             "station": "community",
@@ -656,6 +801,57 @@
         "vitals.recorded"
       ],
       "station": "lab",
+      "team": [
+        [
+          "SM",
+          "Suneetha M",
+          "Vitals"
+        ],
+        [
+          "AR",
+          "Dr Anitha R",
+          "Treating doctor"
+        ],
+        [
+          "KP",
+          "Kiran Kumar P",
+          "Lab"
+        ]
+      ],
+      "audit": [
+        [
+          "09:02",
+          "phc.op.patient-register",
+          "Lalitha G"
+        ],
+        [
+          "09:25",
+          "phc.op.vitals-record",
+          "Suneetha M"
+        ],
+        [
+          "09:50",
+          "phc.op.consult-document",
+          "Dr Anitha R"
+        ],
+        [
+          "09:52",
+          "phc.op.lab-order",
+          "Dr Anitha R"
+        ]
+      ],
+      "agent": "An investigation is on the lab worklist. Until a result exists, the lab station stays blocked for this patient.",
+      "nudges": {
+        "frontdesk": "Search is the default surface. ABHA creation is irreversible, so the confirm is explicit and un-prefilled, never automatic.",
+        "nurse": "Vitals are discrete values. Unedited speech recognition shows about 7.4% error, deletions and substitutions dominating. Form or device, never ambient scribe.",
+        "mo": "Read scope is the widest of any cadre; write is confined to documentation, prescription, orders and referral. No master access.",
+        "lab": "Manual entry uses per-analyte range validation. Out of range blocks the commit and requires an override with a reason.",
+        "lab_incharge": "Releasing a result is a separate capability from entering one, and the person who entered it does not hold it.",
+        "pharmacist": "Dispense stays blocked until a prescription is confirmed. The precondition lives in the operation catalogue, not the UI.",
+        "asha": "Narrative goes to scribe; assessment items go to a form. Scoring is computed by rule, never model generated.",
+        "anm": "Narrative goes to scribe; assessment items go to a form. Scoring is computed by rule, never model generated.",
+        "cho": "Prescribing here is bounded by an approved formulary and protocol set. That bound is declared and is not yet enforced."
+      },
       "actions": {
         "frontdesk": [],
         "nurse": [],
@@ -663,6 +859,7 @@
           {
             "id": "phc.op.consult-document",
             "tool": "propose_consult_document",
+            "short": "Scribe",
             "title": "Document a consultation",
             "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
             "station": "doctor",
@@ -678,6 +875,7 @@
           {
             "id": "phc.op.lab-order",
             "tool": "propose_lab_order",
+            "short": "Order",
             "title": "Order an investigation",
             "summary": "Ask the laboratory to run a test for this patient.",
             "station": "doctor",
@@ -693,6 +891,7 @@
           {
             "id": "phc.op.rx-prescribe",
             "tool": "propose_rx_prescribe",
+            "short": "Rx",
             "title": "Write a prescription",
             "summary": "Prescribe medicines for this patient, with what the pharmacy actually has in view.",
             "station": "doctor",
@@ -711,6 +910,7 @@
           {
             "id": "phc.op.lab-result-enter",
             "tool": "propose_lab_result_enter",
+            "short": "Result",
             "title": "Enter a laboratory result",
             "summary": "Record the value a bench test produced, against the investigation a doctor ordered for this patient.\n",
             "station": "lab",
@@ -729,6 +929,7 @@
           {
             "id": "phc.op.lab-result-enter",
             "tool": "propose_lab_result_enter",
+            "short": "Result",
             "title": "Enter a laboratory result",
             "summary": "Record the value a bench test produced, against the investigation a doctor ordered for this patient.\n",
             "station": "lab",
@@ -748,6 +949,7 @@
           {
             "id": "phc.op.household-visit",
             "tool": "propose_household_visit",
+            "short": "Scribe visit",
             "title": "Record a household visit",
             "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
             "station": "community",
@@ -765,6 +967,7 @@
           {
             "id": "phc.op.household-visit",
             "tool": "propose_household_visit",
+            "short": "Scribe visit",
             "title": "Record a household visit",
             "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
             "station": "community",
@@ -782,6 +985,7 @@
           {
             "id": "phc.op.consult-document",
             "tool": "propose_consult_document",
+            "short": "Scribe",
             "title": "Document a consultation",
             "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
             "station": "doctor",
@@ -797,6 +1001,7 @@
           {
             "id": "phc.op.lab-order",
             "tool": "propose_lab_order",
+            "short": "Order",
             "title": "Order an investigation",
             "summary": "Ask the laboratory to run a test for this patient.",
             "station": "doctor",
@@ -812,6 +1017,7 @@
           {
             "id": "phc.op.rx-prescribe",
             "tool": "propose_rx_prescribe",
+            "short": "Rx",
             "title": "Write a prescription",
             "summary": "Prescribe medicines for this patient, with what the pharmacy actually has in view.",
             "station": "doctor",
@@ -828,6 +1034,7 @@
           {
             "id": "phc.op.household-visit",
             "tool": "propose_household_visit",
+            "short": "Scribe visit",
             "title": "Record a household visit",
             "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
             "station": "community",
@@ -858,6 +1065,20 @@
         "vitals.recorded"
       ],
       "station": null,
+      "team": [],
+      "audit": [],
+      "agent": "Nothing outstanding. The thread stays open as this patient's record.",
+      "nudges": {
+        "frontdesk": "Search is the default surface. ABHA creation is irreversible, so the confirm is explicit and un-prefilled, never automatic.",
+        "nurse": "Vitals are discrete values. Unedited speech recognition shows about 7.4% error, deletions and substitutions dominating. Form or device, never ambient scribe.",
+        "mo": "Read scope is the widest of any cadre; write is confined to documentation, prescription, orders and referral. No master access.",
+        "lab": "Manual entry uses per-analyte range validation. Out of range blocks the commit and requires an override with a reason.",
+        "lab_incharge": "Releasing a result is a separate capability from entering one, and the person who entered it does not hold it.",
+        "pharmacist": "Dispense stays blocked until a prescription is confirmed. The precondition lives in the operation catalogue, not the UI.",
+        "asha": "Narrative goes to scribe; assessment items go to a form. Scoring is computed by rule, never model generated.",
+        "anm": "Narrative goes to scribe; assessment items go to a form. Scoring is computed by rule, never model generated.",
+        "cho": "Prescribing here is bounded by an approved formulary and protocol set. That bound is declared and is not yet enforced."
+      },
       "actions": {
         "frontdesk": [],
         "nurse": [],
@@ -865,6 +1086,7 @@
           {
             "id": "phc.op.consult-document",
             "tool": "propose_consult_document",
+            "short": "Scribe",
             "title": "Document a consultation",
             "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
             "station": "doctor",
@@ -880,6 +1102,7 @@
           {
             "id": "phc.op.lab-order",
             "tool": "propose_lab_order",
+            "short": "Order",
             "title": "Order an investigation",
             "summary": "Ask the laboratory to run a test for this patient.",
             "station": "doctor",
@@ -900,6 +1123,7 @@
           {
             "id": "phc.op.household-visit",
             "tool": "propose_household_visit",
+            "short": "Scribe visit",
             "title": "Record a household visit",
             "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
             "station": "community",
@@ -917,6 +1141,7 @@
           {
             "id": "phc.op.household-visit",
             "tool": "propose_household_visit",
+            "short": "Scribe visit",
             "title": "Record a household visit",
             "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
             "station": "community",
@@ -934,6 +1159,7 @@
           {
             "id": "phc.op.consult-document",
             "tool": "propose_consult_document",
+            "short": "Scribe",
             "title": "Document a consultation",
             "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
             "station": "doctor",
@@ -949,6 +1175,7 @@
           {
             "id": "phc.op.lab-order",
             "tool": "propose_lab_order",
+            "short": "Order",
             "title": "Order an investigation",
             "summary": "Ask the laboratory to run a test for this patient.",
             "station": "doctor",
@@ -964,6 +1191,7 @@
           {
             "id": "phc.op.household-visit",
             "tool": "propose_household_visit",
+            "short": "Scribe visit",
             "title": "Record a household visit",
             "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
             "station": "community",

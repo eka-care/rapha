@@ -2,6 +2,7 @@
 id: phc.op.rx-prescribe
 type: operation
 kind: write
+short: Rx
 title: Write a prescription
 summary: Prescribe medicines for this patient, with what the pharmacy actually has in view.
 capability: rx.prescribe

@@ -2,6 +2,7 @@
 id: phc.op.household-visit
 type: operation
 kind: write
+short: Scribe visit
 title: Record a household visit
 summary: >
   A frontline worker records what happened at a visit to someone's home, and

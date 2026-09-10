@@ -2,6 +2,7 @@
 id: phc.op.consult-document
 type: operation
 kind: write
+short: Scribe
 title: Document a consultation
 summary: >
   Write down what the patient said, what was found, and what the doctor

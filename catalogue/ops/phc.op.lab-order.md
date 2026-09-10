@@ -2,6 +2,7 @@
 id: phc.op.lab-order
 type: operation
 kind: write
+short: Order
 title: Order an investigation
 summary: Ask the laboratory to run a test for this patient.
 capability: lab.order

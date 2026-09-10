@@ -132,6 +132,7 @@
         "not abha.linked"
       ],
       "scope_qualifier": null,
+      "short": "Link ABHA",
       "station": "reception",
       "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
       "surfaces": [
@@ -198,6 +199,7 @@
         "registered"
       ],
       "scope_qualifier": null,
+      "short": "Scribe",
       "station": "doctor",
       "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
       "surfaces": [
@@ -265,6 +267,7 @@
         "registered"
       ],
       "scope_qualifier": null,
+      "short": "Scribe visit",
       "station": "community",
       "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
       "surfaces": [
@@ -304,6 +307,7 @@
         "consult.documented"
       ],
       "scope_qualifier": null,
+      "short": "Order",
       "station": "doctor",
       "summary": "Ask the laboratory to run a test for this patient.",
       "surfaces": [
@@ -365,6 +369,7 @@
         "not lab.resulted"
       ],
       "scope_qualifier": null,
+      "short": "Result",
       "station": "lab",
       "summary": "Record the value a bench test produced, against the investigation a doctor ordered for this patient.\n",
       "surfaces": [
@@ -449,6 +454,7 @@
         "not registered"
       ],
       "scope_qualifier": null,
+      "short": "Register",
       "station": "reception",
       "summary": "Create a record for someone the facility has not seen before, after searching and finding nobody who matches.\n",
       "surfaces": [
@@ -503,6 +509,7 @@
         "not dispensed.complete"
       ],
       "scope_qualifier": null,
+      "short": "Dispense",
       "station": "pharmacy",
       "summary": "Give the patient the medicines a doctor prescribed, record what they actually received, and take that quantity out of facility stock.\n",
       "surfaces": [
@@ -543,6 +550,7 @@
         "not rx.confirmed"
       ],
       "scope_qualifier": null,
+      "short": "Rx",
       "station": "doctor",
       "summary": "Prescribe medicines for this patient, with what the pharmacy actually has in view.",
       "surfaces": [
@@ -618,6 +626,7 @@
         "not vitals.recorded"
       ],
       "scope_qualifier": null,
+      "short": "Vitals",
       "station": "nurse",
       "summary": "Measure and record blood pressure, oxygen saturation, weight and the other basic readings, and flag anything abnormal for the doctor.\n",
       "surfaces": [

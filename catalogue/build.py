@@ -22,7 +22,7 @@ OUT = pathlib.Path(__file__).parent / "catalogue.json"
 # one writer. scripts/check.sh gates both against drift.
 OUT_GO = pathlib.Path(__file__).parents[1] / "care_phc_mcp" / "catalogue.json"
 
-REQUIRED = ("id", "type", "kind", "title", "summary", "capability", "station",
+REQUIRED = ("id", "type", "kind", "short", "title", "summary", "capability", "station",
             "instrument", "preconditions", "irreversibility", "input", "writes",
             "emits", "surfaces", "verified")
 
@@ -55,6 +55,8 @@ def lint(atoms):
         if bad and fm.get("id") is None:
             continue
 
+        if len(str(fm.get("short", ""))) > 14:
+            fail(f"short label {fm['short']!r} is too long for an action bar")
         if fm["id"] != path.stem:
             fail(f"id '{fm['id']}' does not match filename")
         if fm["capability"] not in vocab.CAPABILITIES:

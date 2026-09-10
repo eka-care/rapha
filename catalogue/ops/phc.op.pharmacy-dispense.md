@@ -2,6 +2,7 @@
 id: phc.op.pharmacy-dispense
 type: operation
 kind: write
+short: Dispense
 title: Dispense against a confirmed prescription
 summary: >
   Give the patient the medicines a doctor prescribed, record what they actually

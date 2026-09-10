@@ -27,6 +27,7 @@ type Field struct {
 type Operation struct {
 	ID              string   `json:"id"`
 	Kind            string   `json:"kind"`
+	Short           string   `json:"short"`
 	Title           string   `json:"title"`
 	Summary         string   `json:"summary"`
 	Capability      string   `json:"capability"`

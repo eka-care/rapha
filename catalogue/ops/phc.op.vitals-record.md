@@ -2,6 +2,7 @@
 id: phc.op.vitals-record
 type: operation
 kind: write
+short: Vitals
 title: Record vitals and triage
 summary: >
   Measure and record blood pressure, oxygen saturation, weight and the other

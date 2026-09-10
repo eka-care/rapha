@@ -2,6 +2,7 @@
 id: phc.op.abha-link
 type: operation
 kind: write
+short: Link ABHA
 title: Create or link an ABHA for this patient
 summary: >
   Connect this patient's record to their national health account so their

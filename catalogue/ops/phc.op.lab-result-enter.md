@@ -2,6 +2,7 @@
 id: phc.op.lab-result-enter
 type: operation
 kind: write
+short: Result
 title: Enter a laboratory result
 summary: >
   Record the value a bench test produced, against the investigation a doctor

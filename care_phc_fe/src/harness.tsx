@@ -15,10 +15,15 @@ import "./theme.css";
 
 type Fx = {
   bundles: Record<string, string[]>;
+  capabilities: string[];
   patients: (Patient & {
     flags: string[];
     station: string | null;
     actions: Record<string, Action[]>;
+    team: [string, string, string][];
+    audit: [string, string, string][];
+    agent: string;
+    nudges: Record<string, string>;
   })[];
 };
 
@@ -46,12 +51,18 @@ function App() {
       flags: p.flags,
       station: p.station,
       actions: p.actions[bundle] ?? [],
+      team: p.team ?? [],
+      audit: p.audit ?? [],
+      agent: p.agent,
+      nudge: p.nudges[bundle] ?? "",
+      capabilities: fx.capabilities,
+      held: fx.bundles[bundle] ?? [],
     }),
     [p, bundle],
   );
 
   return (
-    <div className="phc" style={{ maxWidth: 760, margin: "0 auto", padding: 24 }}>
+    <div className="phc" style={{ maxWidth: 1080, margin: "0 auto", padding: 24 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
         <h1 style={{ font: "600 17px Inter, system-ui", margin: 0, letterSpacing: "-.01em" }}>
           PHC Yadiki

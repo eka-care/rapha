@@ -2,6 +2,7 @@
 id: phc.op.patient-register
 type: operation
 kind: write
+short: Register
 title: Register a new patient
 summary: >
   Create a record for someone the facility has not seen before, after
