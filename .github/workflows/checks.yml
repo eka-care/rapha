@@ -18,8 +18,10 @@ jobs:
         with:
           go-version: '1.24'
       - run: pip install pyyaml
-      - name: catalogue, guard, validator and thread state
+      - name: catalogue, guard, validator, thread state, MCP server
         run: ./scripts/check.sh
+      - name: the committed catalogue is the compiled form of the atoms
+        run: git diff --exit-code catalogue/catalogue.json care_phc_mcp/catalogue.json
   plugin-validate:
     runs-on: ubuntu-latest
     steps:
