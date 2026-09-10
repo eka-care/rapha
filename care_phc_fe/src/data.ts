@@ -3,6 +3,7 @@ import type { Action, Patient, Thread } from "./types";
 /** A patient row as the queue and directory need it. */
 export type PatientRow = Patient & {
   init: string; phone: string; cat: string; token: number | null;
+  patientId?: string; facilityId?: string;
   dx: string; last: string; today: boolean; abha: string | null;
   flags: string[]; station: string | null;
   team: [string, string, string][];

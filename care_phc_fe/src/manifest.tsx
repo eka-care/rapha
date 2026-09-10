@@ -1,23 +1,27 @@
 import { lazy } from "react";
 
-const Workspace = lazy(() => import("./WorkspaceRoute"));
 const ThreadTab = lazy(() => import("./ThreadTab"));
+const QueueRoute = lazy(() => import("./QueueRoute"));
 
 /** care_fe reads this after loading remoteEntry.js.
  *
- *  We take full-page routes rather than only an encounter tab, because the
- *  prototype is a workspace and a workspace needs its own sidebar, palette and
- *  queue. The encounter tab stays: someone already inside CARE's own encounter
- *  page should see the thread there rather than being sent elsewhere. */
+ *  We add to CARE's pages rather than replacing them. CARE already ships the
+ *  patient directory (PatientIndex, search first with create only on a miss),
+ *  the encounters overview and a command palette, so we ship none of those.
+ *
+ *  What is left is the part CARE has no concept of: a patient's position in
+ *  the outpatient line. That is the encounter tab, and a queue grouped by
+ *  station rather than by encounter class.
+ *
+ *  The route draws no chrome. care_fe merges plugin routes into its own and
+ *  renders them inside its sidebar, so a route here is an ordinary CARE page. */
 const manifest = {
   plugin: "care-phc-fe",
-  routes: {
-    "/phc": () => <Workspace />,
-  },
-  navItems: [
-    { name: "PHC workspace", url: "/phc" },
-  ],
   encounterTabs: { phc: ThreadTab },
+  routes: {
+    "/phc/queue": () => <QueueRoute />,
+  },
+  navItems: [{ name: "Station queue", url: "/phc/queue" }],
 } as const;
 
 export default manifest;
