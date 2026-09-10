@@ -1,0 +1,53 @@
+{
+  "version": "1.0",
+  "slug": "phc-lab-result-v1",
+  "title": "Enter lab result",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.lab-result-enter",
+      "override_requires_reason": true
+    }
+  },
+  "questions": [
+    {
+      "link_id": "analyte",
+      "text": "Analyte",
+      "type": "string",
+      "required": true
+    },
+    {
+      "link_id": "value",
+      "text": "Value",
+      "type": "decimal",
+      "required": true,
+      "is_observation": true,
+      "styling_metadata": {
+        "phc": {
+          "range_from": "analyte",
+          "flags": "lab.critical"
+        }
+      }
+    },
+    {
+      "link_id": "unit",
+      "text": "Unit",
+      "type": "string",
+      "required": true
+    },
+    {
+      "link_id": "override_reason",
+      "text": "Reason for accepting an out of range value",
+      "type": "text",
+      "required": false,
+      "enable_when": [
+        {
+          "question": "value",
+          "operator": "exists",
+          "answer": true
+        }
+      ]
+    }
+  ]
+}

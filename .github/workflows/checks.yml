@@ -20,7 +20,7 @@ jobs:
       - name: compiled catalogue is committed and current
         run: git diff --exit-code catalogue/catalogue.json
       - name: guard safety checks
-        run: python3 -m catalogue.tests.test_guard
+        run: python3 -m catalogue.tests
   plugin-validate:
     runs-on: ubuntu-latest
     steps:

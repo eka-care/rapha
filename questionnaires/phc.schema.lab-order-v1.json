@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "slug": "phc-lab-order-v1",
+  "title": "Order investigation",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.lab-order"
+    }
+  },
+  "questions": [
+    {
+      "link_id": "investigations",
+      "text": "Investigations",
+      "type": "structured",
+      "structured_type": "service_request",
+      "required": true,
+      "repeats": true
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "slug": "phc-rx-v1",
+  "title": "Prescription",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.rx-prescribe",
+      "show_stock": true
+    }
+  },
+  "questions": [
+    {
+      "link_id": "medications",
+      "text": "Medications",
+      "type": "structured",
+      "structured_type": "medication_request",
+      "required": true,
+      "repeats": true
+    }
+  ]
+}

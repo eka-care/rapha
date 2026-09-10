@@ -1,0 +1,83 @@
+{
+  "version": "1.0",
+  "slug": "phc-register-v1",
+  "title": "Register patient",
+  "status": "active",
+  "subject_type": "patient",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.patient-register"
+    }
+  },
+  "questions": [
+    {
+      "link_id": "name",
+      "text": "Full name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "link_id": "age",
+      "text": "Age",
+      "type": "integer",
+      "required": true,
+      "styling_metadata": {
+        "phc": {
+          "range": {
+            "low": 0,
+            "high": 120
+          }
+        }
+      }
+    },
+    {
+      "link_id": "sex",
+      "text": "Sex",
+      "type": "choice",
+      "required": true,
+      "answer_option": [
+        {
+          "value": "female"
+        },
+        {
+          "value": "male"
+        },
+        {
+          "value": "other"
+        }
+      ]
+    },
+    {
+      "link_id": "phone",
+      "text": "Mobile",
+      "type": "string",
+      "required": true
+    },
+    {
+      "link_id": "village",
+      "text": "Village",
+      "type": "string",
+      "required": true
+    },
+    {
+      "link_id": "category",
+      "text": "Patient category",
+      "type": "choice",
+      "required": false,
+      "answer_option": [
+        {
+          "value": "general"
+        },
+        {
+          "value": "anc"
+        },
+        {
+          "value": "ncd"
+        },
+        {
+          "value": "tb"
+        }
+      ]
+    }
+  ]
+}

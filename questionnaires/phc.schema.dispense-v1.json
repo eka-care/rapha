@@ -1,0 +1,35 @@
+{
+  "version": "1.0",
+  "slug": "phc-dispense-v1",
+  "title": "Dispense",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.pharmacy-dispense",
+      "partial_allowed": true
+    }
+  },
+  "questions": [
+    {
+      "link_id": "dispenses",
+      "text": "Medicines handed over",
+      "type": "structured",
+      "structured_type": "medication_dispense",
+      "required": true,
+      "repeats": true
+    },
+    {
+      "link_id": "batch",
+      "text": "Batch",
+      "type": "string",
+      "required": false
+    },
+    {
+      "link_id": "partial",
+      "text": "Partial dispense",
+      "type": "boolean",
+      "required": false
+    }
+  ]
+}

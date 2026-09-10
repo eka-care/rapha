@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "slug": "phc-consult-v1",
+  "title": "Consultation",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.consult-document",
+      "scribe": true
+    }
+  },
+  "questions": [
+    {
+      "link_id": "history",
+      "text": "History",
+      "type": "text",
+      "required": false
+    },
+    {
+      "link_id": "examination",
+      "text": "Examination",
+      "type": "text",
+      "required": false
+    },
+    {
+      "link_id": "assessment",
+      "text": "Assessment",
+      "type": "text",
+      "required": true
+    },
+    {
+      "link_id": "diagnosis",
+      "text": "Diagnosis",
+      "type": "structured",
+      "structured_type": "condition",
+      "required": false
+    },
+    {
+      "link_id": "plan",
+      "text": "Plan",
+      "type": "text",
+      "required": false
+    }
+  ]
+}

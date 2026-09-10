@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "slug": "phc-abha-link-v1",
+  "title": "Create or link ABHA",
+  "status": "active",
+  "subject_type": "patient",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.abha-link",
+      "irreversible": true
+    }
+  },
+  "questions": [
+    {
+      "link_id": "method",
+      "text": "Journey",
+      "type": "choice",
+      "required": true,
+      "answer_option": [
+        {
+          "value": "link_existing"
+        },
+        {
+          "value": "create_new"
+        }
+      ]
+    },
+    {
+      "link_id": "abha_number",
+      "text": "ABHA number",
+      "type": "string",
+      "required": false
+    },
+    {
+      "link_id": "consent_given",
+      "text": "Patient consents to ABHA creation or linking",
+      "type": "boolean",
+      "required": true
+    }
+  ]
+}

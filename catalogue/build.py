@@ -13,7 +13,7 @@ import sys
 
 import yaml
 
-from catalogue import vocab
+from catalogue import validate, vocab
 
 OPS = pathlib.Path(__file__).parent / "ops"
 OUT = pathlib.Path(__file__).parent / "catalogue.json"
@@ -86,6 +86,24 @@ def lint(atoms):
         for ref in (fm.get("related") or {}).get("operations") or []:
             if ref not in ids:
                 fail(f"related operation '{ref}' does not exist")
+
+        # The atom names a questionnaire; it must exist, be structurally sound,
+        # and point back at this atom. A one-way reference drifts silently.
+        try:
+            schema = validate.load(fm["input"])
+        except FileNotFoundError as e:
+            fail(str(e))
+        else:
+            for q in validate._walk(schema["questions"]):
+                if q["type"] not in validate.TYPES:
+                    fail(f"question '{q['link_id']}' has non-CARE type '{q['type']}'")
+                if q["type"] == "choice" and not (q.get("answer_option") or q.get("answer_value_set")):
+                    fail(f"choice question '{q['link_id']}' has no options")
+                if q["type"] == "group" and not q.get("questions"):
+                    fail(f"group question '{q['link_id']}' has no sub-questions")
+            back = validate._phc(schema).get("operation")
+            if back != fm["id"]:
+                fail(f"questionnaire '{fm['input']}' points at '{back}', not this atom")
 
         if "—" in body or "—" in str(fm.get("summary", "")):
             fail("em dash: the writing guide forbids it")

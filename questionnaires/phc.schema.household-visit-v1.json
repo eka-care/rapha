@@ -1,0 +1,57 @@
+{
+  "version": "1.0",
+  "slug": "phc-household-visit-v1",
+  "title": "Household visit",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.household-visit",
+      "scribe": true,
+      "consent_at_door": true
+    }
+  },
+  "questions": [
+    {
+      "link_id": "visit_type",
+      "text": "Visit type",
+      "type": "choice",
+      "required": true,
+      "answer_option": [
+        {
+          "value": "routine"
+        },
+        {
+          "value": "anc"
+        },
+        {
+          "value": "immunisation"
+        },
+        {
+          "value": "tb_followup"
+        },
+        {
+          "value": "ncd_followup"
+        }
+      ]
+    },
+    {
+      "link_id": "consent_at_door",
+      "text": "Household consents to this visit being recorded",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "link_id": "narrative",
+      "text": "What happened",
+      "type": "text",
+      "required": false
+    },
+    {
+      "link_id": "followup_needed",
+      "text": "Follow up needed",
+      "type": "boolean",
+      "required": false
+    }
+  ]
+}

@@ -1,0 +1,135 @@
+{
+  "version": "1.0",
+  "slug": "phc-vitals-v1",
+  "title": "Vitals and triage",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.vitals-record"
+    }
+  },
+  "questions": [
+    {
+      "link_id": "systolic",
+      "text": "Systolic BP",
+      "type": "integer",
+      "required": true,
+      "is_observation": true,
+      "styling_metadata": {
+        "phc": {
+          "unit": "mm[Hg]",
+          "range": {
+            "low": 70,
+            "high": 250
+          },
+          "critical": {
+            "low": 80,
+            "high": 180
+          },
+          "flags": "vitals.flagged"
+        }
+      }
+    },
+    {
+      "link_id": "diastolic",
+      "text": "Diastolic BP",
+      "type": "integer",
+      "required": true,
+      "is_observation": true,
+      "styling_metadata": {
+        "phc": {
+          "unit": "mm[Hg]",
+          "range": {
+            "low": 40,
+            "high": 150
+          },
+          "critical": {
+            "low": 50,
+            "high": 110
+          },
+          "flags": "vitals.flagged"
+        }
+      }
+    },
+    {
+      "link_id": "pulse",
+      "text": "Pulse",
+      "type": "integer",
+      "required": true,
+      "is_observation": true,
+      "styling_metadata": {
+        "phc": {
+          "unit": "/min",
+          "range": {
+            "low": 30,
+            "high": 200
+          },
+          "critical": {
+            "low": 50,
+            "high": 120
+          },
+          "flags": "vitals.flagged"
+        }
+      }
+    },
+    {
+      "link_id": "spo2",
+      "text": "SpO2",
+      "type": "integer",
+      "required": false,
+      "is_observation": true,
+      "styling_metadata": {
+        "phc": {
+          "unit": "%",
+          "range": {
+            "low": 50,
+            "high": 100
+          },
+          "critical": {
+            "low": 94,
+            "high": 100
+          },
+          "flags": "vitals.flagged"
+        }
+      }
+    },
+    {
+      "link_id": "weight",
+      "text": "Weight",
+      "type": "decimal",
+      "required": false,
+      "is_observation": true,
+      "styling_metadata": {
+        "phc": {
+          "unit": "kg",
+          "range": {
+            "low": 1,
+            "high": 250
+          }
+        }
+      }
+    },
+    {
+      "link_id": "temperature",
+      "text": "Temperature",
+      "type": "decimal",
+      "required": false,
+      "is_observation": true,
+      "styling_metadata": {
+        "phc": {
+          "unit": "Cel",
+          "range": {
+            "low": 30,
+            "high": 45
+          },
+          "critical": {
+            "low": 35,
+            "high": 38.5
+          },
+          "flags": "vitals.flagged"
+        }
+      }
+    }
+  ]
+}
