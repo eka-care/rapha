@@ -22,6 +22,11 @@ surfaces: [rendered, mcp]
 verified:
   status: unverified
   against: care-local
+  # Auth to Eka ABDM Connect IS verified against api.eka.care on 2026-09-10:
+  # login returns access_token, expires_in, refresh_token, and one token serves
+  # many calls. The operation itself is not verified, because the enrolment
+  # journey needs a live OTP and the gateway hop to NHA was failing. See
+  # "When it goes wrong".
 related:
   operations: [phc.op.patient-register]
   concepts: []
@@ -64,6 +69,36 @@ link action. The unlinked worklist no longer lists this patient.
   surface for this or any other write.
 - **The patient may already have one.** Search before creating. Most footfall
   at an outpatient department is repeat patients, and defaulting to create is
-  how duplicate records get manufactured.
+  how duplicate records get manufactured. ABDM enforces this itself: on OTP
+  verify, a `skip_state` of `abha_create` alongside a non empty `abha_profiles`
+  means an account already exists, and the correct next call is auto login
+  rather than create.
 - **The one time password fails at the counter.** Skip it. Flag ABHA pending
   and move the queue. Do not retry while twenty people wait.
+
+### Observed responses
+
+Recorded against `https://api.eka.care` on 2026-09-10. The address rules were
+not in the documentation and were learned from the gateway.
+
+```
+POST /abdm/na/v1/registration/phr/check   {"abha_address": "..."}
+
+"zzz-not-a-real-abha-97531"
+  400 {"error":"Only alphabets, numbers and dot(.) are allowed in ABHA address"}
+"ramesh"
+  400 {"error":"ABHA address should have atleast 8 characters."}
+"zznotarealabha97531"
+  400 {"error":"ABHA address should not be more than 18 characters."}
+"abhatest", "testuser99", "zznotareal1234"
+  500 {"error":"couldn't connect with ABDM servers"}
+```
+
+So an ABHA address is 8 to 18 characters, letters, digits and dots only.
+
+Every address that passed those rules returned the same 500, reproducibly, on
+repeated attempts. Eka's own validation layer is reached and answers correctly;
+the hop onward to NHA is what fails. Two causes fit and this side cannot
+separate them: NHA's gateway being unreachable, or this client not being
+onboarded to the ABDM bridge. A missing scope would more likely return 403 than
+a 500 carrying Eka's own wrapper text, which points at the first.
