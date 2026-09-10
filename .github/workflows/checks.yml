@@ -15,12 +15,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pip install pyyaml
-      - name: atoms lint and compile
-        run: python3 -m catalogue.build
-      - name: compiled catalogue is committed and current
-        run: git diff --exit-code catalogue/catalogue.json
-      - name: guard safety checks
-        run: python3 -m catalogue.tests
+      - name: catalogue, guard, validator and thread state
+        run: ./scripts/check.sh
   plugin-validate:
     runs-on: ubuntu-latest
     steps:
