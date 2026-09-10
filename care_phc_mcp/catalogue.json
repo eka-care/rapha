@@ -89,6 +89,178 @@
     "visit.household",
     "vitals.record"
   ],
+  "instruments": {
+    "phc.inst.consult-scribe": {
+      "commit": "tap",
+      "fallback": "form",
+      "fields": [],
+      "grammar": null,
+      "id": "phc.inst.consult-scribe",
+      "kind": "scribe",
+      "operations": [
+        "phc.op.consult-document",
+        "phc.op.rx-prescribe"
+      ],
+      "readback": "required",
+      "summary": "With the patient's capture consent, the consultation is transcribed and a draft note, diagnosis list and prescription are offered for the doctor to edit and confirm.",
+      "title": "Ambient scribe for the consultation",
+      "type": "instrument",
+      "types": []
+    },
+    "phc.inst.vitals-device": {
+      "commit": "tap",
+      "fallback": "keypad",
+      "fields": [
+        "systolic",
+        "diastolic",
+        "pulse",
+        "spo2"
+      ],
+      "grammar": null,
+      "id": "phc.inst.vitals-device",
+      "kind": "device",
+      "operations": [
+        "phc.op.vitals-record"
+      ],
+      "readback": "required",
+      "summary": "A paired BP cuff or pulse oximeter fills the field. The nurse still commits.",
+      "title": "Read from a connected monitor",
+      "type": "instrument",
+      "types": []
+    },
+    "phc.inst.vitals-voice": {
+      "commit": "tap",
+      "fallback": "keypad",
+      "fields": [
+        "systolic",
+        "diastolic",
+        "pulse",
+        "spo2",
+        "weight",
+        "temperature"
+      ],
+      "grammar": "number",
+      "id": "phc.inst.vitals-voice",
+      "kind": "constrained-voice",
+      "operations": [
+        "phc.op.vitals-record"
+      ],
+      "readback": "required",
+      "summary": "Say one number for one field. It is parsed against a number grammar, shown back on screen, and committed only by a tap. It falls back to the keypad.",
+      "title": "Speak a reading",
+      "type": "instrument",
+      "types": [
+        "integer",
+        "decimal"
+      ]
+    }
+  },
+  "manifest": {
+    "id": "phc",
+    "instruments": [
+      "phc.inst.vitals-voice",
+      "phc.inst.vitals-device",
+      "phc.inst.consult-scribe"
+    ],
+    "metrics": [
+      "phc.metric.visits",
+      "phc.metric.abha-coverage",
+      "phc.metric.vitals-flagged-rate"
+    ],
+    "operations": [
+      "phc.op.patient-register",
+      "phc.op.abha-link",
+      "phc.op.vitals-record",
+      "phc.op.consult-document",
+      "phc.op.rx-prescribe",
+      "phc.op.lab-order",
+      "phc.op.lab-result-enter",
+      "phc.op.pharmacy-dispense",
+      "phc.op.household-visit"
+    ],
+    "title": "Primary health centre",
+    "version": "2026.09.10",
+    "views": [
+      "phc.view.station-queue",
+      "phc.view.patient-summary",
+      "phc.view.facility-dashboard"
+    ],
+    "workflows": [
+      "phc.wf.outpatient"
+    ]
+  },
+  "metrics": {
+    "phc.metric.abha-coverage": {
+      "certified_by": "bundle author, unverified against any reference count",
+      "denominator": {
+        "resource": "patient",
+        "where": {
+          "created_date": {
+            "gte": "window.start"
+          }
+        }
+      },
+      "id": "phc.metric.abha-coverage",
+      "numerator": {
+        "resource": "patient",
+        "where": {
+          "abha_number": "*",
+          "created_date": {
+            "gte": "window.start"
+          }
+        }
+      },
+      "summary": "Share of patients seen in the window who have an ABHA linked.",
+      "title": "ABHA coverage",
+      "type": "metric",
+      "unit": "percent",
+      "window": "week"
+    },
+    "phc.metric.visits": {
+      "certified_by": "bundle author, unverified against any reference count",
+      "denominator": null,
+      "id": "phc.metric.visits",
+      "numerator": {
+        "resource": "encounter",
+        "where": {
+          "created_date": {
+            "gte": "window.start"
+          }
+        }
+      },
+      "summary": "Encounters opened in the window.",
+      "title": "Visits",
+      "type": "metric",
+      "unit": "count",
+      "window": "day"
+    },
+    "phc.metric.vitals-flagged-rate": {
+      "certified_by": "bundle author, unverified against any reference count",
+      "denominator": {
+        "resource": "encounter",
+        "where": {
+          "created_date": {
+            "gte": "window.start"
+          }
+        }
+      },
+      "id": "phc.metric.vitals-flagged-rate",
+      "numerator": {
+        "resource": "thread_flag",
+        "where": {
+          "created_date": {
+            "gte": "window.start"
+          },
+          "flag": "vitals.flagged"
+        }
+      },
+      "summary": "Share of visits in the window where a vital crossed a critical threshold.",
+      "title": "Flagged vitals rate",
+      "type": "metric",
+      "unit": "percent",
+      "window": "week"
+    }
+  },
   "operations": {
     "phc.op.abha-link": {
       "capability": "abha.link",
@@ -658,5 +830,325 @@
     "rx.confirmed",
     "vitals.flagged",
     "vitals.recorded"
-  ]
+  ],
+  "views": {
+    "phc.view.facility-dashboard": {
+      "badges": {},
+      "capability": "reporting.view",
+      "columns": [],
+      "group_by": null,
+      "id": "phc.view.facility-dashboard",
+      "kind": "dashboard",
+      "metrics": [
+        "phc.metric.visits",
+        "phc.metric.abha-coverage",
+        "phc.metric.vitals-flagged-rate"
+      ],
+      "scope": "today",
+      "sections": [],
+      "summary": "Visits, ABHA coverage and flagged vitals for this facility, this week.",
+      "title": "Facility today",
+      "type": "view",
+      "window": "week",
+      "workflow": null
+    },
+    "phc.view.patient-summary": {
+      "badges": {},
+      "capability": "patient.find",
+      "columns": [],
+      "group_by": null,
+      "id": "phc.view.patient-summary",
+      "kind": "summary",
+      "metrics": [],
+      "scope": "today",
+      "sections": [
+        {
+          "fields": [],
+          "resource": null,
+          "show": "line",
+          "title": "Visit",
+          "where": {}
+        },
+        {
+          "fields": [],
+          "resource": null,
+          "show": "flags",
+          "title": "Flags",
+          "where": {}
+        },
+        {
+          "fields": [
+            "code",
+            "value",
+            "unit",
+            "created_date"
+          ],
+          "resource": "observation",
+          "show": null,
+          "title": "Vitals",
+          "where": {
+            "category": "vital-signs"
+          }
+        },
+        {
+          "fields": [
+            "text",
+            "created_by",
+            "created_date"
+          ],
+          "resource": "notes",
+          "show": null,
+          "title": "Notes",
+          "where": {}
+        },
+        {
+          "fields": [
+            "medication",
+            "dosage_instruction",
+            "status"
+          ],
+          "resource": "medication_request",
+          "show": null,
+          "title": "Prescription",
+          "where": {
+            "status": "active"
+          }
+        },
+        {
+          "fields": [
+            "code",
+            "status",
+            "created_date"
+          ],
+          "resource": "service_request",
+          "show": null,
+          "title": "Investigations",
+          "where": {}
+        },
+        {
+          "fields": [
+            "code",
+            "conclusion",
+            "status"
+          ],
+          "resource": "diagnostic_report",
+          "show": null,
+          "title": "Results",
+          "where": {}
+        },
+        {
+          "fields": [],
+          "resource": null,
+          "show": "proposals",
+          "title": "Awaiting confirmation",
+          "where": {}
+        },
+        {
+          "fields": [],
+          "resource": null,
+          "show": "actions",
+          "title": "What you can do",
+          "where": {}
+        },
+        {
+          "fields": [],
+          "resource": null,
+          "show": "audit",
+          "title": "Audit trail",
+          "where": {}
+        }
+      ],
+      "summary": "One patient's visit on one page, with what can be done next.",
+      "title": "Visit summary",
+      "type": "view",
+      "window": "day",
+      "workflow": "phc.wf.outpatient"
+    },
+    "phc.view.station-queue": {
+      "badges": {
+        "abha.pending": "warn",
+        "dispensed.partial": "mute",
+        "lab.critical": "crit",
+        "vitals.flagged": "crit"
+      },
+      "capability": "patient.find",
+      "columns": [
+        "name",
+        "age",
+        "sex",
+        "village",
+        "token"
+      ],
+      "group_by": "station",
+      "id": "phc.view.station-queue",
+      "kind": "queue",
+      "metrics": [],
+      "scope": "today",
+      "sections": [],
+      "summary": "Everyone seen today, grouped by where they are standing now.",
+      "title": "Today's patients by station",
+      "type": "view",
+      "window": "day",
+      "workflow": "phc.wf.outpatient"
+    }
+  },
+  "workflows": {
+    "phc.wf.outpatient": {
+      "id": "phc.wf.outpatient",
+      "states": {
+        "abha.linked": {
+          "exists": {
+            "resource": "patient",
+            "where": {
+              "abha_number": "*"
+            }
+          }
+        },
+        "abha.pending": {
+          "all_of": [
+            "registered",
+            "not abha.linked"
+          ]
+        },
+        "capture.consented": {
+          "stored": true
+        },
+        "consult.documented": {
+          "exists": {
+            "resource": "notes"
+          }
+        },
+        "dispensed.complete": {
+          "gte": [
+            {
+              "resource": "medication_dispense"
+            },
+            {
+              "resource": "medication_request",
+              "where": {
+                "status": "active"
+              }
+            }
+          ]
+        },
+        "dispensed.partial": {
+          "all_of": [
+            {
+              "exists": {
+                "resource": "medication_dispense"
+              }
+            },
+            "not dispensed.complete"
+          ]
+        },
+        "followup.booked": {
+          "exists": {
+            "resource": "token_booking",
+            "where": {
+              "status": "booked"
+            }
+          }
+        },
+        "lab.critical": {
+          "stored": true
+        },
+        "lab.ordered": {
+          "exists": {
+            "resource": "service_request"
+          }
+        },
+        "lab.resulted": {
+          "exists": {
+            "resource": "diagnostic_report"
+          }
+        },
+        "lab.validated": {
+          "exists": {
+            "resource": "diagnostic_report",
+            "where": {
+              "status": "final"
+            }
+          }
+        },
+        "registered": {
+          "exists": {
+            "resource": "patient"
+          }
+        },
+        "rx.confirmed": {
+          "exists": {
+            "resource": "medication_request",
+            "where": {
+              "status": "active"
+            }
+          }
+        },
+        "vitals.flagged": {
+          "stored": true
+        },
+        "vitals.recorded": {
+          "exists": {
+            "resource": "observation",
+            "where": {
+              "category": "vital-signs"
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "applies_when": null,
+          "done_when": "registered",
+          "operations": [
+            "phc.op.patient-register",
+            "phc.op.abha-link"
+          ],
+          "station": "reception"
+        },
+        {
+          "applies_when": null,
+          "done_when": "vitals.recorded",
+          "operations": [
+            "phc.op.vitals-record"
+          ],
+          "station": "nurse"
+        },
+        {
+          "applies_when": null,
+          "done_when": "consult.documented",
+          "operations": [
+            "phc.op.consult-document",
+            "phc.op.rx-prescribe",
+            "phc.op.lab-order"
+          ],
+          "station": "doctor"
+        },
+        {
+          "applies_when": "lab.ordered",
+          "done_when": "lab.resulted",
+          "operations": [
+            "phc.op.lab-result-enter"
+          ],
+          "station": "lab"
+        },
+        {
+          "applies_when": "rx.confirmed",
+          "done_when": "dispensed.complete",
+          "operations": [
+            "phc.op.pharmacy-dispense"
+          ],
+          "station": "pharmacy"
+        }
+      ],
+      "stored": [
+        "capture.consented",
+        "vitals.flagged",
+        "lab.critical"
+      ],
+      "subject": "encounter",
+      "summary": "Reception, vitals, doctor, then lab and pharmacy only when the doctor sent the patient there. The current station is the first step not done.",
+      "title": "Outpatient line",
+      "type": "workflow"
+    }
+  }
 }

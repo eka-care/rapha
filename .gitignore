@@ -6,3 +6,9 @@ node_modules/
 dist/
 .env
 care_phc_mcp/care_phc_mcp
+
+# generated: the local adapter's SQLite file, and build output
+phc.sqlite3
+phc.sqlite3-wal
+phc.sqlite3-shm
+*.tsbuildinfo

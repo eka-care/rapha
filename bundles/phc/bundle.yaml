@@ -1,0 +1,33 @@
+# The primary health centre bundle. Load this and the kernel is a PHC.
+#
+# Operations are referenced by id and live in catalogue/ops, because they are
+# shared vocabulary; a dental bundle would reference some of the same atoms.
+# Everything else listed here lives beside this file. Role bundles (which
+# capabilities a nurse holds) stay in catalogue/vocab.py BUNDLES tonight.
+id: phc
+version: 2026.09.10
+title: Primary health centre
+operations:
+  - phc.op.patient-register
+  - phc.op.abha-link
+  - phc.op.vitals-record
+  - phc.op.consult-document
+  - phc.op.rx-prescribe
+  - phc.op.lab-order
+  - phc.op.lab-result-enter
+  - phc.op.pharmacy-dispense
+  - phc.op.household-visit
+workflows:
+  - phc.wf.outpatient
+views:
+  - phc.view.station-queue
+  - phc.view.patient-summary
+  - phc.view.facility-dashboard
+instruments:
+  - phc.inst.vitals-voice
+  - phc.inst.vitals-device
+  - phc.inst.consult-scribe
+metrics:
+  - phc.metric.visits
+  - phc.metric.abha-coverage
+  - phc.metric.vitals-flagged-rate

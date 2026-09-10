@@ -1,0 +1,89 @@
+# Kernel architecture
+
+One kernel. A hospital, a PHC, a dental chain and a diagnostics lab differ
+only by which declaration bundle they load. The kernel is small and boring on
+purpose: it evaluates the guard, derives thread state from the store, holds
+the proposal queue, and writes audit. Everything a user sees is a plugin
+declared in a bundle and drawn by a generic renderer.
+
+```
+ bundles/<id>/*.md + catalogue/ops/*.md          declarations: git, linted, versioned
+                 |
+                 |  python3 -m catalogue.build     (lint, then compile)
+                 v
+           catalogue.json                          one file, embedded by the MCP server
+                 |
+    +------------+-----------------------------------------------+
+    |                    KERNEL   (kernel/)                       |
+    |  guard      catalogue/guard.py, unchanged                    |
+    |  state      flags from Workflow.states over Store.count      |
+    |             station and actions from Workflow.steps          |
+    |  proposals  put, list, confirm (second guard pass), reject   |
+    |  audit      AuditRecord per decision, denials included       |
+    |  api        the ROUTES in kernel/contracts.py                |
+    +------------+-----------------------------------------------+
+         ^                ^                     ^
+         |                |                     |
+   RENDERER          MCP / AGENT           ANALYTICS
+   care_phc_fe/      care_phc_mcp/         analytics/
+   draws declared    tools from            evaluates Metric
+   forms and views   catalogue.json,       locally; nothing
+   from ThreadView   proposes only         leaves the machine
+   and ViewResult
+         |
+         v  (kernel only, via Store)
+    +-----------------------------------------------------------+
+    |  ADAPTERS  implement kernel.contracts.Store                 |
+    |  adapters/local   SQLite, FHIR-shaped tables    adapter 0   |
+    |  adapters/care    CARE REST, headless           adapter 1   |
+    +-----------------------------------------------------------+
+```
+
+## What each layer may depend on
+
+| layer | may import | may not |
+|---|---|---|
+| declarations | nothing; they are data | any code |
+| `catalogue/` (vocab, build, guard, validate) | stdlib, yaml | kernel, adapters, clients |
+| `kernel/` | `catalogue/`, `kernel/contracts` | adapters (only through the `Store` protocol, injected), Django, network |
+| `adapters/*` | `kernel/contracts`, its own driver (sqlite3, requests) | the guard, state derivation, the renderer |
+| clients (`care_phc_fe`, `care_phc_mcp`, `analytics`) | the API over HTTP and `catalogue.json` | the kernel in-process, any adapter |
+| `care_phc/` (the CARE plug) | `catalogue/`, `kernel/contracts`, Django | nothing new tonight; it becomes adapter 1's home later |
+
+Three rules with no exceptions:
+
+1. Pure logic has no I/O. State derivation takes a `Store` and returns a set;
+   it is tested with a dict-backed fake, never with SQLite or CARE.
+2. There is no path to a write that does not pass `catalogue.guard.evaluate`.
+   Not from the MCP server, not from an instrument, not from a confirm
+   button. Confirming a proposal is a second guard pass on the rendered
+   surface, with the edited payload.
+3. Voice, device and scribe produce a `Draft`. A draft is drawn in editable
+   fields and committed by a tap. Nothing else. Fail closed to the keypad.
+
+## Directory ownership tonight
+
+Each agent owns its directories and touches nothing else. Shared files have
+one owner and an append-only rule.
+
+| directory | owner | notes |
+|---|---|---|
+| `kernel/contracts.py`, `kernel/*.md` | architect | frozen. Report a gap, do not patch it |
+| `bundles/phc/` | build agent | may fix a declaration the linter rejects; may not change shape |
+| `catalogue/build.py`, `catalogue/vocab.py` | build agent | extend lint and compile to the four new types; existing keys unchanged |
+| `catalogue/guard.py`, `catalogue/validate.py`, `catalogue/ops/` | nobody | unchanged tonight |
+| `kernel/state.py`, `kernel/proposals.py`, `kernel/api.py`, `kernel/tests/` | kernel agent | pure modules plus one HTTP server (stdlib `http.server` is enough; `scripts/mock_care.py` shows the shape) |
+| `adapters/local/` | adapter agent | SQLite, one table per `vocab.CARE_RESOURCES` name it needs plus `thread_flag`, `proposal`, `audit`. Field names verbatim from the query grammar |
+| `adapters/care/` | later | not tonight |
+| `care_phc_fe/` | frontend agent | rename `patient` to `subject`, draw `line` from the API instead of the LINE constant, add a `Draft` field state and the tap-to-commit control, generic queue, summary and dashboard renderers |
+| `care_phc_mcp/` | MCP agent | point at the kernel API; add a `thread` and `view` read tool from `catalogue.json`. Still no confirm verb |
+| `analytics/` | analytics agent | evaluate `Metric` over `Store`; local only |
+| `care_phc/` | nobody | unchanged tonight; `thread.py` stays until `kernel/state.py` reproduces it and `test_contracts` proves it |
+| `scripts/check.sh` | everyone, append only | one line per new check, placed after the kernel line |
+
+## The one check that already exists
+
+`python3 -m kernel.tests.test_contracts` asserts that the PHC bundle agrees
+with the code it replaces: the workflow steps equal `thread.LINE`, the states
+cover `vocab.STATES`, every referenced operation exists, and every voice or
+scribe instrument reads back and commits by tap. It runs from `check.sh`.

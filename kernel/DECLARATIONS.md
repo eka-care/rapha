@@ -1,0 +1,244 @@
+# Declarations: the authoring spec
+
+The product is the declarations. This page is the whole rule set for writing
+one. The machine half is YAML frontmatter and compiles into `catalogue.json`;
+the human half is the markdown body. They are one file so they cannot drift.
+
+Every declaration type uses the operation atom format from `catalogue/ops`:
+`---` frontmatter, a `type:` field, an `id` equal to the filename stem, and a
+body that starts with `## In plain words`. Operations keep their five
+mandatory body sections. The other four types need only `## In plain words`.
+Shapes after compilation are the dataclasses in `kernel/contracts.py`; this
+page is the source form.
+
+Ids are `<bundle>.<kind>.<name>` with kind one of `op`, `wf`, `view`, `inst`,
+`metric`. Operations live in `catalogue/ops/`. Everything else lives beside
+`bundle.yaml` in `bundles/<bundle>/`, one flat directory.
+
+Vocabularies are closed. A capability, state, station, or resource that is
+not in `catalogue/vocab.py` is a lint failure, never a new entry. No em
+dashes anywhere, frontmatter included.
+
+## The bundle file
+
+`bundles/<id>/bundle.yaml` lists what the kernel loads. Operations are
+referenced by id, not copied.
+
+```yaml
+id: phc
+version: 2026.09.10           # date-stamped; bump on any change
+title: Primary health centre
+operations: [phc.op.patient-register, ...]   # ids in catalogue/ops
+workflows: [phc.wf.outpatient]
+views: [...]
+instruments: [...]
+metrics: [...]
+```
+
+All five lists are required, and every id listed must exist, and every
+declaration file in the directory must be listed. Role bundles (which
+capabilities a nurse holds) stay in `vocab.BUNDLES` for now. Compiles to
+`catalogue.json["manifest"]`.
+
+## The query grammar
+
+One shape, shared by workflow states, summary sections and metrics, so an
+adapter implements two reads (`count`, `select`) and nothing else.
+
+```yaml
+{resource: <vocab.CARE_RESOURCES>, where: {<field>: <cond>, ...}}
+```
+
+`where` is optional. A condition is a literal (equality), `"*"` (present and
+not null), `{gte: v}` or `{lt: v}`. In a metric, `v` may be the string
+`window.start`. Field names are CARE's emr model field names; the SQLite
+adapter stores them verbatim and the CARE adapter maps them. The fields this
+bundle uses: `abha_number`, `category`, `status`, `code`, `value`, `unit`,
+`text`, `medication`, `dosage_instruction`, `conclusion`, `created_by`,
+`created_date`, `flag`. How a resource joins to a thread is never written in a
+declaration; the adapter knows its own schema.
+
+A metric numerator may name `thread_flag` (in `vocab.KERNEL_RESOURCES`),
+which is how stored flags get counted. Nothing else may.
+
+## 1. Operation
+
+Unchanged from today. Required frontmatter: `id, type, kind, short, title,
+summary, capability, station, instrument, preconditions, irreversibility,
+input, writes, emits, surfaces, verified`. Optional: `scope_qualifier,
+related`. See `catalogue/build.py` REQUIRED and any file in `catalogue/ops`.
+
+`instrument` on an operation is its default capture method. Instrument
+declarations (section 4) add accelerators on top of it.
+
+Worked example: `catalogue/ops/phc.op.vitals-record.md`.
+
+## 2. Workflow
+
+The order operations happen in, and how each state flag is derived. This is
+`care_phc/thread.py` `LINE` and `derive()` written down.
+
+| field | required | value |
+|---|---|---|
+| `id, type, title, summary` | yes | `type: workflow` |
+| `subject` | yes | the resource a thread is about; `encounter` today |
+| `steps` | yes | ordered list, see below |
+| `states` | yes | ordered map, flag to rule; must cover every `vocab.STATES` entry |
+
+A step:
+
+| field | required | value |
+|---|---|---|
+| `station` | yes | `vocab.STATIONS` |
+| `done_when` | yes | a flag; the step is done once it is true |
+| `applies_when` | no | a flag; while it is false the step is skipped, not pending |
+| `operations` | yes | op ids drawn at this station, in the order to offer them; each op's own `station` must match |
+
+The current station is the first step that applies and is not done. `None`
+once every applicable step is done. That is `thread.station()` exactly.
+
+A state rule is one of four forms, evaluated in declaration order, and a
+rule may only reference a flag declared above it:
+
+```yaml
+flag: {stored: true}                     # the store holds it; no record answers it
+flag: {exists: <query>}                  # count > 0
+flag: {gte: [<query a>, <query b>]}      # count(a) >= count(b) and count(b) > 0
+flag: {all_of: [flag, "not flag", <rule>]}
+```
+
+The compiled `Workflow.stored` is the list of flags with `{stored: true}`.
+`Store.raise_flag` refuses any other flag, as `EncounterThread.raise_flag`
+does today.
+
+### How LINE becomes a workflow
+
+`care_phc/thread.py`:
+
+```python
+LINE = (
+    ("reception", "registered", None),
+    ("nurse", "vitals.recorded", None),
+    ("doctor", "consult.documented", None),
+    ("lab", "lab.resulted", "lab.ordered"),
+    ("pharmacy", "dispensed.complete", "rx.confirmed"),
+)
+```
+
+is, tuple for tuple, the `steps` list of `bundles/phc/phc.wf.outpatient.md`,
+with the third element becoming `applies_when`. The conditional steps are the
+point: a patient nobody ordered a test for has `lab.ordered` false, so the
+lab step is skipped and the station moves on to pharmacy or to `None`.
+
+`derive()` becomes `states`. Three examples from the same file:
+
+```yaml
+vitals.recorded:                              # if s.vitals_observations:
+  exists: {resource: observation, where: {category: vital-signs}}
+dispensed.complete:                           # dispensed >= prescribed, prescribed > 0
+  gte:
+    - {resource: medication_dispense}
+    - {resource: medication_request, where: {status: active}}
+abha.pending:                                 # registered and no abha
+  all_of: [registered, "not abha.linked"]
+vitals.flagged: {stored: true}                # STORED
+```
+
+`kernel/tests/test_contracts.py` asserts the declaration and `thread.py`
+agree, so the two cannot diverge while both exist.
+
+Complete worked example: `bundles/phc/phc.wf.outpatient.md`.
+
+## 3. View
+
+A queue, summary or dashboard declared as a query. The renderer draws each
+`kind` one way for every bundle; there is no per-screen code.
+
+| field | required | value |
+|---|---|---|
+| `id, type, title, summary` | yes | `type: view` |
+| `kind` | yes | `queue`, `summary`, `dashboard` |
+| `capability` | yes | `vocab.CAPABILITIES`; who may open it |
+| `workflow` | queue, summary | a workflow id |
+
+Queue fields: `scope` (`today`, `open`, `all`; default `today`), `group_by`
+(`station` or a flag; omitted means one list), `columns` (subject fields to
+show), `badges` (flag to `warn`, `crit`, `ok`, `mute`). Rows are
+`QueueRow`; groups come back in workflow step order with a trailing group for
+`station: None`.
+
+Summary fields: `sections`, an ordered list where each item has `title` and
+exactly one of `show` (`line`, `flags`, `actions`, `proposals`, `audit`) or
+`resource` with optional `where` and `fields`. Called with `?thread=`.
+
+Dashboard fields: `metrics` (ids), `window` (`day`, `week`, `month`, `all`;
+overrides each metric's default).
+
+Worked examples: `bundles/phc/phc.view.station-queue.md`,
+`phc.view.patient-summary.md`, `phc.view.facility-dashboard.md`.
+
+## 4. Instrument
+
+How a value is captured. Declared per field or question type, never per
+screen. An instrument only changes how a value arrives: it produces a
+`Draft`, the renderer puts the draft values in editable fields, a person
+taps commit, and the guard and the range rule run on the tapped values as if
+typed. The kernel has no path from an instrument to a write.
+
+| field | required | value |
+|---|---|---|
+| `id, type, title, summary` | yes | `type: instrument` |
+| `kind` | yes | `form`, `device`, `constrained-voice`, `scribe` |
+| `operations` | yes | op ids this applies to |
+| `fields` | no | link_ids in those operations' questionnaires; empty means all |
+| `types` | no | question types; empty means all |
+| `grammar` | constrained-voice | `number`, `choice`, `date`, `free` |
+| `readback` | yes | must be `required` |
+| `commit` | yes | must be `tap` |
+| `fallback` | yes | `keypad` or `form` |
+
+Lint rules that encode the product's speech rule:
+
+- `readback: required` and `commit: tap` are the only accepted values. This
+  is the "one forty over ninety" rule: a misheard discrete value is silent,
+  plausible and unrecoverable, so it is always shown and always tapped.
+- A `scribe` instrument may not list an operation whose default
+  `instrument` is `device`. Ambient recognition is worst at short numeric
+  utterances, so vitals get constrained voice or nothing.
+- A `scribe` instrument is offered only when `capture.consented` is in the
+  thread's flags. The renderer checks; the guard does not know about
+  instruments and should not.
+- A `Draft` with no values means the instrument failed. The renderer shows
+  the fallback. Voice fails closed to a keypad.
+
+Worked example: `bundles/phc/phc.inst.vitals-voice.md`.
+
+## 5. Metric
+
+A certified count or ratio, evaluated locally by the analytics client.
+Data never leaves the machine; a metric has no export.
+
+| field | required | value |
+|---|---|---|
+| `id, type, title, summary` | yes | `type: metric` |
+| `unit` | yes | `count`, `percent`, `ratio` |
+| `window` | yes | `day`, `week`, `month`, `all`; the default bucket |
+| `numerator` | yes | a query; may use `{gte: window.start}` |
+| `denominator` | `percent`, `ratio` | a query |
+| `certified_by` | no | free text; say honestly who checked it and against what |
+
+Value is `numerator / denominator` (times 100 for percent), or the count for
+`unit: count`. A zero denominator yields `value: 0` and `denominator: 0`, not
+an error, because an empty week is a normal week.
+
+Worked example: `bundles/phc/phc.metric.abha-coverage.md`.
+
+## Compilation
+
+`python3 -m catalogue.build` today lints `catalogue/ops` and writes
+`catalogue.json` with `capabilities, bundles, states, operations`. The build
+agent extends it to read `bundles/<id>/bundle.yaml` and add `manifest,
+workflows, views, instruments, metrics`, keyed by id, with the frontmatter
+fields verbatim plus `description` (the plain-words section). The existing
+four keys do not change shape; `care_phc_mcp/catalogue.go` keeps working
+unmodified because Go ignores unknown keys.

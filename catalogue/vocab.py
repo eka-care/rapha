@@ -54,7 +54,14 @@ CARE_RESOURCES = frozenset({
     "medication_request", "medication_dispense", "inventory_item",
     "service_request", "specimen", "diagnostic_report",
     "questionnaire_response", "consent", "organization", "location",
+    # care/emr/models/scheduling/booking.py TokenBooking. Unverified name;
+    # read only, no operation writes it yet.
+    "token_booking",
 })
+
+# Records the kernel keeps that CARE does not: the stored thread flags. A
+# declaration may count them (a metric) but no operation may write them.
+KERNEL_RESOURCES = frozenset({"thread_flag"})
 
 IRREVERSIBILITY = ("reversible", "correctable", "irreversible")
 INSTRUMENTS = ("form", "device", "constrained-voice", "scribe", "palette")

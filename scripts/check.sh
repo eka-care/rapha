@@ -1,15 +1,46 @@
 #!/bin/sh
 # Everything that can be checked without a running CARE. Run before committing.
+#
+# Order matters in one place only: the two compile steps come first, because
+# catalogue.json is an input to almost everything below them.
 set -e
 cd "$(dirname "$0")/.."
+
+echo "== compile the declarations =="
 python3 -m catalogue.build
+python3 -m kernel.declarations
+
+echo "\n== the kernel and its contracts =="
 python3 -m catalogue.tests.test_guard
 python3 -m catalogue.tests.test_validate
 python3 -m care_phc.tests.test_thread
+python3 -m kernel.tests.test_contracts
+python3 -m kernel.tests.test_kernel
+
+echo "\n== the adapter and the service =="
+python3 -m adapters.local.tests.test_store
+python3 -m api.tests.test_api
+
+echo "\n== the agent, and the ABDM connector =="
+python3 -m agent.tests.test_planner
 python3 -m care_phc.tests.test_token
 python3 -m care_phc.tests.test_eka
+
+echo "\n== the MCP server =="
 (cd care_phc_mcp && go vet ./... && go test ./... && go build -o care_phc_mcp .)
 python3 scripts/agent_demo.py > /dev/null && echo "ok   agent demo runs end to end"
+
+echo "\n== the browser side =="
+# The voice grammar is pure and runs under plain node. The Web Speech wiring
+# in packages/voice/src/v2dd.ts is NOT checked here and cannot be: it needs a
+# microphone and a browser. First real run is its first test.
+node packages/voice/src/grammar.check.ts
+if [ -d web/node_modules ]; then
+  (cd web && npm run check && npm run build >/dev/null)
+  echo "ok   web renderer typechecks and builds"
+else
+  echo "warn web: run (cd web && npm install) to check the renderer"
+fi
 python3 scripts/gen-fixtures.py
 if [ -d care_phc_fe/node_modules ]; then
   (cd care_phc_fe && npx tsc -b && npm run build >/dev/null)
@@ -17,4 +48,15 @@ if [ -d care_phc_fe/node_modules ]; then
 else
   echo "warn care_phc_fe: run npm install to check the frontend"
 fi
+
+echo "\n== end to end, over a real socket =="
+# Starts uvicorn on a free port against a throwaway SQLite file, walks a
+# patient through the line, and drives the Go MCP binary at it. The only check
+# that binds a port; skip it with SKIP_E2E=1 if that is a problem where you are.
+if [ -n "$SKIP_E2E" ]; then
+  echo "warn e2e skipped: SKIP_E2E is set"
+else
+  python3 scripts/e2e.py
+fi
+
 printf '\nall checks passed\n'

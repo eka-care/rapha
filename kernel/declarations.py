@@ -1,0 +1,416 @@
+"""Load and lint a declaration bundle into the dataclasses in contracts.py.
+
+catalogue/build.py lints and compiles the operation atoms. This is the same
+job for the other four declaration types, and it is deliberately the same
+shape: parse() from build.py reads the file, vocab.py owns every closed list,
+and a dangling reference is a build failure and not a warning. A capability
+misspelt in frontmatter is not a typo, it is a screen nobody can open or one
+anybody can.
+
+compile_json() returns exactly the five new catalogue.json keys, so the
+compiler can stay one writer: build.py adds them with one update() call and
+keeps writing the file. Until it does, the kernel loads declarations from
+bundles/<id>/ directly, which is the same data by the same lint.
+
+Pure: reads files, touches no database and no network.
+"""
+from __future__ import annotations
+
+import dataclasses
+import pathlib
+from typing import Optional
+
+import yaml
+
+from catalogue import validate, vocab
+from catalogue.build import parse
+from kernel import contracts as c
+
+ROOT = pathlib.Path(__file__).parents[1]
+BUNDLES = ROOT / "bundles"
+
+REQUIRED = {
+    "workflow": ("id", "type", "title", "summary", "subject", "steps", "states"),
+    "view": ("id", "type", "title", "summary", "kind", "capability"),
+    "instrument": ("id", "type", "title", "summary", "kind", "operations",
+                   "readback", "commit", "fallback"),
+    "metric": ("id", "type", "title", "summary", "unit", "window", "numerator"),
+}
+BADGE_STYLES = ("warn", "crit", "ok", "mute")
+RULE_FORMS = ("stored", "exists", "gte", "all_of")
+
+
+class DeclarationError(Exception):
+    """Raised with every failure, one per line. Never partial-load a bundle."""
+
+
+@dataclasses.dataclass(frozen=True)
+class Bundle:
+    """One loaded declaration package. `operations` are the compiled entries
+    catalogue.json already holds; the kernel does not recompile them."""
+    manifest: c.Manifest
+    operations: dict
+    workflows: dict
+    views: dict
+    instruments: dict
+    metrics: dict
+
+    def workflow(self, wid: Optional[str] = None) -> c.Workflow:
+        if wid is None:
+            (wid,) = self.workflows
+        return self.workflows[wid]
+
+
+# --------------------------------------------------------------------------
+# lint
+# --------------------------------------------------------------------------
+
+def _query(q, where, fail, *, resources, allow_window):
+    """Validate one Query. `where` is the label used in failure messages."""
+    if not isinstance(q, dict) or "resource" not in q:
+        return fail(f"{where}: not a query")
+    if q["resource"] not in resources:
+        fail(f"{where}: unknown resource '{q['resource']}'")
+    for key in set(q) - {"resource", "where"}:
+        fail(f"{where}: unknown query key '{key}'")
+    for fld, cond in (q.get("where") or {}).items():
+        if not isinstance(cond, dict):
+            continue                                  # a literal, or "*"
+        for op, val in cond.items():
+            if op not in ("gte", "lt"):
+                fail(f"{where}: unknown condition '{op}' on {fld}")
+            if val == "window.start" and not allow_window:
+                fail(f"{where}: window.start is only for a metric")
+
+
+def _rule(flag, rule, seen, fail, stored):
+    if not isinstance(rule, dict) or len(rule) != 1:
+        return fail(f"state '{flag}': a rule is one of {RULE_FORMS}")
+    (form, arg), = rule.items()
+    if form not in RULE_FORMS:
+        return fail(f"state '{flag}': unknown rule form '{form}'")
+    q = dict(resources=vocab.CARE_RESOURCES, allow_window=False)
+    if form == "stored":
+        if arg is not True:
+            fail(f"state '{flag}': stored takes true")
+        stored.append(flag)
+    elif form == "exists":
+        _query(arg, f"state '{flag}'", fail, **q)
+    elif form == "gte":
+        if not isinstance(arg, list) or len(arg) != 2:
+            return fail(f"state '{flag}': gte takes exactly two queries")
+        for side in arg:
+            _query(side, f"state '{flag}'", fail, **q)
+    elif form == "all_of":
+        if not isinstance(arg, list) or not arg:
+            return fail(f"state '{flag}': all_of takes a non empty list")
+        for item in arg:
+            if isinstance(item, str):
+                ref = item[4:] if item.startswith("not ") else item
+                if ref not in seen:
+                    fail(f"state '{flag}': references '{ref}' before it is declared")
+            else:
+                _rule(flag, item, seen, fail, [])
+
+
+def _lint_workflow(fm, ops, fail):
+    if fm["subject"] not in vocab.CARE_RESOURCES:
+        fail(f"subject '{fm['subject']}' is not a CARE resource")
+
+    states = fm["states"] or {}
+    if set(states) != set(vocab.STATES):
+        missing = sorted(set(vocab.STATES) - set(states))
+        extra = sorted(set(states) - set(vocab.STATES))
+        fail(f"states must cover the vocabulary exactly: missing {missing}, unknown {extra}")
+
+    for step in fm["steps"] or []:
+        for key in ("station", "done_when"):
+            if key not in step:
+                fail(f"step {step} has no '{key}'")
+        if step.get("station") not in vocab.STATIONS:
+            fail(f"unknown station '{step.get('station')}'")
+        for key in ("done_when", "applies_when"):
+            flag = step.get(key)
+            if flag is not None and flag not in vocab.STATES:
+                fail(f"step {step.get('station')}: {key} names unknown state '{flag}'")
+        for oid in step.get("operations") or []:
+            if oid not in ops:
+                fail(f"step {step.get('station')}: operation '{oid}' does not exist")
+            elif ops[oid]["station"] != step.get("station"):
+                fail(f"'{oid}' is drawn at {step.get('station')} but declares "
+                     f"station {ops[oid]['station']}")
+
+    seen, stored = [], []
+    for flag, rule in states.items():
+        _rule(flag, rule, seen, fail, stored)
+        seen.append(flag)
+    return stored
+
+
+def _lint_view(fm, refs, fail):
+    if fm["kind"] not in c.VIEW_KINDS:
+        fail(f"kind must be one of {c.VIEW_KINDS}")
+    if fm["capability"] not in vocab.CAPABILITIES:
+        fail(f"unknown capability '{fm['capability']}'")
+    if fm.get("scope", "today") not in c.VIEW_SCOPES:
+        fail(f"scope must be one of {c.VIEW_SCOPES}")
+    if fm.get("window", "day") not in c.METRIC_WINDOWS:
+        fail(f"window must be one of {c.METRIC_WINDOWS}")
+
+    if fm["kind"] == "dashboard":
+        for mid in fm.get("metrics") or []:
+            if mid not in refs["metric"]:
+                fail(f"dashboard names metric '{mid}' which does not exist")
+    else:
+        if fm.get("workflow") not in refs["workflow"]:
+            fail(f"{fm['kind']} view names workflow '{fm.get('workflow')}' which does not exist")
+
+    group_by = fm.get("group_by")
+    if group_by is not None and group_by != "station" and group_by not in vocab.STATES:
+        fail(f"group_by '{group_by}' is neither 'station' nor a state")
+    for flag, style in (fm.get("badges") or {}).items():
+        if flag not in vocab.STATES:
+            fail(f"badge names unknown state '{flag}'")
+        if style not in BADGE_STYLES:
+            fail(f"badge style '{style}' must be one of {BADGE_STYLES}")
+
+    for section in fm.get("sections") or []:
+        title = section.get("title", "?")
+        if (section.get("show") is None) == (section.get("resource") is None):
+            fail(f"section '{title}' needs exactly one of show or resource")
+        if section.get("show") is not None and section["show"] not in c.SUMMARY_SHOW:
+            fail(f"section '{title}': show must be one of {c.SUMMARY_SHOW}")
+        if section.get("resource") is not None:
+            _query({"resource": section["resource"], "where": section.get("where") or {}},
+                   f"section '{title}'", fail,
+                   resources=vocab.CARE_RESOURCES, allow_window=False)
+
+
+def _lint_instrument(fm, ops, fail):
+    if fm["kind"] not in c.INSTRUMENT_KINDS:
+        fail(f"kind must be one of {c.INSTRUMENT_KINDS}")
+    # The ambient speech rule, made unwritable. See kernel/DECLARATIONS.md 4.
+    if fm["readback"] != "required":
+        fail("readback must be 'required': a captured value is always shown back")
+    if fm["commit"] != "tap":
+        fail("commit must be 'tap': no instrument is a commit path")
+    if fm["fallback"] not in ("keypad", "form"):
+        fail("fallback must be 'keypad' or 'form'")
+    if fm["kind"] == "constrained-voice" and fm.get("grammar") not in c.VOICE_GRAMMARS:
+        fail(f"constrained-voice needs a grammar from {c.VOICE_GRAMMARS}")
+
+    link_ids = set()
+    for oid in fm["operations"] or []:
+        if oid not in ops:
+            fail(f"names operation '{oid}' which does not exist")
+            continue
+        if fm["kind"] == "scribe" and ops[oid]["instrument"] == "device":
+            fail(f"a scribe may not be offered on '{oid}': ambient recognition is "
+                 "worst at short numeric utterances")
+        link_ids |= {f["link_id"] for f in ops[oid]["fields"]}
+    for field in fm.get("fields") or []:
+        if field not in link_ids:
+            fail(f"field '{field}' is not a question on any of its operations")
+    for qtype in fm.get("types") or []:
+        if qtype not in validate.TYPES:
+            fail(f"question type '{qtype}' is not a CARE type")
+
+
+def _lint_metric(fm, fail):
+    if fm["unit"] not in c.METRIC_UNITS:
+        fail(f"unit must be one of {c.METRIC_UNITS}")
+    if fm["window"] not in c.METRIC_WINDOWS:
+        fail(f"window must be one of {c.METRIC_WINDOWS}")
+    # thread_flag is countable and never writable: a metric numerator is the
+    # only place a kernel resource may appear.
+    _query(fm["numerator"], "numerator", fail,
+           resources=vocab.CARE_RESOURCES | vocab.KERNEL_RESOURCES, allow_window=True)
+    den = fm.get("denominator")
+    if (den is None) != (fm["unit"] == "count"):
+        fail("a count has no denominator; a percent or ratio needs one")
+    if den is not None:
+        _query(den, "denominator", fail,
+               resources=vocab.CARE_RESOURCES, allow_window=True)
+
+
+def lint(manifest, decls, ops):
+    """Return a list of failure strings. Empty means the bundle is sound.
+
+    `decls` is {id: (frontmatter, body)} for the bundle directory, `ops` the
+    compiled operations from catalogue.json.
+    """
+    bad = []
+    refs = {t: {i for i, (fm, _) in decls.items() if fm.get("type") == t}
+            for t in c.DECLARATION_TYPES}
+    stored_by_workflow = {}
+
+    for key in ("id", "version", "title", "operations", "workflows", "views",
+                "instruments", "metrics"):
+        if key not in manifest:
+            bad.append(f"bundle.yaml: missing '{key}'")
+    if bad:
+        return bad
+
+    listed = {i for k in ("workflows", "views", "instruments", "metrics")
+              for i in manifest[k] or []}
+    for i in sorted(listed - set(decls)):
+        bad.append(f"bundle.yaml: lists '{i}' but there is no such declaration file")
+    for i in sorted(set(decls) - listed):
+        bad.append(f"bundle.yaml: '{i}' is in the directory but not listed")
+    for oid in manifest["operations"] or []:
+        if oid not in ops:
+            bad.append(f"bundle.yaml: operation '{oid}' is not in the catalogue")
+
+    for did, (fm, body) in sorted(decls.items()):
+        def fail(msg, did=did):
+            bad.append(f"{did}: {msg}")
+
+        kind = fm.get("type")
+        if kind not in REQUIRED:
+            fail(f"type must be one of {tuple(REQUIRED)}")
+            continue
+        for key in REQUIRED[kind]:
+            if key not in fm:
+                fail(f"missing required field '{key}'")
+        if any(f"{did}: missing required" in line for line in bad):
+            continue
+        if "## In plain words" not in body:
+            fail("body must start with '## In plain words'")
+        if "—" in body or "—" in str(fm):
+            fail("em dash: the writing guide forbids it")
+
+        if kind == "workflow":
+            stored_by_workflow[did] = _lint_workflow(fm, ops, fail)
+        elif kind == "view":
+            _lint_view(fm, refs, fail)
+        elif kind == "instrument":
+            _lint_instrument(fm, ops, fail)
+        elif kind == "metric":
+            _lint_metric(fm, fail)
+
+    return bad
+
+
+# --------------------------------------------------------------------------
+# compile
+# --------------------------------------------------------------------------
+
+def _workflow(fm, stored):
+    return c.Workflow(
+        id=fm["id"], title=fm["title"], summary=fm["summary"].strip(),
+        subject=fm["subject"], states=fm["states"], stored=stored,
+        steps=[c.Step(station=s["station"], done_when=s["done_when"],
+                      applies_when=s.get("applies_when"),
+                      operations=list(s.get("operations") or []))
+               for s in fm["steps"]])
+
+
+def _view(fm):
+    known = {f.name for f in dataclasses.fields(c.View)}
+    kwargs = {k: v for k, v in fm.items() if k in known and k != "sections"}
+    kwargs["summary"] = fm["summary"].strip()
+    kwargs["sections"] = [c.Section(**s) for s in fm.get("sections") or []]
+    return c.View(**kwargs)
+
+
+def _plain(cls, fm):
+    known = {f.name for f in dataclasses.fields(cls)}
+    return cls(**{**{k: v for k, v in fm.items() if k in known},
+                  "summary": fm["summary"].strip()})
+
+
+def load(bundle_id="phc", catalogue=None):
+    """Parse, lint and compile bundles/<bundle_id>/. Raises DeclarationError."""
+    import json
+    if catalogue is None:
+        catalogue = json.loads((ROOT / "catalogue" / "catalogue.json").read_text())
+    ops = catalogue["operations"]
+
+    path = BUNDLES / bundle_id
+    manifest = yaml.safe_load((path / "bundle.yaml").read_text())
+    decls = {}
+    for f in sorted(path.glob("*.md")):
+        fm, body = parse(f)
+        if fm.get("id") != f.stem:
+            raise DeclarationError(f"{f.name}: id '{fm.get('id')}' does not match filename")
+        decls[fm["id"]] = (fm, body)
+
+    bad = lint(manifest, decls, ops)
+    if bad:
+        raise DeclarationError("\n".join(bad))
+
+    workflows, views, instruments, metrics = {}, {}, {}, {}
+    for did, (fm, _) in decls.items():
+        if fm["type"] == "workflow":
+            workflows[did] = _workflow(fm, [f for f, r in fm["states"].items()
+                                            if r == {"stored": True}])
+        elif fm["type"] == "view":
+            views[did] = _view(fm)
+        elif fm["type"] == "instrument":
+            instruments[did] = _plain(c.Instrument, fm)
+        elif fm["type"] == "metric":
+            metrics[did] = _plain(c.Metric, fm)
+
+    return Bundle(
+        manifest=c.Manifest(id=manifest["id"], version=str(manifest["version"]),
+                            title=manifest["title"],
+                            **{k: list(manifest[k] or []) for k in
+                               ("operations", "workflows", "views", "instruments", "metrics")}),
+        operations={oid: ops[oid] for oid in manifest["operations"]},
+        workflows=workflows, views=views, instruments=instruments, metrics=metrics)
+
+
+def compile_json(bundle):
+    """The five new catalogue.json keys, as plain JSON-able dicts. build.py
+    can add them with one update(); the existing four keys do not change."""
+    return {
+        "manifest": dataclasses.asdict(bundle.manifest),
+        "workflows": {k: dataclasses.asdict(v) for k, v in bundle.workflows.items()},
+        "views": {k: dataclasses.asdict(v) for k, v in bundle.views.items()},
+        "instruments": {k: dataclasses.asdict(v) for k, v in bundle.instruments.items()},
+        "metrics": {k: dataclasses.asdict(v) for k, v in bundle.metrics.items()},
+    }
+
+
+def write_catalogue(bundle):
+    """Merge the five declaration keys into the catalogue.json that
+    catalogue/build.py just wrote, and into the copy the Go server embeds.
+
+    This runs here and not in build.py because the layering only goes one way:
+    kernel imports catalogue, so catalogue importing kernel.declarations back
+    would be a circular import. Run build first, then this; check.sh does.
+    """
+    import json
+    out = ROOT / "catalogue" / "catalogue.json"
+    cat = json.loads(out.read_text())
+    cat.update(compile_json(bundle))
+    blob = json.dumps(cat, indent=2, sort_keys=True) + "\n"
+    out.write_text(blob)
+    (ROOT / "care_phc_mcp" / "catalogue.json").write_text(blob)
+    return sorted(compile_json(bundle))
+
+
+def main():
+    import json
+    import sys
+    named = [a for a in sys.argv[1:] if not a.startswith("-")]
+    try:
+        bundle = load(named[0] if named else "phc")
+    except DeclarationError as e:
+        for line in str(e).splitlines():
+            print(f"FAIL {line}")
+        return 1
+    if "--json" not in sys.argv:
+        print("ok   catalogue.json now carries %s" % ", ".join(write_catalogue(bundle)))
+    print(f"ok   bundle {bundle.manifest.id} {bundle.manifest.version}: "
+          f"{len(bundle.operations)} operations, {len(bundle.workflows)} workflows, "
+          f"{len(bundle.views)} views, {len(bundle.instruments)} instruments, "
+          f"{len(bundle.metrics)} metrics", file=sys.stderr if "--json" in sys.argv else sys.stdout)
+    if "--json" in sys.argv:
+        print(json.dumps(compile_json(bundle), indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())
