@@ -5,3 +5,4 @@ gantt/*.xlsx
 node_modules/
 dist/
 .env
+care_phc_mcp/care_phc_mcp

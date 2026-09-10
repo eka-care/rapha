@@ -7,7 +7,8 @@ python3 -m catalogue.tests.test_guard
 python3 -m catalogue.tests.test_validate
 python3 -m care_phc.tests.test_thread
 python3 -m care_phc.tests.test_token
-(cd care_phc_mcp && go vet ./... && go test ./...)
+(cd care_phc_mcp && go vet ./... && go test ./... && go build -o care_phc_mcp .)
+python3 scripts/agent_demo.py > /dev/null && echo "ok   agent demo runs end to end"
 python3 scripts/gen-fixtures.py
 if [ -d care_phc_fe/node_modules ]; then
   (cd care_phc_fe && npx tsc -b && npm run build >/dev/null)
