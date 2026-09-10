@@ -10,6 +10,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: plan and plugin are in sync
         run: ./scripts/plan-check.sh
+  catalogue:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pyyaml
+      - name: atoms lint and compile
+        run: python3 -m catalogue.build
+      - name: compiled catalogue is committed and current
+        run: git diff --exit-code catalogue/catalogue.json
+      - name: guard safety checks
+        run: python3 -m catalogue.tests.test_guard
   plugin-validate:
     runs-on: ubuntu-latest
     steps:

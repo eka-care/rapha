@@ -45,7 +45,7 @@ done
 # 3. the gantt generator is built from that version too. Its TASKS table is
 #    compiled from plan#p8-schedule, so a schedule change that misses it ships a
 #    gantt partners read as current.
-g=gantt/build_gantt.py
+g=plan-archive/gantt/build_gantt.py
 if [ ! -f "$g" ]; then
   echo "warn $g missing, no gantt to check"
 else
@@ -62,7 +62,7 @@ fi
 
 # 4. every plan#id cited anywhere in the plugin exists in the plan
 #    ponytail: grep, not a markdown parser. Fine while ids are plain anchor tags.
-for id in $(grep -rho 'plan#[a-z0-9.-]*' plugin/ gantt/ | sed -e 's/^plan#//' -e 's/\.$//' | sort -u); do
+for id in $(grep -rho 'plan#[a-z0-9.-]*' plugin/ plan-archive/gantt/ | sed -e 's/^plan#//' -e 's/\.$//' | sort -u); do
   if grep -q "<a id=\"$id\"></a>" "$plan"; then
     echo "ok   plan#$id resolves"
   else
@@ -72,12 +72,12 @@ for id in $(grep -rho 'plan#[a-z0-9.-]*' plugin/ gantt/ | sed -e 's/^plan#//' -e
 done
 
 # 5. the version being replaced was archived, not overwritten
-if [ ! -d plan-history ]; then
+if [ ! -d plan-archive/plan-history ]; then
   echo "warn plan-history/ missing, nothing archived yet"
-elif [ -z "$(ls -A plan-history 2>/dev/null)" ]; then
+elif [ -z "$(ls -A plan-archive/plan-history 2>/dev/null)" ]; then
   echo "warn plan-history/ is empty, nothing archived yet"
 else
-  echo "ok   plan-history/ holds $(ls plan-history | wc -l | tr -d ' ') superseded version(s)"
+  echo "ok   plan-history/ holds $(ls plan-archive/plan-history | wc -l | tr -d ' ') superseded version(s)"
 fi
 
 exit $fail

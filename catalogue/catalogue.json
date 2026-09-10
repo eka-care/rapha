@@ -1,0 +1,386 @@
+{
+  "bundles": {
+    "anm": [
+      "patient.find",
+      "patient.register",
+      "abha.link",
+      "visit.household",
+      "assessment.record",
+      "appointment.book",
+      "vitals.record"
+    ],
+    "asha": [
+      "patient.find",
+      "patient.register",
+      "abha.link",
+      "visit.household",
+      "assessment.record",
+      "appointment.book"
+    ],
+    "cho": [
+      "patient.find",
+      "patient.register",
+      "abha.link",
+      "visit.household",
+      "assessment.record",
+      "appointment.book",
+      "vitals.record",
+      "encounter.document",
+      "lab.order",
+      "rx.prescribe"
+    ],
+    "frontdesk": [
+      "patient.find",
+      "patient.register",
+      "abha.link",
+      "appointment.book",
+      "handover"
+    ],
+    "lab": [
+      "patient.find",
+      "lab.result.enter",
+      "handover"
+    ],
+    "lab_incharge": [
+      "patient.find",
+      "lab.result.enter",
+      "lab.result.validate",
+      "handover"
+    ],
+    "mo": [
+      "patient.find",
+      "encounter.document",
+      "rx.prescribe",
+      "lab.order",
+      "assessment.record",
+      "reporting.view",
+      "handover"
+    ],
+    "nurse": [
+      "patient.find",
+      "patient.register",
+      "abha.link",
+      "appointment.book",
+      "vitals.record",
+      "assessment.record",
+      "handover"
+    ],
+    "pharmacist": [
+      "patient.find",
+      "pharmacy.dispense",
+      "handover"
+    ]
+  },
+  "capabilities": [
+    "abha.link",
+    "appointment.book",
+    "assessment.record",
+    "encounter.document",
+    "facility.admin",
+    "handover",
+    "lab.order",
+    "lab.result.enter",
+    "lab.result.validate",
+    "patient.find",
+    "patient.register",
+    "pharmacy.dispense",
+    "reporting.view",
+    "rx.prescribe",
+    "visit.household",
+    "vitals.record"
+  ],
+  "operations": {
+    "phc.op.abha-link": {
+      "capability": "abha.link",
+      "description": "An ABHA is the patient's national health number. Linking one to their record\nhere is how a hospital in another district finds their history later.",
+      "emits": [
+        "abha.linked"
+      ],
+      "id": "phc.op.abha-link",
+      "input": "phc.schema.abha-link-v1",
+      "instrument": "form",
+      "irreversibility": "irreversible",
+      "kind": "write",
+      "preconditions": [
+        "registered",
+        "not abha.linked"
+      ],
+      "scope_qualifier": null,
+      "station": "reception",
+      "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Create or link an ABHA for this patient",
+      "tool": "propose_abha_link",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "patient"
+      ]
+    },
+    "phc.op.consult-document": {
+      "capability": "encounter.document",
+      "description": "The doctor's note. This is narrative, and narrative is the one thing ambient\ncapture is genuinely good at, because context recovers a dropped word and the\nclinician catches the rest on review.",
+      "emits": [
+        "consult.documented"
+      ],
+      "id": "phc.op.consult-document",
+      "input": "phc.schema.consult-v1",
+      "instrument": "scribe",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "registered"
+      ],
+      "scope_qualifier": null,
+      "station": "doctor",
+      "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Document a consultation",
+      "tool": "propose_consult_document",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "encounter",
+        "notes",
+        "condition"
+      ]
+    },
+    "phc.op.household-visit": {
+      "capability": "visit.household",
+      "description": "An accredited social health activist or auxiliary nurse midwife visits a\nhousehold and records the visit. This is the community half of the system and\nthe half that CARE was not built for, so it is ours to design.",
+      "emits": [
+        "consult.documented"
+      ],
+      "id": "phc.op.household-visit",
+      "input": "phc.schema.household-visit-v1",
+      "instrument": "scribe",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "registered"
+      ],
+      "scope_qualifier": null,
+      "station": "community",
+      "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Record a household visit",
+      "tool": "propose_household_visit",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "encounter",
+        "questionnaire_response"
+      ]
+    },
+    "phc.op.lab-order": {
+      "capability": "lab.order",
+      "description": "The doctor asks for a test. The request lands on the lab's worklist.",
+      "emits": [
+        "lab.ordered"
+      ],
+      "id": "phc.op.lab-order",
+      "input": "phc.schema.lab-order-v1",
+      "instrument": "form",
+      "irreversibility": "reversible",
+      "kind": "write",
+      "preconditions": [
+        "consult.documented"
+      ],
+      "scope_qualifier": null,
+      "station": "doctor",
+      "summary": "Ask the laboratory to run a test for this patient.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Order an investigation",
+      "tool": "propose_lab_order",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "service_request"
+      ]
+    },
+    "phc.op.lab-result-enter": {
+      "capability": "lab.result.enter",
+      "description": "The lab technician types in what the test measured. This is a number, and a\nnumber entered wrongly here is acted on at district review months later\nwithout anybody noticing it was ever wrong.",
+      "emits": [
+        "lab.resulted",
+        "lab.critical"
+      ],
+      "id": "phc.op.lab-result-enter",
+      "input": "phc.schema.lab-result-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "lab.ordered",
+        "not lab.resulted"
+      ],
+      "scope_qualifier": null,
+      "station": "lab",
+      "summary": "Record the value a bench test produced, against the investigation a doctor ordered for this patient.\n",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Enter a laboratory result",
+      "tool": "propose_lab_result_enter",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "diagnostic_report",
+        "specimen"
+      ]
+    },
+    "phc.op.patient-register": {
+      "capability": "patient.register",
+      "description": "Make a new patient record. This is the second thing the clerk does, never the\nfirst. The first thing is always to search.",
+      "emits": [
+        "registered",
+        "abha.pending"
+      ],
+      "id": "phc.op.patient-register",
+      "input": "phc.schema.register-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "not registered"
+      ],
+      "scope_qualifier": null,
+      "station": "reception",
+      "summary": "Create a record for someone the facility has not seen before, after searching and finding nobody who matches.\n",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Register a new patient",
+      "tool": "propose_patient_register",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "patient"
+      ]
+    },
+    "phc.op.pharmacy-dispense": {
+      "capability": "pharmacy.dispense",
+      "description": "The pharmacist hands over medicine and records it. What gets recorded is what\nthe patient was actually given, which is not always what the doctor wrote.\nStockouts at a primary health centre are routine, so a partial dispense is a\nnormal outcome and not an error.",
+      "emits": [
+        "dispensed.partial",
+        "dispensed.complete"
+      ],
+      "id": "phc.op.pharmacy-dispense",
+      "input": "phc.schema.dispense-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "rx.confirmed",
+        "not dispensed.complete"
+      ],
+      "scope_qualifier": null,
+      "station": "pharmacy",
+      "summary": "Give the patient the medicines a doctor prescribed, record what they actually received, and take that quantity out of facility stock.\n",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Dispense against a confirmed prescription",
+      "tool": "propose_pharmacy_dispense",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "medication_dispense",
+        "inventory_item"
+      ]
+    },
+    "phc.op.rx-prescribe": {
+      "capability": "rx.prescribe",
+      "description": "The doctor prescribes. Confirming the prescription is what makes the\npharmacist's dispense action exist at all.",
+      "emits": [
+        "rx.confirmed"
+      ],
+      "id": "phc.op.rx-prescribe",
+      "input": "phc.schema.rx-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "consult.documented",
+        "not rx.confirmed"
+      ],
+      "scope_qualifier": null,
+      "station": "doctor",
+      "summary": "Prescribe medicines for this patient, with what the pharmacy actually has in view.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Write a prescription",
+      "tool": "propose_rx_prescribe",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "medication_request"
+      ]
+    },
+    "phc.op.vitals-record": {
+      "capability": "vitals.record",
+      "description": "The nurse takes the patient's readings and records them. These are numbers,\nand they travel: an abnormal blood pressure recorded here becomes a district\nlevel statistic and a treatment decision.",
+      "emits": [
+        "vitals.recorded",
+        "vitals.flagged"
+      ],
+      "id": "phc.op.vitals-record",
+      "input": "phc.schema.vitals-v1",
+      "instrument": "device",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "registered",
+        "not vitals.recorded"
+      ],
+      "scope_qualifier": null,
+      "station": "nurse",
+      "summary": "Measure and record blood pressure, oxygen saturation, weight and the other basic readings, and flag anything abnormal for the doctor.\n",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Record vitals and triage",
+      "tool": "propose_vitals_record",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "observation"
+      ]
+    }
+  },
+  "states": [
+    "abha.linked",
+    "abha.pending",
+    "capture.consented",
+    "consult.documented",
+    "dispensed.complete",
+    "dispensed.partial",
+    "followup.booked",
+    "lab.critical",
+    "lab.ordered",
+    "lab.resulted",
+    "lab.validated",
+    "registered",
+    "rx.confirmed",
+    "vitals.flagged",
+    "vitals.recorded"
+  ]
+}
