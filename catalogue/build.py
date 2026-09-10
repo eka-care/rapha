@@ -17,6 +17,10 @@ from catalogue import validate, vocab
 
 OPS = pathlib.Path(__file__).parent / "ops"
 OUT = pathlib.Path(__file__).parent / "catalogue.json"
+# The Go MCP server embeds its catalogue, and go:embed cannot reach out of
+# its own package, so the compiled form is written to both places by this
+# one writer. scripts/check.sh gates both against drift.
+OUT_GO = pathlib.Path(__file__).parents[1] / "care_phc_mcp" / "catalogue.json"
 
 REQUIRED = ("id", "type", "kind", "title", "summary", "capability", "station",
             "instrument", "preconditions", "irreversibility", "input", "writes",
@@ -94,7 +98,7 @@ def lint(atoms):
         except FileNotFoundError as e:
             fail(str(e))
         else:
-            for q in validate._walk(schema["questions"]):
+            for q in validate.walk(schema["questions"]):
                 if q["type"] not in validate.TYPES:
                     fail(f"question '{q['link_id']}' has non-CARE type '{q['type']}'")
                 if q["type"] == "choice" and not (q.get("answer_option") or q.get("answer_value_set")):
@@ -121,12 +125,20 @@ def compile_catalogue(atoms):
     ops = {}
     for _, (fm, body) in atoms.items():
         plain = body.split("## In plain words", 1)[1].split("##", 1)[0].strip()
+        schema = validate.load(fm["input"])
+        fields = [
+            {"link_id": q["link_id"], "type": q["type"], "text": q["text"],
+             "required": bool(q.get("required")),
+             "options": [o["value"] for o in q.get("answer_option") or []] or None}
+            for q in validate.walk(schema["questions"])
+        ]
         ops[fm["id"]] = {
             **{k: fm[k] for k in REQUIRED if k != "verified"},
             "scope_qualifier": fm.get("scope_qualifier"),
             "verified": fm["verified"]["status"],
             "tool": tool_name(fm),
             "description": plain,
+            "fields": fields,
         }
     return {
         "capabilities": sorted(vocab.CAPABILITIES),
@@ -147,7 +159,10 @@ def main():
     if bad:
         return 1
     cat = compile_catalogue(atoms)
-    OUT.write_text(json.dumps(cat, indent=2, sort_keys=True) + "\n")
+    blob = json.dumps(cat, indent=2, sort_keys=True) + "\n"
+    OUT.write_text(blob)
+    OUT_GO.parent.mkdir(exist_ok=True)
+    OUT_GO.write_text(blob)
     print(f"ok   {len(atoms)} atoms linted and compiled to {OUT.name}")
     for oid, op in sorted(cat["operations"].items()):
         print(f"     {op['tool']:<28} {op['capability']:<20} {op['verified']}")

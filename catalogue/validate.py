@@ -30,15 +30,15 @@ def _phc(node):
     return (node.get("styling_metadata") or {}).get("phc") or {}
 
 
-def _walk(questions):
+def walk(questions):
     for q in questions:
         yield q
-        yield from _walk(q.get("questions") or [])
+        yield from walk(q.get("questions") or [])
 
 
 def make_validator(schema):
     """Return a callable(op, payload) -> list of problems, for guard.evaluate."""
-    questions = {q["link_id"]: q for q in _walk(schema["questions"])}
+    questions = {q["link_id"]: q for q in walk(schema["questions"])}
 
     def validate(op, payload):
         problems = []
@@ -90,7 +90,7 @@ def make_validator(schema):
 def flags(schema, payload):
     """State flags this payload raises. Critical values promote an action."""
     raised = set()
-    for q in _walk(schema["questions"]):
+    for q in walk(schema["questions"]):
         phc, value = _phc(q), payload.get(q["link_id"])
         crit, flag = phc.get("critical"), phc.get("flags")
         if not (crit and flag) or value in (None, ""):

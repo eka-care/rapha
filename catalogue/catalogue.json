@@ -96,6 +96,32 @@
       "emits": [
         "abha.linked"
       ],
+      "fields": [
+        {
+          "link_id": "method",
+          "options": [
+            "link_existing",
+            "create_new"
+          ],
+          "required": true,
+          "text": "Journey",
+          "type": "choice"
+        },
+        {
+          "link_id": "abha_number",
+          "options": null,
+          "required": false,
+          "text": "ABHA number",
+          "type": "string"
+        },
+        {
+          "link_id": "consent_given",
+          "options": null,
+          "required": true,
+          "text": "Patient consents to ABHA creation or linking",
+          "type": "boolean"
+        }
+      ],
       "id": "phc.op.abha-link",
       "input": "phc.schema.abha-link-v1",
       "instrument": "form",
@@ -125,6 +151,43 @@
       "description": "The doctor's note. This is narrative, and narrative is the one thing ambient\ncapture is genuinely good at, because context recovers a dropped word and the\nclinician catches the rest on review.",
       "emits": [
         "consult.documented"
+      ],
+      "fields": [
+        {
+          "link_id": "history",
+          "options": null,
+          "required": false,
+          "text": "History",
+          "type": "text"
+        },
+        {
+          "link_id": "examination",
+          "options": null,
+          "required": false,
+          "text": "Examination",
+          "type": "text"
+        },
+        {
+          "link_id": "assessment",
+          "options": null,
+          "required": true,
+          "text": "Assessment",
+          "type": "text"
+        },
+        {
+          "link_id": "diagnosis",
+          "options": null,
+          "required": false,
+          "text": "Diagnosis",
+          "type": "structured"
+        },
+        {
+          "link_id": "plan",
+          "options": null,
+          "required": false,
+          "text": "Plan",
+          "type": "text"
+        }
       ],
       "id": "phc.op.consult-document",
       "input": "phc.schema.consult-v1",
@@ -157,6 +220,42 @@
       "emits": [
         "consult.documented"
       ],
+      "fields": [
+        {
+          "link_id": "visit_type",
+          "options": [
+            "routine",
+            "anc",
+            "immunisation",
+            "tb_followup",
+            "ncd_followup"
+          ],
+          "required": true,
+          "text": "Visit type",
+          "type": "choice"
+        },
+        {
+          "link_id": "consent_at_door",
+          "options": null,
+          "required": true,
+          "text": "Household consents to this visit being recorded",
+          "type": "boolean"
+        },
+        {
+          "link_id": "narrative",
+          "options": null,
+          "required": false,
+          "text": "What happened",
+          "type": "text"
+        },
+        {
+          "link_id": "followup_needed",
+          "options": null,
+          "required": false,
+          "text": "Follow up needed",
+          "type": "boolean"
+        }
+      ],
       "id": "phc.op.household-visit",
       "input": "phc.schema.household-visit-v1",
       "instrument": "scribe",
@@ -187,6 +286,15 @@
       "emits": [
         "lab.ordered"
       ],
+      "fields": [
+        {
+          "link_id": "investigations",
+          "options": null,
+          "required": true,
+          "text": "Investigations",
+          "type": "structured"
+        }
+      ],
       "id": "phc.op.lab-order",
       "input": "phc.schema.lab-order-v1",
       "instrument": "form",
@@ -216,6 +324,36 @@
       "emits": [
         "lab.resulted",
         "lab.critical"
+      ],
+      "fields": [
+        {
+          "link_id": "analyte",
+          "options": null,
+          "required": true,
+          "text": "Analyte",
+          "type": "string"
+        },
+        {
+          "link_id": "value",
+          "options": null,
+          "required": true,
+          "text": "Value",
+          "type": "decimal"
+        },
+        {
+          "link_id": "unit",
+          "options": null,
+          "required": true,
+          "text": "Unit",
+          "type": "string"
+        },
+        {
+          "link_id": "override_reason",
+          "options": null,
+          "required": false,
+          "text": "Reason for accepting an out of range value",
+          "type": "text"
+        }
       ],
       "id": "phc.op.lab-result-enter",
       "input": "phc.schema.lab-result-v1",
@@ -249,6 +387,59 @@
         "registered",
         "abha.pending"
       ],
+      "fields": [
+        {
+          "link_id": "name",
+          "options": null,
+          "required": true,
+          "text": "Full name",
+          "type": "string"
+        },
+        {
+          "link_id": "age",
+          "options": null,
+          "required": true,
+          "text": "Age",
+          "type": "integer"
+        },
+        {
+          "link_id": "sex",
+          "options": [
+            "female",
+            "male",
+            "other"
+          ],
+          "required": true,
+          "text": "Sex",
+          "type": "choice"
+        },
+        {
+          "link_id": "phone",
+          "options": null,
+          "required": true,
+          "text": "Mobile",
+          "type": "string"
+        },
+        {
+          "link_id": "village",
+          "options": null,
+          "required": true,
+          "text": "Village",
+          "type": "string"
+        },
+        {
+          "link_id": "category",
+          "options": [
+            "general",
+            "anc",
+            "ncd",
+            "tb"
+          ],
+          "required": false,
+          "text": "Patient category",
+          "type": "choice"
+        }
+      ],
       "id": "phc.op.patient-register",
       "input": "phc.schema.register-v1",
       "instrument": "form",
@@ -278,6 +469,29 @@
       "emits": [
         "dispensed.partial",
         "dispensed.complete"
+      ],
+      "fields": [
+        {
+          "link_id": "dispenses",
+          "options": null,
+          "required": true,
+          "text": "Medicines handed over",
+          "type": "structured"
+        },
+        {
+          "link_id": "batch",
+          "options": null,
+          "required": false,
+          "text": "Batch",
+          "type": "string"
+        },
+        {
+          "link_id": "partial",
+          "options": null,
+          "required": false,
+          "text": "Partial dispense",
+          "type": "boolean"
+        }
       ],
       "id": "phc.op.pharmacy-dispense",
       "input": "phc.schema.dispense-v1",
@@ -310,6 +524,15 @@
       "emits": [
         "rx.confirmed"
       ],
+      "fields": [
+        {
+          "link_id": "medications",
+          "options": null,
+          "required": true,
+          "text": "Medications",
+          "type": "structured"
+        }
+      ],
       "id": "phc.op.rx-prescribe",
       "input": "phc.schema.rx-v1",
       "instrument": "form",
@@ -340,6 +563,50 @@
       "emits": [
         "vitals.recorded",
         "vitals.flagged"
+      ],
+      "fields": [
+        {
+          "link_id": "systolic",
+          "options": null,
+          "required": true,
+          "text": "Systolic BP",
+          "type": "integer"
+        },
+        {
+          "link_id": "diastolic",
+          "options": null,
+          "required": true,
+          "text": "Diastolic BP",
+          "type": "integer"
+        },
+        {
+          "link_id": "pulse",
+          "options": null,
+          "required": true,
+          "text": "Pulse",
+          "type": "integer"
+        },
+        {
+          "link_id": "spo2",
+          "options": null,
+          "required": false,
+          "text": "SpO2",
+          "type": "integer"
+        },
+        {
+          "link_id": "weight",
+          "options": null,
+          "required": false,
+          "text": "Weight",
+          "type": "decimal"
+        },
+        {
+          "link_id": "temperature",
+          "options": null,
+          "required": false,
+          "text": "Temperature",
+          "type": "decimal"
+        }
       ],
       "id": "phc.op.vitals-record",
       "input": "phc.schema.vitals-v1",

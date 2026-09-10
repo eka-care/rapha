@@ -14,6 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
       - run: pip install pyyaml
       - name: catalogue, guard, validator and thread state
         run: ./scripts/check.sh
