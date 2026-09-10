@@ -24,6 +24,8 @@ from typing import Optional
 
 from catalogue import guard, validate
 from kernel import contracts as c
+from kernel import mapping
+from kernel.state import drawn_by
 from kernel.state import flags as thread_flags
 
 
@@ -62,6 +64,14 @@ def _audit(store, decision_audit, *, thread, at, proposal=None):
 def _decide(store, bundle, op, *, thread, payload, caps, surface, actor,
             confirmed=False, scopes=None, workflow=None):
     workflow = workflow or bundle.workflow()
+    if not drawn_by(workflow, op["id"]):
+        # Before the guard, because this is not a judgement about this thread's
+        # state: the operation is not part of this line at all.
+        return guard.Decision(False, "%s is not a step of %s: no station in this "
+                                     "workflow draws it" % (op["id"], workflow.id),
+                              audit={"operation": op["id"], "actor": actor,
+                                     "surface": surface, "payload": dict(payload),
+                                     "outcome": "denied: not in this workflow"})
     return guard.evaluate(
         op, caps=caps, state=thread_flags(store, thread, workflow), payload=payload,
         surface=surface, confirmed=confirmed, scopes=scopes, actor=actor,
@@ -71,12 +81,18 @@ def _decide(store, bundle, op, *, thread, payload, caps, surface, actor,
 def _write(store, bundle, op, *, thread, payload, workflow):
     """Guard steps 6 and 7: the CARE write, then the state emit.
 
-    Every resource in Operation.writes gets the payload as it stands. Mapping
-    a questionnaire link_id onto a resource field is the adapter's knowledge
-    and is not written in any declaration tonight; this is honest about that
-    rather than pretending a mapping exists.
+    Which answer becomes which column is declared on the operation atom and
+    compiled by kernel/mapping.py, so the store is handed rows and not the
+    payload. Every adapter inherits the one mapping; none of them re-derives
+    what a blood pressure is. What an adapter still owns is its own schema:
+    how a row joins to the thread, and what its columns are called.
+
+    One record in, one Store.write out. A payload fans out, so three vitals
+    are three observation rows and two medicines are two medication_request
+    rows, which is what dispensed.complete counts.
     """
-    ids = [store.write(res, dict(payload), thread=thread) for res in op["writes"]]
+    ids = [store.write(res, row, thread=thread)
+           for res, row in mapping.records(op, payload)]
     for flag in raised(op, payload, workflow):
         store.raise_flag(thread, flag)
     return ids

@@ -17,6 +17,23 @@ preconditions:
 irreversibility: correctable
 input: phc.schema.dispense-v1
 writes: [medication_dispense, inventory_item]
+mapping:
+  # The batch is read back to the person at the counter and not stored: no
+  # resource here has a column for it. Saying so is the point of this list.
+  ignored: [batch, partial]
+  records:
+    - resource: medication_dispense
+      per_item: dispenses
+      fields:
+        medication: {item: [medication, drug, code]}
+        quantity: {item: [quantity, qty]}
+        status: {const: completed}
+    - resource: inventory_item
+      per_item: dispenses
+      fields:
+        code: {item: [medication, drug, code]}
+        quantity: {minus: [quantity, qty]}
+        status: {const: issued}
 emits: [dispensed.partial, dispensed.complete]
 surfaces: [rendered, mcp]
 verified:

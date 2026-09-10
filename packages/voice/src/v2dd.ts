@@ -95,6 +95,9 @@ export type ListenOptions = {
    *  "one forty" and Indian names markedly better than en-US does. */
   lang?: string;
   timeoutMs?: number;
+  /** Aborting stops the microphone and resolves with an empty Draft, which
+   *  means keypad. There is no shape of abort that commits anything. */
+  signal?: AbortSignal;
 };
 
 /**
@@ -129,6 +132,11 @@ export function captureValue(opts: ListenOptions): Promise<Draft> {
     const timer = setTimeout(
       () => finish({ ...meta, values: {}, confidence: {}, reason: "heard nothing" }),
       opts.timeoutMs ?? 8000,
+    );
+    opts.signal?.addEventListener(
+      "abort",
+      () => finish({ ...meta, values: {}, confidence: {}, reason: "stopped" }),
+      { once: true },
     );
 
     rec.onresult = (e: any) => {

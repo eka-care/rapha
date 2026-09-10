@@ -1,0 +1,24 @@
+{
+  "version": "1.0",
+  "slug": "lab-accession-v1",
+  "title": "Accession a referral",
+  "status": "active",
+  "subject_type": "patient",
+  "styling_metadata": {
+    "phc": {
+      "operation": "lab.op.referral-accession"
+    }
+  },
+  "questions": [
+    {"link_id": "name", "text": "Full name", "type": "string", "required": true},
+    {"link_id": "age", "text": "Age", "type": "integer", "required": true,
+     "styling_metadata": {"phc": {"range": {"low": 0, "high": 120}}}},
+    {"link_id": "sex", "text": "Sex", "type": "choice", "required": true,
+     "answer_option": [{"value": "female"}, {"value": "male"}, {"value": "other"}]},
+    {"link_id": "phone", "text": "Mobile", "type": "string", "required": true},
+    {"link_id": "referrer_name", "text": "Referring clinician", "type": "string", "required": true},
+    {"link_id": "referrer_contact", "text": "Referrer contact (phone or portal id)", "type": "string", "required": false},
+    {"link_id": "panel", "text": "Panel requested", "type": "choice", "required": true,
+     "answer_option": [{"value": "cbc"}, {"value": "bmp"}]}
+  ]
+}

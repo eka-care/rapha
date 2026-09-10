@@ -16,6 +16,8 @@ python3 -m catalogue.tests.test_validate
 python3 -m care_phc.tests.test_thread
 python3 -m kernel.tests.test_contracts
 python3 -m kernel.tests.test_kernel
+python3 -m kernel.tests.test_mapping
+python3 -m bundles.lab.check      # a second bundle on the same kernel; SKIP_E2E=1 skips its socket half
 
 echo "\n== the adapter and the service =="
 python3 -m adapters.local.tests.test_store
@@ -23,20 +25,28 @@ python3 -m api.tests.test_api
 
 echo "\n== the agent, and the ABDM connector =="
 python3 -m agent.tests.test_planner
+python3 -m agent.tests.test_live      # binds a port; SKIP_E2E=1 skips that half
 python3 -m care_phc.tests.test_token
 python3 -m care_phc.tests.test_eka
 
 echo "\n== the MCP server =="
 (cd care_phc_mcp && go vet ./... && go test ./... && go build -o care_phc_mcp .)
-python3 scripts/agent_demo.py > /dev/null && echo "ok   agent demo runs end to end"
+# Two lines, not one `cmd && echo`: under `set -e` a failing command on the
+# left of && does not stop the script, so that spelling let this check fail in
+# silence. It did.
+python3 scripts/agent_demo.py > /dev/null
+echo "ok   agent demo runs end to end"
 
 echo "\n== the browser side =="
-# The voice grammar is pure and runs under plain node. The Web Speech wiring
-# in packages/voice/src/v2dd.ts is NOT checked here and cannot be: it needs a
-# microphone and a browser. First real run is its first test.
+# The voice grammar is pure and runs under plain node. The browser's own
+# recogniser is NOT checked here and cannot be: it needs a microphone. Every
+# line around it is, including that no voice path can write.
 node packages/voice/src/grammar.check.ts
 if [ -d web/node_modules ]; then
   (cd web && npm run check && npm run build >/dev/null)
+  # Which fields take voice comes from the instrument declarations, and nothing
+  # on the voice path can write. Both are asserted here; neither needs a mic.
+  (cd web && node --experimental-strip-types src/voice/voice.check.ts)
   echo "ok   web renderer typechecks and builds"
 else
   echo "warn web: run (cd web && npm install) to check the renderer"

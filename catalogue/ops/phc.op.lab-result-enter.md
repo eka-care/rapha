@@ -17,6 +17,21 @@ preconditions:
 irreversibility: correctable
 input: phc.schema.lab-result-v1
 writes: [diagnostic_report, specimen]
+mapping:
+  # The reason for an override is recorded on the audit line, which is where a
+  # reader looks for why a value outside range was accepted. It is not a
+  # column on the report.
+  ignored: [override_reason]
+  records:
+    - resource: diagnostic_report
+      fields:
+        code: {answer: analyte}
+        conclusion: {joined: [value, unit]}
+        status: {const: preliminary}
+    - resource: specimen
+      fields:
+        code: {answer: analyte}
+        status: {const: available}
 emits: [lab.resulted, lab.critical]
 surfaces: [rendered, mcp]
 verified:

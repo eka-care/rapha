@@ -17,5 +17,5 @@
   },
   "include": ["src"],
   "//": "validate.check.ts runs under node, not vite: it imports node: builtins and diffs against python. Type checking it would mean pulling in @types/node for one file.",
-  "exclude": ["src/validate.check.ts"]
+  "exclude": ["src/validate.check.ts", "src/voice/voice.check.ts"]
 }

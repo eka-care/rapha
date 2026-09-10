@@ -64,13 +64,19 @@ func Load() (*Catalogue, error) {
 // For returns the operations this service account may invoke, sorted so the
 // tool list is stable between runs. v0.1 §6 wants a role's surface well under
 // fifty operations; the bundles already partition it, so there is no splitting
-// logic here beyond the capability filter.
-func (c *Catalogue) For(caps map[string]bool) []Operation {
+// logic here beyond two filters: the capability, and which operations the
+// kernel's loaded bundle holds. A nil or empty `bundle` does not narrow, which
+// is what the offline PHC_CAPABILITIES hatch wants.
+func (c *Catalogue) For(caps map[string]bool, bundle map[string]bool) []Operation {
 	var ops []Operation
 	for _, op := range c.Operations {
-		if caps[op.Capability] {
-			ops = append(ops, op)
+		if !caps[op.Capability] {
+			continue
 		}
+		if len(bundle) > 0 && !bundle[op.ID] {
+			continue
+		}
+		ops = append(ops, op)
 	}
 	sort.Slice(ops, func(i, j int) bool { return ops[i].ID < ops[j].ID })
 	return ops

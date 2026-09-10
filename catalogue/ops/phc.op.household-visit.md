@@ -16,6 +16,15 @@ preconditions:
 irreversibility: correctable
 input: phc.schema.household-visit-v1
 writes: [encounter, questionnaire_response]
+mapping:
+  records:
+    - resource: encounter
+      fields:
+        status: {const: in_progress}
+    - resource: questionnaire_response
+      fields:
+        questionnaire: {const: phc.schema.household-visit-v1}
+        payload: {json: payload}
 emits: [consult.documented]
 surfaces: [rendered, mcp]
 verified:

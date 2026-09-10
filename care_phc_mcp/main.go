@@ -85,6 +85,31 @@ func (c *Client) capabilities(ctx context.Context) (map[string]bool, error) {
 	return caps, nil
 }
 
+// loaded asks the kernel which operations the bundle it started with actually
+// holds. catalogue.json is embedded at build time and carries every bundle's
+// atoms, so without this a server pointed at a laboratory kernel offers
+// propose_vitals_record, which that kernel answers with a 404. An empty result
+// means "do not narrow": the offline escape hatch below never asks.
+func (c *Client) loaded(ctx context.Context) (map[string]bool, error) {
+	body, err := c.do(ctx, http.MethodGet, "/api/v1/phc/facility/", nil)
+	if err != nil {
+		return nil, err
+	}
+	var out struct {
+		Bundle struct {
+			Operations []string `json:"operations"`
+		} `json:"bundle"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, err
+	}
+	ids := map[string]bool{}
+	for _, id := range out.Bundle.Operations {
+		ids[id] = true
+	}
+	return ids, nil
+}
+
 func text(s string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: s}}}
 }
@@ -146,11 +171,26 @@ func main() {
 	if err != nil {
 		log.Fatalf("could not read this account's capabilities: %v", err)
 	}
+	// Only when we are actually talking to a kernel. With PHC_CAPABILITIES set
+	// there is nothing to ask, and the embedded catalogue is the whole answer.
+	var bundle map[string]bool
+	if os.Getenv("PHC_CAPABILITIES") == "" {
+		if bundle, err = client.loaded(ctx); err != nil {
+			// Not fatal. Narrowing keeps a lab tool off a health centre's list;
+			// it is not what stops a write, the kernel is, and it answers an
+			// operation it never loaded with a 404 either way. Something that
+			// serves /whoami but not /facility (scripts/mock_care.py) should
+			// still start, loudly.
+			log.Printf("care-phc: cannot tell which bundle this kernel loaded "+
+				"(%v); offering every embedded operation this account may use", err)
+			bundle = nil
+		}
+	}
 
 	server := mcp.NewServer(&mcp.Implementation{
 		Name: "care-phc", Version: "0.1.0",
 	}, nil)
-	ops := cat.For(caps)
+	ops := cat.For(caps, bundle)
 	for _, op := range ops {
 		schema, err := json.Marshal(op.InputSchema())
 		if err != nil {

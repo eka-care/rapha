@@ -44,19 +44,42 @@ func TestEveryOperationIsOnBothSurfaces(t *testing.T) {
 func TestAnAccountOnlySeesToolsItCanUse(t *testing.T) {
 	c := load(t)
 	pharmacist := map[string]bool{"patient.find": true, "pharmacy.dispense": true}
-	ops := c.For(pharmacist)
+	ops := c.For(pharmacist, nil)
 	if len(ops) != 1 || ops[0].ID != "phc.op.pharmacy-dispense" {
 		t.Fatalf("pharmacist saw %d operations, want just dispense", len(ops))
 	}
-	if len(c.For(map[string]bool{})) != 0 {
+	if len(c.For(map[string]bool{}, nil)) != 0 {
 		t.Error("an account with no capabilities saw tools")
 	}
 	all := map[string]bool{}
 	for _, cap := range c.Capabilities {
 		all[cap] = true
 	}
-	if len(c.For(all)) != len(c.Operations) {
+	if len(c.For(all, nil)) != len(c.Operations) {
 		t.Error("an account with every capability could not see every operation")
+	}
+}
+
+// catalogue.json is embedded at build time and holds every bundle's atoms, so
+// a server pointed at a kernel that loaded one bundle must not offer another
+// bundle's tools: the kernel answers those with a 404.
+func TestOnlyTheLoadedBundlesOperationsAreOffered(t *testing.T) {
+	c := load(t)
+	all := map[string]bool{}
+	for _, cap := range c.Capabilities {
+		all[cap] = true
+	}
+	var one string
+	for id := range c.Operations {
+		one = id
+		break
+	}
+	ops := c.For(all, map[string]bool{one: true})
+	if len(ops) != 1 || ops[0].ID != one {
+		t.Fatalf("bundle of one offered %d tools, want just %s", len(ops), one)
+	}
+	if len(c.For(all, nil)) != len(c.Operations) {
+		t.Error("no bundle given must not narrow: that is the offline hatch")
 	}
 }
 

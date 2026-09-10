@@ -14,6 +14,13 @@ preconditions:
 irreversibility: reversible
 input: phc.schema.lab-order-v1
 writes: [service_request]
+mapping:
+  records:
+    - resource: service_request
+      per_item: investigations
+      fields:
+        code: {item: [code, test]}
+        status: {const: active}
 emits: [lab.ordered]
 surfaces: [rendered, mcp]
 verified:

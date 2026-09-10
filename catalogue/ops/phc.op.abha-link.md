@@ -17,6 +17,14 @@ preconditions:
 irreversibility: irreversible
 input: phc.schema.abha-link-v1
 writes: [patient]
+mapping:
+  # The method and the consent are the reason the write is allowed, not part
+  # of the row. Both are on the audit line for this operation.
+  ignored: [method, consent_given]
+  records:
+    - resource: patient
+      fields:
+        abha_number: {answer: abha_number}
 emits: [abha.linked]
 surfaces: [rendered, mcp]
 verified:

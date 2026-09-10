@@ -14,7 +14,7 @@ import inspect
 
 from care_phc.thread import Snapshot, derive
 from care_phc.thread import station as coded_station
-from catalogue import guard
+from catalogue import guard, vocab
 from kernel import contracts as c
 from kernel import declarations, proposals, state, views
 
@@ -262,7 +262,13 @@ def test_out_of_range_blocks_and_an_override_needs_a_reason():
 
     ok = dict(bad, override_reason="cuff reads high, repeated twice, referring")
     assert proposals.commit(s, BUNDLE, "phc.op.vitals-record", payload=ok, **args)
-    assert s.rows["observation"][0]["override_reason"], "the reason was not recorded"
+    assert s.rows["observation"][0]["value"] == 400, "the value as measured"
+    # The reason is recorded on the audit line, which is where a reader looks
+    # for why an impossible value was accepted. No resource has a column for
+    # it. This used to assert it landed on the observation row, which was true
+    # only of this dict fake: it was handed the raw payload, and the SQLite
+    # adapter dropped the same key on the floor.
+    assert s.audit(T)[-1].payload["override_reason"], "the reason was not recorded"
 
 
 def test_a_critical_but_in_range_value_raises_a_stored_flag():
@@ -519,6 +525,34 @@ def test_a_thread_view_is_the_shape_the_renderer_was_promised():
     assert out["proposals"][0]["status"] == "pending"
     assert out["station"] is None and out["nudge"]
     assert set(out) == {f.name for f in dataclasses.fields(c.ThreadView)}
+
+
+def test_an_operation_no_step_draws_is_neither_a_button_nor_a_write():
+    """phc.op.household-visit is in the PHC manifest and in no PHC step: it
+    stands at `community` and the outpatient line has no such station. It must
+    not be drawn on a clinic thread, and it must not be writable onto one from
+    any surface, or a household questionnaire lands on an encounter."""
+    stray = "phc.op.household-visit"
+    assert stray in OPS, "the fixture this asserts against has moved"
+    assert not state.drawn_by(WF, stray)
+    assert all(state.drawn_by(WF, op_id) for op_id in OPS if op_id != stray)
+
+    s = registered()
+    every = set(vocab.CAPABILITIES)
+    drawn = [op["id"] for op in state.actions(WF, OPS, state.flags(s, T, WF), every)]
+    assert stray not in drawn, drawn
+    assert "phc.op.vitals-record" in drawn, drawn
+
+    payload = {"visit_type": "routine", "consent_at_door": True,
+               "narrative": "knocked, nothing clinical happened",
+               "followup_needed": False}
+    denied = proposals.commit(s, BUNDLE, stray, thread=T, payload=payload,
+                              caps=every, actor="nurse", confirmed=True)
+    assert not denied and "not a step of" in denied.reason, denied.reason
+    denied, nothing = proposals.propose(s, BUNDLE, stray, thread=T, payload=payload,
+                                        caps=every, actor="agent")
+    assert not denied and nothing is None, denied.reason
+    assert s.count("questionnaire_response", thread=T, where={}) == 0
 
 
 if __name__ == "__main__":

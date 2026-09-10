@@ -16,6 +16,19 @@ preconditions:
 irreversibility: correctable
 input: phc.schema.consult-v1
 writes: [encounter, notes, condition]
+mapping:
+  records:
+    - resource: encounter
+      fields:
+        status: {const: in_progress}
+    - resource: notes
+      fields:
+        text: {note: [history, examination, assessment, plan]}
+    - resource: condition
+      per_item: diagnosis
+      fields:
+        code: {item: [code, text]}
+        verification_status: {const: confirmed}
 emits: [consult.documented]
 surfaces: [rendered, mcp]
 verified:

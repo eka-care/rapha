@@ -18,14 +18,21 @@ import { Form, labelled, validate } from "./Form";
 import { questionnaire } from "./declarations";
 import type { Operation, Payload, Proposal } from "./types";
 import { Badge, Empty, Failed, human } from "./ui";
+import { mountsFor } from "./voice/instruments";
+import { VoiceCapture } from "./voice/VoiceCapture";
 
 const IRREVERSIBLE = "irreversible";
 
 export function OperationPanel({
-  op, thread, client, proposal, onDone, onCancel,
+  op, thread, client, proposal, instruments, flags, onDone, onCancel,
 }: {
   op: Operation;
   thread: string;
+  /** The compiled instrument declarations. Which capture controls appear on
+   *  this screen is entirely their answer, never this file's. */
+  instruments?: Record<string, unknown>;
+  /** The thread's flags, because the scribe declaration gates on one. */
+  flags?: string[];
   /** Whichever kernel this screen is talking to. The panel does not know or
    *  care which, so demo mode cannot write to a real store by accident. */
   client: Client;
@@ -35,6 +42,10 @@ export function OperationPanel({
 }) {
   const schema = questionnaire(op.input);
   const [payload, setPayload] = useState<Payload>({ ...(proposal?.payload ?? {}) });
+  /** Per link_id, how sure the instrument that produced the value was. A
+   *  value under 0.9 draws the field as unconfirmed. Typing over a value
+   *  clears its entry: a number a person typed is not a heard number. */
+  const [heard, setHeard] = useState<Record<string, number>>({});
   const [tried, setTried] = useState(false);
   const [stage, setStage] = useState<"edit" | "confirm">("edit");
   const [confirmed, setConfirmed] = useState(false);
@@ -57,11 +68,29 @@ export function OperationPanel({
   }
 
   const irreversible = op.irreversibility === IRREVERSIBLE;
-  const edit = (next: Payload) => {
-    setPayload(next);
+  const invalidate = () => {
     setConfirmed(false);           // an edit invalidates a confirm, always
     if (stage === "confirm") setStage("edit");
   };
+  const edit = (next: Payload) => {
+    setPayload(next);
+    setHeard((was) =>
+      Object.fromEntries(
+        Object.entries(was).filter(([id]) => String(next[id] ?? "") === String(payload[id] ?? "")),
+      ),
+    );
+    invalidate();
+  };
+
+  /** What an instrument produced. It lands in the same editable fields a
+   *  person types into and it is committed by the same tap. There is no other
+   *  path from here: this sets state, and state is not a write. */
+  const fromInstrument = (values: Record<string, unknown>, confidence: Record<string, number>) => {
+    setPayload((was) => ({ ...was, ...values }));
+    setHeard((was) => ({ ...was, ...confidence }));
+    invalidate();
+  };
+  const mounts = mountsFor(instruments, op, schema);
 
   const send = async () => {
     setTried(true);
@@ -129,12 +158,22 @@ export function OperationPanel({
           </div>
         )}
 
+        <VoiceCapture
+          mounts={mounts}
+          operation={op.id}
+          flags={flags ?? []}
+          payload={payload}
+          disabled={busy}
+          onValues={fromInstrument}
+          onText={(link_id, text) => fromInstrument({ [link_id]: text }, { [link_id]: 0.6 })}
+        />
+
         <Form
           schema={schema}
           value={payload}
           onChange={edit}
           problems={tried ? problems : []}
-          confidence={proposal?.confidence}
+          confidence={{ ...(proposal?.confidence ?? {}), ...heard }}
           disabled={busy}
         />
 

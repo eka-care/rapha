@@ -1,0 +1,28 @@
+# A standalone diagnostics laboratory. Load this and the kernel is a lab.
+#
+# Built to stress the claim that a lab differs from a PHC only by bundle.
+# Every place the closed vocabulary forced a PHC name onto a lab fact is
+# written down in bundles/LAB-LOG.md, which cannot live beside this file because every .md here is parsed as a declaration; the names below are the ones the
+# linter accepts, not the ones a laboratory would choose.
+id: lab
+version: 2026.09.11
+title: Diagnostics laboratory
+operations:
+  - lab.op.referral-accession
+  - lab.op.specimen-collect
+  - lab.op.result-enter
+  - lab.op.result-verify
+  - lab.op.report-release
+workflows:
+  - lab.wf.specimen
+views:
+  - lab.view.worklist
+  - lab.view.report
+  - lab.view.turnaround
+instruments:
+  - lab.inst.analyser
+metrics:
+  - lab.metric.accessioned
+  - lab.metric.released
+  - lab.metric.release-ratio
+  - lab.metric.critical-rate

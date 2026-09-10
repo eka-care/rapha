@@ -28,6 +28,7 @@ import urllib.error
 import urllib.request
 
 ROOT = pathlib.Path(__file__).parents[1]
+sys.path.insert(0, str(ROOT))
 PREFIX = "/api/v1/phc"  # the MCP server's prefix; /api is the same router
 checks = 0
 
@@ -139,10 +140,122 @@ def mcp(base, thread):
     assert tools and all(t.startswith("propose_") for t in tools), tools
     ok("the Go MCP server offers %d tools and every one of them is a proposal" % len(tools))
 
+    # catalogue.json is embedded at build time and holds every bundle's atoms.
+    # The server asks the kernel which bundle it loaded, so a laboratory tool
+    # must not be on the list of a kernel that is running a health centre.
+    offered = {t["name"] for t in replies[2]["result"]["tools"]}
+    declared = {op["tool"] for op in call(base, "/catalogue/")["operations"].values()}
+    assert offered <= declared, sorted(offered - declared)
+    assert "propose_result_verify" not in offered, sorted(offered)
+    ok("and not one of them belongs to a bundle this kernel did not load")
+
     said = replies[3]["result"]["content"][0]["text"]
     assert "Proposed, not committed" in said, said
     assert not replies[3]["result"].get("isError"), said
     ok("an agent's tool call reaches the kernel and comes back as a proposal")
+
+
+def agent_confirms(base, db, thread):
+    """The agent's proposal reaches the screen, and only the screen ends it.
+
+    Driven with agent/client.py rather than urllib, so what is checked is the
+    client the CLI actually uses: it holds no verb that commits and refuses to
+    assemble a URL that would. The proposal it leaves behind has to show up in
+    the ThreadView a clinician opens, or nobody would ever find it.
+    """
+    from agent.client import Kernel
+
+    kernel = Kernel(base, actor="agent:e2e")
+    payload = {"systolic": 132, "diastolic": 84, "pulse": 78,
+               "temperature": 36.9, "spo2": 98, "weight": 58}
+    answer = kernel.propose("phc.op.vitals-record", thread, payload)
+    pid = answer["proposal_id"]
+    assert rows(db, "SELECT * FROM observation WHERE encounter=?", (thread,)) == []
+    ok("the agent's own client proposes over the socket and writes no clinical row")
+
+    for path in ("/proposals/%s/confirm" % pid, "/operations/x/commit"):
+        try:
+            kernel._call(path)
+        except RuntimeError as refused:
+            assert "will not call" in str(refused), refused
+        else:
+            raise AssertionError("agent.client assembled %s" % path)
+    ok("the agent's client refuses to build a confirm or a commit URL at all")
+
+    panel = call(base, "/threads/%s/" % thread)
+    pending = [p for p in panel["proposals"] if p["id"] == pid]
+    assert len(pending) == 1, panel["proposals"]
+    assert pending[0]["status"] == "pending", pending
+    assert pending[0]["surface"] == "mcp", pending
+    ok("the proposal appears on the clinician's thread, pending, marked machine surface")
+
+    surfaces = rows(db, "SELECT surface, outcome FROM audit WHERE proposal=?", (pid,))
+    assert surfaces and all(s == "mcp" for s, _ in surfaces), surfaces
+    assert not any(o == "allowed" for _, o in surfaces), surfaces
+
+    confirmed = call(base, "/proposals/%s/confirm/" % pid, {"confirmed": True})
+    assert confirmed["proposal"]["status"] == "confirmed"
+    written = dict(rows(db, "SELECT code, value FROM observation WHERE encounter=?",
+                        (thread,)))
+    assert written.get("systolic") == "132", written
+    assert not [p for p in call(base, "/threads/%s/" % thread)["proposals"]
+                if p["id"] == pid]
+    ok("a person confirming it on the rendered surface is what writes the row")
+
+
+def voice_cannot_commit(base, db):
+    """A spoken value has no route of its own, and cannot buy itself a tap.
+
+    The browser half of this is web/src/voice/voice.check.ts, which asserts the
+    control holds no client. This is the server half, which is the one that
+    would matter if somebody wrote a different renderer: the kernel offers no
+    voice route, ignores a body that claims a surface, and still refuses an
+    irreversible operation that was not tapped.
+    """
+    catalogue = call(base, "/catalogue/")
+    instruments = catalogue["instruments"]
+    assert instruments, "the bundle declares no instrument to check"
+    for iid, decl in sorted(instruments.items()):
+        assert decl["commit"] == "tap", (iid, decl["commit"])
+        assert decl["readback"] == "required", (iid, decl["readback"])
+    ok("every one of the %d declared instruments commits by tap and reads back"
+       % len(instruments))
+
+    routes = urllib.request.urlopen(base + "/").read().decode()
+    for word in ("voice", "draft", "instrument", "dictate", "speech"):
+        assert word not in routes, "the API grew a %s route" % word
+    ok("the kernel serves no voice, draft or instrument route: a tap is an ordinary commit")
+
+    # The operation the vitals instrument names, sent the way a renderer that
+    # trusted its microphone might send it: a surface, a confidence, no person.
+    op = "phc.op.vitals-record"
+    assert any(op in (d.get("operations") or []) for d in instruments.values())
+    thread = register(base, "Voice Test", "T-93")
+    spoken = {"systolic": 400, "diastolic": 90, "pulse": 72,
+              "temperature": 36.8, "spo2": 97, "weight": 60}
+    denied = call(base, "/operations/%s/commit/" % op,
+                  {"thread": thread, "surface": "voice", "confirmed": True,
+                   "confidence": {"systolic": 0.99}, "payload": spoken}, expect=422)
+    assert "outside 70 to 250" in denied["detail"], denied
+    ok("a heard value out of range is refused even claiming a surface and full confidence")
+
+    call(base, "/operations/%s/commit/" % op,
+         {"thread": thread, "surface": "voice",
+          "payload": dict(spoken, systolic=130)})
+    surfaces = {s for (s,) in rows(db, "SELECT DISTINCT surface FROM audit "
+                                       "WHERE thread=?", (thread,))}
+    assert surfaces == {"rendered"}, surfaces
+    ok("a body claiming surface 'voice' is recorded as rendered: the kernel names the surface, not the caller")
+
+    # And the irreversible one, which is where an unattended microphone would
+    # do real damage, still wants the checkbox.
+    denied = call(base, "/operations/phc.op.abha-link/commit/",
+                  {"thread": thread, "surface": "voice",
+                   "payload": {"method": "link_existing",
+                               "abha_number": "22-2222-2222-2222",
+                               "consent_given": True}}, expect=422)
+    assert "explicit confirm" in denied["detail"], denied
+    ok("an irreversible operation is still untappable by voice: %s" % denied["detail"])
 
 
 def main():
@@ -264,6 +377,19 @@ def main():
         assert any(o.startswith("denied") for o in outcomes), outcomes
         assert any(o in ("allowed", "confirmed") for o in outcomes), outcomes
         ok("the audit log holds what was refused as well as what was written")
+
+        # --- every view the bundle declares opens for the account the
+        # renderer actually is. The browser has no role switch, so a view whose
+        # capability the demo role withholds is a dead nav tab, and that is how
+        # the lab bundle's own dashboard was unreachable.
+        declared = call(base, "/facility/")["views"]
+        for v in declared:
+            call(base, "/views/%s/" % v["id"], expect=200 if v["kind"] != "summary" else 400)
+        ok("all %d declared views open for the role the renderer runs as"
+           % len(declared))
+
+        agent_confirms(base, db, register(base, "Agent Confirms", "T-92"))
+        voice_cannot_commit(base, db)
 
         # A registered patient standing at the nurse, so the agent's proposal
         # is refused by nothing but the surface rule if it is refused at all.

@@ -61,7 +61,14 @@ class Verdict:
 
 
 def load(path=CATALOGUE) -> dict:
-    return json.loads(pathlib.Path(path).read_text())
+    cat = json.loads(pathlib.Path(path).read_text())
+    # catalogue/ops is shared between bundles (bundles/lab has its own atoms
+    # there), and the router must plan only over what the kernel loaded, which
+    # the manifest names. The API's /catalogue is already narrowed this way.
+    listed = (cat.get("manifest") or {}).get("operations")
+    if listed:
+        cat["operations"] = {k: v for k, v in cat["operations"].items() if k in listed}
+    return cat
 
 
 # --------------------------------------------------------------------------
@@ -174,6 +181,22 @@ def extract(op: dict, utterance: str) -> dict:
     return payload
 
 
+def typed(op: dict, payload) -> dict:
+    """Keep only answers the operation actually declares.
+
+    The validator ignores a key it does not know, which means an invented key
+    rides along into the proposal a person then taps. Two of those are
+    dangerous rather than untidy: override_reason waives the physiological
+    range check, and any stray key is a value nobody typed. So a planner may
+    answer the questions the questionnaire asks and nothing else. A person can
+    still override at the rendered surface, by writing the reason themselves.
+    """
+    if not isinstance(payload, dict):
+        return {}
+    allowed = {f["link_id"] for f in op["fields"]} - {"override_reason"}
+    return {k: v for k, v in payload.items() if k in allowed}
+
+
 def route(utterance: str, catalogue: dict, *, limit: int = 3) -> list:
     """Match an utterance to operations, using only the compiled catalogue.
 
@@ -244,7 +267,12 @@ TOOL = {
         "required": ["operations"],
         "additionalProperties": False,
     },
-    "strict": True,
+    # No "strict": true. Strict tool use requires every object in the schema to
+    # be closed, and `payload` cannot be: its keys are one operation's link_ids
+    # and differ per operation. An untested strict flag that 400s on the first
+    # live call would be worse than the check we already do, which is typed():
+    # the payload is filtered against the operation's own fields after the
+    # model answers, so an unknown key never reaches the guard either way.
 }
 
 
@@ -263,11 +291,18 @@ def _brief(catalogue: dict, caps) -> list:
 
 def llm(utterance: str, catalogue: dict, *, caps, state, model: str = MODEL,
         client=None) -> list:
-    """Plan with claude-opus-5. Unverified against the live API: no key on this
-    machine, so only the request shape and the reply handling are checked.
+    """Plan with claude-opus-5. Still unverified against api.anthropic.com:
+    there is no key on this machine. What is verified is one step better than
+    a stub: agent/tests/test_live.py runs the real SDK against a fake endpoint
+    on a loopback port, so the kwargs, the tool definition and the pydantic
+    reply objects are exercised. Whether Anthropic accepts this tool schema is
+    the open question, and the first live call is its first test.
 
-    Fails closed in both directions. No tool call means no proposals, and an
-    operation id the catalogue does not hold is dropped rather than passed on.
+    Fails closed in three ways. No tool call means no proposals; an operation
+    id the catalogue does not hold is dropped rather than repaired; and a
+    payload key the operation does not declare is dropped by typed(), so the
+    model emits typed proposals or it emits nothing. Free text never executes:
+    `why` is printed and nothing reads it back.
     `client` exists so the check can hand in a stub; it is not a config knob.
     """
     if client is None:
@@ -299,10 +334,11 @@ def llm(utterance: str, catalogue: dict, *, caps, state, model: str = MODEL,
             op_id = item.get("operation")
             if op_id not in catalogue["operations"]:
                 continue  # a hallucinated id is dropped, not repaired
-            payload = item.get("payload")
             out.append(Proposed(
                 operation=op_id,
-                payload=payload if isinstance(payload, dict) else {},
+                # typed() is the trust boundary: the model answers the
+                # questionnaire's questions or it answers nothing.
+                payload=typed(catalogue["operations"][op_id], item.get("payload")),
                 why=str(item.get("why") or "")[:200],
                 backend="llm",
             ))
@@ -349,3 +385,34 @@ def verdicts(proposals, catalogue: dict, *, caps, state, actor="agent", scopes=N
         )
         out.append(Verdict(p, decision))
     return out
+
+
+# --------------------------------------------------------------------------
+# Ordering. Read from the kernel, never computed here.
+# --------------------------------------------------------------------------
+
+def by_kernel_order(proposals, actions) -> list:
+    """Sort a plan into the order the kernel already put its actions in.
+
+    ThreadView.actions is kernel/state.py actions(): visible operations sorted
+    by this thread's current station and then by the declared line. That is the
+    ordering, and it is not this package's to have an opinion about. route()
+    scores how well an utterance names an operation, which is a different
+    question; that score decides what was heard, never what to do next.
+
+    An operation the kernel does not list here sorts last and is still sent, so
+    the guard gets to state the refusal rather than the agent guessing it.
+    """
+    rank = {op["id"]: i for i, op in enumerate(actions)}
+    return sorted(proposals, key=lambda p: (rank.get(p.operation, len(rank)), p.operation))
+
+
+def explain_order(proposal, actions, station=None) -> str:
+    """One sentence about where the kernel puts this, sourced from the kernel."""
+    ids = [op["id"] for op in actions]
+    if proposal.operation not in ids:
+        return ("the kernel does not offer this on this thread now"
+                + (" (it is standing at %s)" % station if station else ""))
+    place = ids.index(proposal.operation) + 1
+    where = next(op["station"] for op in actions if op["id"] == proposal.operation)
+    return "the kernel lists it %d of %d at %s" % (place, len(ids), where)

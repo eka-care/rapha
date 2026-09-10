@@ -63,15 +63,83 @@ which is how stored flags get counted. Nothing else may.
 
 ## 1. Operation
 
-Unchanged from today. Required frontmatter: `id, type, kind, short, title,
-summary, capability, station, instrument, preconditions, irreversibility,
-input, writes, emits, surfaces, verified`. Optional: `scope_qualifier,
-related`. See `catalogue/build.py` REQUIRED and any file in `catalogue/ops`.
+Required frontmatter: `id, type, kind, short, title, summary, capability,
+station, instrument, preconditions, irreversibility, input, writes, emits,
+surfaces, verified`, plus `mapping` on a `kind: write` operation. Optional:
+`scope_qualifier, related`. See `catalogue/build.py` REQUIRED and any file in
+`catalogue/ops`.
 
 `instrument` on an operation is its default capture method. Instrument
 declarations (section 4) add accelerators on top of it.
 
-Worked example: `catalogue/ops/phc.op.vitals-record.md`.
+### The mapping: which answer becomes which column
+
+`writes` says which resources a payload becomes. `mapping` says which answer
+becomes which field of one, and it is required on every `kind: write`
+operation. Without it an adapter has to re-derive what a blood pressure is,
+and the second adapter re-derives it differently.
+
+```yaml
+mapping:
+  ignored: [method, consent_given]     # answers deliberately not stored
+  records:
+    - resource: observation            # must be one of writes
+      per_question: [systolic, diastolic, pulse]   # one row per answered question
+      fields:
+        category: {const: vital-signs}
+        code: {question: link_id}
+        value: {question: answer}
+        unit: {question: unit}
+```
+
+A record names one `resource`, an optional fan out, and its `fields`. The two
+fan outs are alternatives: `per_item: <link_id>` walks a repeating structured
+answer and gives one row per item, `per_question: [<link_id>]` gives one row
+per answered question. With neither, a record is one row.
+
+A field's value is a single key source:
+
+| source | value |
+|---|---|
+| `{answer: <link_id>}` | the payload's answer |
+| `{const: <literal>}` | a literal |
+| `{item: <key>}` or `{item: [<key>]}` | the current item's value, first non empty |
+| `{minus: <key>}` | the same, negated, for a stock decrement |
+| `{question: link_id \| answer \| unit}` | about the current question |
+| `{joined: [<link_id>]}` | non empty answers joined with a space |
+| `{note: [<link_id>]}` | non empty answers as labelled paragraphs |
+| `{json: payload}` | the whole payload as sorted JSON |
+
+`{question: unit}` reads `styling_metadata.phc.unit` from the questionnaire,
+which is why no adapter repeats a unit: it is written once, next to the range
+that validates it.
+
+Lint refuses, and every one of these is a build failure and not a warning:
+
+- a record naming a link_id the questionnaire does not have, anywhere;
+- a record naming a resource the operation does not list in `writes`, or a
+  `writes` entry no record maps anything into;
+- `{item: ...}` or `{minus: ...}` without `per_item`, `{question: ...}`
+  without `per_question`, `{question: unit}` where a listed question declares
+  no unit;
+- a required question that is neither mapped nor listed under `ignored`. An
+  answer with nowhere to go is a clinical value dropped in silence, so
+  dropping one has to be written down.
+
+A record whose fields are all `const` is written every time. A record with any
+answer derived field is written only when one of them produced a value, so an
+unanswered question is no row rather than an empty one. Column names are not
+linted here, because the kernel must not know an adapter's schema:
+`adapters/local/tests/test_store.py` checks them against its own tables, and
+`adapters/local/store.py` raises on a column it does not have rather than
+dropping the value.
+
+The compiled mapping is not written into `catalogue.json`. Nothing outside the
+kernel turns a payload into rows, and the MCP server proposes only; add it to
+the compiled artifact when an out of process consumer needs it.
+
+Worked example: `catalogue/ops/phc.op.vitals-record.md`. The code is
+`kernel/mapping.py` and the checks are `kernel/tests/test_mapping.py`.
 
 ## 2. Workflow
 

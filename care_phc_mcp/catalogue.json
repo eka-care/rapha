@@ -262,6 +262,365 @@
     }
   },
   "operations": {
+    "lab.op.referral-accession": {
+      "capability": "patient.register",
+      "description": "Somebody outside this laboratory asked for a test. The front desk records who\nthe patient is, who asked, and which panel. Nothing clinical is asserted yet.",
+      "emits": [
+        "registered",
+        "lab.ordered"
+      ],
+      "fields": [
+        {
+          "link_id": "name",
+          "options": null,
+          "required": true,
+          "text": "Full name",
+          "type": "string"
+        },
+        {
+          "link_id": "age",
+          "options": null,
+          "required": true,
+          "text": "Age",
+          "type": "integer"
+        },
+        {
+          "link_id": "sex",
+          "options": [
+            "female",
+            "male",
+            "other"
+          ],
+          "required": true,
+          "text": "Sex",
+          "type": "choice"
+        },
+        {
+          "link_id": "phone",
+          "options": null,
+          "required": true,
+          "text": "Mobile",
+          "type": "string"
+        },
+        {
+          "link_id": "referrer_name",
+          "options": null,
+          "required": true,
+          "text": "Referring clinician",
+          "type": "string"
+        },
+        {
+          "link_id": "referrer_contact",
+          "options": null,
+          "required": false,
+          "text": "Referrer contact (phone or portal id)",
+          "type": "string"
+        },
+        {
+          "link_id": "panel",
+          "options": [
+            "cbc",
+            "bmp"
+          ],
+          "required": true,
+          "text": "Panel requested",
+          "type": "choice"
+        }
+      ],
+      "id": "lab.op.referral-accession",
+      "input": "lab.schema.accession-v1",
+      "instrument": "form",
+      "irreversibility": "reversible",
+      "kind": "write",
+      "preconditions": [
+        "not registered"
+      ],
+      "scope_qualifier": null,
+      "short": "Accession",
+      "station": "reception",
+      "summary": "Register the person a referring clinician sent, and the panel they asked for, so the laboratory has a subject and an order to work against.\n",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Accession a referred patient and their order",
+      "tool": "propose_referral_accession",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "patient",
+        "service_request",
+        "questionnaire_response"
+      ]
+    },
+    "lab.op.report-release": {
+      "capability": "lab.result.validate",
+      "description": "The report goes to the referrer. A released result is acted on by somebody\nthis laboratory cannot reach, so the release is irreversible: an agent\ncannot propose it and a person has to tap an un-prefilled confirm.",
+      "emits": [
+        "dispensed.complete"
+      ],
+      "fields": [
+        {
+          "link_id": "channel",
+          "options": [
+            "portal",
+            "print",
+            "phone"
+          ],
+          "required": true,
+          "text": "Send by",
+          "type": "choice"
+        },
+        {
+          "link_id": "attest",
+          "options": null,
+          "required": true,
+          "text": "I attest the verified result is the one being released",
+          "type": "boolean"
+        },
+        {
+          "link_id": "note",
+          "options": null,
+          "required": false,
+          "text": "Note to the referrer",
+          "type": "text"
+        }
+      ],
+      "id": "lab.op.report-release",
+      "input": "lab.schema.release-v1",
+      "instrument": "form",
+      "irreversibility": "irreversible",
+      "kind": "write",
+      "preconditions": [
+        "lab.validated",
+        "not dispensed.complete"
+      ],
+      "scope_qualifier": null,
+      "short": "Release",
+      "station": "doctor",
+      "summary": "Send the verified result out of the laboratory to the clinician who ordered it. Once it has left, it has left.\n",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Release the verified report to the referrer",
+      "tool": "propose_report_release",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "questionnaire_response"
+      ]
+    },
+    "lab.op.result-enter": {
+      "capability": "lab.result.enter",
+      "description": "A number per analyte. Each analyte carries three bands on its own question:\na plausible band that blocks the write, a critical band that raises\n`lab.critical`, and a reference interval that is written down but that\nnothing in the kernel reads.",
+      "emits": [
+        "lab.resulted",
+        "lab.critical"
+      ],
+      "fields": [
+        {
+          "link_id": "panel",
+          "options": [
+            "cbc",
+            "bmp"
+          ],
+          "required": true,
+          "text": "Panel",
+          "type": "choice"
+        },
+        {
+          "link_id": "haemoglobin",
+          "options": null,
+          "required": false,
+          "text": "Haemoglobin",
+          "type": "decimal"
+        },
+        {
+          "link_id": "wbc",
+          "options": null,
+          "required": false,
+          "text": "White cell count",
+          "type": "decimal"
+        },
+        {
+          "link_id": "platelets",
+          "options": null,
+          "required": false,
+          "text": "Platelets",
+          "type": "decimal"
+        },
+        {
+          "link_id": "glucose",
+          "options": null,
+          "required": false,
+          "text": "Glucose",
+          "type": "decimal"
+        },
+        {
+          "link_id": "creatinine",
+          "options": null,
+          "required": false,
+          "text": "Creatinine",
+          "type": "decimal"
+        },
+        {
+          "link_id": "sodium",
+          "options": null,
+          "required": false,
+          "text": "Sodium",
+          "type": "decimal"
+        },
+        {
+          "link_id": "potassium",
+          "options": null,
+          "required": false,
+          "text": "Potassium",
+          "type": "decimal"
+        },
+        {
+          "link_id": "override_reason",
+          "options": null,
+          "required": false,
+          "text": "Reason for accepting a value outside the plausible band",
+          "type": "text"
+        }
+      ],
+      "id": "lab.op.result-enter",
+      "input": "lab.schema.panel-result-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "vitals.recorded",
+        "not lab.resulted"
+      ],
+      "scope_qualifier": null,
+      "short": "Result",
+      "station": "lab",
+      "summary": "The technologist keys or accepts from the analyser one value per analyte, each checked against its own plausible band and its own critical band.\n",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Enter panel results",
+      "tool": "propose_result_enter",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "observation",
+        "diagnostic_report"
+      ]
+    },
+    "lab.op.result-verify": {
+      "capability": "lab.result.validate",
+      "description": "A second person, holding a capability the first does not, says the result is\nright. This is the separation of duties a laboratory runs on.",
+      "emits": [
+        "lab.validated"
+      ],
+      "fields": [
+        {
+          "link_id": "decision",
+          "options": [
+            "verified",
+            "rejected"
+          ],
+          "required": true,
+          "text": "Pathologist decision",
+          "type": "choice"
+        },
+        {
+          "link_id": "comment",
+          "options": null,
+          "required": false,
+          "text": "Interpretation or reason",
+          "type": "text"
+        }
+      ],
+      "id": "lab.op.result-verify",
+      "input": "lab.schema.verify-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "lab.resulted",
+        "not lab.validated"
+      ],
+      "scope_qualifier": null,
+      "short": "Verify",
+      "station": "doctor",
+      "summary": "The pathologist reads the entered values and either verifies the result or rejects it. Only a verified result can be released.\n",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Verify a preliminary result",
+      "tool": "propose_result_verify",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "diagnostic_report",
+        "notes"
+      ]
+    },
+    "lab.op.specimen-collect": {
+      "capability": "assessment.record",
+      "description": "The sample is drawn and labelled. From here the specimen, not the person, is\nwhat moves through the laboratory.",
+      "emits": [
+        "vitals.recorded"
+      ],
+      "fields": [
+        {
+          "link_id": "specimen_type",
+          "options": [
+            "venous-blood",
+            "urine",
+            "swab"
+          ],
+          "required": true,
+          "text": "Specimen",
+          "type": "choice"
+        },
+        {
+          "link_id": "container",
+          "options": null,
+          "required": false,
+          "text": "Container or tube",
+          "type": "string"
+        },
+        {
+          "link_id": "fasting",
+          "options": null,
+          "required": false,
+          "text": "Patient fasting",
+          "type": "boolean"
+        }
+      ],
+      "id": "lab.op.specimen-collect",
+      "input": "lab.schema.specimen-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "lab.ordered",
+        "not vitals.recorded"
+      ],
+      "scope_qualifier": null,
+      "short": "Collect",
+      "station": "nurse",
+      "summary": "The phlebotomist records that the sample was drawn, what it is and what it is in, so the bench can start.\n",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Collect and accession a specimen",
+      "tool": "propose_specimen_collect",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "specimen"
+      ]
+    },
     "phc.op.abha-link": {
       "capability": "abha.link",
       "description": "An ABHA is the patient's national health number. Linking one to their record\nhere is how a hospital in another district finds their history later.",

@@ -35,7 +35,11 @@ def _resources(query):
 def test_manifest_lists_every_declaration_and_every_operation():
     listed = set(sum((MANIFEST[k] for k in ("workflows", "views", "instruments", "metrics")), []))
     assert listed == set(DECLS), f"manifest and files disagree: {listed ^ set(DECLS)}"
-    assert set(MANIFEST["operations"]) == set(CAT["operations"]), "bundle must reference all 9 ops"
+    # catalogue/ops is shared between bundles (bundles/lab references its own
+    # lab.* atoms), so the PHC manifest owns the phc.* atoms and no others.
+    assert set(MANIFEST["operations"]) <= set(CAT["operations"])
+    assert set(MANIFEST["operations"]) == {o for o in CAT["operations"] if o.startswith("phc.")}, \
+        "the phc bundle must reference every phc.* op"
     for path in BUNDLE.glob("*.md"):
         fm, body = parse(path)
         assert fm["id"] == path.stem and fm["type"] in c.DECLARATION_TYPES

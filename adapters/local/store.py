@@ -23,9 +23,10 @@ Honest limits
 -------------
 - Column names are taken from care/emr/models and are UNVERIFIED against a
   running CARE, same caveat as care_phc/queries.py. Adapter 1 maps them.
-- write() takes the confirmed payload, not a row: shaping it into columns is
-  this adapter's job, in shape.py, and one payload can fan out into several
-  rows. It upserts, because linking an ABHA updates the patient row that
+- write() takes one row, already shaped by the operation's declared mapping
+  (kernel/mapping.py). This adapter no longer knows what a blood pressure is,
+  which is the point: adapter 1 inherits the same mapping instead of deriving
+  its own. It upserts, because linking an ABHA updates the patient row that
   registration created.
 - One connection per thread, autocommit, WAL on a file. FastAPI runs sync
   endpoints in a thread pool, so one shared connection is not an option: it
@@ -43,7 +44,6 @@ import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from adapters.local.shape import shape
 from kernel.contracts import AuditRecord, Proposal, ThreadRef
 
 # One table per resource this bundle's operations read or write, plus the
@@ -212,30 +212,36 @@ class SqliteStore:
     # ---------------------------------------------------------------- writes
 
     def write(self, resource, record, *, thread):
-        """Write a payload as rows of `resource`. Returns the first row's id.
+        """Write one row of `resource` and return its id.
 
-        The kernel hands over the confirmed payload as it stands, because no
-        declaration says which answer becomes which column. Turning it into
-        rows is this adapter's job (see shape.py) and it is the only part of
-        adapter 0 that knows what a blood pressure is.
+        The kernel hands over a row the operation's mapping declaration
+        produced, so nothing here reads a link_id or invents a unit. What is
+        left is this adapter's own schema: the thread join, and the fact that
+        a second patient row on a thread is an update of the first person and
+        not a second person.
 
-        Fan out is real: three vitals are three observation rows and two
-        medicines are two medication_request rows, because dispensed.complete
-        is a count comparison and one row per prescription would break it. The
-        Store protocol says "the new record's id"; with a fan out that is the
-        first, and None when the payload had nothing for this resource.
+        Fan out happens above this line. Three vitals are three calls, because
+        dispensed.complete is a count comparison and one row per prescription
+        would break it.
         """
-        rows = shape(resource, record, thread=thread, store=self)
-        written = [self._put(resource, row, thread=thread) for row in rows]
-        if resource == "patient" and written:
+        record = dict(record)
+        if resource == "patient" and "id" not in record:
+            # Registration made the row; linking an ABHA updates it. Which one
+            # this is does not need the operation's name, only the join.
+            existing = self.select("patient", thread=thread, where={},
+                                   fields=["id"], limit=1)
+            if existing:
+                record["id"] = existing[0]["id"]
+        written = self._put(resource, record, thread=thread)
+        if resource == "patient":
             # The adapter owns the join, so it also maintains it: a patient
             # registered against an empty thread is attached to it here.
             encounter = self.db.execute(
                 "SELECT patient FROM encounter WHERE id = ?", [thread]).fetchone()
             if encounter and not encounter["patient"]:
-                self._put("encounter", {"id": thread, "patient": written[0]},
+                self._put("encounter", {"id": thread, "patient": written},
                           thread=thread)
-        return written[0] if written else None
+        return written
 
     def _put(self, resource, record, *, thread):
         """Insert, or update the named columns when the id already exists.
@@ -243,7 +249,13 @@ class SqliteStore:
         The thread column is filled in here so no caller has to know the join.
         """
         columns = TABLES[_table(resource)]
-        record = {k: _text(v) for k, v in record.items() if k in columns}
+        # A column this table does not have is refused, not filtered away.
+        # Silently dropping a mapped clinical value is the worst failure this
+        # file could have, and a mapping typo is exactly how it would happen.
+        unknown = sorted(set(record) - set(columns))
+        if unknown:
+            raise ValueError("%s has no column %s" % (resource, ", ".join(unknown)))
+        record = {k: _text(v) for k, v in record.items()}
         column = THREAD_COLUMN.get(resource, DEFAULT_THREAD_COLUMN)
         if column and column != "id":
             record.setdefault(column, thread)

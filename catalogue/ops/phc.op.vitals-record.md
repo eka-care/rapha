@@ -17,6 +17,15 @@ preconditions:
 irreversibility: correctable
 input: phc.schema.vitals-v1
 writes: [observation]
+mapping:
+  records:
+    - resource: observation
+      per_question: [systolic, diastolic, pulse, spo2, weight, temperature]
+      fields:
+        category: {const: vital-signs}
+        code: {question: link_id}
+        value: {question: answer}
+        unit: {question: unit}
 emits: [vitals.recorded, vitals.flagged]
 surfaces: [rendered, mcp]
 verified:

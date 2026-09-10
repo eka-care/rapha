@@ -15,6 +15,14 @@ preconditions:
 irreversibility: correctable
 input: phc.schema.rx-v1
 writes: [medication_request]
+mapping:
+  records:
+    - resource: medication_request
+      per_item: medications
+      fields:
+        medication: {item: [medication, drug, code]}
+        dosage_instruction: {item: [dosage_instruction, dose]}
+        status: {const: active}
 emits: [rx.confirmed]
 surfaces: [rendered, mcp]
 verified:

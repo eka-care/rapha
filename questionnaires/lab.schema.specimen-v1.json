@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "slug": "lab-specimen-v1",
+  "title": "Collect a specimen",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "lab.op.specimen-collect"
+    }
+  },
+  "questions": [
+    {"link_id": "specimen_type", "text": "Specimen", "type": "choice", "required": true,
+     "answer_option": [{"value": "venous-blood"}, {"value": "urine"}, {"value": "swab"}]},
+    {"link_id": "container", "text": "Container or tube", "type": "string", "required": false},
+    {"link_id": "fasting", "text": "Patient fasting", "type": "boolean", "required": false}
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "slug": "lab-release-v1",
+  "title": "Release the report to the referrer",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "lab.op.report-release"
+    }
+  },
+  "questions": [
+    {"link_id": "channel", "text": "Send by", "type": "choice", "required": true,
+     "answer_option": [{"value": "portal"}, {"value": "print"}, {"value": "phone"}]},
+    {"link_id": "attest", "text": "I attest the verified result is the one being released", "type": "boolean", "required": true},
+    {"link_id": "note", "text": "Note to the referrer", "type": "text", "required": false}
+  ]
+}

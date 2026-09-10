@@ -49,12 +49,14 @@ function Widget({
         </select>
       );
     case "text":
-      return <textarea className="f-in" rows={4} value={str} disabled={disabled}
+      return <textarea className="f-in" id={`f-${q.link_id}`} rows={4} value={str} disabled={disabled}
                        onChange={(e) => set(e.target.value)} />;
     case "integer":
     case "decimal":
+      // The id is how an instrument that refused to guess hands the cursor
+      // back to this field. inputMode makes it a keypad on a phone.
       return (
-        <input className="f-in" inputMode="decimal" value={str} disabled={disabled}
+        <input className="f-in" id={`f-${q.link_id}`} inputMode="decimal" value={str} disabled={disabled}
                step={q.type === "integer" ? 1 : "any"} type="number"
                onChange={(e) => set(e.target.value === "" ? undefined : e.target.value)} />
       );

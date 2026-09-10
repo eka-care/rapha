@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "slug": "lab-verify-v1",
+  "title": "Verify a result",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "lab.op.result-verify"
+    }
+  },
+  "questions": [
+    {"link_id": "decision", "text": "Pathologist decision", "type": "choice", "required": true,
+     "answer_option": [{"value": "verified"}, {"value": "rejected"}]},
+    {"link_id": "comment", "text": "Interpretation or reason", "type": "text", "required": false}
+  ]
+}

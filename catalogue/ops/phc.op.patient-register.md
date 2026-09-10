@@ -16,6 +16,16 @@ preconditions:
 irreversibility: correctable
 input: phc.schema.register-v1
 writes: [patient]
+mapping:
+  records:
+    - resource: patient
+      fields:
+        name: {answer: name}
+        age: {answer: age}
+        sex: {answer: sex}
+        phone: {answer: phone}
+        village: {answer: village}
+        category: {answer: category}
 emits: [registered, abha.pending]
 surfaces: [rendered, mcp]
 verified:

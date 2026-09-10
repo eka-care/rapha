@@ -153,6 +153,8 @@ function ThreadScreen({ id, cat, demo }: { id: string; cat: Catalogue; demo: boo
           thread={id}
           client={client}
           proposal={open.proposal}
+          instruments={cat.instruments}
+          flags={thread.data?.flags ?? []}
           onCancel={() => setOpen(null)}
           onDone={() => {
             setOpen(null);

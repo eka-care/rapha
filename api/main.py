@@ -46,10 +46,15 @@ DB = os.environ.get("PHC_DB", "phc.sqlite3")
 # A sub-centre nurse who is also the pharmacist and runs the lab is the normal
 # case and not an edge case (addendum SSC), so the demo account holds the
 # union. Pass ?role=nurse or X-PHC-Role to narrow it and watch actions vanish.
+#
+# The union is over every declared role, not a hand written five. Naming five
+# quietly withheld lab.result.validate and visit.household, which meant the
+# renderer (which has no role switch) got a 403 on any view declaring them:
+# the lab bundle's own dashboard was unreachable from the only account the
+# browser can be.
 DEMO_ROLE = "demo"
 ROLES = dict(vocab.BUNDLES)
-ROLES[DEMO_ROLE] = sorted(set(sum(
-    (vocab.BUNDLES[r] for r in ("frontdesk", "nurse", "mo", "lab", "pharmacist")), [])))
+ROLES[DEMO_ROLE] = sorted(set().union(*vocab.BUNDLES.values()))
 
 
 def make_store():

@@ -3,16 +3,15 @@
 The adapter's only cleverness is the thread join and the where clause, so that
 is what this pins down. No HTTP, no guard: a store with rows in it.
 """
-import json
 import os
-import pathlib
 
-from adapters.local.shape import shape
-from adapters.local.store import SqliteStore, seed
+from adapters.local.store import TABLES, SqliteStore, seed
+from kernel import declarations, mapping
 from kernel.contracts import AuditRecord, Proposal
 
-OPERATIONS = json.loads((pathlib.Path(__file__).parents[3] / "catalogue"
-                         / "catalogue.json").read_text())["operations"]
+# The operations with their declared mapping attached. Nothing in this file
+# derives a row any more; it checks that the declared ones fit these tables.
+OPERATIONS = declarations.load("phc").operations
 
 # One representative payload per operation, answering the questions the
 # questionnaire marks required. Nothing here is clinical advice; it is the
@@ -85,27 +84,54 @@ def test_writing_a_patient_twice_updates_the_one_the_thread_already_has():
     assert store.count("patient", thread="enc-002", where={"abha_number": "*"}) == 1
 
 
+def test_every_declared_record_names_columns_this_adapter_has():
+    """The adapter's half of the mapping lint. kernel/mapping.py checks a
+    record against the questionnaire and against Operation.writes; it must not
+    know this schema, so column names are checked here. A mapped column this
+    table lacks is a build failure, not a value dropped at three in the
+    morning."""
+    for op_id, op in sorted(OPERATIONS.items()):
+        for record in op["mapping"]:
+            missing = sorted(set(record["fields"]) - set(TABLES[record["resource"]]))
+            assert not missing, "%s maps %s into %s, which has no such column" % (
+                op_id, missing, record["resource"])
+
+
 def test_every_operation_in_the_bundle_writes_a_row_with_something_in_it():
-    """The failure this guards against is silent: a payload key nothing maps
-    is dropped, and the row lands empty with the state flag never flipping."""
-    store = fresh()
+    """The failure this guards against is silent: an answer nothing maps is
+    dropped, and the row lands empty with the state flag never flipping."""
     # what every row gets regardless of payload. Anything else is content,
     # including a status: the encounter row a consultation writes carries only
     # a status, because the row itself is the thread and already exists.
     skeleton = {"id", "encounter", "created_by", "created_date"}
     for op_id, payload in sorted(PAYLOADS.items()):
-        op = OPERATIONS[op_id]
-        for resource in op["writes"]:
-            rows = shape(resource, payload, thread="enc-004", store=store)
-            assert rows, "%s writes %s and shaped no row" % (op_id, resource)
-            for row in rows:
-                assert set(row) - skeleton, \
-                    "%s writes an empty %s row" % (op_id, resource)
+        rows = mapping.records(OPERATIONS[op_id], payload)
+        landed = {resource for resource, _ in rows}
+        assert landed == set(OPERATIONS[op_id]["writes"]), \
+            "%s declares writes %s and this payload reached %s" % (
+                op_id, sorted(OPERATIONS[op_id]["writes"]), sorted(landed))
+        for resource, row in rows:
+            assert set(row) - skeleton, \
+                "%s writes an empty %s row" % (op_id, resource)
+
+
+def test_a_column_this_table_does_not_have_is_refused_and_not_dropped():
+    store = fresh()
+    try:
+        store.write("observation", {"code": "systolic", "value": 118,
+                                    "override_reason": "on the other arm"},
+                    thread="enc-002")
+    except ValueError as e:
+        assert "no column override_reason" in str(e), e
+    else:
+        raise AssertionError("a mapped value with nowhere to go was swallowed")
 
 
 def test_the_vitals_payload_fans_out_into_one_row_per_reading():
     store = fresh()
-    store.write("observation", PAYLOADS["phc.op.vitals-record"], thread="enc-002")
+    for resource, row in mapping.records(OPERATIONS["phc.op.vitals-record"],
+                                         PAYLOADS["phc.op.vitals-record"]):
+        store.write(resource, row, thread="enc-002")
     rows = store.select("observation", thread="enc-002",
                         where={"category": "vital-signs"},
                         fields=["code", "value", "unit"], limit=10)
@@ -165,13 +191,15 @@ def test_two_threads_writing_at_once_do_not_corrupt_the_file():
     store.open_thread(token="T-1")
     errors = []
 
+    op = OPERATIONS["phc.op.vitals-record"]
+
     def hammer(n):
         try:
             for i in range(20):
-                store.write("observation", {"systolic": 100 + i, "diastolic": 70,
-                                            "pulse": 70, "temperature": 36.6,
-                                            "spo2": 98, "weight": 50},
-                            thread="enc-001")
+                for resource, row in mapping.records(
+                        op, {"systolic": 100 + i, "diastolic": 70, "pulse": 70,
+                             "temperature": 36.6, "spo2": 98, "weight": 50}):
+                    store.write(resource, row, thread="enc-001")
                 store.count("observation", thread=None, where={})
         except Exception as e:  # noqa: BLE001 - the point is that nothing raises
             errors.append("%s: %s" % (n, e))

@@ -25,6 +25,7 @@ import yaml
 from catalogue import validate, vocab
 from catalogue.build import parse
 from kernel import contracts as c
+from kernel import mapping
 
 ROOT = pathlib.Path(__file__).parents[1]
 BUNDLES = ROOT / "bundles"
@@ -335,7 +336,11 @@ def load(bundle_id="phc", catalogue=None):
             raise DeclarationError(f"{f.name}: id '{fm.get('id')}' does not match filename")
         decls[fm["id"]] = (fm, body)
 
-    bad = lint(manifest, decls, ops)
+    # Which answer becomes which column lives on the operation atom, so it is
+    # linted here with everything else that references a questionnaire, and
+    # attached to the operations this bundle loads. See kernel/mapping.py.
+    mappings, bad_mappings = mapping.load()
+    bad = lint(manifest, decls, ops) + bad_mappings
     if bad:
         raise DeclarationError("\n".join(bad))
 
@@ -356,7 +361,8 @@ def load(bundle_id="phc", catalogue=None):
                             title=manifest["title"],
                             **{k: list(manifest[k] or []) for k in
                                ("operations", "workflows", "views", "instruments", "metrics")}),
-        operations={oid: ops[oid] for oid in manifest["operations"]},
+        operations={oid: dict(ops[oid], mapping=mappings.get(oid, []))
+                    for oid in manifest["operations"]},
         workflows=workflows, views=views, instruments=instruments, metrics=metrics)
 
 
@@ -402,6 +408,10 @@ def main():
         return 1
     if "--json" not in sys.argv:
         print("ok   catalogue.json now carries %s" % ", ".join(write_catalogue(bundle)))
+    print("ok   %d records mapped from %d operations' answers to their columns"
+          % (sum(len(op["mapping"]) for op in bundle.operations.values()),
+             sum(1 for op in bundle.operations.values() if op["mapping"])),
+          file=sys.stderr if "--json" in sys.argv else sys.stdout)
     print(f"ok   bundle {bundle.manifest.id} {bundle.manifest.version}: "
           f"{len(bundle.operations)} operations, {len(bundle.workflows)} workflows, "
           f"{len(bundle.views)} views, {len(bundle.instruments)} instruments, "

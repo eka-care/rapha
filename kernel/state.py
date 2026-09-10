@@ -94,6 +94,21 @@ def line(workflow, known):
     return out
 
 
+def drawn_by(workflow, op_id):
+    """Does any step of this workflow put this operation on a thread?
+
+    catalogue/ops is shared between bundles, and a manifest may list an atom no
+    step draws. phc.op.household-visit is one: it stands at `community`, which
+    the outpatient line has no station for. Nothing stopped it, so once the
+    demo account held visit.household it appeared as a button on every clinic
+    encounter and wrote a household questionnaire onto it. A thread belongs to
+    a workflow, so an operation that workflow never draws has no place on that
+    thread, from any surface. kernel/proposals._decide refuses the write with
+    the same predicate.
+    """
+    return any(op_id in (step.operations or []) for step in workflow.steps)
+
+
 def actions(workflow, operations, known, caps, station_filter=None):
     """Quick actions to draw, ordered. Addendum SSD.2: a table, not a model.
 
@@ -102,8 +117,13 @@ def actions(workflow, operations, known, caps, station_filter=None):
     """
     order = {step.station: i for i, step in enumerate(workflow.steps)}
     here = station(workflow, known)
+    # Only what this workflow's steps actually draw. A manifest may list an
+    # atom from catalogue/ops that no station of this line has a place for;
+    # kernel/proposals refuses to write it with the same predicate, so it must
+    # not be a button either.
     picked = [op for op in operations.values()
-              if visible(op, caps, known)
+              if drawn_by(workflow, op["id"])
+              and visible(op, caps, known)
               and (station_filter is None or op["station"] == station_filter)]
     picked.sort(key=lambda op: (op["station"] != here, order.get(op["station"], 99), op["id"]))
     return picked
