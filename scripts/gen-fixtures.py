@@ -20,6 +20,8 @@ from catalogue import vocab  # noqa: E402
 CAT = json.loads((pathlib.Path(__file__).parents[1] / "catalogue" / "catalogue.json").read_text())
 OUT = pathlib.Path(__file__).parents[1] / "care_phc_fe" / "src" / "fixtures.json"
 
+DIRECTORY = {'Lakshmi Devi': {'init': 'LD', 'phone': '98•••• 4471', 'cat': 'NCD', 'token': 24, 'dx': 'Hypertension, 4 yrs', 'last': '12 Mar 2026', 'today': True}, 'Lakshmamma G': {'init': 'LG', 'phone': '98•••• 4471', 'cat': 'General', 'token': 25, 'dx': 'Osteoarthritis', 'last': '04 Jan 2026', 'today': True}, 'Lakshman Rao': {'init': 'LR', 'phone': '90•••• 2210', 'cat': 'NCD', 'token': 26, 'dx': 'Type 2 diabetes', 'last': '22 Aug 2026', 'today': True}, 'Sarojamma K': {'init': 'SK', 'phone': '87•••• 3390', 'cat': 'ANC', 'token': 27, 'dx': 'Pregnancy, 26 weeks', 'last': '01 Sep 2026', 'today': True}, 'Ramesh Naidu': {'init': 'RN', 'phone': '99•••• 5512', 'cat': 'TB', 'token': None, 'dx': 'Pulmonary TB, on treatment', 'last': '18 Jul 2026', 'today': False}}
+
 PATIENTS = [
     {"name": "Lakshmi Devi", "age": 52, "sex": "F", "village": "Yadiki",
      "note": "Hypertension, 4 years", "snapshot": {"patient_exists": True}},
@@ -109,6 +111,8 @@ def main():
         snap["stored"] = frozenset(snap.get("stored", ()))
         flags = derive(Snapshot(**snap))
         entry = {k: p[k] for k in ("name", "age", "sex", "village", "note")}
+        entry.update(DIRECTORY[p["name"]])
+        entry["abha"] = p["snapshot"].get("abha_number")
         entry["flags"] = sorted(flags)
         entry["station"] = station(flags)
         entry["team"] = p.get("team", [])

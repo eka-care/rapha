@@ -1,1 +1,1 @@
-{"root":["./src/threadtab.tsx","./src/harness.tsx","./src/manifest.ts","./src/types.ts","./src/components/threadpanel.tsx"],"version":"5.9.3"}
+{"root":["./src/threadtab.tsx","./src/workspace.tsx","./src/workspaceroute.tsx","./src/data.ts","./src/harness.tsx","./src/manifest.tsx","./src/types.ts","./src/components/directory.tsx","./src/components/queue.tsx","./src/components/spotlight.tsx","./src/components/threadpanel.tsx"],"version":"5.9.3"}

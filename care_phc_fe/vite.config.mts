@@ -11,7 +11,7 @@ export default defineConfig({
     federation({
       name: "care_phc_fe",
       filename: "remoteEntry.js",
-      exposes: { "./manifest": "./src/manifest.ts" },
+      exposes: { "./manifest": "./src/manifest.tsx" },
       shared: ["react", "react-dom"],
     }),
     react(),
