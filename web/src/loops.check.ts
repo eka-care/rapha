@@ -27,6 +27,11 @@ ok(w.primary?.id === "phc.op.consult-document", "the closer is primary");
 ok(w.overflow.length === 3, "everything else is overflow");
 ok(!w.overflow.some((o) => o.id === w.primary?.id), "primary never repeats in overflow");
 
+// -- the closer need not be first: position is not the rule, closes is -----
+const mid = weigh(doctor, "phc.op.lab-order");
+ok(mid.primary?.id === "phc.op.lab-order", "the closer is primary even when it is not actions[0]");
+ok(mid.overflow.some((o) => o.id === "phc.op.consult-document"), "actions[0] moves to overflow when it is not the closer");
+
 // -- no closes, or a closer not offered: fall back to the first action ------
 const none = weigh(doctor, null);
 ok(none.primary?.id === "phc.op.consult-document", "falls back to the first action");
