@@ -101,10 +101,13 @@ def test_a_proposal_is_not_a_write_and_is_confirmed_exactly_once():
                         json={"confirmed": True})
     assert again.status_code == 409, "a proposal is confirmed once"
     assert "already confirmed" in again.json()["detail"]
-    # and the second attempt wrote nothing.
+    # and the second attempt wrote nothing. Counted for this operation, not for
+    # the thread: the seed declares its own audit trail, so enc-002 already
+    # carries a confirmed registration before this test does anything.
     assert client.get("/api/threads/enc-002").json()["subject"]["name"] == "Kamala Devi"
     assert len([a for a in client.get("/api/threads/enc-002").json()["audit"]
-                if a["outcome"] == "confirmed"]) == 1
+                if a["outcome"] == "confirmed"
+                and a["operation"] == "phc.op.vitals-record"]) == 1
 
 
 def test_confirm_refuses_anything_that_did_not_come_through_propose():

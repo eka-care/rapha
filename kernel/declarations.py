@@ -256,12 +256,19 @@ def _lint_metric(fm, fail):
                resources=vocab.CARE_RESOURCES, allow_window=True)
 
 
-def _lint_seed(threads, manifest, voc):
+def _lint_seed(threads, manifest, voc, ops):
     """Check the demo day against the facility's own words.
 
     The one failure this exists for: a seeded proposal naming an operation
     the bundle does not load. That is what put a pending Amoxicillin on a
     laboratory thread, drawn as an agent card the kernel would then 404.
+
+    The second: an audit line whose payload does not answer that operation's
+    own questionnaire. The thread draws a posted card's values from it, so a
+    key that is not a link_id renders as a raw identifier and no key at all
+    renders as a card with nothing in it. The health centre's seed had no
+    payloads for a while and every demo thread read "Nothing has been recorded
+    on this visit yet" over three ticked steps.
     """
     bad, seen = [], set()
     for i, t in enumerate(threads or []):
@@ -289,7 +296,25 @@ def _lint_seed(threads, manifest, voc):
             if op not in (manifest["operations"] or []):
                 bad.append(f"{where}: names operation '{op}', which this bundle "
                            f"does not load")
+                continue
+            bad += _lint_seed_payload(where, op, entry.get("payload") or {}, ops)
     return bad
+
+
+def _lint_seed_payload(where, op, payload, ops):
+    """Every key a seeded payload carries answers a question that operation's
+    questionnaire declares. An empty payload is allowed on a proposal, which is
+    a machine that filled in nothing; on an audit line it is a posted card with
+    no values under its title, so it is refused."""
+    schema_id = (ops.get(op) or {}).get("input")
+    if not schema_id:
+        return []
+    try:
+        asked = {q["link_id"] for q in validate.walk(validate.load(schema_id)["questions"])}
+    except (FileNotFoundError, KeyError):
+        return []  # the missing questionnaire is already a failure of its own
+    return [f"{where}: '{op}' payload answers '{k}', which "
+            f"{schema_id} does not ask" for k in sorted(set(payload) - asked)]
 
 
 def lint(manifest, decls, ops, seed=()):
@@ -315,7 +340,7 @@ def lint(manifest, decls, ops, seed=()):
     # how a released report came to be called `dispensed.complete`.
     voc = vocab.from_manifest(manifest)
     bad += voc.problems()
-    bad += _lint_seed(seed, manifest, voc)
+    bad += _lint_seed(seed, manifest, voc, ops)
 
     listed = {i for k in ("workflows", "views", "instruments", "metrics")
               for i in manifest[k] or []}

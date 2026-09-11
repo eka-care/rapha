@@ -533,10 +533,16 @@ def seed(store, threads=None):
             # A seeded thread that claims work was done has to say who did it:
             # "not actor of lab.op.result-enter" is evaluated against this
             # trail, so without these rows the demo day cannot show the rule.
+            #
+            # And what was recorded, not only that something was. The thread
+            # draws a posted operation's values from this payload, so an entry
+            # without one is a receipt for something invisible: a card headed
+            # "Record vitals and triage" with no vitals under it.
             store.append_audit(AuditRecord(
                 id=row_id(), thread=thread, operation=entry["operation"],
                 actor=entry.get("actor"), surface=entry.get("surface", "rendered"),
-                payload={}, outcome=entry.get("outcome", "confirmed"), at=stamp))
+                payload=entry.get("payload") or {},
+                outcome=entry.get("outcome", "confirmed"), at=stamp))
         for p in t.get("proposals") or []:
             pid = p.get("id") or row_id()
             payload = p.get("payload") or {}

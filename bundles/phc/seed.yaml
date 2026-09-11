@@ -31,6 +31,11 @@ threads:
     status: in_progress
     patient: {name: Kamala Devi, age: 34, sex: female, phone: "9800000002",
               village: Sonpur, category: general}
+    audit:
+      - operation: phc.op.patient-register
+        actor: "user:frontdesk"
+        payload: {name: Kamala Devi, age: 34, sex: female, phone: "9800000002",
+                  village: Sonpur, category: general}
 
   # Vitals taken and the blood pressure is high. Stands at the doctor.
   - id: enc-003
@@ -44,6 +49,15 @@ threads:
       - {resource: observation, category: vital-signs, code: diastolic, value: 112, unit: "mm[Hg]"}
       - {resource: observation, category: vital-signs, code: pulse, value: 92, unit: "/min"}
     flags: [vitals.flagged]
+    audit:
+      - operation: phc.op.patient-register
+        actor: "user:frontdesk"
+        payload: {name: Ramesh Kumar, age: 61, sex: male, phone: "9800000003",
+                  village: Bhagwanpur, category: general}
+      - operation: phc.op.vitals-record
+        actor: "user:nurse"
+        payload: {systolic: 186, diastolic: 112, pulse: 92, spo2: 97,
+                  weight: 71, temperature: 36.8}
 
   # Seen and sent to the laboratory. Carries the one proposal a person has
   # not yet accepted, so the confirm path has a subject the moment the app
@@ -60,6 +74,25 @@ threads:
       - {resource: observation, category: vital-signs, code: pulse, value: 92, unit: "/min"}
       - {resource: notes, text: "Fever three days, no red flags on examination."}
       - {resource: service_request, code: CBC, status: active}
+    audit:
+      - operation: phc.op.patient-register
+        actor: "user:frontdesk"
+        payload: {name: Iqbal Ahmed, age: 52, sex: male, phone: "9800000004",
+                  village: Sonpur, category: general}
+      - operation: phc.op.vitals-record
+        actor: "user:nurse"
+        payload: {systolic: 118, diastolic: 76, pulse: 92, spo2: 98,
+                  weight: 64, temperature: 38.1}
+      - operation: phc.op.consult-document
+        actor: "user:mo"
+        payload:
+          history: Fever three days, no cough, no urinary symptoms.
+          examination: Chest clear, abdomen soft, no rash.
+          assessment: Fever three days, no red flags on examination.
+          plan: Blood count today, review with the result.
+      - operation: phc.op.lab-order
+        actor: "user:mo"
+        payload: {investigations: [CBC]}
     proposals:
       - id: seed-prop-001
         operation: phc.op.rx-prescribe
@@ -84,6 +117,28 @@ threads:
          dosage_instruction: 1 tab TDS x 3 days, status: active}
       - {resource: medication_request, medication: ORS sachet,
          dosage_instruction: 1 sachet after each loose stool, status: active}
+    audit:
+      - operation: phc.op.patient-register
+        actor: "user:frontdesk"
+        payload: {name: Sunita Bai, age: 27, sex: female, phone: "9800000005",
+                  village: Rampur, category: general}
+      - operation: phc.op.vitals-record
+        actor: "user:nurse"
+        payload: {systolic: 118, diastolic: 76, pulse: 92, spo2: 99,
+                  weight: 49, temperature: 37.6}
+      - operation: phc.op.consult-document
+        actor: "user:mo"
+        payload:
+          history: Fever three days, loose stools since yesterday.
+          examination: Hydrated, chest clear, abdomen soft.
+          assessment: Fever three days, no red flags on examination.
+          plan: Paracetamol and oral rehydration, return if it worsens.
+      - operation: phc.op.rx-prescribe
+        actor: "user:mo"
+        payload:
+          medications:
+            - {medication: Paracetamol 500mg, dosage_instruction: 1 tab TDS x 3 days}
+            - {medication: ORS sachet, dosage_instruction: 1 sachet after each loose stool}
 
   # Dispensed and closed. Stands nowhere; the line is complete.
   - id: enc-006
@@ -105,3 +160,36 @@ threads:
          quantity: "1", status: completed}
       - {resource: medication_dispense, medication: ORS sachet,
          quantity: "1", status: completed}
+    audit:
+      - operation: phc.op.patient-register
+        actor: "user:frontdesk"
+        payload: {name: Meera Patel, age: 45, sex: female, phone: "9800000006",
+                  village: Rampur, category: general}
+      - operation: phc.op.abha-link
+        actor: "user:frontdesk"
+        payload: {method: link_existing, abha_number: "12-3456-7890-9012",
+                  consent_given: true}
+      - operation: phc.op.vitals-record
+        actor: "user:nurse"
+        payload: {systolic: 118, diastolic: 76, pulse: 92, spo2: 98,
+                  weight: 58, temperature: 37.2}
+      - operation: phc.op.consult-document
+        actor: "user:mo"
+        payload:
+          history: Fever three days, loose stools since yesterday.
+          examination: Hydrated, chest clear, abdomen soft.
+          assessment: Fever three days, no red flags on examination.
+          plan: Paracetamol and oral rehydration, return if it worsens.
+      - operation: phc.op.rx-prescribe
+        actor: "user:mo"
+        payload:
+          medications:
+            - {medication: Paracetamol 500mg, dosage_instruction: 1 tab TDS x 3 days}
+            - {medication: ORS sachet, dosage_instruction: 1 sachet after each loose stool}
+      - operation: phc.op.pharmacy-dispense
+        actor: "user:pharmacist"
+        payload:
+          dispenses:
+            - {medication: Paracetamol 500mg, quantity: "1"}
+            - {medication: ORS sachet, quantity: "1"}
+          partial: false

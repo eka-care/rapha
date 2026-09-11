@@ -32,7 +32,11 @@ threads:
                   referrer_name: Dr Nandini Rao, referrer_contact: "9440000090",
                   panel: cbc}
     audit:
-      - {operation: lab.op.referral-accession, actor: "user:phlebotomist"}
+      - operation: lab.op.referral-accession
+        actor: "user:phlebotomist"
+        payload: {name: Anjali Rao, age: 34, sex: female, phone: "9440000021",
+                  referrer_name: Dr Nandini Rao, referrer_contact: "9440000090",
+                  panel: cbc}
 
   # Drawn and labelled. On the bench, waiting to be run. The analyser has
   # already offered a full set of values and a person has not accepted them:
@@ -54,8 +58,14 @@ threads:
       - {resource: specimen, code: venous-blood, status: available,
          created_by: "user:phlebotomist"}
     audit:
-      - {operation: lab.op.referral-accession, actor: "user:phlebotomist"}
-      - {operation: lab.op.specimen-collect, actor: "user:phlebotomist"}
+      - operation: lab.op.referral-accession
+        actor: "user:phlebotomist"
+        payload: {name: Faizal Sheikh, age: 47, sex: male, phone: "9440000022",
+                  referrer_name: Dr Ipsita Barua, referrer_contact: "9440000091",
+                  panel: bmp}
+      - operation: lab.op.specimen-collect
+        actor: "user:phlebotomist"
+        payload: {specimen_type: venous-blood, container: EDTA tube, fasting: false}
     proposals:
       - operation: lab.op.result-enter
         proposed_by: "device:analyser"
@@ -92,9 +102,17 @@ threads:
          created_by: "user:technologist"}
     flags: [lab.critical]
     audit:
-      - {operation: lab.op.referral-accession, actor: "user:phlebotomist"}
-      - {operation: lab.op.specimen-collect, actor: "user:phlebotomist"}
-      - {operation: lab.op.result-enter, actor: "user:technologist"}
+      - operation: lab.op.referral-accession
+        actor: "user:phlebotomist"
+        payload: {name: Devi Prasad, age: 66, sex: male, phone: "9440000023",
+                  referrer_name: Dr Shobha Menon, referrer_contact: "9440000092",
+                  panel: bmp}
+      - operation: lab.op.specimen-collect
+        actor: "user:phlebotomist"
+        payload: {specimen_type: venous-blood, container: EDTA tube, fasting: false}
+      - operation: lab.op.result-enter
+        actor: "user:technologist"
+        payload: {panel: bmp, glucose: 412, creatinine: 2.4, sodium: 131, potassium: 6.8}
 
   # Rejected by the pathologist. This one is stranded at verification and the
   # worklist badges it warn, because this bundle has no amend loop. It is on
@@ -128,10 +146,20 @@ threads:
       - {resource: notes, text: "Specimen haemolysed. Recollect before reporting.",
          created_by: "user:pathologist"}
     audit:
-      - {operation: lab.op.referral-accession, actor: "user:phlebotomist"}
-      - {operation: lab.op.specimen-collect, actor: "user:phlebotomist"}
-      - {operation: lab.op.result-enter, actor: "user:technologist"}
-      - {operation: lab.op.result-verify, actor: "user:pathologist"}
+      - operation: lab.op.referral-accession
+        actor: "user:phlebotomist"
+        payload: {name: Rukmini Shetty, age: 41, sex: female, phone: "9440000024",
+                  referrer_name: Dr Nandini Rao, referrer_contact: "9440000090",
+                  panel: cbc}
+      - operation: lab.op.specimen-collect
+        actor: "user:phlebotomist"
+        payload: {specimen_type: venous-blood, container: EDTA tube, fasting: false}
+      - operation: lab.op.result-enter
+        actor: "user:technologist"
+        payload: {panel: cbc, haemoglobin: 9.1, wbc: 7.2, platelets: 188}
+      - operation: lab.op.result-verify
+        actor: "user:pathologist"
+        payload: {decision: rejected, comment: Specimen haemolysed. Recollect before reporting.}
 
   # Verified by a second person. Waiting to be released to the referrer.
   - id: lab-006
@@ -163,10 +191,20 @@ threads:
       - {resource: notes, text: "Mild anaemia. Values consistent with the specimen.",
          created_by: "user:pathologist"}
     audit:
-      - {operation: lab.op.referral-accession, actor: "user:phlebotomist"}
-      - {operation: lab.op.specimen-collect, actor: "user:phlebotomist"}
-      - {operation: lab.op.result-enter, actor: "user:technologist"}
-      - {operation: lab.op.result-verify, actor: "user:pathologist"}
+      - operation: lab.op.referral-accession
+        actor: "user:phlebotomist"
+        payload: {name: Sunanda Iyer, age: 29, sex: female, phone: "9440000025",
+                  referrer_name: Dr Ipsita Barua, referrer_contact: "9440000091",
+                  panel: cbc}
+      - operation: lab.op.specimen-collect
+        actor: "user:phlebotomist"
+        payload: {specimen_type: venous-blood, container: EDTA tube, fasting: false}
+      - operation: lab.op.result-enter
+        actor: "user:technologist"
+        payload: {panel: cbc, haemoglobin: 11.2, wbc: 6.4, platelets: 233}
+      - operation: lab.op.result-verify
+        actor: "user:pathologist"
+        payload: {decision: verified, comment: Mild anaemia. Values consistent with the specimen.}
 
   # Released. The line is complete and this one stands nowhere.
   - id: lab-007
@@ -205,8 +243,21 @@ threads:
         payload: {channel: portal, attest: true,
                   note: Released to the referring clinician's portal.}
     audit:
-      - {operation: lab.op.referral-accession, actor: "user:phlebotomist"}
-      - {operation: lab.op.specimen-collect, actor: "user:phlebotomist"}
-      - {operation: lab.op.result-enter, actor: "user:technologist"}
-      - {operation: lab.op.result-verify, actor: "user:pathologist"}
-      - {operation: lab.op.report-release, actor: "user:pathologist"}
+      - operation: lab.op.referral-accession
+        actor: "user:phlebotomist"
+        payload: {name: Mohan Bhat, age: 58, sex: male, phone: "9440000026",
+                  referrer_name: Dr Shobha Menon, referrer_contact: "9440000092",
+                  panel: bmp}
+      - operation: lab.op.specimen-collect
+        actor: "user:phlebotomist"
+        payload: {specimen_type: venous-blood, container: EDTA tube, fasting: false}
+      - operation: lab.op.result-enter
+        actor: "user:technologist"
+        payload: {panel: bmp, glucose: 104, creatinine: 1.0, sodium: 140, potassium: 4.3}
+      - operation: lab.op.result-verify
+        actor: "user:pathologist"
+        payload: {decision: verified, comment: Within the reference intervals held on the panel.}
+      - operation: lab.op.report-release
+        actor: "user:pathologist"
+        payload: {channel: portal, attest: true,
+                  note: Released to the referring clinician's portal.}

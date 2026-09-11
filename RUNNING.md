@@ -225,7 +225,7 @@ open http://localhost:5173/#/threads/enc-002
 ## 5. The checks
 
 ```sh
-sh scripts/check.sh                 # everything, about 15 seconds, 247 ok lines
+sh scripts/check.sh                 # everything, about 18 seconds, 248 ok lines
 ```
 
 That runs the linters, every Python and Go unit check, the browser-side checks,
@@ -280,14 +280,13 @@ port.
   held by sequential `seed-NNNN` ids. Nothing reads those durations anyway,
   which is `bundles/LAB-LOG.md` leak 3.
 
-- **A seeded posted operation shows its title and no values.** A seed's audit
-  lines carry no payload, and `web/src/messages.ts` builds a posted card's
-  values from the payload in the audit. So on a seeded thread "Enter panel
-  results" is a receipt for something invisible, even though the rows it wrote
-  are in `observation` and the laboratory report view shows them. Anything
-  committed in this session draws its values in full. Fixing it means either
-  writing payloads into both `seed.yaml` files by hand or teaching the card to
-  read rows, and the second one is a kernel change.
+- **A seeded thread's conversation is as good as its declared audit.** A
+  posted card draws its values from the payload on the audit line, so a seed
+  that writes rows and declares no trail produces a thread of no cards at all
+  and an agent saying nothing has been recorded over a stepper full of ticks.
+  Both seeds now declare theirs, the linter refuses a payload key the
+  questionnaire does not ask for, and `test_contracts` refuses an empty one. A
+  third bundle has to write its own; nothing derives a trail from rows.
 
 - **`enable_when` is the renderer's rule and not the kernel's.** The lab's
   result questionnaire hides the analytes the chosen panel does not use and

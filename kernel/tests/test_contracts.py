@@ -7,6 +7,7 @@ commit without a tap. No kernel, no database, no network.
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 import pathlib
 
@@ -16,6 +17,7 @@ from care_phc.thread import LINE, STORED
 from catalogue import validate, vocab
 from catalogue.build import parse
 from kernel import contracts as c
+from kernel import declarations
 
 ROOT = pathlib.Path(__file__).parents[2]
 BUNDLE = ROOT / "bundles" / "phc"
@@ -140,6 +142,40 @@ def test_api_shapes_are_plain_json():
     assert "patient" not in out and "subject" in out, "the FE rename is part of the contract"
     assert c.Proposal("p1", "enc-1", "phc.op.rx-prescribe", {}, "svc", c.MCP,
                       "pending", "2026-09-10T10:00:00Z").status in c.PROPOSAL_STATUSES
+
+
+def test_a_seeded_audit_line_answers_its_own_questionnaire():
+    """A posted card draws its values from the audit payload, so a seed that
+    names an operation and answers nothing is a receipt for something
+    invisible, and one that answers a key the form does not ask renders a raw
+    identifier at a clinician. Both are build failures.
+
+    This is the check for the bug that shipped: the health centre's seed
+    declared no audit at all, so every demo thread said "Nothing has been
+    recorded on this visit yet" over three ticked steps of its own stepper.
+    """
+    ops = CAT["operations"]
+    phc = declarations.load("phc")
+    manifest = dataclasses.asdict(phc.manifest)
+    voc = vocab.for_bundle("phc")
+
+    good = declarations._lint_seed(phc.seed, manifest, voc, ops)
+    assert good == [], good
+
+    typo = [{"id": "enc-1", "audit": [
+        {"operation": "phc.op.vitals-record", "actor": "user:nurse",
+         "payload": {"systolic": 120, "sistolic": 120}}]}]
+    bad = declarations._lint_seed(typo, manifest, voc, ops)
+    assert len(bad) == 1 and "sistolic" in bad[0], bad
+    assert "phc.schema.vitals-v1 does not ask" in bad[0], bad
+
+    # Every audit line in every bundle's seed says what was recorded, not only
+    # that something was.
+    for bundle_id in ("phc", "lab"):
+        b = declarations.load(bundle_id)
+        for t in b.seed:
+            for entry in t.get("audit") or []:
+                assert entry.get("payload"), (bundle_id, t["id"], entry["operation"])
 
 
 if __name__ == "__main__":

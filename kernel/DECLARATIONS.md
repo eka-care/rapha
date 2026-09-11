@@ -80,17 +80,27 @@ threads:
       - {resource: observation, category: laboratory, code: potassium, value: 6.8, unit: mmol/L,
          created_by: "user:technologist"}
     flags: [lab.critical]            # stored flags; must be this bundle's states
-    audit:                           # who did what, so `actor of` rules can fire
-      - {operation: lab.op.result-enter, actor: "user:technologist"}
+    audit:                           # who did what, and what they recorded
+      - {operation: lab.op.result-enter, actor: "user:technologist",
+         payload: {panel: bmp, potassium: 6.8, ...}}
     proposals:                       # a write awaiting a person
       - {operation: lab.op.result-enter, proposed_by: "device:analyser", surface: mcp,
          payload: {...}}
 ```
 
+An audit line's `payload` is what that person keyed, and it is not decoration:
+`web/src/messages.ts` draws a posted operation card's values from it, so a line
+without one is a card headed "Enter panel results" with nothing under it, and
+a thread of them makes the agent say nothing has been recorded on a visit whose
+own stepper shows three ticked steps. It did, for a while.
+
 Linted with everything else: a resource must be a CARE resource, a flag must
-be one of this bundle's `states`, and an operation named by a proposal or an
-audit line must be one this bundle loads. That last rule is the one this file
-exists for. The seed used to live in `adapters/local/store.py`, where it ran
+be one of this bundle's `states`, an operation named by a proposal or an audit
+line must be one this bundle loads, and every key in a payload must be a
+`link_id` that operation's questionnaire asks for. The third rule is the one
+this file exists for; the fourth is
+`kernel/tests/test_contracts.test_a_seeded_audit_line_answers_its_own_questionnaire`,
+which also asserts that no audit line in either shipped seed is empty. The seed used to live in `adapters/local/store.py`, where it ran
 under whatever bundle was loaded, so a laboratory opened on six outpatients
 with tokens like `A01` and a pending prescription on a specimen thread; see
 `bundles/LAB-LOG.md` leak 10.
