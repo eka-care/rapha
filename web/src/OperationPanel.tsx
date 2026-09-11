@@ -279,7 +279,12 @@ export function OperationPanel({
           ),
         )}
 
-        {mountsJourney && (
+        {/* Gone the moment the form is showing. What is left of it by then is
+            a stale note and a button that would do what has already happened,
+            and a control that does nothing is how a person learns to distrust
+            the ones that do. The SDK tears its own root down on every terminal
+            outcome, and on a failure it never mounted one. */}
+        {mountsJourney && !journeyDone && (
           <Journey
             mobile={mobile}
             /* On the link panel the way out is to close it. On a registration
