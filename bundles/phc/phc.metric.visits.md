@@ -2,7 +2,7 @@
 id: phc.metric.visits
 type: metric
 title: Visits
-summary: Encounters opened in the window.
+summary: Encounters opened.
 unit: count
 window: day
 numerator: {resource: encounter, where: {created_date: {gte: window.start}}}

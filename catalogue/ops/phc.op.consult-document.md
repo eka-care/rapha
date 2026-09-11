@@ -4,9 +4,7 @@ type: operation
 kind: write
 short: Consult
 title: Document a consultation
-summary: >
-  Write down what the patient said, what was found, and what the doctor
-  concluded.
+summary: History, findings and assessment.
 capability: encounter.document
 scope_qualifier: null
 station: doctor

@@ -23,7 +23,7 @@ async function ask(path: string, init: RequestInit): Promise<ScribeSession> {
   } catch {
     throw new ApiError(
       `Cannot reach the kernel at ${API_BASE}, so the recording went nowhere.`,
-      "Nothing was uploaded and nothing was kept. Type the note; it is the same record.",
+      "Nothing was uploaded or kept. Type the note.",
     );
   }
   const body = await res.text();
@@ -33,7 +33,7 @@ async function ask(path: string, init: RequestInit): Promise<ScribeSession> {
       detail = JSON.parse(body).detail ?? detail;
     } catch { /* not json, the text is the detail */ }
     throw new ApiError(detail || `The kernel answered ${res.status}.`,
-                       "Type the note. The record is the same either way.", res.status);
+                       "Type the note.", res.status);
   }
   return JSON.parse(body) as ScribeSession;
 }

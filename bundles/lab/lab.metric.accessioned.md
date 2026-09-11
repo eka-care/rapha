@@ -2,7 +2,7 @@
 id: lab.metric.accessioned
 type: metric
 title: Orders accessioned
-summary: Active orders accessioned in the window.
+summary: Active orders accessioned.
 unit: count
 window: day
 numerator: {resource: service_request, where: {status: active, created_date: {gte: window.start}}}

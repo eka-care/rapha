@@ -2,8 +2,8 @@
 id: lab.view.worklist
 type: view
 kind: queue
-title: Worklist by specimen status
-summary: Every specimen accessioned today, grouped by where it stands.
+title: Worklist by status
+summary: Today's specimens, grouped by station.
 capability: worklist.read
 workflow: lab.wf.specimen
 scope: today

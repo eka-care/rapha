@@ -2,9 +2,7 @@
 id: lab.wf.specimen
 type: workflow
 title: Specimen line
-summary: >
-  Accession, phlebotomy, processing, then verification by a second person and
-  release. The current station is the first step not done.
+summary: Accession, phlebotomy, processing, verification, release.
 subject: encounter
 steps:
   - station: accession

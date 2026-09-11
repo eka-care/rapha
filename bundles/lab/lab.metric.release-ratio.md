@@ -2,7 +2,7 @@
 id: lab.metric.release-ratio
 type: metric
 title: Released per accessioned
-summary: Reports out over orders in, the nearest declarable thing to throughput.
+summary: Reports out over orders in.
 unit: ratio
 window: day
 numerator: {resource: questionnaire_response, where: {questionnaire: lab.schema.release-v1, created_date: {gte: window.start}}}

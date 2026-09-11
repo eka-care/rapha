@@ -4,9 +4,7 @@ type: operation
 kind: write
 short: Scribe visit
 title: Record a household visit
-summary: >
-  A frontline worker records what happened at a visit to someone's home, and
-  anything that needs following up.
+summary: What happened at the home, and anything to follow up.
 capability: visit.household
 scope_qualifier: null
 station: community

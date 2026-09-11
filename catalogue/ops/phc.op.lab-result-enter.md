@@ -4,9 +4,7 @@ type: operation
 kind: write
 short: Result
 title: Enter a laboratory result
-summary: >
-  Record the value a bench test produced, against the investigation a doctor
-  ordered for this patient.
+summary: Record a bench result against the order it answers.
 capability: lab.result.enter
 scope_qualifier: null
 station: lab

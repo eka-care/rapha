@@ -3,9 +3,7 @@ id: phc.inst.vitals-voice
 type: instrument
 kind: constrained-voice
 title: Speak a reading
-summary: >
-  Say one number for one field. It is parsed against a number grammar, shown
-  back on screen, and committed only by a tap. It falls back to the keypad.
+summary: Say one number into one field.
 operations: [phc.op.vitals-record]
 fields: [systolic, diastolic, pulse, spo2, weight, temperature]
 types: [integer, decimal]

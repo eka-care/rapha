@@ -4,9 +4,7 @@ type: operation
 kind: write
 short: Vitals
 title: Record vitals and triage
-summary: >
-  Measure and record blood pressure, oxygen saturation, weight and the other
-  basic readings, and flag anything abnormal for the doctor.
+summary: Blood pressure, oxygen saturation, weight and temperature.
 capability: vitals.record
 scope_qualifier: null
 station: nurse

@@ -184,8 +184,8 @@ export function Sidebar({
             </button>
           ))
         ) : (
-          <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--gray-400)", lineHeight: 1.5 }}>
-            No threads yet. Open one from a queue, or search.
+          <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--gray-400)" }}>
+            No threads yet.
           </div>
         )}
       </div>
@@ -204,9 +204,7 @@ export function Sidebar({
               </button>
             ))
           ) : (
-            <div style={{ padding: 9, fontSize: 11, color: "var(--ink-3)" }}>
-              This kernel declared no roles.
-            </div>
+            <div style={{ padding: 9, fontSize: 11, color: "var(--ink-3)" }}>No roles.</div>
           )}
         </div>
         <button
@@ -276,9 +274,9 @@ export function Overlay({ children, onClose }: { children: React.ReactNode; onCl
 /** The right-hand drawer a summary view opens in. Same reason as the modal:
  *  the conversation stays where it was. */
 export function Sheet({
-  title: heading, sub, onClose, children,
+  title: heading, onClose, children,
 }: {
-  title: string; sub?: string; onClose: () => void; children: React.ReactNode;
+  title: string; onClose: () => void; children: React.ReactNode;
 }) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -293,7 +291,6 @@ export function Sheet({
           {heading}
           <button className="icon-btn ml-auto" onClick={onClose} title="Close">✕</button>
         </div>
-        {sub && <div className="sh-s">{sub}</div>}
       </div>
       <div className="sh-b">{children}</div>
     </div>

@@ -64,8 +64,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     // same from here, so say all four.
     throw new ApiError(
       `Cannot reach the kernel API at ${API_BASE}.`,
-      "Start it and reload. If it is running, it is refusing this origin: it needs to allow " +
-        `${location.origin} in CORS. Meanwhile, "Use demo data" draws these screens from a fixture.`,
+      'Start it and reload, or tap "Use demo data".',
     );
   }
   if (res.status === 404) {
@@ -73,8 +72,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     // never built. The person cannot tell which, so say both.
     throw new ApiError(
       `Nothing at ${path}.`,
-      "Either that record does not exist any more, or the kernel does not serve this route yet. " +
-        "Check the id in the address bar first, then kernel/contracts.py ROUTES for the name it expects.",
+      "Check the id in the address bar, or the kernel does not serve this route.",
       404,
     );
   }
@@ -90,7 +88,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(
       detail || `The API answered ${res.status}.`,
       res.status === 403
-        ? "You do not hold the capability this needs. Someone with it has to do this step."
+        ? "Someone who holds this capability has to do this step."
         : res.status >= 500
           ? "This is the API's error, not yours. Its log will say more."
           : "Correct what it names above and try again.",

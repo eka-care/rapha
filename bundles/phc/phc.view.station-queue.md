@@ -2,8 +2,8 @@
 id: phc.view.station-queue
 type: view
 kind: queue
-title: Today's patients by station
-summary: Everyone seen today, grouped by where they are standing now.
+title: Patients by station
+summary: Today, grouped by station.
 capability: patient.find
 workflow: phc.wf.outpatient
 scope: today

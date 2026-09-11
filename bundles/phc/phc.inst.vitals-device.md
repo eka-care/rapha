@@ -3,7 +3,7 @@ id: phc.inst.vitals-device
 type: instrument
 kind: device
 title: Read from a connected monitor
-summary: A paired BP cuff or pulse oximeter fills the field. The nurse still commits.
+summary: A paired cuff or oximeter fills the field.
 operations: [phc.op.vitals-record]
 fields: [systolic, diastolic, pulse, spo2]
 readback: required

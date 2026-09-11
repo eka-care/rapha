@@ -4,9 +4,7 @@ type: operation
 kind: write
 short: Result
 title: Enter panel results
-summary: >
-  The technologist keys or accepts from the analyser one value per analyte,
-  each checked against its own plausible band and its own critical band.
+summary: One value per analyte, keyed or read from the analyser.
 capability: result.enter
 scope_qualifier: null
 station: processing

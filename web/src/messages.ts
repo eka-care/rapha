@@ -21,7 +21,7 @@
 import type {
   AuditRecord, Catalogue, Operation, Proposal, Questionnaire, ThreadView, ViewDecl,
 } from "./types";
-import { phcOf, walk } from "./validate.ts";   // the extension is for node: messages.check.ts runs this file outside vite
+import { labelOf, phcOf, walk } from "./validate.ts";   // the extension is for node: messages.check.ts runs this file outside vite
 import { human, title } from "./words.ts";
 
 /** A labelled value on a posted or proposed card. */
@@ -94,7 +94,7 @@ export function valuesOf(ctx: Ctx, op: string, payload: Record<string, unknown> 
     const phc = phcOf(q);
     out.push({
       link_id: q.link_id,
-      label: q.text,
+      label: labelOf(q),
       value: fmt(given[q.link_id]) + (phc.unit ? ` ${phc.unit}` : ""),
       crit: outsideCritical(phc.critical, given[q.link_id]),
     });
@@ -194,14 +194,18 @@ export function messages(thread: ThreadView, ctx: Ctx, said: Said[] = []): Msg[]
 
 export type AgentLine = { sentences: string[]; actions: Operation[] };
 
-/** The three sentences the agent closes every thread with.
+/** The two sentences the agent closes every thread with: what last happened,
+ *  and the kernel's own wayfinding.
  *
  *  The prototype had nine hand-written sentences keyed to PHC states. There is
  *  no declaration field carrying per-state prose (a `says:` on each workflow
- *  state would be the place, and contracts are frozen), so these three are
- *  composed from the record instead. They are true for any bundle.
+ *  state would be the place, and contracts are frozen), so these are composed
+ *  from the record instead. They are true for any bundle.
+ *
+ *  There was a third, "Here is what you can do as X", above a row of buttons
+ *  that already say so. A sentence nobody reads is not honesty.
  */
-export function agentLine(thread: ThreadView, ctx: Ctx, role: string): AgentLine {
+export function agentLine(thread: ThreadView, ctx: Ctx): AgentLine {
   // The kernel's nudge is a fragment, not a sentence, and three fragments run
   // together read as one long mistake.
   const stop = (s: string) => (/[.!?]$/.test(s.trim()) ? s.trim() : `${s.trim()}.`);
@@ -230,10 +234,7 @@ export function agentLine(thread: ThreadView, ctx: Ctx, role: string): AgentLine
   // out button: when the role cannot act here, this says so.
   if (thread.nudge) sentences.push(stop(cap(thread.nudge)));
 
-  const actions = thread.actions ?? [];
-  if (actions.length) sentences.push(`Here is what you can do as ${human(role)}.`);
-
-  return { sentences, actions: actions.slice(0, 5) };
+  return { sentences, actions: (thread.actions ?? []).slice(0, 5) };
 }
 
 const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);

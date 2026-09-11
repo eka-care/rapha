@@ -88,8 +88,10 @@ assert.deepEqual(elsewhere(session, "phc.op.consult-document"), ["phc.op.rx-pres
 checks++;
 ok(!draftFor(session, "phc.op.vitals-record"), "no draft is offered for an operation with none");
 
-// -- every sentence ends in the keyboard ----------------------------------
-for (const s of ["running", "failed", "withdrawn"] as const)
+// -- the two outcomes that owe a next step say one; the rest say nothing --
+for (const s of ["recording", "uploading", "running", "ready"] as const)
+  ok(sentence(s) === "", `the ${s} phase is drawn, not narrated`);
+for (const s of ["failed", "withdrawn"] as const)
   ok(/type the note|stands/i.test(sentence(s)),
      `the ${s} sentence says what to do instead of waiting`);
 ok(sentence("failed", "Eka said no.") === "Eka said no.",
@@ -98,7 +100,7 @@ ok(sentence("failed", "Eka said no.") === "Eka said no.",
 // -- the recorder's own small pure parts ----------------------------------
 ok(pickMime((t) => t === "audio/mp4") === "audio/mp4", "Safari's type is taken when it is the only one");
 ok(pickMime(() => false) === "", "a browser supporting none of them still records");
-ok(/allow it/.test(reasonFor("NotAllowedError")), "a refused microphone says how to allow it");
+ok(/allow it/i.test(reasonFor("NotAllowedError")), "a refused microphone says how to allow it");
 ok(/type the note/i.test(reasonFor("NotFoundError")), "and says the keyboard is the same record");
 
 // -- 3. nothing on this path writes ---------------------------------------

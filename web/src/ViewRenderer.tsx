@@ -24,12 +24,7 @@ export function ViewRenderer({
   if (result.kind === "summary") {
     return <Sections sections={result.rows as SectionResult[]} onAction={onAction} onReview={onReview} />;
   }
-  return (
-    <Empty>
-      This view is a <b>{result.kind}</b>, which this renderer cannot draw. Add it to
-      ViewRenderer.tsx, or check the kind in the declaration.
-    </Empty>
-  );
+  return <Empty>No renderer for a <b>{result.kind}</b> view.</Empty>;
 }
 
 // ---------------------------------------------------------------- queue ----
@@ -84,7 +79,7 @@ function QueueView({ result, onOpenThread }: { result: ViewResult; onOpenThread?
           {list.map((r) => <Card key={r.thread} row={r} onOpen={onOpenThread} />)}
         </div>
       ) : (
-        <Empty>Nobody here right now.</Empty>
+        <Empty>Nobody here.</Empty>
       )}
     </>
   );
@@ -284,7 +279,10 @@ function Dashboard({ rows, titles }: { rows: MetricValue[]; titles?: Record<stri
     <>
       <div className="mgrid">
         {rows.map((m) => (
-          <div className="card metric" key={m.metric}>
+          // The exact window start is an ISO timestamp. It is the tile's
+          // tooltip, not a second line under a line that already says "in the
+          // week": nobody reads a machine timestamp off a dashboard.
+          <div className="card metric" key={m.metric} title={`since ${m.window_start}`}>
             <div className="eyebrow">{m.title ?? titles?.[m.metric] ?? human(m.metric)}</div>
             <div className="m-val">{metricValue(m)}</div>
             <div className="m-sub">
@@ -292,13 +290,9 @@ function Dashboard({ rows, titles }: { rows: MetricValue[]; titles?: Record<stri
                 ? `${m.numerator} in the ${m.window}`
                 : `${m.numerator} of ${m.denominator} in the ${m.window}`}
             </div>
-            <div className="m-sub dim">since {m.window_start}</div>
           </div>
         ))}
       </div>
-      <p className="f-hint" style={{ marginTop: 12 }}>
-        Computed on this machine from this machine's records. Nothing here is sent anywhere.
-      </p>
     </>
   );
 }

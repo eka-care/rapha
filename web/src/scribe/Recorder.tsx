@@ -128,7 +128,7 @@ export function Recorder({
     }
     setPhase(s.status === "ready" && !draft ? "failed" : (s.status as Phase));
     if (s.status === "ready" && !draft) {
-      setNote(`The scribe heard nothing this form asks for.${
+      setNote(`Nothing for this form.${
         elsewhere(s, operation).length
           ? ` It did fill ${elsewhere(s, operation).map(human).join(" and ")}.`
           : ""} Type the note.`);
@@ -215,7 +215,7 @@ export function Recorder({
       rec.current?.stop();                 // onstop uploads
     } catch {
       setPhase("failed");
-      setNote("The recorder stopped badly and nothing was captured. Type the note.");
+      setNote("The recorder stopped badly. Type the note.");
     }
   };
 
@@ -281,28 +281,22 @@ export function Recorder({
 
         {(live || busy) && (
           <button className="cq" onClick={() => void withdraw()}>
-            {live ? "Stop and discard" : "Stop waiting, discard the draft"}
+            Discard
           </button>
         )}
 
-        <div className="f-hint" style={{ flex: "1 1 240px" }}>
-          {/* The note is drawn in its own block once there is an outcome, so
-              saying it twice here would be noise on the one screen where every
-              extra sentence is between a doctor and the patient. */}
-          {(note && !said.includes(phase) && note) ||
-            `${mount.summary} Prose and lists only. No number is ever taken from a recording:
-             those are typed or spoken into their own field.`}
-        </div>
+        {/* Whatever the recorder is doing, in a few words. Nothing when it is
+            idle: the button already says what it is. The outcome blocks below
+            draw the note once there is one, so it is never said twice. */}
+        {note && !said.includes(phase) && (
+          <div className="f-hint" style={{ flex: "1 1 240px" }}>{note}</div>
+        )}
       </div>
 
       {busy && (
         <div className="sc-wait" role="status">
           <span className="sc-spin" />
           {phase === "uploading" ? "Uploading" : "The scribe is working"}
-          <span className="f-hint">
-            Nothing is waiting on this. Type the note now if you would rather: what you type stays,
-            and a draft that arrives afterwards is offered beside it rather than over it.
-          </span>
         </div>
       )}
 
@@ -312,22 +306,16 @@ export function Recorder({
           {draftFor(session, operation)?.transcript && (
             <div className="transcript">"{draftFor(session, operation)?.transcript}"</div>
           )}
-          <div className="f-hint">{note}</div>
+          {note && <div className="f-hint">{note}</div>}
           {other.length > 0 && (
-            <div className="f-hint">
-              The same recording also drafted {other.map(human).join(" and ")}. Open{" "}
-              {other.length === 1 ? "it" : "them"} from this thread and the draft is waiting there.
-            </div>
+            <div className="f-hint">Also drafted {other.map(human).join(" and ")}.</div>
           )}
         </div>
       )}
 
       {held.length > 0 && (
         <div className="sc-heard held">
-          <div className="eyebrow">You had already written here</div>
-          <div className="f-hint">
-            Your text stands. The scribe's version is below and it goes nowhere unless you tap it.
-          </div>
+          <div className="eyebrow">Already written, kept</div>
           {held.map((h) => (
             <div className="sc-held" key={h.link_id}>
               <b>{labels.get(h.link_id) ?? h.link_id}</b>
@@ -349,11 +337,7 @@ export function Recorder({
       {refused.length > 0 && (
         <div className="sc-heard bad">
           <div className="eyebrow">Dropped</div>
-          <div className="f-hint">
-            The scribe returned {refused.join(", ")}, which a recording may not fill on this form.
-            Nothing was put in {refused.length === 1 ? "that field" : "those fields"}. This is a bug
-            in the kernel's scribe and it is worth reporting.
-          </div>
+          <div className="f-hint">{refused.join(", ")}</div>
         </div>
       )}
 

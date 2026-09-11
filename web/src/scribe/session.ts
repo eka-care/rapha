@@ -119,23 +119,23 @@ export function sentence(status: ScribeStatus | "idle" | "recording" | "uploadin
                          reason = ""): string {
   switch (status) {
     case "recording":
-      return "Recording this consultation. The patient agreed to it at the desk, and the indicator above stays on for as long as it runs.";
     case "uploading":
-      return "Sending the recording to the kernel, which holds the credentials. The audio is deleted there as soon as it has been handed on.";
+      // The live indicator and the spinner above already say this in a word.
+      return "";
     case "running":
-      return "The scribe is working on it. This usually takes under a minute. You do not have to wait: type the note and what you type is what is kept.";
+      // The spinner beside this already says it.
+      return "";
     case "ready":
-      return "The draft is in the fields below, marked unconfirmed. Read every value against what was said, correct anything wrong, and tap Commit. Nothing is recorded until you do.";
+      // The fields are marked unconfirmed. Saying it again here is decoration.
+      return "";
     case "failed":
-      return reason || "The scribe could not produce a draft. Type the note.";
+      return reason || "No draft. Type the note.";
     case "withdrawn":
-      // Honest about what this control does and does not do. It stops this
-      // recording and discards it, which is the half of addendum E.3 a
-      // renderer can do on its own. Keeping capture off for the rest of the
-      // visit is a flag, and a flag is written by an operation: the
-      // consultation form's own stop question. There is no one tap withdrawal
-      // here because no bundle can declare an operation for one yet.
-      return "Stopped. The recording was discarded and nothing from it was kept. To keep capture off for the rest of this visit, tick the patient's stop question on the consultation form and commit it. Anything already confirmed stands.";
+      // This control stops one recording and discards it. Keeping capture
+      // off for the rest of the visit is a flag, written by the consultation
+      // form's own stop question, which is a pill away and not this screen's
+      // to explain.
+      return "Discarded. Anything already confirmed stands.";
     default:
       return "";
   }
@@ -152,13 +152,13 @@ export function pickMime(supported: (t: string) => boolean): string {
  *  web/src/voice say the same things; these are getUserMedia's. */
 export function reasonFor(name: string): string {
   if (/NotAllowed|Security/.test(name))
-    return "This page is not allowed to use the microphone. Click the icon at the left of the address bar, allow it, and try again. Until then, type the note: it is the same record.";
+    return "Microphone blocked. Allow it in the address bar, or type the note.";
   if (/NotFound|Overconstrained/.test(name))
-    return "No microphone was found on this machine. Plug one in and reload, or type the note.";
+    return "No microphone. Type the note.";
   if (/NotReadable|Aborted/.test(name))
-    return "Something else on this machine is holding the microphone. Close it and try again, or type the note.";
+    return "Another app holds the microphone. Type the note.";
   if (/undefined|not a function|mediaDevices/.test(name))
-    return "This browser will not record on an insecure origin. It needs https or localhost. Type the note.";
+    return "Recording needs https or localhost. Type the note.";
   return `The microphone did not start (${name}). Type the note.`;
 }
 

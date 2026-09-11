@@ -37,7 +37,7 @@ export function rows(
   const out: Row[] = [];
 
   if (query && isAsk(query)) {
-    out.push({ kind: "ask", id: `ask:${query}`, name: query, meta: "Ask the agent, workspace scope", group: "Ask the agent" });
+    out.push({ kind: "ask", id: `ask:${query}`, name: query, meta: "", group: "Ask the agent" });
   }
 
   const seen = new Set<string>();
@@ -59,11 +59,13 @@ export function rows(
     }
   }
 
+  // A destination row is its own name. The declaration's summary under it was
+  // three sentences explaining three words.
   const go: Row[] = [
-    { kind: "home", id: "home", name: "Home", meta: "Your shift at a glance", group: "Go to" },
+    { kind: "home", id: "home", name: "Home", meta: "", group: "Go to" },
     ...nav.map((v) => ({
       kind: "view" as const, id: v.id, name: v.title ?? title(v.id),
-      meta: v.summary ?? v.kind, group: "Go to", view: v,
+      meta: "", group: "Go to", view: v,
     })),
   ];
   out.push(...go.filter((r) => !query || r.name.toLowerCase().includes(lo)));

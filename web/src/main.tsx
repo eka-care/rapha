@@ -269,7 +269,7 @@ function App() {
           <div className="ml-auto" />
           <div className="srcline">
             <span className={`dot ${demo ? "demo" : cat.error ? "down" : "up"}`} />
-            {demo ? "Demo data, nothing is real" : API_BASE}
+            {demo ? "Demo data" : API_BASE}
           </div>
           <button className="pill" onClick={() => setDemo(!demo)}>
             {demo ? "Use the API" : "Use demo data"}
@@ -333,7 +333,6 @@ function App() {
                       thread={thread.data}
                       cat={cat.data}
                       ctx={ctx}
-                      role={role === DEMO_ROLE ? "the demo account" : human(role)}
                       said={said[thread.data.id] ?? []}
                       asking={asking}
                       onSay={(t) => say(route.id, t, route.id)}
@@ -382,7 +381,6 @@ function App() {
             client={client}
             queues={queues}
             nav={nav}
-            role={role}
             onClose={() => setPalette(false)}
             onOpenThread={openThread}
             onGo={(h: string) => {
@@ -456,11 +454,11 @@ function topbar(
   cat: Catalogue | undefined,
   thread: ThreadView | null,
 ): [string, string] {
-  if (route.kind === "home") return ["Today", "Your shift at a glance"];
-  if (route.kind === "ask") return ["Workspace chat", "Not scoped to one thread"];
+  if (route.kind === "home") return ["Today", ""];
+  if (route.kind === "ask") return ["Workspace chat", ""];
   if (route.kind === "view") {
     const v = cat?.views?.[route.id];
-    return [v?.title ?? title(route.id), v?.summary ?? ""];
+    return [v?.title ?? title(route.id), ""];
   }
   if (!thread) return [title(route.id), ""];
   const done = [...thread.line].reverse().find((s) => s.status === "done");
@@ -494,7 +492,7 @@ function SummarySheet({
 }) {
   const { data, error, loading, reload } = useAsync(() => client.view(view.id, thread), [view.id, thread, client]);
   return (
-    <Sheet title={view.title ?? title(view.id)} sub={view.summary} onClose={onClose}>
+    <Sheet title={view.title ?? title(view.id)} onClose={onClose}>
       {loading && <Loading what="the summary" />}
       {error && <Failed error={error} onRetry={reload} />}
       {data && (
@@ -545,21 +543,13 @@ function Workspace({
           <div style={{ flex: 1 }}>
             <div className="pt-name">Workspace chat</div>
             <div className="pt-meta">
-              Not scoped to one thread. {cat.manifest?.title ?? "This bundle"} ·{" "}
-              {cat.manifest?.version ?? ""}
+              {cat.manifest?.title ?? "This bundle"} · {cat.manifest?.version ?? ""}
             </div>
           </div>
         </div>
         <div className="thread">
           {said.length === 0 && (
-            <div className="empty">
-              Ask about a declared view and it is answered from the read this page already did.
-              Anything else needs the agent.
-              <br />
-              <br />
-              Nothing typed here is part of the record: the kernel has no route for a sentence and
-              stores none.
-            </div>
+            <div className="empty">Nothing asked yet.</div>
           )}
           {said.map((m) => {
             if (m.who === "user") {
@@ -584,14 +574,12 @@ function Workspace({
                     {hit ? (
                       <>
                         <div className="t">{hit.decl.title ?? title(hit.decl.id)}</div>
-                        A read across this facility. No write was performed.
                         <Counts l={hit} cat={cat} />
                         <div className="props">
                           <button className="prop" onClick={() => onGo(`#/views/${hit.decl.id}`)}>
                             <Icon name="list" />
                             <span style={{ flex: 1 }}>
                               <span className="p-l">Open {hit.decl.title ?? title(hit.decl.id)}</span>
-                              <div className="p-s">The same read, on its own screen.</div>
                             </span>
                           </button>
                         </div>

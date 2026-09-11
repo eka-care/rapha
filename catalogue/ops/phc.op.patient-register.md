@@ -4,9 +4,7 @@ type: operation
 kind: write
 short: Register
 title: Register a new patient
-summary: >
-  Create a record for someone the facility has not seen before, after
-  searching and finding nobody who matches.
+summary: Create a record for a patient the facility has not seen before.
 capability: patient.register
 scope_qualifier: null
 station: reception

@@ -3,7 +3,7 @@ id: phc.view.patient-summary
 type: view
 kind: summary
 title: Visit summary
-summary: One patient's visit on one page, with what can be done next.
+summary: One visit on one page.
 capability: patient.find
 workflow: phc.wf.outpatient
 sections:

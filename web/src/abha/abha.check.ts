@@ -13,7 +13,7 @@
  *  real branch in it.
  */
 import assert from "node:assert/strict";
-import { identifierFrom, payloadFor, sentence, type AbhaOutcome } from "./sdk.ts";
+import { environmentLine, identifierFrom, payloadFor, type AbhaOutcome } from "./sdk.ts";
 
 // The shape the SDK's own mock declares, trimmed to what matters here.
 const success = {
@@ -73,11 +73,17 @@ for (const outcome of [
   { kind: "closed" },
 ] as AbhaOutcome[]) {
   assert.deepEqual(payloadFor(outcome), {}, `${outcome.kind} fills no field`);
-  // Every one of them says the patient is still seen. That sentence is the
-  // whole of "register now, link later" as a person experiences it.
-  assert.match(sentence(outcome, ""), /will be seen/, `${outcome.kind} says the patient is seen`);
 }
 
-assert.match(sentence(linked, ""), /cannot be undone/, "a link says what it costs before the tap");
+// The environment is a chip on staging and a warning on production. It used to
+// be a sentence in both, which a clinician skipped, so the one that matters was
+// as easy to skip as the one that does not.
+assert.deepEqual(
+  environmentLine({ environment: "staging" } as never),
+  { text: "staging", danger: false },
+);
+const prod = environmentLine({ environment: "production" } as never);
+assert.equal(prod.danger, true, "production is drawn as a warning");
+assert.ok(prod.text.split(" ").length <= 8, "and it is one short line, not a disclaimer");
 
 console.log("ok   abha: the identifier is read off the journey, and only a link fills the form");

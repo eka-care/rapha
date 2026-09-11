@@ -58,10 +58,6 @@ export class Boundary extends Component<{ children: ReactNode }, { err: Error | 
       <div className="card state bad">
         <div className="eyebrow">This screen stopped</div>
         <div className="state-t">The renderer could not draw what the API sent.</div>
-        <p className="state-p">
-          Nothing was written and nothing was lost. Reload; if it happens again, this data has a
-          shape the renderer does not handle, and the message below says where.
-        </p>
         <pre className="state-p" style={{ whiteSpace: "pre-wrap", fontSize: 11 }}>
           {this.state.err.message}
         </pre>

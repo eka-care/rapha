@@ -8,7 +8,7 @@
  */
 import type { Operation, Payload, Question, Questionnaire } from "./types";
 import { blankRow, itemFields, toRow, type ItemField } from "./structured";
-import { enabled, phcOf, prune, validate, raisedFlags, rangeBlocked, walk } from "./validate";
+import { enabled, labelOf, phcOf, prune, validate, raisedFlags, rangeBlocked, walk } from "./validate";
 
 export { validate, rangeBlocked, raisedFlags };
 
@@ -27,10 +27,7 @@ const SURE = 0.9;
  *  Nothing on the voice path lands here: packages/voice fails closed below its
  *  own floor, so every value it hands over carries a real score above zero. */
 const unsureHint = (score: number) =>
-  score > 0
-    ? `Heard, not certain (${Math.round(score * 100)}%). Read it back before you commit.`
-    : "Filled by an instrument, not typed. Nothing scored this value, so read it " +
-      "back against what was said before you commit.";
+  score > 0 ? `Unconfirmed · ${Math.round(score * 100)}%` : "Unconfirmed";
 
 /** The one answer that is not a clinical value: the sentence someone typed to
  *  get past a range block. catalogue/validate.py knows it by this name too. */
@@ -125,10 +122,6 @@ function Structured({
                  onChange={(e) => edit(i, "code", e.target.value)} />
         ))}
         <Add disabled={disabled} onClick={() => onChange([...rows.filter((r) => !blankRow(r)), {}])} />
-        <div className="f-hint">
-          {op?.id ?? "This operation"} declares no fields for {q.link_id}, so this is one free text
-          line per {q.structured_type ?? "entry"} and what you write is what is sent.
-        </div>
       </div>
     );
   }
@@ -148,10 +141,6 @@ function Structured({
         </div>
       ))}
       <Add disabled={disabled} onClick={() => onChange([...rows.filter((r) => !blankRow(r)), {}])} />
-      <div className="f-hint">
-        One {fields[0].resource} per row, with the fields {op?.id ?? "this operation"} maps. Typed,
-        not picked: there is no catalogue of {q.structured_type ?? "these"} on this machine.
-      </div>
     </div>
   );
 }
@@ -225,19 +214,20 @@ export function Form({
           {q.required && <span className="f-req">required</span>}
           {phc.unit && <span className="f-unit">{phc.unit}</span>}
         </label>
+        {q.description && <div className="f-hint">{q.description}</div>}
         <Widget q={q} op={op} ids={ids} value={value[q.link_id]}
                 onChange={(v) => set(q.link_id, v)} disabled={disabled} />
         {phc.range && (
           <div className="f-hint">Usual range {phc.range.low} to {phc.range.high}{phc.unit ? ` ${phc.unit}` : ""}</div>
         )}
         {phc.range_from && (
-          <div className="f-hint">Range depends on {phc.range_from}. Not checked here or on the server.</div>
+          <div className="f-hint">Range depends on {phc.range_from}</div>
         )}
         {unsure && (
           <div className="f-hint unsure">{unsureHint(confidence?.[q.link_id] ?? 0)}</div>
         )}
         {critical && !mine.length && (
-          <span className="badge b-crit">Outside the safe band{phc.flags ? `, raises ${phc.flags}` : ""}</span>
+          <span className="badge b-crit">Outside range{phc.flags ? ` · ${phc.flags}` : ""}</span>
         )}
         {mine.map((p) => <div className="f-bad" key={p.message}>{p.message}</div>)}
       </div>
@@ -256,18 +246,11 @@ export function Form({
           <textarea className="f-in" rows={2} disabled={disabled}
                     value={String(value[OVERRIDE] ?? "")}
                     onChange={(e) => set(OVERRIDE, e.target.value || undefined)} />
-          <div className="f-hint">
-            A value outside the usual range is not refused, it is recorded with your reason.
-            The reason is written to the audit trail and cannot be removed later.
-          </div>
         </div>
       )}
 
       {flags.length > 0 && (
-        <div className="f-flags">
-          This will raise {flags.join(", ")}. A flag does not block the entry; it is what makes the
-          next station look.
-        </div>
+        <div className="f-flags">Raises {flags.join(", ")}</div>
       )}
     </div>
   );
@@ -278,5 +261,5 @@ export function Form({
 export function labelled(schema: Questionnaire, payload: Payload): [string, string, unknown][] {
   return walk(schema.questions)
     .filter((q) => q.type !== "group" && q.type !== "display")
-    .map((q) => [q.link_id, q.text, payload[q.link_id]] as [string, string, unknown]);
+    .map((q) => [q.link_id, labelOf(q), payload[q.link_id]] as [string, string, unknown]);
 }

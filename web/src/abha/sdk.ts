@@ -145,47 +145,20 @@ export function payloadFor(outcome: AbhaOutcome): Record<string, unknown> {
 
 // ------------------------------------------------------------ the words
 
-/** One plain sentence per outcome. Every one of them says what happens next,
- *  because every one of them has a next, including the failures. */
-export function sentence(outcome: AbhaOutcome | null, loading: string): string {
-  if (!outcome) return loading;
-  switch (outcome.kind) {
-    case "linked":
-      return `The journey returned ${outcome.number || outcome.address || "an identifier"}. ` +
-        "It is in the form below and nothing is recorded yet: read it back to the patient, " +
-        "answer the two questions the journey does not answer, then tap Continue and tick " +
-        "the box. Linking an ABHA cannot be undone.";
-    case "skipped":
-      return "Skipped. The patient is registered, has a token and will be seen. " +
-        "The visit carries ABHA pending and joins the unlinked worklist, which is a first " +
-        "class path and not a failure.";
-    case "failed":
-      return `${outcome.reason} The patient is registered, has a token and will be seen. ` +
-        "The visit carries ABHA pending. Do not retry while the queue waits.";
-    case "closed":
-      return "The journey was closed before it finished. The patient is registered, has a " +
-        "token and will be seen, with ABHA pending. Reopen it from this thread at any time.";
-  }
+/** The script did not load. One sentence, and it is the next step: a blank
+ *  modal with no way out is the one outcome that is not allowed. The detail
+ *  goes to the console, not to the clerk. */
+export function loadFailure(config: AbhaConfig | null): string {
+  return config
+    ? "The ABHA SDK did not load. Register without one."
+    : "This kernel has no ABHA configuration. Register without one.";
 }
 
-/** The script did not load. Says which of the three it is, and the keyboard
- *  path is in every one of them, because a blank modal is the one outcome that
- *  is not allowed. */
-export function loadFailure(config: AbhaConfig | null, detail: string): string {
-  if (!config)
-    return "This kernel did not answer with an ABHA configuration, so the journey cannot " +
-      "be opened. Register the patient without one: they keep their token and their place " +
-      `in the queue. (${detail})`;
-  return `The ABHA SDK did not load from ${config.script}. That is usually no network from ` +
-    "this browser, or unpkg being unreachable. The patient is registered and will be seen " +
-    `with ABHA pending; link it at the next contact. (${detail})`;
-}
-
-/** Which environment is loaded, in words nobody can misread. Production sends
- *  real one time passwords to real phones and creates permanent national
- *  health accounts, so it says so. */
+/** Which environment is loaded. Staging is a chip. Production is a warning,
+ *  because it sends a real OTP to a real phone and creates a permanent
+ *  national health account. */
 export function environmentLine(config: AbhaConfig): { text: string; danger: boolean } {
   return config.environment === "production"
-    ? { text: "PRODUCTION ABHA. Real OTPs, real permanent accounts.", danger: true }
-    : { text: "Staging ABHA SDK. Nothing here creates a real account.", danger: false };
+    ? { text: "Production: real OTPs, real accounts.", danger: true }
+    : { text: "staging", danger: false };
 }

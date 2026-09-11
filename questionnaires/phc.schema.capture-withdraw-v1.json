@@ -12,12 +12,13 @@
   "questions": [
     {
       "link_id": "capture_stop",
-      "text": "The patient asked to stop the recording. Tick Yes and capture stops for the rest of this visit and the sound from here on is discarded. What was already checked and confirmed stays in the record.",
+      "text": "The patient asked to stop the recording. It cannot be turned back on this visit.",
       "type": "boolean",
       "required": true,
       "styling_metadata": {
         "phc": {
-          "flags": "capture.withdrawn"
+          "flags": "capture.withdrawn",
+          "short": "Recording stopped"
         }
       }
     }

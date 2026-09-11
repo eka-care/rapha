@@ -3,10 +3,8 @@ id: phc.op.abha-link
 type: operation
 kind: write
 short: Link ABHA
-title: Create or link an ABHA for this patient
-summary: >
-  Connect this patient's record to their national health account so their
-  records can be found elsewhere later.
+title: Create or link an ABHA
+summary: Link this patient to their national health account.
 capability: abha.link
 scope_qualifier: null
 station: reception

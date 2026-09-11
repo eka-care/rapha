@@ -11,15 +11,15 @@
  *  shape as web/src/scribe/Recorder.tsx, for the same reason.
  *
  *  Which SDK is loaded is the server's answer (GET /abha/config), so the
- *  environment is a setting, no client id is baked into this bundle, and the
- *  environment is on screen in words. It defaults to staging: a production
- *  ABHA journey sends a real one time password to a real phone and creates a
- *  permanent national health account.
+ *  environment is a setting and no client id is baked into this bundle. It is
+ *  on screen as a chip, and it defaults to staging: a production ABHA journey
+ *  sends a real one time password to a real phone and creates a permanent
+ *  national health account, which is the one line that stays a sentence.
  */
 import { useEffect, useId, useRef, useState } from "react";
 import { API_BASE } from "../api";
 import {
-  environmentLine, identifierFrom, loadFailure, sentence,
+  environmentLine, identifierFrom, loadFailure,
   type AbhaConfig, type AbhaOutcome,
 } from "./sdk";
 import "./abha.css";
@@ -111,7 +111,8 @@ export function Journey({
         if (!res.ok) throw new Error(`the kernel answered ${res.status}`);
         got = (await res.json()) as AbhaConfig;
       } catch (e) {
-        if (live) setFailure(loadFailure(null, e instanceof Error ? e.message : String(e)));
+        console.warn("abha config", e);
+        if (live) setFailure(loadFailure(null));
         return;
       }
       if (!live) return;
@@ -120,7 +121,8 @@ export function Journey({
       try {
         await load(got);
       } catch (e) {
-        if (live) setFailure(loadFailure(got, e instanceof Error ? e.message : String(e)));
+        console.warn("abha sdk", e);
+        if (live) setFailure(loadFailure(got));
         return;
       }
       if (!live || typeof window.initAbhaApp !== "function") return;
@@ -180,13 +182,13 @@ export function Journey({
 
   return (
     <div className="abha">
-      <div className="abha-bar">
-        <span className="abha-what">ABHA journey</span>
-        {env && (
+      {/* A chip, and no heading over it: the panel title above already says
+          this is the ABHA journey. The package name is the chip's tooltip. */}
+      {env && (
+        <div className="abha-bar" title={config?.package}>
           <span className={env.danger ? "abha-env danger" : "abha-env"}>{env.text}</span>
-        )}
-        {config && <span className="abha-pkg">{config.package}</span>}
-      </div>
+        </div>
+      )}
 
       {failure ? (
         <div className="abha-note bad">
@@ -197,19 +199,8 @@ export function Journey({
         </div>
       ) : (
         <>
-          <div className="abha-note">
-            {sentence(
-              outcome,
-              mounted
-                ? "Eka's own journey is below and this screen is not driving it. Finish it and the " +
-                  "identifier lands in the form here; skip it and the patient is registered, " +
-                  "tokened and seen with ABHA pending. Nothing is recorded either way until the " +
-                  "tap at the foot of this panel."
-                : config
-                  ? "Loading the journey."
-                  : "Asking the kernel which SDK to load.",
-            )}
-          </div>
+          {!mounted && !outcome && <div className="abha-note">Loading</div>}
+          {outcome?.kind === "failed" && <div className="abha-note bad">{outcome.reason}</div>}
           {/* Kept in the tree whatever happens: the SDK holds a React root on
               this node and removing it from under React is how a blank modal
               happens. It is emptied by the SDK itself on a terminal outcome. */}

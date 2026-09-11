@@ -128,8 +128,8 @@
         "phc.op.rx-prescribe"
       ],
       "readback": "required",
-      "summary": "With the patient's capture consent, the consultation is transcribed and a draft note, diagnosis list and prescription are offered for the doctor to edit and confirm.",
-      "title": "Ambient scribe for the consultation",
+      "summary": "Transcribes the consultation into a draft note and prescription.",
+      "title": "Ambient scribe",
       "type": "instrument",
       "types": []
     },
@@ -149,7 +149,7 @@
         "phc.op.vitals-record"
       ],
       "readback": "required",
-      "summary": "A paired BP cuff or pulse oximeter fills the field. The nurse still commits.",
+      "summary": "A paired cuff or oximeter fills the field.",
       "title": "Read from a connected monitor",
       "type": "instrument",
       "types": []
@@ -172,7 +172,7 @@
         "phc.op.vitals-record"
       ],
       "readback": "required",
-      "summary": "Say one number for one field. It is parsed against a number grammar, shown back on screen, and committed only by a tap. It falls back to the keypad.",
+      "summary": "Say one number into one field.",
       "title": "Speak a reading",
       "type": "instrument",
       "types": [
@@ -237,7 +237,7 @@
           }
         }
       },
-      "summary": "Share of patients seen in the window who have an ABHA linked.",
+      "summary": "Patients seen with an ABHA linked.",
       "title": "ABHA coverage",
       "type": "metric",
       "unit": "percent",
@@ -255,7 +255,7 @@
           }
         }
       },
-      "summary": "Encounters opened in the window.",
+      "summary": "Encounters opened.",
       "title": "Visits",
       "type": "metric",
       "unit": "count",
@@ -281,7 +281,7 @@
           "flag": "vitals.flagged"
         }
       },
-      "summary": "Share of visits in the window where a vital crossed a critical threshold.",
+      "summary": "Visits where a vital crossed a critical band.",
       "title": "Flagged vitals rate",
       "type": "metric",
       "unit": "percent",
@@ -364,12 +364,12 @@
       "scope_qualifier": null,
       "short": "Accession",
       "station": "accession",
-      "summary": "Register the person a referring clinician sent, and the panel they asked for, so the laboratory has a subject and an order to work against.\n",
+      "summary": "Register the referred patient and the panel ordered for them.",
       "surfaces": [
         "rendered",
         "mcp"
       ],
-      "title": "Accession a referred patient and their order",
+      "title": "Accession a referral",
       "tool": "propose_referral_accession",
       "type": "operation",
       "verified": "unverified",
@@ -424,12 +424,12 @@
       "scope_qualifier": null,
       "short": "Release",
       "station": "release",
-      "summary": "Send the verified result out of the laboratory to the clinician who ordered it. Once it has left, it has left.\n",
+      "summary": "Send the verified report to the referring clinician.",
       "surfaces": [
         "rendered",
         "mcp"
       ],
-      "title": "Release the verified report to the referrer",
+      "title": "Release the report",
       "tool": "propose_report_release",
       "type": "operation",
       "verified": "unverified",
@@ -508,7 +508,7 @@
           "link_id": "override_reason",
           "options": null,
           "required": false,
-          "text": "Reason for accepting a value outside the plausible band",
+          "text": "Reason for accepting an out of range value",
           "type": "text"
         }
       ],
@@ -524,7 +524,7 @@
       "scope_qualifier": null,
       "short": "Result",
       "station": "processing",
-      "summary": "The technologist keys or accepts from the analyser one value per analyte, each checked against its own plausible band and its own critical band.\n",
+      "summary": "One value per analyte, keyed or read from the analyser.",
       "surfaces": [
         "rendered",
         "mcp"
@@ -577,7 +577,7 @@
       "scope_qualifier": null,
       "short": "Verify",
       "station": "verification",
-      "summary": "A second pair of eyes reads the entered values and either verifies the result or rejects it. Only a verified result can be released.\n",
+      "summary": "A second person verifies or rejects the entered values.",
       "surfaces": [
         "rendered",
         "mcp"
@@ -636,7 +636,7 @@
       "scope_qualifier": null,
       "short": "Collect",
       "station": "phlebotomy",
-      "summary": "The phlebotomist records that the sample was drawn, what it is and what it is in, so the bench can start.\n",
+      "summary": "Record the draw, the sample type and its container.",
       "surfaces": [
         "rendered",
         "mcp"
@@ -693,12 +693,12 @@
       "scope_qualifier": null,
       "short": "Link ABHA",
       "station": "reception",
-      "summary": "Connect this patient's record to their national health account so their records can be found elsewhere later.\n",
+      "summary": "Link this patient to their national health account.",
       "surfaces": [
         "rendered",
         "mcp"
       ],
-      "title": "Create or link an ABHA for this patient",
+      "title": "Create or link an ABHA",
       "tool": "propose_abha_link",
       "type": "operation",
       "verified": "unverified",
@@ -717,7 +717,7 @@
           "link_id": "capture_stop",
           "options": null,
           "required": true,
-          "text": "The patient asked to stop the recording. Tick Yes and capture stops for the rest of this visit and the sound from here on is discarded. What was already checked and confirmed stays in the record.",
+          "text": "The patient asked to stop the recording. It cannot be turned back on this visit.",
           "type": "boolean"
         }
       ],
@@ -732,7 +732,7 @@
       "scope_qualifier": null,
       "short": "Stop recording",
       "station": "doctor",
-      "summary": "The patient has asked to stop the recording. Capture stops for the rest of this visit, and nothing clinical has to be written to do it.\n",
+      "summary": "Stop the scribe for the rest of this visit.",
       "surfaces": [
         "rendered",
         "mcp"
@@ -799,7 +799,7 @@
       "scope_qualifier": null,
       "short": "Consult",
       "station": "doctor",
-      "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
+      "summary": "History, findings and assessment.",
       "surfaces": [
         "rendered",
         "mcp"
@@ -867,7 +867,7 @@
       "scope_qualifier": null,
       "short": "Scribe visit",
       "station": "community",
-      "summary": "A frontline worker records what happened at a visit to someone's home, and anything that needs following up.\n",
+      "summary": "What happened at the home, and anything to follow up.",
       "surfaces": [
         "rendered",
         "mcp"
@@ -907,7 +907,7 @@
       "scope_qualifier": null,
       "short": "Order",
       "station": "doctor",
-      "summary": "Ask the laboratory to run a test for this patient.",
+      "summary": "Ask the laboratory to run a test.",
       "surfaces": [
         "rendered",
         "mcp"
@@ -969,7 +969,7 @@
       "scope_qualifier": null,
       "short": "Result",
       "station": "lab",
-      "summary": "Record the value a bench test produced, against the investigation a doctor ordered for this patient.\n",
+      "summary": "Record a bench result against the order it answers.",
       "surfaces": [
         "rendered",
         "mcp"
@@ -1046,14 +1046,14 @@
           "link_id": "capture_consent",
           "options": null,
           "required": false,
-          "text": "Recording this visit. Read it out: \"With your permission we record your conversation with the doctor, so the notes write themselves. Only the staff treating you here can see it. The sound is deleted as soon as the doctor has checked and confirmed the notes, and the notes stay in your record. This is for today's visit only, and you can stop it at any time. If you say no you are seen in exactly the same way and the doctor types instead.\" Tick Yes only if the patient agreed.",
+          "text": "Recording consent",
           "type": "boolean"
         },
         {
           "link_id": "capture_declined",
           "options": null,
           "required": false,
-          "text": "The patient said no to recording. Tick Yes and the visit is marked declined, so nothing listens and no station asks again. Their care is unchanged.",
+          "text": "The patient said no to recording.",
           "type": "boolean"
         }
       ],
@@ -1068,7 +1068,7 @@
       "scope_qualifier": null,
       "short": "Register",
       "station": "reception",
-      "summary": "Create a record for someone the facility has not seen before, after searching and finding nobody who matches.\n",
+      "summary": "Create a record for a patient the facility has not seen before.",
       "surfaces": [
         "rendered",
         "mcp"
@@ -1123,12 +1123,12 @@
       "scope_qualifier": null,
       "short": "Dispense",
       "station": "pharmacy",
-      "summary": "Give the patient the medicines a doctor prescribed, record what they actually received, and take that quantity out of facility stock.\n",
+      "summary": "Record what was handed over, and drop stock by that much.",
       "surfaces": [
         "rendered",
         "mcp"
       ],
-      "title": "Dispense against a confirmed prescription",
+      "title": "Dispense a prescription",
       "tool": "propose_pharmacy_dispense",
       "type": "operation",
       "verified": "unverified",
@@ -1164,7 +1164,7 @@
       "scope_qualifier": null,
       "short": "Rx",
       "station": "doctor",
-      "summary": "Prescribe medicines for this patient, with what the pharmacy actually has in view.",
+      "summary": "Prescribe medicines, with pharmacy stock in view.",
       "surfaces": [
         "rendered",
         "mcp"
@@ -1240,7 +1240,7 @@
       "scope_qualifier": null,
       "short": "Vitals",
       "station": "nurse",
-      "summary": "Measure and record blood pressure, oxygen saturation, weight and the other basic readings, and flag anything abnormal for the doctor.\n",
+      "summary": "Blood pressure, oxygen saturation, weight and temperature.",
       "surfaces": [
         "rendered",
         "mcp"
@@ -1295,7 +1295,7 @@
       ],
       "scope": "today",
       "sections": [],
-      "summary": "Visits, ABHA coverage and flagged vitals for this facility, this week.",
+      "summary": "Visits, ABHA coverage and flagged vitals.",
       "title": "Facility today",
       "type": "view",
       "window": "week",
@@ -1407,7 +1407,7 @@
           "where": {}
         }
       ],
-      "summary": "One patient's visit on one page, with what can be done next.",
+      "summary": "One visit on one page.",
       "title": "Visit summary",
       "type": "view",
       "window": "day",
@@ -1435,8 +1435,8 @@
       "metrics": [],
       "scope": "today",
       "sections": [],
-      "summary": "Everyone seen today, grouped by where they are standing now.",
-      "title": "Today's patients by station",
+      "summary": "Today, grouped by station.",
+      "title": "Patients by station",
       "type": "view",
       "window": "day",
       "workflow": "phc.wf.outpatient"
@@ -1612,7 +1612,7 @@
         "lab.critical"
       ],
       "subject": "encounter",
-      "summary": "Reception, vitals, doctor, then lab and pharmacy only when the doctor sent the patient there. The current station is the first step not done.",
+      "summary": "Reception, vitals, doctor, then lab and pharmacy when ordered.",
       "title": "Outpatient line",
       "type": "workflow"
     }

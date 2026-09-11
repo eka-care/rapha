@@ -2,11 +2,8 @@
 id: phc.inst.consult-scribe
 type: instrument
 kind: scribe
-title: Ambient scribe for the consultation
-summary: >
-  With the patient's capture consent, the consultation is transcribed and a
-  draft note, diagnosis list and prescription are offered for the doctor to
-  edit and confirm.
+title: Ambient scribe
+summary: Transcribes the consultation into a draft note and prescription.
 operations: [phc.op.consult-document, phc.op.rx-prescribe]
 readback: required
 commit: tap

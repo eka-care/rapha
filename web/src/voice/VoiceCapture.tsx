@@ -17,14 +17,14 @@ import "./voice.css";
  *  codes are the Web Speech API's; anything unlisted is shown as it came. */
 function nextStep(reason: string): string {
   if (/not-allowed|denied/.test(reason))
-    return "This page is not allowed to use the microphone. Click the icon at the left of the address bar, allow the microphone, and try again. Until then, type the values.";
+    return "Allow the microphone in the address bar, or type the values.";
   if (/audio-capture|no-speech-device/.test(reason))
-    return "No microphone was found. Plug one in and reload, or type the values.";
+    return "No microphone. Type the values.";
   if (/service-not-allowed/.test(reason))
-    return "The browser refused to start speech recognition. It only runs on https or localhost. Type the values here.";
+    return "Speech needs https or localhost. Type the values.";
   if (/network/.test(reason))
-    return "Speech recognition in this browser needs the network and could not reach it. Type the values.";
-  return "Type it instead. The keypad is the field below.";
+    return "Speech recognition could not reach the network. Type the values.";
+  return "Type the values.";
 }
 
 export function VoiceCapture({
@@ -103,10 +103,7 @@ export function VoiceCapture({
           return (
             <div className="v-row" key={m.id}>
               <span className="v-off">Device</span>
-              <div className="f-hint">
-                {m.title} is declared for {m.fields.join(", ") || "these fields"}, and no pairing
-                code exists on this machine. Read the monitor and type the numbers.
-              </div>
+              <div className="f-hint">Not paired. Type the numbers.</div>
             </div>
           );
         }
@@ -115,10 +112,7 @@ export function VoiceCapture({
           return (
             <div className="v-row" key={m.id}>
               <span className="v-off">No microphone</span>
-              <div className="f-hint">
-                This browser has no speech recognition, so {m.title.toLowerCase()} is not offered.
-                Chrome or Edge have it. Everything below can be typed, which is the same record.
-              </div>
+              <div className="f-hint">Type the values.</div>
             </div>
           );
         }
@@ -132,10 +126,6 @@ export function VoiceCapture({
             >
               {live === m.id ? "Listening, tap to stop" : m.title}
             </button>
-            <div className="f-hint">
-              Say one reading, for example the field name then the number. It is shown back for you
-              to check and it is recorded only when you tap Commit.
-            </div>
           </div>
         );
       })}
@@ -151,10 +141,6 @@ export function VoiceCapture({
                 <span className="v-conf">{Math.round((heard.confidence[id] ?? 0) * 100)}%</span>
               </span>
             ))}
-          </div>
-          <div className="f-hint">
-            These are sitting in the fields below, marked unconfirmed. Read each one against what
-            you measured, correct anything wrong, then tap Commit. Nothing is written until you do.
           </div>
         </div>
       )}

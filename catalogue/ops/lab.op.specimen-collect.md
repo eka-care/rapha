@@ -4,9 +4,7 @@ type: operation
 kind: write
 short: Collect
 title: Collect and label a specimen
-summary: >
-  The phlebotomist records that the sample was drawn, what it is and what it
-  is in, so the bench can start.
+summary: Record the draw, the sample type and its container.
 capability: specimen.collect
 scope_qualifier: null
 station: phlebotomy

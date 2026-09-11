@@ -2,9 +2,7 @@
 id: phc.wf.outpatient
 type: workflow
 title: Outpatient line
-summary: >
-  Reception, vitals, doctor, then lab and pharmacy only when the doctor sent
-  the patient there. The current station is the first step not done.
+summary: Reception, vitals, doctor, then lab and pharmacy when ordered.
 subject: encounter
 steps:
   - station: reception

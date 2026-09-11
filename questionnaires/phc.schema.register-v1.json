@@ -81,18 +81,20 @@
     },
     {
       "link_id": "capture_consent",
-      "text": "Recording this visit. Read it out: \"With your permission we record your conversation with the doctor, so the notes write themselves. Only the staff treating you here can see it. The sound is deleted as soon as the doctor has checked and confirmed the notes, and the notes stay in your record. This is for today's visit only, and you can stop it at any time. If you say no you are seen in exactly the same way and the doctor types instead.\" Tick Yes only if the patient agreed.",
+      "text": "Recording consent",
       "type": "boolean",
       "required": false,
       "styling_metadata": {
         "phc": {
-          "flags": "capture.agreed"
+          "flags": "capture.agreed",
+          "short": "Consent to record"
         }
-      }
+      },
+      "description": "We can record your conversation with the doctor so the notes write themselves. Only the staff treating you can hear it, and the sound is deleted once the doctor confirms the notes. It is for today only, you can stop at any time, and saying no changes nothing about your care."
     },
     {
       "link_id": "capture_declined",
-      "text": "The patient said no to recording. Tick Yes and the visit is marked declined, so nothing listens and no station asks again. Their care is unchanged.",
+      "text": "The patient said no to recording.",
       "type": "boolean",
       "required": false,
       "styling_metadata": {

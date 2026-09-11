@@ -3,7 +3,7 @@ id: lab.inst.analyser
 type: instrument
 kind: device
 title: Read from the analyser
-summary: A connected analyser fills the analyte fields. The technologist still commits.
+summary: The analyser fills the analyte fields.
 operations: [lab.op.result-enter]
 fields: [haemoglobin, wbc, platelets, glucose, creatinine, sodium, potassium]
 readback: required

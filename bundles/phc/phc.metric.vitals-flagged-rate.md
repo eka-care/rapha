@@ -2,7 +2,7 @@
 id: phc.metric.vitals-flagged-rate
 type: metric
 title: Flagged vitals rate
-summary: Share of visits in the window where a vital crossed a critical threshold.
+summary: Visits where a vital crossed a critical band.
 unit: percent
 window: week
 numerator: {resource: thread_flag, where: {flag: vitals.flagged, created_date: {gte: window.start}}}

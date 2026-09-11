@@ -2,7 +2,7 @@
 id: lab.metric.critical-rate
 type: metric
 title: Critical result rate
-summary: Share of threads in the window where an analyte crossed its critical band.
+summary: Specimens where an analyte crossed its critical band.
 unit: percent
 window: week
 numerator: {resource: thread_flag, where: {flag: lab.critical, created_date: {gte: window.start}}}

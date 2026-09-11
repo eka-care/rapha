@@ -50,13 +50,9 @@ export function Home({
             {open + complete} on the {(workflow?.title ?? "line").toLowerCase()} today, {complete} complete.
           </span>
         </div>
-        <div className="hero-sub">
-          Everything below is a read. Nothing here writes to a record: the agent proposes, a person
-          confirms, and the confirmation is the write.
-        </div>
         <div className="hero-ask" onClick={onSearch}>
           <Icon name="search" size="lg" />
-          <input placeholder="Ask about this facility, or find a thread" readOnly />
+          <input placeholder="Search or ask" readOnly />
           <span className="kbd">⌘K</span>
         </div>
         <div className="chips">
@@ -70,34 +66,11 @@ export function Home({
 
       {first && (
         <div className="card">
-          <div className="brief">
-            <div className="brief-av"><Icon name="spark" size="sm" /></div>
-            <div>
-              <div className="m-meta" style={{ marginBottom: 4 }}>Shift brief</div>
-              <div className="brief-t">
-                <b>{open}</b> on the line right now
-                {heaviest && heaviest.count > 0 && (
-                  <>
-                    , heaviest at{" "}
-                    <em onClick={() => onGo(`#/views/${first.decl.id}`)}>{title(String(heaviest.key))}</em>
-                  </>
-                )}
-                . {complete} complete. Everything here comes from{" "}
-                {first.decl.title ?? title(first.decl.id)}, read once when this page loaded.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {first && (
-        <div className="card">
           <div className="card-h">
             <div>
               <div className="eyebrow">Live</div>
               <div className="card-t" style={{ marginTop: 2 }}>{workflow?.title ?? "The line"}</div>
             </div>
-            <span className="badge b-mute ml-auto">the baton, in motion</span>
           </div>
           <div className="flow">
             {groups.map((g) => {
@@ -163,9 +136,7 @@ export function Home({
               ))
             ) : (
               <div style={{ padding: "30px 15px", textAlign: "center", color: "var(--ink-3)", fontSize: 12.5 }}>
-                Nothing is flagged right now.
-                <br />
-                Which flags show here is the queue view's own badge list, not this screen's opinion.
+                Nothing flagged.
               </div>
             )}
           </div>
@@ -186,7 +157,7 @@ export function Home({
 
           {recent.length > 0 && (
             <div className="card">
-              <div className="card-h"><div className="card-t">Pick up where you left off</div></div>
+              <div className="card-h"><div className="card-t">Recent</div></div>
               <div className="cont">
                 {recent.slice(0, 4).map((t) => (
                   <div className="cn" key={t.id} onClick={() => onOpenThread(t.id)}>

@@ -21,6 +21,9 @@ export type Phc = {
 export type Question = {
   link_id: string;
   text: string;
+  /** Help shown under the label on the form only. The posted card repeats the
+   *  label, so anything long belongs here rather than in text. */
+  description?: string;
   type: string;
   required?: boolean;
   repeats?: boolean;

@@ -25,6 +25,10 @@
   --eka-blue:#221E19; --eka-blue-bg:#F1ECE3; --eka-blue-100:#E2DACD;
   --eka-blue-600:#100E0B; --eka-blue-700:#3A342C;
   --abdm:#2B5BD7; --abdm-bg:#EDF1FB; --abdm-bd:#D5DFF6;
+  /* The one accent Eka's ABHA journey is themed with. Identity is the only
+     place this app spends blue, and a filled brand button carries white text
+     in both themes, so this one is not the --abdm pair. */
+  --abha-brand:#2B5BD7;
   --grad-rose:linear-gradient(140deg,#3A342C 0%,#221E19 55%,#100E0B 100%);
   --grad-rose-line:linear-gradient(90deg,#C9BCA6,#8A7C66,#C9BCA6);
   --rose-ink:#8A7C66; --rose-tint:#F5F0E7; --pink-accent:#C0AE92;
@@ -51,6 +55,7 @@
   --eka-blue:#EDE5D8; --eka-blue-bg:#26211A; --eka-blue-100:#3A332A;
   --eka-blue-600:#FFFFFF; --eka-blue-700:#D8CEBD;
   --abdm:#8AA9F0; --abdm-bg:#1A2033; --abdm-bd:#2C3552;
+  --abha-brand:#3E6FE0;
   --grad-rose:linear-gradient(140deg,#EDE5D8 0%,#D8CEBD 55%,#BFB3A0 100%);
   --grad-rose-line:linear-gradient(90deg,#6B6052,#A2937C,#6B6052);
   --rose-ink:#A2937C; --rose-tint:#221E18; --pink-accent:#6B6052;

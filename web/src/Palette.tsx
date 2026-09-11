@@ -18,13 +18,12 @@ import type { Catalogue, Operation, ThreadView, ViewDecl, ViewResult } from "./t
 import { Badge, human } from "./ui";
 
 export function Palette({
-  cat, client, queues, nav, role, onClose, onOpenThread, onGo, onAsk, onRegister, onAction,
+  cat, client, queues, nav, onClose, onOpenThread, onGo, onAsk, onRegister, onAction,
 }: {
   cat: Catalogue;
   client: Client;
   queues: { decl: ViewDecl; result: ViewResult }[];
   nav: ViewDecl[];
-  role: string;
   onClose: () => void;
   onOpenThread: (id: string) => void;
   onGo: (hash: string) => void;
@@ -68,7 +67,7 @@ export function Palette({
           ref={input}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search threads, jump to a view, or ask the agent"
+          placeholder="Search or ask"
         />
       </div>
 
@@ -76,8 +75,7 @@ export function Palette({
         <div style={{ padding: "38px 22px", textAlign: "center", width: "100%", color: "var(--ink-3)" }}>
           <Icon name="search" size="lg" />
           <p style={{ fontSize: 12.5, margin: "12px 0 14px", lineHeight: 1.6 }}>
-            Nothing on today's line matches "<b>{q.trim()}</b>".<br />
-            Opening a new one creates a permanent record. It cannot be undone, only deprecated.
+            No match for "<b>{q.trim()}</b>". Opening a new one creates a permanent record.
           </p>
           <button className="btn btn-b" style={{ margin: "0 auto" }} onClick={onRegister}>
             <Icon name="plus" size="sm" />{word}
@@ -119,7 +117,7 @@ export function Palette({
             )}
           </div>
           <div className="spot-prev">
-            <Preview r={cur} client={client} role={role} onOpenThread={onOpenThread} onAction={onAction} />
+            <Preview r={cur} client={client} onOpenThread={onOpenThread} onAction={onAction} />
           </div>
         </div>
       )}
@@ -128,9 +126,6 @@ export function Palette({
         <span><span className="kbd">↑↓</span> navigate</span>
         <span><span className="kbd">↵</span> run</span>
         <span><span className="kbd">esc</span> dismiss</span>
-        <span className="ml-auto" style={{ color: "var(--rose-ink)", fontWeight: 600 }}>
-          Find first · create only on miss
-        </span>
       </div>
     </div>
   );
@@ -140,11 +135,10 @@ export function Palette({
  *  this palette. Without it the quick actions would be a guess, and a guess
  *  about what a person may do is exactly what the guard exists to stop. */
 function Preview({
-  r, client, role, onOpenThread, onAction,
+  r, client, onOpenThread, onAction,
 }: {
   r: Row | undefined;
   client: Client;
-  role: string;
   onOpenThread: (id: string) => void;
   onAction: (thread: string, op: Operation) => void;
 }) {
@@ -175,16 +169,10 @@ function Preview({
           <div className="pv-av"><Icon name="spark" size="lg" /></div>
           <div>
             <div className="pv-n">Ask the agent</div>
-            <div className="pv-s">Not tied to one thread</div>
           </div>
         </div>
         <div className="pv-rows">
           <div className="pv-r"><span>Question</span><b style={{ maxWidth: 200 }}>{r.name}</b></div>
-          <div className="pv-r"><span>Writes</span><b>None from here</b></div>
-        </div>
-        <div className="hint">
-          Anything the agent proposes arrives on a thread as a card you confirm. This box has no
-          path to a commit.
         </div>
       </>
     );
@@ -200,7 +188,6 @@ function Preview({
             <div className="pv-s">{r.meta}</div>
           </div>
         </div>
-        <div className="hint">Press <span className="kbd">↵</span> to go.</div>
       </>
     );
   }
@@ -239,11 +226,7 @@ function Preview({
           </button>
         ))}
       </div>
-      <div className="hint" style={{ marginTop: 12 }}>
-        {t
-          ? `Filtered by your role (${role === "demo" ? "every capability" : human(role)}). Nothing is hidden behind a greyed button: what is not here, you cannot do.`
-          : "Reading this thread..."}
-      </div>
+      {!t && <div className="hint" style={{ marginTop: 12 }}>Reading...</div>}
     </>
   );
 }

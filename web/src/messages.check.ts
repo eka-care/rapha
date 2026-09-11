@@ -146,16 +146,15 @@ assert.equal(clock("2026-09-10T18:45:00Z"), "18:45");
 
 // ---------------------------------------------------------------- the agent
 
-const line = agentLine(thread, ctx, "the medical officer");
-assert.equal(line.sentences.length, 3);
+const line = agentLine(thread, ctx);
+assert.equal(line.sentences.length, 2, "what just happened, and where the baton is. Nothing else");
 assert.ok(line.sentences[0].includes("was refused"), "the newest event is the first sentence");
 assert.equal(line.sentences[1], "Doctor: Document a consultation.", "the kernel's nudge is the second, ended");
-assert.ok(line.sentences[2].includes("as the medical officer"), "the third names the role");
 assert.ok(line.actions.length <= 5);
 
 const quiet = agentLine(
   { ...thread, actions: [], audit: [], nudge: "Waiting at doctor. Nobody with your capabilities can act here." },
-  ctx, "lab",
+  ctx,
 );
 assert.deepEqual(quiet.actions, [], "no actions means no props, and no greyed ones either");
 assert.equal(quiet.sentences.length, 2, "with nothing to offer, the agent does not offer");

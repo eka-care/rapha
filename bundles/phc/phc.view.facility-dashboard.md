@@ -3,7 +3,7 @@ id: phc.view.facility-dashboard
 type: view
 kind: dashboard
 title: Facility today
-summary: Visits, ABHA coverage and flagged vitals for this facility, this week.
+summary: Visits, ABHA coverage and flagged vitals.
 capability: reporting.view
 metrics: [phc.metric.visits, phc.metric.abha-coverage, phc.metric.vitals-flagged-rate]
 window: week

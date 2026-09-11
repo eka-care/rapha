@@ -4,9 +4,7 @@ type: operation
 kind: write
 short: Stop recording
 title: Stop recording this visit
-summary: >
-  The patient has asked to stop the recording. Capture stops for the rest of
-  this visit, and nothing clinical has to be written to do it.
+summary: Stop the scribe for the rest of this visit.
 capability: encounter.document
 scope_qualifier: null
 station: doctor

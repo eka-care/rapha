@@ -3,7 +3,7 @@ id: lab.view.report
 type: view
 kind: summary
 title: Laboratory report
-summary: One specimen from referral to release, with the values and who did what.
+summary: One specimen, referral to release.
 capability: worklist.read
 workflow: lab.wf.specimen
 sections:

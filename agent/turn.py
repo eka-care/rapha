@@ -135,13 +135,11 @@ def say(cards, actions) -> str:
             lines.append("%s was refused: %s. %s"
                          % (c["title"], c["verdict"]["reason"].rstrip(". "),
                             c["verdict"]["next"]))
-    # A question the planner would not answer for itself, asked out loud. It
-    # comes before the reassurance so it is not the last thing read past.
+    # A question the planner would not answer for itself, asked out loud.
     for c in cards:
         lines.extend(c.get("ask") or [])
-    if any(c["verdict"]["allowed"] for c in cards):
-        lines.append("Nothing is recorded until you confirm it on screen. "
-                     "I have no way to do that.")
+    # No "nothing is recorded until you confirm" line: the card under this
+    # sentence carries the confirm control, and it said so the last five times.
     return " ".join(lines)
 
 
@@ -246,7 +244,7 @@ def demo():
     assert got["verdict"] == {"allowed": True, "reason": "proposed", "next": ""}
     assert got["flags_raised"] == ["vitals.flagged"]
     assert got["offered_here"] and "1 of 1 at nurse" in got["order"]
-    assert "confirm it on screen" in turn["said"]
+    assert turn["said"] == "Proposed Record vitals for you to confirm.", turn["said"]
 
     # An operation the kernel does not offer here is still sent, and comes back
     # with the guard's own reason and a next step.

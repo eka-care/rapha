@@ -392,6 +392,54 @@ def reject(proposal_id: str, request: Request, body: dict = Body(default={})):
 
 ABHA_PACKAGES = {"staging": "@eka-care/abha-stg", "production": "@eka-care/abha"}
 
+# The theme handed to initAbhaApp, so Eka's journey sits inside our modal
+# instead of beside it. Read off the staging bundle on 2026-09-11 rather than
+# off the reference, and the bundle disagrees with the reference twice:
+#
+#   - There are FOUR token groups, not three. `content` (primary, secondary,
+#     muted, success, enabled) is the group that carries every text colour and
+#     it is absent from the documented shape.
+#   - `qrCodeColors` is read off `theme`, not off `data`.
+#
+# generateThemeCSS interpolates each value straight into a declaration
+# (`#<container> .<class>{<prop>: <value> !important}`), so `var(--x)` is legal
+# there, and unlike a hex it follows the app's own light and dark toggle
+# without re-initialising the journey. These are web/src/theme.css's tokens.
+#
+# Two traps in the map, both real:
+#   - `surface.base` also paints `pds2-text-content-enabled`, which would set
+#     text to the colour of the card under it. `content.enabled` maps to the
+#     same class and is written after it, so it is what wins. Never drop it.
+#   - `qrCodeColors` goes to a <canvas>, where `var(--x)` is not a colour. Those
+#     two stay literal, and stay light: a QR code is read by a phone camera and
+#     not by a theme.
+ABHA_THEME = {
+    "surface": {
+        "base": "var(--surface)",
+        "subtle": "var(--gray-100)",
+        "muted": "var(--gray-200)",
+        "strong": "var(--gray-300)",
+        "success": "var(--success-bg)",
+        "danger": "var(--destructive-bg)",
+        "neutral": "var(--gray-100)",
+        "abhaCard": "var(--abdm-bg)",
+    },
+    "content": {
+        "primary": "var(--ink)",
+        "secondary": "var(--ink-2)",
+        "muted": "var(--ink-3)",
+        "success": "var(--success)",
+        "enabled": "var(--ink)",
+    },
+    "semantic": {
+        "success": "var(--success)",
+        "warning": "var(--warning)",
+        "error": "var(--destructive)",
+    },
+    "primary": {"brand": "var(--abha-brand)"},
+    "qrCodeColors": {"fgColor": "#1A1714", "bgColor": "#FFFFFF"},
+}
+
 
 @router.get("/abha/config")
 def abha_config():
@@ -411,8 +459,8 @@ def abha_config():
         # A platform name, not a secret. "ext" is the SDK's own name for an
         # external clinical surface, which is what this renderer is.
         "client_id": os.environ.get("ABHA_CLIENT_ID") or "ext",
-        # Passed to the SDK's generateThemeCSS. Absent is fine and common.
-        "theme": json.loads(theme) if theme else None,
+        # Passed to the SDK's generateThemeCSS. ABHA_THEME overrides it whole.
+        "theme": json.loads(theme) if theme else ABHA_THEME,
         # The facility's HIP id, when this deployment has one. The SDK sends it
         # as an X-Hip-Id header. None here is honest: this repository has no
         # onboarded bridge, and the journey says so rather than pretending.

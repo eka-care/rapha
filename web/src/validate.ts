@@ -26,6 +26,12 @@ export function phcOf(q: { styling_metadata?: { phc?: unknown } }): Record<strin
   return ((q.styling_metadata ?? {}).phc ?? {}) as Record<string, any>;
 }
 
+/** What a question is called on a card. `phc.short` exists for the two
+ *  questions whose text is a script read to a patient: the script belongs on
+ *  the form, and the record needs a label, not a paragraph. */
+export const labelOf = (q: { text?: string; styling_metadata?: { phc?: unknown } }): string =>
+  phcOf(q).short ?? q.text ?? "";
+
 const answered = (v: unknown) => v !== undefined && v !== null && v !== "";
 
 /** python int() and float() on the value, or null when they would raise.

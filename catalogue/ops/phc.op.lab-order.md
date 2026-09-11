@@ -4,7 +4,7 @@ type: operation
 kind: write
 short: Order
 title: Order an investigation
-summary: Ask the laboratory to run a test for this patient.
+summary: Ask the laboratory to run a test.
 capability: lab.order
 scope_qualifier: null
 station: doctor

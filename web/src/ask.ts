@@ -20,9 +20,7 @@ const SAY = "/api/v1/phc/agent/say";
 /** What the kernel sends back per proposal. Only the fields this box reads. */
 type Card = { proposal_id: string | null; title?: string; verdict?: { reason?: string } };
 
-export const NO_AGENT =
-  "The kernel did not answer. Start it (sh api/run.sh) and try again. Nothing was proposed and " +
-  "nothing was written.";
+export const NO_AGENT = "The kernel did not answer. Start it (sh api/run.sh) and try again.";
 
 export type Answer = { said: string; proposed: number };
 
@@ -30,7 +28,7 @@ export type Answer = { said: string; proposed: number };
  *  landed, so the caller knows whether to re-read the thread. */
 export async function ask(body: { utterance: string; thread?: string; role: string }): Promise<Answer> {
   if (!body.thread) {
-    return { said: "Open a thread first. A sentence is about somebody, and the kernel needs to know who.", proposed: 0 };
+    return { said: "Open a thread first.", proposed: 0 };
   }
   try {
     const res = await fetch(`${API_BASE}${SAY}`, {

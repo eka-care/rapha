@@ -3,10 +3,8 @@ id: lab.op.referral-accession
 type: operation
 kind: write
 short: Accession
-title: Accession a referred patient and their order
-summary: >
-  Register the person a referring clinician sent, and the panel they asked
-  for, so the laboratory has a subject and an order to work against.
+title: Accession a referral
+summary: Register the referred patient and the panel ordered for them.
 capability: order.accession
 scope_qualifier: null
 station: accession

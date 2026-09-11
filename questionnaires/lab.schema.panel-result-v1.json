@@ -69,7 +69,7 @@
        "critical": {"low": 2.8, "high": 6.0},
        "flags": "lab.critical",
        "reference": {"low": 3.5, "high": 5.0}}}},
-    {"link_id": "override_reason", "text": "Reason for accepting a value outside the plausible band",
+    {"link_id": "override_reason", "text": "Reason for accepting an out of range value",
      "type": "text", "required": false}
   ]
 }

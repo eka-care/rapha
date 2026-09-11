@@ -2,7 +2,7 @@
 id: lab.metric.released
 type: metric
 title: Reports released
-summary: Reports released to a referrer in the window.
+summary: Reports released to a referrer.
 unit: count
 window: day
 numerator: {resource: questionnaire_response, where: {questionnaire: lab.schema.release-v1, created_date: {gte: window.start}}}

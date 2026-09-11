@@ -2,7 +2,7 @@
 id: phc.metric.abha-coverage
 type: metric
 title: ABHA coverage
-summary: Share of patients seen in the window who have an ABHA linked.
+summary: Patients seen with an ABHA linked.
 unit: percent
 window: week
 numerator: {resource: patient, where: {abha_number: "*", created_date: {gte: window.start}}}

@@ -79,10 +79,6 @@ export function OperationPanel({
         <div className="mod-bar" />
         <div className="state">
         <div className="state-t">No questionnaire for {op.id}.</div>
-        <p className="state-p">
-          The operation names <b>{op.input}</b> as its input, and there is no such file in
-          questionnaires/. Either the id is wrong in catalogue/ops/, or the form was never written.
-        </p>
         {onCancel && <button className="cq" onClick={onCancel}>Back</button>}
         </div>
       </div>
@@ -178,11 +174,9 @@ export function OperationPanel({
     <div className={inline ? "mod inline" : "mod"}>
       <div className="mod-bar" />
       <div className="mod-h" style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
-        <div>
-          <div className="eyebrow">{proposal ? "Proposed, not recorded" : "New entry"}</div>
-          <div className="mod-t" style={{ marginTop: 2 }}>{op.title}</div>
-          <div className="mod-s">{op.summary}</div>
-        </div>
+        {/* Title only. The eyebrow said "New entry" on every panel there is,
+            and the summary restated the title over the fields it describes. */}
+        {!inline && <div className="mod-t">{op.title}</div>}
         <div className="ml-auto" style={{ display: "flex", gap: 6 }}>
           <Badge>{op.instrument}</Badge>
           {irreversible && <Badge style="crit">irreversible</Badge>}
@@ -191,15 +185,9 @@ export function OperationPanel({
 
       <div className="mod-b">
 
-        {proposal && (
+        {proposal?.transcript && (
           <div className="provenance">
-            <div className="eyebrow">Where this came from</div>
-            <div>
-              {proposal.proposed_by ?? "An unattributed caller"} proposed this over{" "}
-              <b>{proposal.surface}</b> at {proposal.created_at}. It has changed nothing.
-              Read every value; the ones a machine is unsure of are marked.
-            </div>
-            {proposal.transcript && <div className="transcript">"{proposal.transcript}"</div>}
+            <div className="transcript">"{proposal.transcript}"</div>
           </div>
         )}
 
@@ -234,11 +222,7 @@ export function OperationPanel({
           ) : (
             <div className="v-row" key={m.id}>
               <span className="v-off">Scribe off</span>
-              <div className="f-hint">
-                Capture consent is not recorded on this visit, so nothing is recorded. Ask the
-                patient, record the consent, and {m.title.toLowerCase()} appears here. Type the note
-                meanwhile: it is the same record, and declining is not a barrier to care.
-              </div>
+              <div className="f-hint">No capture consent.</div>
             </div>
           ),
         )}
@@ -261,10 +245,7 @@ export function OperationPanel({
         )}
 
         {showForm && missing.length > 0 && !tried && (
-          <div className="missing">
-            Still missing: {missing.join(", ")}. Fill {missing.length === 1 ? "it" : "them"} in below.
-            Nothing is sent until you tap {irreversible ? "Continue" : proposal ? "Confirm" : "Commit"}.
-          </div>
+          <div className="missing">Missing: {missing.join(", ")}</div>
         )}
 
         {showForm && <Form
@@ -293,10 +274,6 @@ export function OperationPanel({
         {stage === "confirm" && (
           <div className="confirmbox">
             <div className="card-t">This cannot be undone</div>
-            <p className="state-p">
-              {op.title} is irreversible: {op.writes.join(", ") || "the record"} cannot be taken back
-              from this screen. Nothing has ticked this box for you and nothing can.
-            </p>
             <label className="f-check big">
               <input type="checkbox" checked={confirmed} disabled={busy}
                      onChange={(e) => setConfirmed(e.target.checked)} />
@@ -307,8 +284,7 @@ export function OperationPanel({
 
         {tried && problems.length > 0 && (
           <div className="f-bad block">
-            {problems.length} thing{problems.length === 1 ? "" : "s"} to fix before this can be sent.
-            The server checks the same list, so fixing them here is the same as fixing them there.
+            {problems.length} thing{problems.length === 1 ? "" : "s"} to fix.
           </div>
         )}
 
@@ -316,9 +292,7 @@ export function OperationPanel({
       </div>
 
       <div className="mod-f">
-        <span className="f-hint" style={{ flex: 1 }}>
-          Actor, surface, payload and outcome are written to the audit log.
-        </span>
+        <span style={{ flex: 1 }} />
         {onCancel && <button className="cq" onClick={onCancel} disabled={busy}>Cancel</button>}
         {proposal && (
           <button className="cq" onClick={reject} disabled={busy}>Reject</button>

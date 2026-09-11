@@ -3,10 +3,8 @@ id: phc.op.pharmacy-dispense
 type: operation
 kind: write
 short: Dispense
-title: Dispense against a confirmed prescription
-summary: >
-  Give the patient the medicines a doctor prescribed, record what they actually
-  received, and take that quantity out of facility stock.
+title: Dispense a prescription
+summary: Record what was handed over, and drop stock by that much.
 capability: pharmacy.dispense
 scope_qualifier: null
 station: pharmacy

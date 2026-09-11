@@ -234,7 +234,7 @@ class DemoWrite extends ApiError {
   constructor() {
     super(
       "This is demo data, so nothing was written.",
-      "Demo data is read only. Start the kernel API at the address in the header, turn demo off, and do it again.",
+      "Turn demo off to write.",
     );
   }
 }

@@ -4,9 +4,7 @@ type: operation
 kind: write
 short: Verify
 title: Verify a preliminary result
-summary: >
-  A second pair of eyes reads the entered values and either verifies the
-  result or rejects it. Only a verified result can be released.
+summary: A second person verifies or rejects the entered values.
 capability: result.verify
 scope_qualifier: null
 station: verification

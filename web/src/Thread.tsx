@@ -34,12 +34,11 @@ import { Badge, human } from "./ui";
 import { Line } from "./ViewRenderer";
 
 export function Thread({
-  thread, cat, ctx, role, said, asking, onSay, onAction, renderProposal, onReject, onSummary, onMore,
+  thread, cat, ctx, said, asking, onSay, onAction, renderProposal, onReject, onSummary, onMore,
 }: {
   thread: ThreadView;
   cat: Catalogue;
   ctx: Ctx;
-  role: string;
   said: Said[];
   /** An utterance is in flight. The input stays usable; only the send button
    *  says so, because a chat that freezes has lost the person's sentence. */
@@ -55,7 +54,7 @@ export function Thread({
   const queue = queueViewFor(cat, thread.workflow);
   const head = header(thread, queue);
   const msgs = messages(thread, ctx, said);
-  const line = agentLine(thread, ctx, role);
+  const line = agentLine(thread, ctx);
   const bar = composer(thread, cat);
 
   return (
@@ -87,7 +86,7 @@ export function Thread({
             .map((m) => (
               <Message key={m.id} m={m} renderProposal={renderProposal} onReject={onReject} />
             ))}
-          <AgentBubble line={line} onAction={onAction} consentMissing={bar.consentMissing} />
+          <AgentBubble line={line} onAction={onAction} />
         </Scroll>
 
         <div className="composer">
@@ -106,7 +105,7 @@ export function Thread({
         </div>
       </div>
 
-      <Panel thread={thread} cat={cat} />
+      <Panel thread={thread} />
     </div>
   );
 }
@@ -176,26 +175,19 @@ function Message({
         <div className="t">{m.title}</div>
         {m.stale ? (
           <>
-            Proposed by {m.by}, and the visit has moved past it. Confirming it would be refused,
-            so there is nothing to review. Rejecting it clears it from the thread.
+            The visit has moved past it.
             <Values values={m.values} />
             <div className="props">
               <button className="prop" onClick={() => onReject(m.proposal)}>
                 <Icon name="alert" />
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="p-l">Reject</span>
-                  <div className="p-s">Records the refusal against this proposal and writes nothing else.</div>
                 </span>
               </button>
             </div>
           </>
         ) : (
-          <>
-            Proposed by {m.by}. Nothing in it has been recorded, and nothing will be until you
-            read the values below and tap. Correct anything that is wrong first: what is sent is
-            what is on screen, not what was proposed.
-            <div className="inlinepanel">{renderProposal(m.proposal)}</div>
-          </>
+          <div className="inlinepanel">{renderProposal(m.proposal)}</div>
         )}
       </Bubble>
     );
@@ -283,24 +275,22 @@ function Refusals({ msgs }: { msgs: Msg[] }) {
 // ---------------------------------------------------------------- the agent
 
 function AgentBubble({
-  line, onAction, consentMissing,
+  line, onAction,
 }: {
   line: ReturnType<typeof agentLine>;
   onAction: (op: Operation) => void;
-  consentMissing: boolean;
 }) {
   return (
     <Bubble av="agent" meta={<>Agent · now</>}>
       {line.sentences.join(" ")}
-      {consentMissing && " Capture consent is not recorded on this visit, so the scribe is off."}
       {line.actions.length > 0 && (
         <div className="props">
           {line.actions.map((op, i) => (
-            <button key={op.id} className={`prop${i === 0 ? " primary" : ""}`} onClick={() => onAction(op)}>
+            <button key={op.id} className={`prop${i === 0 ? " primary" : ""}`}
+                    title={op.summary} onClick={() => onAction(op)}>
               <Icon name={iconFor(op)} />
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span className="p-l">{op.title}</span>
-                <div className="p-s">{first(op.summary)}</div>
               </span>
               <span className={`p-tag ${tagClass(op)}`}>
                 {op.irreversibility === "irreversible" ? "irreversible" : op.instrument}
@@ -313,7 +303,6 @@ function AgentBubble({
   );
 }
 
-const first = (s: string) => (s || "").split(/(?<=\.)\s|\n/)[0].trim();
 const tagClass = (op: Operation) =>
   op.irreversibility === "irreversible" ? "irr" : op.instrument === "scribe" ? "scribe" : "form";
 
@@ -371,18 +360,9 @@ function Ask({ asking, onSay, about }: { asking?: boolean; onSay: (t: string) =>
 
 // -------------------------------------------------------------- the right rail
 
-function Panel({ thread, cat }: { thread: ThreadView; cat: Catalogue }) {
+function Panel({ thread }: { thread: ThreadView }) {
   const done = [...thread.line].reverse().find((s) => s.status === "done");
   const crew = team(thread.audit ?? []);
-
-  // The doctrine the prototype hard-coded per role is written already, in the
-  // instrument declarations, attached to the thing it governs. Showing it here
-  // is the same sentence with a reason to believe it.
-  const here = new Set((thread.actions ?? []).filter((o) => o.station === thread.station).map((o) => o.id));
-  const doctrine = Object.values(cat.instruments ?? {})
-    .filter((d) => (d.operations ?? []).some((id) => here.has(id)))
-    .map((d) => (d as { summary?: string }).summary)
-    .filter((s): s is string => !!s);
 
   return (
     <div className="panel">
@@ -395,8 +375,6 @@ function Panel({ thread, cat }: { thread: ThreadView; cat: Catalogue }) {
           <span className="badge b-mute ml-auto">{done ? human(done.label) : "Not started"}</span>
         </div>
         <Line line={thread.line} />
-        {thread.nudge && <div className="nudge">{thread.nudge}</div>}
-        {doctrine.map((d) => <div className="nudge" key={d}>{d}</div>)}
       </div>
 
       <div className="card">
@@ -422,27 +400,17 @@ function Panel({ thread, cat }: { thread: ThreadView; cat: Catalogue }) {
             <span className="f-hint">Nobody yet.</span>
           )}
         </div>
-        <div className="nudge">
-          Membership accrues as stations touch the patient. It is scoped to this visit, not to the
-          facility, and there is no operation that joins it by hand.
-        </div>
       </div>
 
       <div className="card">
         <div className="card-h">
           <Icon name="lock" size="sm" />
           <div className="card-t">Capabilities held</div>
-          <span className="badge b-mute ml-auto">at {cat.manifest?.title ?? "this facility"}</span>
         </div>
         <div className="caps">
           {thread.capabilities.map((c) => (
             <span key={c} className={`cap${thread.held.includes(c) ? " on" : ""}`}>{c}</span>
           ))}
-        </div>
-        <div className="nudge">
-          Every action you cannot take is absent from this screen rather than greyed out. This is
-          where you can see the shape of what is being hidden, and check it against the role in the
-          sidebar foot.
         </div>
       </div>
 
@@ -455,7 +423,7 @@ function Panel({ thread, cat }: { thread: ThreadView; cat: Catalogue }) {
           {thread.audit.length ? (
             [...thread.audit].reverse().map((a) => <Row key={a.id} a={a} />)
           ) : (
-            <span className="f-hint">No operations posted.</span>
+            <span className="f-hint">Nothing posted.</span>
           )}
         </div>
       </div>

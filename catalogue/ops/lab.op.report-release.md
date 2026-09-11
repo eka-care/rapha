@@ -3,10 +3,8 @@ id: lab.op.report-release
 type: operation
 kind: write
 short: Release
-title: Release the verified report to the referrer
-summary: >
-  Send the verified result out of the laboratory to the clinician who ordered
-  it. Once it has left, it has left.
+title: Release the report
+summary: Send the verified report to the referring clinician.
 capability: report.release
 scope_qualifier: null
 station: release

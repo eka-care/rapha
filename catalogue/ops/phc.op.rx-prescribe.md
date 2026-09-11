@@ -4,7 +4,7 @@ type: operation
 kind: write
 short: Rx
 title: Write a prescription
-summary: Prescribe medicines for this patient, with what the pharmacy actually has in view.
+summary: Prescribe medicines, with pharmacy stock in view.
 capability: rx.prescribe
 scope_qualifier: null
 station: doctor
