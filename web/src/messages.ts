@@ -37,7 +37,7 @@ export type Said = { id: string; at: string; who: "user" | "agent"; text: string
 export type Msg =
   | {
       kind: "posted"; id: string; at: string; title: string; actor: string;
-      tags: Tag[]; values: Kv[]; transcript?: string | null;
+      operation: string; tags: Tag[]; values: Kv[]; transcript?: string | null;
     }
   | {
       kind: "denied"; id: string; at: string; title: string; actor: string; reason: string;
@@ -168,7 +168,7 @@ export function messages(thread: ThreadView, ctx: Ctx, said: Said[] = []): Msg[]
       const raised = (thread.proposals ?? []).find((p) => p.id === a.proposal)?.flags_raised ?? [];
       out.push({
         kind: "posted", id: a.id, at: a.at, title: titleOf(ctx, a.operation),
-        actor: actorOf(a.actor), tags: tagsFor(ctx, a, raised),
+        actor: actorOf(a.actor), operation: a.operation, tags: tagsFor(ctx, a, raised),
         values: a.outcome === "rejected" ? [] : valuesOf(ctx, a.operation, a.payload),
         transcript: (thread.proposals ?? []).find((p) => p.id === a.proposal)?.transcript ?? null,
       });

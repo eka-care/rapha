@@ -214,6 +214,9 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .bubble b{color:var(--ink);font-weight:600}
 .bubble .t{font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:4px;
   display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.folded>summary{list-style:none;cursor:pointer;color:var(--ink-2);
+  padding:6px 0;font-size:13px}
+.folded>summary::-webkit-details-marker{display:none}
 .kvbox{margin-top:9px;border:1px solid var(--border);border-radius:var(--r-md);padding:8px 10px;background:var(--surface)}
 .kv{display:flex;justify-content:space-between;gap:12px;font-size:11.5px;padding:3px 0;color:var(--ink-3)}
 .kv b{color:var(--eka-blue);font-weight:700}

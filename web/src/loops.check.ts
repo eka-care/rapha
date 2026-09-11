@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { cue, opensOnArrival, weigh } from "./loops.ts";
+import { cue, mine, opensOnArrival, weigh } from "./loops.ts";
 import type { Operation, QueueRow } from "./types";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -84,5 +84,11 @@ ok(!opensOnArrival(undefined), "nothing to open is not an open");
 
 // Irreversible work is never opened for someone who did not ask for it.
 ok(!opensOnArrival(op("phc.op.abha-link")), "an irreversible operation waits to be asked for");
+
+// -- a role sees its own work, not the handover log -------------------------
+ok(mine(op("phc.op.vitals-record"), "nurse"), "the nurse's own work stays open");
+ok(!mine(register, "nurse"), "reception's finished form collapses for the nurse");
+ok(mine(register, "reception"), "and stays open for the clerk who filled it");
+ok(mine(register, null), "a complete line collapses nothing");
 
 console.log(`ok   ${checks} loop checks`);

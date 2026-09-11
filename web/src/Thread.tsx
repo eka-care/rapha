@@ -25,7 +25,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Icon, iconFor } from "./icons";
-import { weigh } from "./loops";
+import { mine, weigh } from "./loops";
 import {
   agentLine, clock, composer, header, messages, queueViewFor,
   type Ctx, type Kv, type Msg, type Pill, type Said, type Tag,
@@ -88,7 +88,10 @@ export function Thread({
           {msgs
             .filter((m) => !(m.kind === "denied" && m.old))
             .map((m) => (
-              <Message key={m.id} m={m} renderProposal={renderProposal} onReject={onReject} />
+              <Message
+                key={m.id} m={m} cat={cat} station={thread.station}
+                renderProposal={renderProposal} onReject={onReject}
+              />
             ))}
           <AgentBubble line={line} closes={thread.closes} onAction={onAction} onMore={onMore} />
         </Scroll>
@@ -128,9 +131,11 @@ function Scroll({ msgs, children }: { msgs: Msg[]; children: React.ReactNode }) 
 // ------------------------------------------------------------------ messages
 
 function Message({
-  m, renderProposal, onReject,
+  m, cat, station, renderProposal, onReject,
 }: {
   m: Msg;
+  cat: Catalogue;
+  station: string | null;
   renderProposal: (p: Proposal) => React.ReactNode;
   onReject: (p: Proposal) => void;
 }) {
@@ -198,7 +203,7 @@ function Message({
       </Bubble>
     );
   }
-  return (
+  const card = (
     <Bubble
       av="check"
       meta={
@@ -215,6 +220,19 @@ function Message({
       {m.transcript && <div className="quote">"{m.transcript}"</div>}
     </Bubble>
   );
+
+  // Another station's finished work is context, not this screen's task: fold
+  // it to one line rather than open it above whatever this role is here to do.
+  const op = cat.operations[m.operation];
+  if (op && !mine(op, station)) {
+    return (
+      <details className="folded">
+        <summary>{op.short} · {m.actor} · {clock(m.at)}</summary>
+        {card}
+      </details>
+    );
+  }
+  return card;
 }
 
 function Bubble({

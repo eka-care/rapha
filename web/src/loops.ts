@@ -44,6 +44,18 @@ export function opensOnArrival(op: Operation | undefined): boolean {
   return !!op && op.irreversibility !== "irreversible";
 }
 
+/** Whether a committed operation's card belongs open on this screen.
+ *
+ *  The nurse opening onto reception's six-row registration form is workflow
+ *  fragmentation: someone else's completed context, above her own task. It
+ *  collapses to one line she can expand. Once the line is complete there is no
+ *  current station and nothing collapses, because the whole visit is the
+ *  subject then.
+ */
+export function mine(op: Operation, station: string | null): boolean {
+  return station === null || op.station === station;
+}
+
 export function cue(a: {
   station: string | null;
   opener: Operation | null;
