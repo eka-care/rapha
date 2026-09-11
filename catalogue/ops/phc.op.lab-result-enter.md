@@ -25,11 +25,13 @@ mapping:
   records:
     - resource: diagnostic_report
       fields:
+        created_by: {actor: id}
         code: {answer: analyte}
         conclusion: {joined: [value, unit]}
         status: {const: preliminary}
     - resource: specimen
       fields:
+        created_by: {actor: id}
         code: {answer: analyte}
         status: {const: available}
 emits: [lab.resulted, lab.critical]

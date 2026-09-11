@@ -268,7 +268,11 @@ class SqliteStore:
         exists = self.db.execute(
             "SELECT 1 FROM %s WHERE id = ?" % _table(resource), [rid]).fetchone()
         if exists:
-            sets = [k for k in record if k != "id"]
+            # Authorship is written once. Linking an ABHA updates the patient
+            # row registration created, and the person linking is not the
+            # person who registered; overwriting created_by would lose the
+            # registrar and leave the row claiming the wrong author.
+            sets = [k for k in record if k not in ("id", "created_by")]
             self.db.execute(
                 "UPDATE %s SET %s WHERE id = ?"
                 % (_table(resource), ", ".join("%s = ?" % k for k in sets)),

@@ -7,13 +7,13 @@ title: Enter panel results
 summary: >
   The technologist keys or accepts from the analyser one value per analyte,
   each checked against its own plausible band and its own critical band.
-capability: lab.result.enter
+capability: result.enter
 scope_qualifier: null
-station: lab
+station: processing
 instrument: form
 preconditions:
-  - vitals.recorded
-  - not lab.resulted
+  - specimen.collected
+  - not result.entered
 irreversibility: correctable
 input: lab.schema.panel-result-v1
 writes: [observation, diagnostic_report]
@@ -23,15 +23,17 @@ mapping:
     - resource: observation
       per_question: [haemoglobin, wbc, platelets, glucose, creatinine, sodium, potassium]
       fields:
+        created_by: {actor: id}
         category: {const: laboratory}
         code: {question: link_id}
         value: {question: answer}
         unit: {question: unit}
     - resource: diagnostic_report
       fields:
+        created_by: {actor: id}
         code: {answer: panel}
         status: {const: preliminary}
-emits: [lab.resulted, lab.critical]
+emits: [result.entered, lab.critical]
 surfaces: [rendered, mcp]
 verified:
   status: unverified
@@ -50,19 +52,19 @@ nothing in the kernel reads.
 
 ## Before you start
 
-A specimen must exist and no result may exist yet. You need
-`lab.result.enter`. Entering is not verifying: the pathologist does that with
-a different capability.
+A specimen must exist and no result may exist yet. You need `result.enter`.
+Entering is not verifying, and whoever enters is barred from verifying this
+specimen by name, not by which capabilities they were given.
 
 ## What happens
 
 Every answered analyte becomes one observation row with the unit from its
-question, and one preliminary report row is written. A value outside its
-plausible band is refused unless a reason is given. A value inside the
-plausible band but outside the critical band commits and raises
-`lab.critical`. A value outside the reference interval but inside the
-critical band commits and raises nothing, because the grammar has one flag
-per question and it is spent on critical.
+question and the technologist as its author, and one preliminary report row
+is written. A value outside its plausible band is refused unless a reason is
+given. A value inside the plausible band but outside the critical band
+commits and raises `lab.critical`. A value outside the reference interval but
+inside the critical band commits and raises nothing, because the grammar has
+one flag per question and it is spent on critical.
 
 ## How you know it worked
 
@@ -73,5 +75,5 @@ the observations.
 
 - **Wrong analyte for the panel.** `enable_when` hides the field in the
   renderer; the server does not enforce it. A glucose on a CBC commits.
-- **Keyed twice.** The second entry is refused: `lab.resulted` is already
+- **Keyed twice.** The second entry is refused: `result.entered` is already
   true and there is no amend operation.

@@ -11,7 +11,7 @@
  */
 import compiled from "../../catalogue/catalogue.json";
 import { ApiError } from "./api";
-import type { Catalogue, Operation, Proposal, ThreadView, ViewResult } from "./types";
+import type { Catalogue, Facility, Operation, Proposal, ThreadView, ViewResult } from "./types";
 
 const OPS = (compiled as unknown as Catalogue).operations;
 const CAPS = (compiled as { capabilities: string[] }).capabilities;
@@ -196,6 +196,17 @@ export const mockApi = {
       views: VIEWS,
       manifest: { id: "phc", title: "Primary health centre", version: "demo", views: Object.keys(VIEWS) },
     } as Catalogue),
+  facility: () =>
+    wait({
+      bundle: { id: "phc", title: "Primary health centre", version: "demo", workflow: "phc.wf.outpatient" },
+      capabilities: CAPS,
+      views: Object.values(VIEWS),
+      // The real kernel's role list is vocab.BUNDLES, one list for every
+      // bundle. Demo mode has no store to switch against, so the switcher
+      // offers only the union role it is actually drawing.
+      roles: ["demo"],
+      user: { id: "user:demo", role: "demo", capabilities: CAPS },
+    } as Facility),
   view: (id: string, thread?: string) =>
     wait(id.endsWith("dashboard") ? dashboard() : thread ? summary(thread) : queue()),
   thread: (id: string) => {
@@ -210,6 +221,9 @@ export const mockApi = {
     throw new DemoWrite();
   },
   reject: async () => {
+    throw new DemoWrite();
+  },
+  openThread: async () => {
     throw new DemoWrite();
   },
 };

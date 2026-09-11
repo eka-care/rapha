@@ -19,6 +19,7 @@ mapping:
     - resource: service_request
       per_item: investigations
       fields:
+        created_by: {actor: id}
         code: {item: [code, test]}
         status: {const: active}
 emits: [lab.ordered]

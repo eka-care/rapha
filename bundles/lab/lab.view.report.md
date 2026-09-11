@@ -4,7 +4,7 @@ type: view
 kind: summary
 title: Laboratory report
 summary: One specimen from referral to release, with the values and who did what.
-capability: patient.find
+capability: worklist.read
 workflow: lab.wf.specimen
 sections:
   - title: Progress
@@ -25,7 +25,7 @@ sections:
   - title: Report status
     resource: diagnostic_report
     fields: [code, status, created_date]
-  - title: Pathologist notes
+  - title: Verifier notes
     resource: notes
     fields: [text, created_date]
   - title: Release

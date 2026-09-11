@@ -87,3 +87,33 @@ one owner and an append-only rule.
 with the code it replaces: the workflow steps equal `thread.LINE`, the states
 cover `vocab.STATES`, every referenced operation exists, and every voice or
 scribe instrument reads back and commits by tap. It runs from `check.sh`.
+
+## What moved after that night, 2026.09.12
+
+The table above is the work plan for one night and is kept as written. Four
+things in it are no longer true, and an out of date map is worse than a
+patched one:
+
+- **A facility's words are its own.** `stations`, `states`, `capabilities` and
+  `roles` now live in `bundles/<id>/bundle.yaml`, not `catalogue/vocab.py`, and
+  `kernel/declarations.py` closes them per bundle. What survives in `vocab.py`
+  is the kernel's and the adapter's grammar (`CARE_RESOURCES`,
+  `KERNEL_RESOURCES`, `IRREVERSIBILITY`, `INSTRUMENTS`, `KINDS`), each with the
+  reason it is not a facility's to choose. This is why a laboratory's draw room
+  is no longer called `nurse`.
+- **`catalogue/guard.py` changed.** It grew `actor of <operation>` as a
+  precondition form, `parse_precondition` shared with the linter, and
+  `person()`, which strips the `agent:` prefix so an agent inherits the
+  exclusions of whoever it acts for. Rule 2 is unchanged and is what made this
+  necessary: if there is one path to a write, the separation of duties rule has
+  to live on it.
+- **Every row carries its author.** `{actor: id}` is a mapping source and a
+  record that declares no author fails lint, so "who did this" is not a
+  question only the audit can answer.
+- **`api/` and `agent/` exist.** `api/main.py` is the HTTP server the table
+  gives to the kernel agent, and it carries one route the diagram does not:
+  `POST /agent/say`, a sentence in and proposals out. It reaches a write only
+  through `kernel.proposals.propose` on `guard.MCP`, which takes no `confirmed`
+  argument, so it is a machine surface like any other. `web/` replaced
+  `care_phc_fe/` as the renderer; the older one still builds and is still
+  fixture driven.

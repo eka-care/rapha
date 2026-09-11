@@ -33,16 +33,7 @@ export function Badge({ style = "mute", children }: { style?: string; children: 
   return <span className={`badge ${STYLE[style] ?? "b-mute"}`}>{children}</span>;
 }
 
-/** Declaration ids are machine names. Nothing but the declaration knows a
- *  human label, so when one is missing this is the least-worst fallback. */
-export const human = (id: string | null | undefined) =>
-  (id ?? "").replace(/^[a-z0-9]+\.(op|view|wf|inst|metric)\./, "").replace(/[-_.]/g, " ");
-
-/** Same, for somewhere a label starts a line. */
-export const title = (id: string | null | undefined) => {
-  const s = human(id);
-  return s.charAt(0).toUpperCase() + s.slice(1);
-};
+export { human, title } from "./words";
 
 /** A render that throws must not leave a white page. React unmounts the whole
  *  tree on an uncaught error, so this is the only place that can promise

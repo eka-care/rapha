@@ -63,6 +63,29 @@ def flags(store, thread, workflow):
     return known
 
 
+# Outcomes on an audit line that mean "this actor performed this operation on
+# this thread". A proposal is a request and not a performance; a denial is the
+# opposite of one.
+PERFORMED = ("allowed", "confirmed")
+
+
+def performers(store, thread):
+    """{operation id: set of actors who have performed it on this thread}.
+
+    Read from the audit trail, which is the only record that carries an actor
+    per decision. The rows an operation wrote carry an author too (the
+    {actor: id} mapping source fills created_by), but a row is per resource and
+    a separation of duties rule is per operation, so the audit is the honest
+    source: it is written for denials and proposals as well, and this filters
+    to the two outcomes that mean the work was actually done.
+    """
+    out = {}
+    for record in store.audit(thread):
+        if record.outcome in PERFORMED and record.actor:
+            out.setdefault(record.operation, set()).add(record.actor)
+    return out
+
+
 def station(workflow, known) -> Optional[str]:
     """Where this thread is. None once the line is complete.
 
@@ -109,11 +132,17 @@ def drawn_by(workflow, op_id):
     return any(op_id in (step.operations or []) for step in workflow.steps)
 
 
-def actions(workflow, operations, known, caps, station_filter=None):
+def actions(workflow, operations, known, caps, station_filter=None,
+            actor=None, performed=None):
     """Quick actions to draw, ordered. Addendum SSD.2: a table, not a model.
 
     Ordering is by the declared line, so the next thing to do at this
     thread's current station sorts first.
+
+    `actor` and `performed` (from performers() above) are what make an
+    `actor of` precondition invisible rather than refused on tap. Without
+    them such an action is still drawn and the guard refuses it: see
+    catalogue/guard.visible.
     """
     order = {step.station: i for i, step in enumerate(workflow.steps)}
     here = station(workflow, known)
@@ -123,20 +152,27 @@ def actions(workflow, operations, known, caps, station_filter=None):
     # not be a button either.
     picked = [op for op in operations.values()
               if drawn_by(workflow, op["id"])
-              and visible(op, caps, known)
+              and visible(op, caps, known, actor, performed)
               and (station_filter is None or op["station"] == station_filter)]
     picked.sort(key=lambda op: (op["station"] != here, order.get(op["station"], 99), op["id"]))
     return picked
 
 
-def thread_view(store, ref, workflow, operations, *, caps, nudge=""):
-    """contracts.ThreadView for one thread. One read pass, no writes."""
+def thread_view(store, ref, workflow, operations, *, caps, nudge="", actor=None):
+    """contracts.ThreadView for one thread. One read pass, no writes.
+
+    Pass `actor` and an action whose precondition names an actor is absent for
+    the person it excludes. api/main.py passes `caller(request)["id"]`. Without
+    one such an action is still drawn and the guard refuses the tap with the
+    reason, which is the fail-safe, not the intended shape.
+    """
     known = flags(store, ref.id, workflow)
     return c.ThreadView(
         id=ref.id, workflow=workflow.id, subject=dict(ref.subject),
         flags=sorted(known), station=station(workflow, known),
         line=line(workflow, known),
-        actions=actions(workflow, operations, known, caps),
+        actions=actions(workflow, operations, known, caps, actor=actor,
+                        performed=performers(store, ref.id) if actor else None),
         proposals=store.proposals(ref.id, status="pending"),
         audit=store.audit(ref.id),
         capabilities=sorted(vocab.CAPABILITIES), held=sorted(caps), nudge=nudge)

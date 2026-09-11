@@ -5,11 +5,41 @@
  *  ApiError is never blank and never says "something went wrong".
  */
 import { useCallback, useEffect, useState } from "react";
-import type { Catalogue, ThreadView, ViewResult } from "./types";
+import type { Catalogue, Facility, ThreadView, ViewResult } from "./types";
 
 export const API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
 const PREFIX = "/api/v1/phc";
+
+/** Who the kernel thinks is asking. There is no authentication on this
+ *  kernel: api/main.caller() reads X-PHC-Role and falls back to a union role
+ *  that holds every capability. Switching it here switches which actions come
+ *  back on every thread, which is the whole point of the switcher in the
+ *  sidebar foot. It is a demo affordance and not a security boundary, and the
+ *  API says so itself.
+ *
+ *  DEMO_ROLE is the kernel's default and the one value that is not a person. */
+export const DEMO_ROLE = "demo";
+const ROLE_KEY = "phc.role";
+
+let role: string = (() => {
+  try {
+    return localStorage.getItem(ROLE_KEY) || DEMO_ROLE;
+  } catch {
+    return DEMO_ROLE;                                  // private window, no storage
+  }
+})();
+
+export const currentRole = () => role;
+
+export function setRole(next: string) {
+  role = next;
+  try {
+    localStorage.setItem(ROLE_KEY, next);
+  } catch {
+    /* the header still carries it for this session */
+  }
+}
 
 export class ApiError extends Error {
   next: string;
@@ -27,7 +57,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(url, {
       ...init,
-      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+      headers: { "Content-Type": "application/json", "X-PHC-Role": role, ...(init?.headers ?? {}) },
     });
   } catch {
     // fetch only rejects for network, DNS, TLS and CORS. All four look the
@@ -75,6 +105,7 @@ const post = <T,>(path: string, body: unknown) =>
 
 export const api = {
   catalogue: () => req<Catalogue>("/catalogue/"),
+  facility: () => req<Facility>("/facility/"),
   view: (id: string, thread?: string) =>
     req<ViewResult>(`/views/${id}/${thread ? `?thread=${encodeURIComponent(thread)}` : ""}`),
   thread: (id: string) => req<ThreadView>(`/threads/${id}/`),
@@ -86,6 +117,11 @@ export const api = {
     post<unknown>(`/proposals/${proposal}/confirm/`, body),
   reject: (proposal: string, body: { reason?: string }) =>
     post<unknown>(`/proposals/${proposal}/reject/`, body),
+  /** Opens an empty visit. It writes an encounter row and no clinical fact,
+   *  which is why the palette may call it on a miss: it asserts nothing about
+   *  a person. Everything the person then types still goes through the
+   *  guard. */
+  openThread: (body: { token?: string } = {}) => post<ThreadView>("/threads/", body),
 };
 
 /** What a screen needs to talk to a kernel. The demo client in mock.ts

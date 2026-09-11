@@ -22,7 +22,7 @@ from typing import Optional
 
 import yaml
 
-from catalogue import validate, vocab
+from catalogue import guard, validate, vocab
 from catalogue.build import parse
 from kernel import contracts as c
 from kernel import mapping
@@ -114,25 +114,26 @@ def _rule(flag, rule, seen, fail, stored):
                 _rule(flag, item, seen, fail, [])
 
 
-def _lint_workflow(fm, ops, fail):
+def _lint_workflow(fm, ops, fail, voc):
     if fm["subject"] not in vocab.CARE_RESOURCES:
         fail(f"subject '{fm['subject']}' is not a CARE resource")
 
     states = fm["states"] or {}
-    if set(states) != set(vocab.STATES):
-        missing = sorted(set(vocab.STATES) - set(states))
-        extra = sorted(set(states) - set(vocab.STATES))
-        fail(f"states must cover the vocabulary exactly: missing {missing}, unknown {extra}")
+    if set(states) != set(voc.states):
+        missing = sorted(set(voc.states) - set(states))
+        extra = sorted(set(states) - set(voc.states))
+        fail(f"states must cover this bundle's vocabulary exactly: "
+             f"missing {missing}, unknown {extra}")
 
     for step in fm["steps"] or []:
         for key in ("station", "done_when"):
             if key not in step:
                 fail(f"step {step} has no '{key}'")
-        if step.get("station") not in vocab.STATIONS:
+        if step.get("station") not in voc.stations:
             fail(f"unknown station '{step.get('station')}'")
         for key in ("done_when", "applies_when"):
             flag = step.get(key)
-            if flag is not None and flag not in vocab.STATES:
+            if flag is not None and flag not in voc.states:
                 fail(f"step {step.get('station')}: {key} names unknown state '{flag}'")
         for oid in step.get("operations") or []:
             if oid not in ops:
@@ -148,10 +149,10 @@ def _lint_workflow(fm, ops, fail):
     return stored
 
 
-def _lint_view(fm, refs, fail):
+def _lint_view(fm, refs, fail, voc):
     if fm["kind"] not in c.VIEW_KINDS:
         fail(f"kind must be one of {c.VIEW_KINDS}")
-    if fm["capability"] not in vocab.CAPABILITIES:
+    if fm["capability"] not in voc.capabilities:
         fail(f"unknown capability '{fm['capability']}'")
     if fm.get("scope", "today") not in c.VIEW_SCOPES:
         fail(f"scope must be one of {c.VIEW_SCOPES}")
@@ -167,10 +168,10 @@ def _lint_view(fm, refs, fail):
             fail(f"{fm['kind']} view names workflow '{fm.get('workflow')}' which does not exist")
 
     group_by = fm.get("group_by")
-    if group_by is not None and group_by != "station" and group_by not in vocab.STATES:
+    if group_by is not None and group_by != "station" and group_by not in voc.states:
         fail(f"group_by '{group_by}' is neither 'station' nor a state")
     for flag, style in (fm.get("badges") or {}).items():
-        if flag not in vocab.STATES:
+        if flag not in voc.states:
             fail(f"badge names unknown state '{flag}'")
         if style not in BADGE_STYLES:
             fail(f"badge style '{style}' must be one of {BADGE_STYLES}")
@@ -245,12 +246,18 @@ def lint(manifest, decls, ops):
             for t in c.DECLARATION_TYPES}
     stored_by_workflow = {}
 
-    for key in ("id", "version", "title", "operations", "workflows", "views",
-                "instruments", "metrics"):
+    for key in ("id", "version", "title", "stations", "states", "capabilities",
+                "roles", "operations", "workflows", "views", "instruments", "metrics"):
         if key not in manifest:
             bad.append(f"bundle.yaml: missing '{key}'")
     if bad:
         return bad
+
+    # This bundle's own closed vocabulary. Everything below is checked against
+    # it and not against a union: a laboratory that can reach a PHC's flags is
+    # how a released report came to be called `dispensed.complete`.
+    voc = vocab.from_manifest(manifest)
+    bad += voc.problems()
 
     listed = {i for k in ("workflows", "views", "instruments", "metrics")
               for i in manifest[k] or []}
@@ -261,6 +268,29 @@ def lint(manifest, decls, ops):
     for oid in manifest["operations"] or []:
         if oid not in ops:
             bad.append(f"bundle.yaml: operation '{oid}' is not in the catalogue")
+            continue
+        # The per bundle closure. catalogue/build.py linted this atom against
+        # every bundle's words at once, because catalogue/ops is shared; here
+        # is where an atom belonging to another facility is caught.
+        op = ops[oid]
+        if op["capability"] not in voc.capabilities:
+            bad.append(f"{oid}: capability '{op['capability']}' is not this "
+                       f"bundle's vocabulary")
+        if op["station"] not in voc.stations:
+            bad.append(f"{oid}: station '{op['station']}' is not this bundle's line")
+        for pre in op.get("preconditions") or []:
+            kind, name, _ = guard.parse_precondition(pre)
+            if kind == "actor":
+                if name not in (manifest["operations"] or []):
+                    bad.append(f"{oid}: precondition names '{name}', which this "
+                               f"bundle does not load, so the rule can never fire")
+            elif name not in voc.states:
+                bad.append(f"{oid}: precondition names state '{name}', which is "
+                           f"not this bundle's vocabulary")
+        for flag in op.get("emits") or []:
+            if flag not in voc.states:
+                bad.append(f"{oid}: emits '{flag}', which is not this bundle's "
+                           f"vocabulary")
 
     for did, (fm, body) in sorted(decls.items()):
         def fail(msg, did=did):
@@ -281,9 +311,9 @@ def lint(manifest, decls, ops):
             fail("em dash: the writing guide forbids it")
 
         if kind == "workflow":
-            stored_by_workflow[did] = _lint_workflow(fm, ops, fail)
+            stored_by_workflow[did] = _lint_workflow(fm, ops, fail, voc)
         elif kind == "view":
-            _lint_view(fm, refs, fail)
+            _lint_view(fm, refs, fail, voc)
         elif kind == "instrument":
             _lint_instrument(fm, ops, fail)
         elif kind == "metric":
@@ -390,6 +420,13 @@ def write_catalogue(bundle):
     out = ROOT / "catalogue" / "catalogue.json"
     cat = json.loads(out.read_text())
     cat.update(compile_json(bundle))
+    # The four original keys stay catalogue wide, because `operations` is: the
+    # Go server embeds every bundle's atoms and narrows at runtime by asking
+    # the kernel which bundle it loaded (/facility), and its own test asserts
+    # that `capabilities` covers every operation it holds. So capabilities,
+    # bundles and states here are the union that catalogue/build.py wrote, and
+    # the five keys added above are the one loaded bundle's. The API is the
+    # place that answers per bundle: it serves vocab for the bundle it loaded.
     blob = json.dumps(cat, indent=2, sort_keys=True) + "\n"
     out.write_text(blob)
     (ROOT / "care_phc_mcp" / "catalogue.json").write_text(blob)

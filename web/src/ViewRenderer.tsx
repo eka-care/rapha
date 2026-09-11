@@ -97,7 +97,12 @@ function Card({ row, onOpen }: { row: QueueRow; onOpen?: (t: string) => void }) 
   const cols = Object.entries(row.subject).filter(([, v]) => v !== null && v !== undefined && v !== "");
   const headIdx = Math.max(0, cols.findIndex(([k, v]) => k === "name" || typeof v === "string"));
   const head = cols[headIdx] ? String(cols[headIdx][1]) : row.thread;
-  const rest = cols.filter((_, i) => i !== headIdx).map(([, v]) => String(v));
+  // A token is the kernel's own word for a thread (api ThreadRef carries one),
+  // not a bundle's, and the design gives it the corner rather than the line.
+  const token = cols.find(([k], i) => i !== headIdx && /token/i.test(k));
+  const rest = cols
+    .filter(([k], i) => i !== headIdx && k !== token?.[0])
+    .map(([, v]) => String(v));
   const initials = head.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
   return (
@@ -108,6 +113,7 @@ function Card({ row, onOpen }: { row: QueueRow; onOpen?: (t: string) => void }) 
           <div className="qc-n">{head}</div>
           <div className="qc-m">{rest.join(" · ")}</div>
         </div>
+        {token && <span className="qc-tok">{String(token[1])}</span>}
       </div>
       <div className="qc-chips">
         <Badge style="blue">{row.station ? human(row.station) : "Complete"}</Badge>

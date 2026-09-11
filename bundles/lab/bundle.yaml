@@ -1,12 +1,52 @@
 # A standalone diagnostics laboratory. Load this and the kernel is a lab.
 #
-# Built to stress the claim that a lab differs from a PHC only by bundle.
-# Every place the closed vocabulary forced a PHC name onto a lab fact is
-# written down in bundles/LAB-LOG.md, which cannot live beside this file because every .md here is parsed as a declaration; the names below are the ones the
-# linter accepts, not the ones a laboratory would choose.
+# Built to stress the claim that a lab differs from a PHC only by bundle. It
+# now declares its own vocabulary below, so nothing on these screens wears a
+# primary health centre's word: the draw room is phlebotomy and not `nurse`,
+# a released report is `report.released` and not `dispensed.complete`. The
+# lies this file used to carry are struck through in bundles/LAB-LOG.md.
 id: lab
-version: 2026.09.11
+version: 2026.09.12
 title: Diagnostics laboratory
+
+# The line, in order. Five places a specimen stands.
+stations: [accession, phlebotomy, processing, verification, release]
+
+# What is true about a specimen. Six derived from rows, one stored.
+# lab.critical keeps its name because questionnaires/lab.schema.panel-result-v1
+# raises it by that name and questionnaires/ is not this bundle's directory.
+states:
+  - order.accessioned
+  - specimen.collected
+  - result.entered
+  - result.rejected
+  - result.verified
+  - report.released
+  - lab.critical
+
+# What a person may do in a laboratory. Not one of these existed while the
+# vocabulary was the PHC's, which is why phlebotomy was declared as
+# `assessment.record`.
+capabilities:
+  - worklist.read
+  - order.accession
+  - specimen.collect
+  - result.enter
+  - result.verify
+  - report.release
+  - reporting.view
+
+roles:
+  phlebotomist: [worklist.read, order.accession, specimen.collect]
+  technologist: [worklist.read, result.enter]
+  pathologist: [worklist.read, result.verify, report.release, reporting.view]
+  # The role the actor rule exists for. In a small laboratory one senior
+  # technologist both keys and verifies, and holding both capabilities is
+  # normal. What must never happen is the same person doing both to the same
+  # specimen, and that is a precondition on lab.op.result-verify, not a
+  # promise about how the roles are handed out.
+  senior_technologist: [worklist.read, result.enter, result.verify]
+
 operations:
   - lab.op.referral-accession
   - lab.op.specimen-collect

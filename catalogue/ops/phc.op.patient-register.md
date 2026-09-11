@@ -20,6 +20,7 @@ mapping:
   records:
     - resource: patient
       fields:
+        created_by: {actor: id}
         name: {answer: name}
         age: {answer: age}
         sex: {answer: sex}

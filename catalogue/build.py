@@ -13,7 +13,7 @@ import sys
 
 import yaml
 
-from catalogue import validate, vocab
+from catalogue import guard, validate, vocab
 
 OPS = pathlib.Path(__file__).parent / "ops"
 OUT = pathlib.Path(__file__).parent / "catalogue.json"
@@ -41,9 +41,16 @@ def load():
 
 
 def lint(atoms):
-    """Return a list of failure strings. Empty means the catalogue is sound."""
+    """Return a list of failure strings. Empty means the catalogue is sound.
+
+    catalogue/ops is shared between bundles, so an atom is linted against the
+    union of every bundle's vocabulary: this pass cannot know which facility
+    an atom belongs to. The closure that matters is per bundle and lives in
+    kernel/declarations.py, over the operations a manifest actually lists.
+    """
     bad = []
     ids = {fm.get("id") for fm, _ in atoms.values()}
+    known = vocab.every()
 
     for path, (fm, body) in atoms.items():
         def fail(msg):
@@ -59,11 +66,11 @@ def lint(atoms):
             fail(f"short label {fm['short']!r} is too long for an action bar")
         if fm["id"] != path.stem:
             fail(f"id '{fm['id']}' does not match filename")
-        if fm["capability"] not in vocab.CAPABILITIES:
+        if fm["capability"] not in known.capabilities:
             fail(f"unknown capability '{fm['capability']}'")
         if fm["kind"] not in vocab.KINDS:
             fail(f"kind must be one of {vocab.KINDS}")
-        if fm["station"] not in vocab.STATIONS:
+        if fm["station"] not in known.stations:
             fail(f"unknown station '{fm['station']}'")
         if fm["instrument"] not in vocab.INSTRUMENTS:
             fail(f"unknown instrument '{fm['instrument']}'")
@@ -71,11 +78,16 @@ def lint(atoms):
             fail(f"irreversibility must be one of {vocab.IRREVERSIBILITY}")
 
         for pre in fm["preconditions"] or []:
-            flag = pre[4:] if pre.startswith("not ") else pre
-            if flag not in vocab.STATES:
-                fail(f"precondition names unknown state '{flag}'")
+            kind, name, _ = guard.parse_precondition(pre)
+            if kind == "actor":
+                # "not actor of <op>": separation of duties. The operation it
+                # names has to exist, or the rule silently never fires.
+                if name not in ids:
+                    fail(f"precondition names operation '{name}' which does not exist")
+            elif name not in known.states:
+                fail(f"precondition names unknown state '{name}'")
         for flag in fm["emits"] or []:
-            if flag not in vocab.STATES:
+            if flag not in known.states:
                 fail(f"emits unknown state '{flag}'")
         for res in fm["writes"] or []:
             if res not in vocab.CARE_RESOURCES:
@@ -142,10 +154,15 @@ def compile_catalogue(atoms):
             "description": plain,
             "fields": fields,
         }
+    # The union, because this compiler reads every atom and no bundle. The
+    # next step, kernel/declarations.write_catalogue, narrows these three keys
+    # to the bundle whose manifest it writes beside them, so the file the Go
+    # server embeds describes one facility and not a merged one.
+    every = vocab.every()
     return {
-        "capabilities": sorted(vocab.CAPABILITIES),
-        "bundles": vocab.BUNDLES,
-        "states": sorted(vocab.STATES),
+        "capabilities": sorted(every.capabilities),
+        "bundles": every.roles,
+        "states": sorted(every.states),
         "operations": ops,
     }
 

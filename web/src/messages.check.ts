@@ -1,0 +1,285 @@
+/** One runnable check for the thread's logic and the palette's.
+ *
+ *  Run: node --experimental-strip-types src/messages.check.ts   (from web/)
+ *
+ *  It reads the real compiled catalogue and the real questionnaires, so it
+ *  fails when a declaration changes shape, which is the point. The fixture
+ *  thread is hand-built, because the interesting cases (a refusal older than
+ *  the last post, a proposal for an operation the visit has moved past) do not
+ *  reliably exist in a seeded database.
+ *
+ *  Four of these assertions are safety properties, not conveniences:
+ *
+ *   - the composer never returns a disabled pill;
+ *   - no module the thread screen composes from can commit or confirm;
+ *   - a superseded proposal offers no Review;
+ *   - a refused audit row never renders as a posted record.
+ */
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import {
+  actorOf, agentLine, clock, composer, header, messages, queueViewFor, summariesFor,
+  type Ctx,
+} from "./messages.ts";
+import { firstOperation, isAsk, rows } from "./search.ts";
+import type { Catalogue, Questionnaire, ThreadView, ViewDecl, ViewResult } from "./types";
+
+const root = fileURLToPath(new URL("../../", import.meta.url));
+const read = (p: string) => readFileSync(root + p, "utf8");
+const cat = JSON.parse(read("catalogue/catalogue.json")) as Catalogue;
+
+const schema = (id: string | undefined): Questionnaire | null => {
+  if (!id) return null;
+  try {
+    return JSON.parse(read(`questionnaires/${id}.json`)) as Questionnaire;
+  } catch {
+    return null;
+  }
+};
+
+const VITALS = "phc.op.vitals-record";
+const CONSULT = "phc.op.consult-document";
+const WF = "phc.wf.outpatient";
+assert.ok(cat.operations[VITALS], "the compiled catalogue should carry the vitals operation");
+
+const queue = queueViewFor(cat, WF)!;
+assert.equal(queue.kind, "queue");
+
+const ctx: Ctx = { operations: cat.operations, schema, badges: queue.badges ?? {} };
+
+const thread: ThreadView = {
+  id: "enc-t",
+  workflow: WF,
+  subject: { encounter: "enc-t", name: "A Patient", age: "34", sex: "female", village: "Sonpur",
+             token: "A02", abha_number: null, status: "in_progress", created_by: "seed" },
+  flags: ["registered", "vitals.recorded", "abha.pending"],
+  station: "doctor",
+  line: [
+    { station: "reception", label: "registered", status: "done" },
+    { station: "nurse", label: "vitals.recorded", status: "done" },
+    { station: "doctor", label: "consult.documented", status: "now" },
+  ],
+  actions: [cat.operations[CONSULT]],
+  proposals: [
+    {
+      id: "prop-1", thread: "enc-t", operation: VITALS,
+      payload: { systolic: 140, diastolic: 90, pulse: 72 },
+      proposed_by: "agent", surface: "mcp", status: "pending",
+      created_at: "2026-09-10T18:53:11Z", flags_raised: [],
+    },
+  ],
+  audit: [
+    { id: "a1", thread: "enc-t", operation: "phc.op.lab-order", actor: "user:mo", surface: "mcp",
+      payload: {}, outcome: "denied: precondition not met: consult.documented",
+      at: "2026-09-10T18:40:00Z", proposal: null },
+    { id: "a2", thread: "enc-t", operation: VITALS, actor: "user:nurse", surface: "rendered",
+      payload: { systolic: 190, diastolic: 125, pulse: 72, override_reason: "cuff reads high, repeated" },
+      outcome: "allowed", at: "2026-09-10T18:45:00Z", proposal: null },
+    { id: "a3", thread: "enc-t", operation: VITALS, actor: "agent", surface: "mcp",
+      payload: { systolic: 140 }, outcome: "proposed", at: "2026-09-10T18:53:11Z", proposal: "prop-1" },
+    { id: "a4", thread: "enc-t", operation: "phc.op.abha-link", actor: "agent", surface: "mcp",
+      payload: {}, outcome: "denied: payload invalid: method is required",
+      at: "2026-09-10T18:55:00Z", proposal: null },
+  ],
+  capabilities: ["encounter.document", "vitals.record", "lab.order"],
+  held: ["encounter.document"],
+  nudge: "doctor: Document a consultation",
+};
+
+// ---------------------------------------------------------------- messages
+
+const msgs = messages(thread, ctx);
+
+// Order is the record's order, whatever the kinds are.
+assert.deepEqual(
+  msgs.map((m) => m.kind),
+  ["denied", "posted", "proposal", "denied"],
+  "messages are one time-sorted list of the record's events",
+);
+
+// A proposal's own `proposed` audit row is the same event as its card, and
+// drawing both would show the same values twice.
+assert.equal(msgs.filter((m) => m.kind === "posted").length, 1);
+
+const posted = msgs.find((m) => m.kind === "posted")!;
+assert.equal(posted.title, cat.operations[VITALS].title, "the card is titled by the declaration");
+const labels = posted.values.map((v) => v.label);
+assert.ok(labels.includes("Systolic BP"), "payload values are labelled by the questionnaire");
+assert.ok(
+  posted.values.find((v) => v.link_id === "systolic")!.value.endsWith("mm[Hg]"),
+  "the unit comes from styling_metadata.phc",
+);
+assert.ok(
+  posted.values.find((v) => v.link_id === "override_reason")!.crit,
+  "the reason someone typed to get past a range block is never quiet",
+);
+assert.ok(
+  posted.values.some((v) => v.crit && v.link_id !== "override_reason"),
+  "190/125 is outside the critical band the declaration names",
+);
+
+// A refusal is a refusal: it is never drawn as a record of something done.
+const denials = msgs.filter((m) => m.kind === "denied");
+assert.equal(denials.length, 2);
+assert.equal(denials[0].old, true, "a refusal before the last post folds away");
+assert.equal(denials[1].old, false, "the newest refusal stays on screen");
+for (const d of denials) assert.ok(!("values" in d), "a refusal has no values to show");
+
+// The visit is past vitals, so a pending vitals proposal is superseded: the
+// guard would refuse it, and the screen has to say so before the tap.
+const prop = msgs.find((m) => m.kind === "proposal")!;
+assert.equal(prop.stale, true);
+assert.equal(prop.by, "agent");
+assert.equal(prop.values.length, 3);
+
+// ... and when the operation is live again, it is reviewable.
+const live = messages({ ...thread, actions: [cat.operations[VITALS]] }, ctx);
+assert.equal(live.find((m) => m.kind === "proposal")!.stale, false);
+
+assert.equal(actorOf("user:lab_incharge"), "lab incharge");
+assert.equal(actorOf("agent:demo"), "agent", "a machine is one word on a card, whichever account it used");
+assert.equal(actorOf(null), "unattributed");
+assert.equal(clock("2026-09-10T18:45:00Z"), "18:45");
+
+// ---------------------------------------------------------------- the agent
+
+const line = agentLine(thread, ctx, "the medical officer");
+assert.equal(line.sentences.length, 3);
+assert.ok(line.sentences[0].includes("was refused"), "the newest event is the first sentence");
+assert.equal(line.sentences[1], "Doctor: Document a consultation.", "the kernel's nudge is the second, ended");
+assert.ok(line.sentences[2].includes("as the medical officer"), "the third names the role");
+assert.ok(line.actions.length <= 5);
+
+const quiet = agentLine(
+  { ...thread, actions: [], audit: [], nudge: "Waiting at doctor. Nobody with your capabilities can act here." },
+  ctx, "lab",
+);
+assert.deepEqual(quiet.actions, [], "no actions means no props, and no greyed ones either");
+assert.equal(quiet.sentences.length, 2, "with nothing to offer, the agent does not offer");
+assert.ok(
+  quiet.sentences[1].includes("Nobody with your capabilities"),
+  "the reason for an absence is said in words",
+);
+
+// ---------------------------------------------------------------- composer
+
+const bar = composer(thread, cat);
+assert.ok(bar.pills.length > 0);
+for (const p of bar.pills) {
+  assert.ok(!("disabled" in p), "a pill is never disabled: an unavailable action is absent");
+}
+assert.equal(
+  bar.pills.filter((p) => p.kind === "action").length <= 6, true,
+  "six visible actions at most; the rest live behind the palette",
+);
+assert.equal(bar.pills.filter((p) => p.primary).length <= 1, true, "one emphasis at most");
+assert.ok(
+  bar.pills.some((p) => p.kind === "summary"),
+  "every summary view this workflow declares is a pill on the thread",
+);
+assert.equal(bar.consentMissing, true, "the consult declares a scribe and consent is not recorded");
+assert.ok(
+  !bar.pills.some((p) => p.kind === "scribe"),
+  "no consent, no scribe pill: the instrument declaration gates it, not this renderer",
+);
+
+const consented = composer({ ...thread, flags: [...thread.flags, "capture.consented"] }, cat);
+assert.ok(consented.pills.some((p) => p.kind === "scribe"), "with consent the scribe pill appears");
+assert.equal(consented.consentMissing, false);
+
+// More than six actions caps at six and offers the palette for the rest.
+const many = composer(
+  { ...thread, actions: Object.values(cat.operations).slice(0, 9) },
+  cat,
+);
+assert.equal(many.pills.filter((p) => p.kind === "action").length, 6);
+assert.ok(many.pills.some((p) => p.kind === "more"));
+
+assert.ok(summariesFor(cat, WF).length >= 1);
+
+// ------------------------------------------------------------------ header
+
+const head = header(thread, queue);
+assert.equal(head.name, "A Patient");
+assert.equal(head.initials, "AP");
+assert.ok(
+  !head.meta.some((m) => m === "in_progress" || m === "seed"),
+  "the queue view's columns decide the meta line, so plumbing never reaches it",
+);
+assert.deepEqual(head.meta, ["34", "female", "Sonpur"]);
+assert.ok(head.badges.some((b) => b.text === "A02"), "the token is a badge, not part of the meta");
+assert.ok(
+  head.badges.some((b) => b.text === "abha pending" && b.style === "warn"),
+  "a flag is styled by the queue view's badge map, not by a regex over its name",
+);
+assert.ok(
+  !head.badges.some((b) => b.text === "registered"),
+  "a flag the view did not name is not a badge",
+);
+
+// A thread whose subject carries no name falls back to the id rather than
+// inventing one. bundles/LAB-LOG.md 12: a lab thread has no patient row.
+const nameless = header({ ...thread, subject: { encounter: "spec-1", token: "L07", status: "in_progress" } }, queue);
+assert.equal(nameless.name, "L07", "with no name column on the subject, the token is the headline");
+assert.ok(!nameless.badges.some((b) => b.text === "L07"), "and it is not also a badge");
+
+// With no queue view at all, nothing has declared what matters, so the first
+// field that is not obvious plumbing is the least-worst headline. It is a
+// worse screen than the declared one, which is the argument for declaring.
+const unguided = header({ ...thread, subject: { encounter: "spec-1", status: "x" } }, undefined);
+assert.equal(unguided.name, "spec-1");
+assert.equal(header({ ...thread, subject: {} }, undefined).name, "enc-t", "and with nothing, the id");
+
+// ------------------------------------------------------------------ palette
+
+const decl = queue;
+const result: ViewResult = {
+  view: decl.id, kind: "queue", generated_at: "", groups: [],
+  rows: [
+    { thread: "enc-1", subject: { name: "Kamala Devi", age: "34", sex: "female", village: "Sonpur", token: "A02" },
+      station: "doctor", flags: [], badges: { "abha.pending": "warn" }, opened_at: "" },
+    { thread: "enc-2", subject: { name: "Rahul Yadav", age: "51", sex: "male", village: "Bela", token: "A03" },
+      station: "nurse", flags: [], badges: {}, opened_at: "" },
+  ],
+};
+const nav: ViewDecl[] = [decl];
+
+const all = rows("", [{ decl, result }], nav);
+assert.equal(all.filter((r) => r.kind === "thread").length, 2, "an empty box lists today's line");
+assert.ok(all.some((r) => r.kind === "home"), "Home is always reachable");
+
+const hit = rows("kamala", [{ decl, result }], nav);
+assert.deepEqual(hit.filter((r) => r.kind === "thread").map((r) => r.id), ["enc-1"]);
+assert.equal(hit.find((r) => r.kind === "thread")!.group, "Matches");
+
+const village = rows("bela", [{ decl, result }], nav);
+assert.deepEqual(village.filter((r) => r.kind === "thread").map((r) => r.id), ["enc-2"],
+  "any column the view declared is searchable, not only the name");
+
+const miss = rows("zzz", [{ decl, result }], nav);
+assert.equal(miss.filter((r) => r.kind === "thread").length, 0, "a miss is a miss");
+
+const question = rows("how many are waiting?", [{ decl, result }], nav);
+assert.equal(question[0].kind, "ask", "a question offers the agent first");
+assert.equal(isAsk("Kamala"), false);
+
+// Create on miss opens the first operation of the workflow's first step,
+// whichever the bundle says that is.
+assert.equal(firstOperation(cat, WF), cat.workflows![WF].steps[0].operations[0]);
+
+// ------------------------------------------------------- no write from here
+
+// The thread screen composes from these four modules. If a commit or a confirm
+// ever appears in one of them, the conversation has become a machine surface.
+for (const file of ["src/messages.ts", "src/search.ts", "src/ask.ts", "src/Thread.tsx"]) {
+  const body = read(`web/${file}`)
+    .split("\n")
+    .filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l))          // prose about commits is fine
+    .join("\n");
+  assert.ok(!/\bclient\./.test(body), `${file} must hold no client`);
+  assert.ok(!/\bfetch\(/.test(body) || file === "src/ask.ts", `${file} must not fetch`);
+  assert.ok(!/\.commit\(|\.confirm\(/.test(body), `${file} must have no commit or confirm path`);
+}
+
+console.log("ok   thread messages, agent line, composer, header and palette rows");

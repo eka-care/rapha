@@ -56,11 +56,14 @@ A bundle is chosen when the API starts, and nothing else changes:
 PHC_BUNDLE=lab PHC_DB=lab.sqlite3 PORT=8001 sh api/run.sh
 ```
 
-That is the whole switch. The same kernel now runs `bundles/lab/`: a four
-station laboratory line, its own operations, its own worklist, report and
-turnaround board. Give it its own `PHC_DB`, because the seed is written for
-the PHC and its six patients turn up on the laboratory's worklist otherwise
-(they still do inside one database; see `bundles/LAB-LOG.md`).
+That is the whole switch. The same kernel now runs `bundles/lab/`: a five
+station laboratory line (`accession, phlebotomy, processing, verification,
+release`), its own operations, its own flags, its own capabilities and roles,
+and its own worklist, report and turnaround board. All of those are declared
+in `bundles/lab/bundle.yaml` and closed against that bundle alone, so a lab
+declaration naming `nurse` or `vitals.recorded` fails the linter. Give it its
+own `PHC_DB`: the seed itself is still the PHC's, so its six patients turn up
+on the laboratory's worklist either way (see `bundles/LAB-LOG.md`).
 
 Three things the switch does not carry, all of them real:
 
@@ -108,6 +111,25 @@ It reads `/whoami` to learn its capabilities and offers only the operations
 that account may use. Every write tool is `propose_*`; there is no confirm verb
 and no path by which it can commit.
 
+The ask box on screen, which needs nothing extra started: the composer at the
+foot of every thread posts to the kernel's own route.
+
+```sh
+curl -s localhost:8000/api/v1/phc/agent/say \
+  -H 'Content-Type: application/json' \
+  -d '{"thread": "enc-002", "utterance": "bp 138 over 86, pulse 74"}' \
+  | python3 -m json.tool | head -30
+```
+
+That route is `api/main.say()`. It calls `agent/turn.py`, which plans with
+`agent/planner.py` and then calls `kernel.proposals.propose` on the machine
+surface. It takes no `confirmed` argument and has no branch that reaches
+`confirm` or `commit`, so the worst a sentence can do is put a card in front
+of a person. The reply carries the full thread panel after the turn, and per
+proposal the guard's own verdict, the payload it filled, and one plain
+sentence saying what to do next. `web/src/ask.ts` posts to exactly this. There
+is no second process and no `VITE_AGENT_BASE`.
+
 The planner, from a sentence:
 
 ```sh
@@ -138,14 +160,18 @@ open http://localhost:5173/#/threads/enc-002
 ## 5. The checks
 
 ```sh
-sh scripts/check.sh                 # everything, about 9 seconds
+sh scripts/check.sh                 # everything, about 13 seconds, 237 ok lines
 ```
 
 That runs the linters, every Python and Go unit check, the browser-side checks,
-and `scripts/e2e.py`, which starts its own uvicorn on a free port, walks a
-patient through the line over HTTP, reads the SQLite file to prove the row
-landed, and drives the Go MCP binary at it. `SKIP_E2E=1` skips the only step
-that binds a port.
+`bundles/lab/check.py` (a second bundle on the same kernel, with its own socket
+half), and `scripts/e2e.py`, which starts its own uvicorn on a free port, walks
+a patient through the line over HTTP, reads the SQLite file to prove the row
+landed, drives the Go MCP binary at it, posts a sentence to `/agent/say` and
+confirms what comes back, then starts a second kernel as the laboratory and
+proves that the account which keyed a result cannot verify it: not on the
+panel, not on either surface, and not by asking the agent to do it. `SKIP_E2E=1`
+skips the two steps that bind a port.
 
 ## What is not wired
 
@@ -181,8 +207,30 @@ that binds a port.
   refuses to write it: "not a step of phc.wf.outpatient". The atom stays in
   `catalogue/ops` for a bundle that declares a household workflow. Nothing here
   declares one yet.
-- **The lab bundle's line wears PHC words.** `vocab.STATES` and `vocab.STATIONS`
-  are closed and the PHC's, so a laboratory's draw room is called `nurse` and a
-  released report is `dispensed.complete`. Every substitution is listed in
-  `bundles/LAB-LOG.md`. That file is the honest answer to "does one kernel run
-  another facility": yes, and read the log before believing the screens.
+- **The lab bundle's seed is the PHC's six patients.** A bundle now declares
+  its own `stations`, `states`, `capabilities` and `roles` in
+  `bundles/<id>/bundle.yaml`, and `kernel/declarations.py` closes them per
+  bundle, so a laboratory's line reads `accession, phlebotomy, processing,
+  verification, release` and its roles are `phlebotomist, technologist,
+  pathologist, senior_technologist`. What is still the PHC's is
+  `adapters/local/store.seed`: open the lab on a fresh database and five
+  outpatients are standing at the accession desk with tokens like `A01`, and
+  one seeded proposal names an operation the lab does not declare. Every
+  remaining leak is listed in `bundles/LAB-LOG.md`, which is the honest answer
+  to "does one kernel run another facility": mostly, and read the log before
+  believing the screens.
+
+- **A seeded thread is only on today's line for one day.** Every queue view is
+  `scope: today` and the seed dates its rows when the file is created, so a
+  database made yesterday draws an empty workspace this morning. Delete the
+  SQLite file and restart. There is no code fix here that is not a lie about
+  what a queue means.
+
+- **Separation of duties is declared, not authenticated.** `actor of` and
+  `not actor of` are real preconditions, enforced on both surfaces and read by
+  `guard.visible` so the action is absent rather than greyed out. But with no
+  authentication the actor is `user:<role>`, so "a different person" means "a
+  different role". `catalogue.guard.person()` strips the `agent:` prefix, so an
+  agent inherits the exclusions of whoever it is acting for; without that, the
+  account that keyed a result could have the verify proposed to itself by
+  dictating instead of tapping.

@@ -239,6 +239,24 @@ def test_an_agent_can_never_commit_an_irreversible_write():
     assert "surface" not in inspect.signature(proposals.commit).parameters
 
 
+def test_confirming_a_proposal_this_bundle_does_not_declare_is_a_refusal():
+    """One SQLite file opened under a second bundle still holds the first
+    bundle's pending rows, and the renderer draws them. Tapping one used to
+    raise KeyError inside confirm() and answer 500. Nothing was written either
+    way, but a crash is not a refusal and does not reach the audit."""
+    s = registered()
+    stranded = c.Proposal(
+        id="prop-stranded", thread=T, operation="lab.op.result-verify",
+        payload={"decision": "verified"}, proposed_by="agent", surface=guard.MCP,
+        status="pending", created_at="2026-09-13T00:00:00Z", flags_raised=[])
+    s.put_proposal(stranded)
+    d, back = proposals.confirm(s, BUNDLE, stranded, caps={"result.verify"},
+                                actor="user:demo", confirmed=True)
+    assert not d and "not an operation this facility declares" in d.reason
+    assert back.status == "pending", "a refusal must not decide the proposal"
+    assert s.log[-1].outcome == "denied: not in this bundle"
+
+
 def test_an_irreversible_write_needs_an_explicit_confirm_from_a_person():
     payload = {"method": "link_existing", "abha_number": "12-3456", "consent_given": True}
     s = registered()
@@ -473,11 +491,17 @@ def test_lint_refuses_a_dangling_or_misspelt_reference():
         assert any(expected in b for b in bad), f"{did} {change} linted clean"
 
 
-def test_lint_refuses_states_that_do_not_cover_the_vocabulary():
-    trimmed = dict(declarations.load("phc").workflows["phc.wf.outpatient"].states)
-    trimmed.pop("lab.critical")
-    assert any("cover the vocabulary" in b
+def test_lint_refuses_states_that_do_not_cover_this_bundles_vocabulary():
+    """Closure is per bundle: the states a workflow declares must be exactly
+    the ones its own bundle.yaml lists. A flag from another facility's
+    vocabulary is as much a failure as a missing one."""
+    states = dict(declarations.load("phc").workflows["phc.wf.outpatient"].states)
+    trimmed = {k: v for k, v in states.items() if k != "lab.critical"}
+    assert any("cover this bundle's vocabulary" in b
                for b in _lint_with("phc.wf.outpatient", states=trimmed))
+    borrowed = dict(states, **{"specimen.collected": {"stored": True}})
+    assert any("unknown ['specimen.collected']" in b
+               for b in _lint_with("phc.wf.outpatient", states=borrowed))
 
 
 def test_lint_refuses_a_state_rule_that_looks_ahead():

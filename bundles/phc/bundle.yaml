@@ -2,8 +2,11 @@
 #
 # Operations are referenced by id and live in catalogue/ops, because they are
 # shared vocabulary; a dental bundle would reference some of the same atoms.
-# Everything else listed here lives beside this file. Role bundles (which
-# capabilities a nurse holds) stay in catalogue/vocab.py BUNDLES tonight.
+# Everything else listed here lives beside this file, including this facility's
+# own vocabulary: its stations, its state flags, its capabilities and its role
+# bundles. They were in catalogue/vocab.py until the laboratory had to borrow
+# them, and closure is now checked per bundle: a phc.* declaration may name
+# what is below and nothing else.
 id: phc
 version: 2026.09.10
 title: Primary health centre
@@ -31,3 +34,68 @@ metrics:
   - phc.metric.visits
   - phc.metric.abha-coverage
   - phc.metric.vitals-flagged-rate
+
+# The line, in order. A station is a place a person stands, and these are a
+# primary health centre's.
+stations: [reception, nurse, doctor, lab, pharmacy, community]
+
+# Thread state flags. Derived from CARE resources where CARE knows the answer;
+# stored on the thread only where it does not. phc.wf.outpatient must declare a
+# rule for every one of these and for nothing else.
+states:
+  - registered
+  - abha.linked
+  - abha.pending
+  - capture.consented
+  - vitals.recorded
+  - vitals.flagged
+  - consult.documented
+  - rx.confirmed
+  - lab.ordered
+  - lab.resulted
+  - lab.validated
+  - lab.critical
+  - dispensed.partial
+  - dispensed.complete
+  - followup.booked
+
+# What a person may do here. An atom naming anything else fails the per bundle
+# closure check in kernel/declarations.py.
+# addendum SSC. `handover` is the prototype's; it is a real operation, not a role.
+capabilities:
+  - patient.find
+  - patient.register
+  - abha.link
+  - vitals.record
+  - assessment.record
+  - encounter.document
+  - rx.prescribe
+  - lab.order
+  - lab.result.enter
+  - lab.result.validate
+  - pharmacy.dispense
+  - visit.household
+  - appointment.book
+  - handover
+  - facility.admin
+  - reporting.view
+
+# Role bundles. Default bundles ship as CARE roles with is_system=True. A
+# facility's own combination is an is_system=False role in the DB, which CARE's
+# sync_permissions_roles command deliberately does not touch.
+roles:
+  frontdesk: [patient.find, patient.register, abha.link, appointment.book, handover]
+  nurse: [patient.find, patient.register, abha.link, appointment.book,
+          vitals.record, assessment.record, handover]
+  mo: [patient.find, encounter.document, rx.prescribe, lab.order,
+       assessment.record, reporting.view, handover]
+  lab: [patient.find, lab.result.enter, handover]
+  lab_incharge: [patient.find, lab.result.enter, lab.result.validate, handover]
+  pharmacist: [patient.find, pharmacy.dispense, handover]
+  asha: [patient.find, patient.register, abha.link, visit.household,
+         assessment.record, appointment.book]
+  anm: [patient.find, patient.register, abha.link, visit.household,
+        assessment.record, appointment.book, vitals.record]
+  cho: [patient.find, patient.register, abha.link, visit.household,
+        assessment.record, appointment.book, vitals.record,
+        encounter.document, lab.order, rx.prescribe]

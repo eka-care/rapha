@@ -25,6 +25,7 @@ python3 -m api.tests.test_api
 
 echo "\n== the agent, and the ABDM connector =="
 python3 -m agent.tests.test_planner
+python3 -m agent.turn          # one conversational turn, no kernel and no key
 python3 -m agent.tests.test_live      # binds a port; SKIP_E2E=1 skips that half
 python3 -m care_phc.tests.test_token
 python3 -m care_phc.tests.test_eka

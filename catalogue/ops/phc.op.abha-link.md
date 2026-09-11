@@ -24,6 +24,7 @@ mapping:
   records:
     - resource: patient
       fields:
+        created_by: {actor: id}
         abha_number: {answer: abha_number}
 emits: [abha.linked]
 surfaces: [rendered, mcp]

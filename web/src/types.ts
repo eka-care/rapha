@@ -40,6 +40,13 @@ export type Questionnaire = {
 
 export type Payload = Record<string, unknown>;
 
+/** The line a thread walks. The palette needs steps[0].operations[0]: the
+ *  first thing a bundle does to a brand new thread. */
+export type Workflow = {
+  id: string; title: string; summary?: string; subject?: string;
+  steps: { station: string; done_when: string; applies_when: string | null; operations: string[] }[];
+};
+
 // ---- compiled declarations ----
 
 export type Operation = {
@@ -61,16 +68,41 @@ export type Operation = {
   description: string;
 };
 
-export type ViewDecl = { id: string; kind: "queue" | "summary" | "dashboard"; title: string; summary?: string };
+export type ViewDecl = {
+  id: string; kind: "queue" | "summary" | "dashboard"; title: string; summary?: string;
+  /** A queue view says which subject fields matter and how a flag is styled.
+   *  The thread header and the palette read both, so that neither has to
+   *  guess at a subject's shape. `/facility` sends a short form of a view
+   *  without them; `/catalogue` sends them. */
+  columns?: string[];
+  badges?: Record<string, string>;
+  workflow?: string | null;
+  group_by?: string | null;
+  scope?: string;
+  capability?: string;
+  metrics?: string[];
+};
 
 export type Catalogue = {
   capabilities?: string[];
   operations: Record<string, Operation>;
   views?: Record<string, ViewDecl>;
   metrics?: Record<string, { id: string; title: string }>;
-  workflows?: Record<string, { id: string; title: string }>;
-  instruments?: Record<string, { id: string; title: string; operations: string[]; kind: string; fields?: string[] }>;
+  workflows?: Record<string, Workflow>;
+  instruments?: Record<string, { id: string; title: string; summary?: string; operations: string[]; kind: string; fields?: string[] }>;
   manifest?: { id: string; title: string; version: string; views: string[] };
+  /** role id to the capabilities it holds. vocab.BUNDLES, one list for the
+   *  whole kernel, so a bundle's menu may name a role it has no use for. */
+  bundles?: Record<string, string[]>;
+};
+
+/** GET /facility: which bundle this kernel loaded, and who is asking. */
+export type Facility = {
+  bundle: { id: string; title: string; version: string; workflow: string };
+  capabilities: string[];
+  views: ViewDecl[];
+  roles: string[];
+  user: { id: string; role: string; capabilities: string[] };
 };
 
 // ---- kernel records ----

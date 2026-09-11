@@ -52,6 +52,12 @@ A source is a single key dict, one of:
     {joined: [<link_id>]}      non empty answers joined with a space
     {note: [<link_id>]}        non empty answers as labelled paragraphs
     {json: payload}            the whole payload as sorted JSON
+    {actor: id}                who is performing this operation
+
+`{actor: id}` is required on every record, and it is the answer to "who wrote
+this row". Rows used to land with `created_by` null on every adapter, which
+left the audit trail as the only record of authorship and made separation of
+duties a convention about which role bundle a person logs in with.
 
 `{question: unit}` is the point of the exercise: the unit comes from
 `styling_metadata.phc.unit` on the question, so it is written once, next to the
@@ -90,7 +96,13 @@ from catalogue.build import parse
 
 OPS = pathlib.Path(__file__).parents[1] / "catalogue" / "ops"
 
-SOURCES = ("answer", "const", "item", "minus", "question", "joined", "note", "json")
+SOURCES = ("answer", "const", "item", "minus", "question", "joined", "note",
+           "json", "actor")
+# Sources that do not read the payload. A record made only of these is written
+# every time; a record with any other source is written only when the payload
+# gave one of them a value.
+PAYLOAD_FREE = ("const", "actor")
+ACTOR_FACTS = ("id",)
 ITEM_ONLY = ("item", "minus")
 QUESTION_ONLY = ("question",)
 QUESTION_FACTS = ("link_id", "answer", "unit")
@@ -126,10 +138,12 @@ def _first(context, keys):
     return None
 
 
-def _value(source, payload, context):
+def _value(source, payload, context, actor=None):
     (kind, arg), = source.items()
     if kind == "const":
         return arg
+    if kind == "actor":
+        return actor
     if kind == "answer":
         return payload.get(arg)
     if kind == "item":
@@ -150,22 +164,23 @@ def _value(source, payload, context):
     raise ValueError("unknown mapping source %r; lint should have refused it" % kind)
 
 
-def _row(record, payload, context):
+def _row(record, payload, context, actor=None):
     """One row, or None when this record has nothing to say about this payload."""
     row, derived, any_derived_source = {}, False, False
     for column, source in record["fields"].items():
-        any_derived_source = any_derived_source or "const" not in source
-        value = _value(source, payload, context)
+        from_payload = not set(source) & set(PAYLOAD_FREE)
+        any_derived_source = any_derived_source or from_payload
+        value = _value(source, payload, context, actor)
         if _blank(value):
             continue
         row[column] = value
-        derived = derived or "const" not in source
+        derived = derived or from_payload
     if any_derived_source and not derived:
         return None
     return row
 
 
-def records(op, payload):
+def records(op, payload, actor=None):
     """The rows this payload becomes, as [(resource, row)] in declared order.
 
     `op` is a compiled operation carrying "mapping"; kernel/declarations.py
@@ -184,7 +199,7 @@ def records(op, payload):
         else:
             contexts = [{}]
         for context in contexts:
-            row = _row(record, payload, context)
+            row = _row(record, payload, context, actor)
             if row is not None:
                 out.append((record["resource"], row))
     return out
@@ -236,6 +251,10 @@ def _lint_source(source, where, record, questions, fail):
         if arg != "payload":
             fail("%s: json takes 'payload' and nothing else" % where)
         return set(questions)          # the blob keeps every answer
+    if kind == "actor":
+        if arg not in ACTOR_FACTS:
+            fail("%s: actor takes one of %s" % (where, ", ".join(ACTOR_FACTS)))
+        return set()
     return set()                       # const, item, minus: no link_id
 
 
@@ -283,6 +302,11 @@ def _lint_record(record, index, writes, questions, fail):
             fail("%s: '%s' is not a column name" % (where, column))
         used |= _lint_source(source, "%s field '%s'" % (where, column),
                              record, questions, fail)
+    # Every row says who wrote it. Not a style rule: a row with no author is
+    # why "the same person must not verify their own result" could be declared
+    # nowhere and enforced nowhere.
+    if not any(isinstance(s, dict) and "actor" in s for s in fields.values()):
+        fail("%s: no author. Give one column {actor: id}" % where)
     return used
 
 

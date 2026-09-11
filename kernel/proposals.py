@@ -27,6 +27,7 @@ from kernel import contracts as c
 from kernel import mapping
 from kernel.state import drawn_by
 from kernel.state import flags as thread_flags
+from kernel.state import performers
 
 
 def now() -> str:
@@ -75,10 +76,10 @@ def _decide(store, bundle, op, *, thread, payload, caps, surface, actor,
     return guard.evaluate(
         op, caps=caps, state=thread_flags(store, thread, workflow), payload=payload,
         surface=surface, confirmed=confirmed, scopes=scopes, actor=actor,
-        validate=validator(op))
+        validate=validator(op), performers=performers(store, thread))
 
 
-def _write(store, bundle, op, *, thread, payload, workflow):
+def _write(store, bundle, op, *, thread, payload, workflow, actor=None):
     """Guard steps 6 and 7: the CARE write, then the state emit.
 
     Which answer becomes which column is declared on the operation atom and
@@ -90,9 +91,13 @@ def _write(store, bundle, op, *, thread, payload, workflow):
     One record in, one Store.write out. A payload fans out, so three vitals
     are three observation rows and two medicines are two medication_request
     rows, which is what dispensed.complete counts.
+
+    `actor` is what the mapping's {actor: id} source reads, so every row a
+    declaration writes carries its author. Rows used to land with created_by
+    null, which made "who did this" a question only the audit could answer.
     """
     ids = [store.write(res, row, thread=thread)
-           for res, row in mapping.records(op, payload)]
+           for res, row in mapping.records(op, payload, actor=actor)]
     for flag in raised(op, payload, workflow):
         store.raise_flag(thread, flag)
     return ids
@@ -133,7 +138,8 @@ def commit(store, bundle, op_id, *, thread, payload, caps, actor,
                        scopes=scopes, workflow=workflow)
     _audit(store, decision.audit, thread=thread, at=at)
     if decision:
-        _write(store, bundle, op, thread=thread, payload=payload, workflow=workflow)
+        _write(store, bundle, op, thread=thread, payload=payload, workflow=workflow,
+               actor=actor)
     return decision
 
 
@@ -142,8 +148,23 @@ def confirm(store, bundle, proposal, *, caps, actor, payload=None,
     """Accept a queued write. The second guard pass, on the rendered surface,
     with the payload as the person edited it. Returns (Decision, Proposal)."""
     at = at or now()
-    op, workflow = bundle.operations[proposal.operation], bundle.workflow()
     payload = dict(proposal.payload if payload is None else payload)
+    workflow = bundle.workflow()
+
+    if proposal.operation not in bundle.operations:
+        # A proposal outlived the bundle that queued it: one SQLite file opened
+        # under PHC_BUNDLE=lab still holds the health centre's rows. Refuse it
+        # like any other denial rather than raising KeyError on the tap, which
+        # is what this did. Nothing was ever written either way; a 500 on a
+        # confirm button is still the wrong answer.
+        decision = guard.Decision(False, "%s is not an operation this facility "
+                                         "declares" % proposal.operation,
+                                  {"operation": proposal.operation, "actor": actor,
+                                   "surface": guard.RENDERED, "payload": payload,
+                                   "outcome": "denied: not in this bundle"})
+        _audit(store, decision.audit, thread=proposal.thread, at=at, proposal=proposal.id)
+        return decision, proposal
+    op = bundle.operations[proposal.operation]
 
     if proposal.status != "pending":
         decision = guard.Decision(False, f"proposal is already {proposal.status}", {
@@ -161,7 +182,8 @@ def confirm(store, bundle, proposal, *, caps, actor, payload=None,
 
     decision.audit["outcome"] = "confirmed"
     _audit(store, decision.audit, thread=proposal.thread, at=at, proposal=proposal.id)
-    _write(store, bundle, op, thread=proposal.thread, payload=payload, workflow=workflow)
+    _write(store, bundle, op, thread=proposal.thread, payload=payload,
+           workflow=workflow, actor=actor)
     decided = c.Proposal(**{**proposal.__dict__, "status": "confirmed",
                             "decided_by": actor, "decided_at": at,
                             "final_payload": payload,

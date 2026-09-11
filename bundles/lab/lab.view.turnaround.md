@@ -4,7 +4,7 @@ type: view
 kind: dashboard
 title: Turnaround today
 summary: Accessioned, released, the ratio between them, and the critical rate.
-capability: lab.result.validate
+capability: reporting.view
 metrics: [lab.metric.accessioned, lab.metric.released, lab.metric.release-ratio, lab.metric.critical-rate]
 window: day
 ---

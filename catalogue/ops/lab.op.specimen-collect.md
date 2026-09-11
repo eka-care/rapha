@@ -3,17 +3,17 @@ id: lab.op.specimen-collect
 type: operation
 kind: write
 short: Collect
-title: Collect and accession a specimen
+title: Collect and label a specimen
 summary: >
   The phlebotomist records that the sample was drawn, what it is and what it
   is in, so the bench can start.
-capability: assessment.record
+capability: specimen.collect
 scope_qualifier: null
-station: nurse
+station: phlebotomy
 instrument: form
 preconditions:
-  - lab.ordered
-  - not vitals.recorded
+  - order.accessioned
+  - not specimen.collected
 irreversibility: correctable
 input: lab.schema.specimen-v1
 writes: [specimen]
@@ -21,9 +21,10 @@ mapping:
   records:
     - resource: specimen
       fields:
+        created_by: {actor: id}
         code: {answer: specimen_type}
         status: {const: available}
-emits: [vitals.recorded]
+emits: [specimen.collected]
 surfaces: [rendered, mcp]
 verified:
   status: unverified
@@ -40,24 +41,22 @@ what moves through the laboratory.
 
 ## Before you start
 
-An order must be accessioned. You need `assessment.record`, because the
-vocabulary has no phlebotomy capability and this is the one the nurse role
-holds that the technologist role does not. The flag this raises is called
-`vitals.recorded` for the same reason: the vocabulary is closed and this is
-the free slot at the second station.
+An order must be accessioned. You need `specimen.collect`, which the
+phlebotomist holds and the technologist does not.
 
 ## What happens
 
-One specimen row lands with status available. The thread moves to the bench.
+One specimen row lands with status available, carrying the phlebotomist who
+drew it. The specimen moves to processing.
 
 ## How you know it worked
 
-The worklist shows the specimen under the bench, and the report view's
-Specimen section shows its type.
+The worklist shows the specimen under processing, and the report view's
+Specimen section names the container and the time.
 
 ## When it goes wrong
 
 - **Haemolysed or clotted.** There is no reject-specimen operation in this
   bundle; the thread has to be re-accessioned.
-- **Two tubes.** One row per collect; run the operation twice only if the
-  precondition allows it, which it does not once one specimen exists.
+- **Two tubes.** One row per collect, and the precondition refuses a second
+  once one specimen exists.

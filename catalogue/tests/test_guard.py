@@ -78,6 +78,28 @@ def test_denials_are_audited_too():
     assert d.audit["actor"] == "u5" and d.audit["surface"] == guard.MCP
 
 
+def test_an_agent_inherits_the_exclusions_of_the_person_it_acts_for():
+    """The hole this closes: api/main.py proposes as `agent:<caller id>`, so
+    without stripping the prefix the account that keyed a result could get the
+    verify proposed for itself by dictating the sentence instead of tapping
+    the button. It was refused on the confirm, but a card it could never
+    accept was put in front of it, which is the greyed out button the
+    invisibility rule exists to forbid."""
+    op = OPS["lab.op.result-verify"]
+    state = {"result.entered", "specimen.collected", "order.accessioned"}
+    caps = {"result.verify"}
+    performed = {"lab.op.result-enter": {"user:senior_technologist"}}
+
+    for who in ("user:senior_technologist", "agent:user:senior_technologist"):
+        assert not guard.visible(op, caps, state, who, performed), who
+        d = guard.evaluate(op, caps=caps, state=state, payload={}, validate=ok,
+                           surface=guard.MCP, actor=who, performers=performed)
+        assert not d and "not actor of lab.op.result-enter" in d.reason, who
+
+    for who in ("user:pathologist", "agent:user:pathologist"):
+        assert guard.visible(op, caps, state, who, performed), who
+
+
 def test_every_write_operation_is_a_proposal_on_mcp():
     for oid, op in OPS.items():
         if op["kind"] == "write":

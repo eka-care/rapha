@@ -20,6 +20,7 @@ mapping:
     - resource: medication_request
       per_item: medications
       fields:
+        created_by: {actor: id}
         medication: {item: [medication, drug, code]}
         dosage_instruction: {item: [dosage_instruction, dose]}
         status: {const: active}

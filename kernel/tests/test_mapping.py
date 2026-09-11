@@ -166,13 +166,40 @@ def failures(mapping_block, writes=("observation",)):
 GOOD = {"records": [
     {"resource": "observation",
      "per_question": ["systolic"],
-     "fields": {"code": {"question": "link_id"}, "value": {"question": "answer"},
+     "fields": {"created_by": {"actor": "id"},
+                "code": {"question": "link_id"}, "value": {"question": "answer"},
                 "unit": {"question": "unit"}}},
 ], "ignored": ["note", "drugs"]}
 
 
 def test_a_sound_mapping_lints_clean():
     assert failures(GOOD) == ""
+
+
+def test_a_row_with_no_author_fails_the_build():
+    """Every row says who wrote it, or the build stops. Until this rule a
+    kernel write left created_by null on every table, which is why a
+    separation of duties rule had nothing to read."""
+    fields = dict(GOOD["records"][0]["fields"])
+    fields.pop("created_by")
+    bad = {"records": [dict(GOOD["records"][0], fields=fields)],
+           "ignored": ["note", "drugs"]}
+    assert "no author" in failures(bad), failures(bad)
+    worse = {"records": [dict(GOOD["records"][0],
+                              fields=dict(fields, created_by={"actor": "name"}))],
+             "ignored": ["note", "drugs"]}
+    assert "actor takes one of id" in failures(worse), failures(worse)
+
+
+def test_the_author_lands_on_every_row_and_never_stands_in_for_an_answer():
+    op = OPERATIONS["phc.op.vitals-record"]
+    rows = mapping.records(op, {"spo2": 97}, actor="user:nurse")
+    assert rows == [("observation", {"created_by": "user:nurse",
+                                     "category": "vital-signs", "code": "spo2",
+                                     "value": 97, "unit": "%"})], rows
+    # An author is not an answer: a payload that produced nothing is still no
+    # row, not a row carrying only its author.
+    assert mapping.records(op, {}, actor="user:nurse") == []
 
 
 def test_a_link_id_the_questionnaire_lacks_fails_the_build():

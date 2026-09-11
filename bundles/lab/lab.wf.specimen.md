@@ -3,63 +3,57 @@ id: lab.wf.specimen
 type: workflow
 title: Specimen line
 summary: >
-  Accession, collection, bench, then verification and release by a second
-  person. The current station is the first step not done.
+  Accession, phlebotomy, processing, then verification by a second person and
+  release. The current station is the first step not done.
 subject: encounter
 steps:
-  - station: reception
-    done_when: lab.ordered
+  - station: accession
+    done_when: order.accessioned
     operations: [lab.op.referral-accession]
-  - station: nurse
-    done_when: vitals.recorded
+  - station: phlebotomy
+    done_when: specimen.collected
     operations: [lab.op.specimen-collect]
-  - station: lab
-    done_when: lab.resulted
+  - station: processing
+    done_when: result.entered
     operations: [lab.op.result-enter]
-  - station: doctor
-    done_when: dispensed.complete
-    operations: [lab.op.result-verify, lab.op.report-release]
+  - station: verification
+    done_when: result.verified
+    operations: [lab.op.result-verify]
+  - station: release
+    done_when: report.released
+    operations: [lab.op.report-release]
 states:
-  registered:
-    exists: {resource: patient}
-  abha.linked:
-    exists: {resource: patient, where: {abha_number: "*"}}
-  abha.pending:
-    all_of: [registered, "not abha.linked"]
-  lab.ordered:
+  order.accessioned:
     exists: {resource: service_request, where: {status: active}}
-  # specimen collected. The vocabulary is closed; this is the free slot.
-  vitals.recorded:
+  specimen.collected:
     exists: {resource: specimen}
-  lab.resulted:
+  result.entered:
     exists: {resource: observation, where: {category: laboratory}}
-  lab.validated:
+  # A rejection writes a report row with status rejected. Declaring the flag
+  # is what makes the stranded specimen visible on the worklist instead of
+  # silent; it does not un-strand it, because there is no amend operation.
+  result.rejected:
+    exists: {resource: diagnostic_report, where: {status: rejected}}
+  result.verified:
     exists: {resource: diagnostic_report, where: {status: verified}}
-  # report released to the referrer. Same reason for the name.
-  dispensed.complete:
+  report.released:
     exists: {resource: questionnaire_response, where: {questionnaire: lab.schema.release-v1}}
   lab.critical: {stored: true}
-  # Everything below is padding. Lint demands every vocabulary flag be
-  # declared; nothing in this bundle raises or reads these six.
-  capture.consented: {stored: true}
-  vitals.flagged: {stored: true}
-  consult.documented: {stored: true}
-  rx.confirmed: {stored: true}
-  dispensed.partial: {stored: true}
-  followup.booked: {stored: true}
 ---
 
 ## In plain words
 
 A specimen walks a line: accessioned at the front desk, drawn by the
 phlebotomist, run at the bench by the technologist, then verified and
-released by the pathologist. Nobody consults and nobody prescribes. The
-person who enters a result cannot verify it; the person who verifies it is
-the one who may release it.
+released. Nobody consults and nobody prescribes.
 
-Read the station names as the laboratory's: reception is accession, nurse is
-the draw room, lab is the bench, doctor is the pathologist's desk. The
-vocabulary has no others. Read `vitals.recorded` as specimen collected and
-`dispensed.complete` as report released, for the same reason. Six flags at
-the bottom exist only because lint demands the whole PHC vocabulary be
-covered.
+Every word on this line is the laboratory's own, declared in
+`bundles/lab/bundle.yaml` and closed there: five stations, six flags derived
+from rows and one stored. The line used to wear a primary health centre's
+vocabulary, so the draw room was called `nurse` and a released report was
+`dispensed.complete`.
+
+The person who enters a result cannot verify it. That is a precondition on
+`lab.op.result-verify` naming the actor of `lab.op.result-enter`, not a hope
+about how the roles are handed out: the `senior_technologist` role holds both
+capabilities, and is still refused on a specimen it keyed.

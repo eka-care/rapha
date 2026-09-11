@@ -15,9 +15,12 @@ Ids are `<bundle>.<kind>.<name>` with kind one of `op`, `wf`, `view`, `inst`,
 `metric`. Operations live in `catalogue/ops/`. Everything else lives beside
 `bundle.yaml` in `bundles/<bundle>/`, one flat directory.
 
-Vocabularies are closed. A capability, state, station, or resource that is
-not in `catalogue/vocab.py` is a lint failure, never a new entry. No em
-dashes anywhere, frontmatter included.
+Vocabularies are closed PER BUNDLE. A capability, state, station or role that
+the bundle's own `bundle.yaml` does not declare is a lint failure, never a new
+entry. `catalogue/vocab.py` keeps only what belongs to the kernel and the
+adapter rather than to a facility: `CARE_RESOURCES`, `KERNEL_RESOURCES`,
+`IRREVERSIBILITY`, `INSTRUMENTS`, `KINDS` and `BODY_SECTIONS`. No em dashes
+anywhere, frontmatter included.
 
 ## The bundle file
 
@@ -28,6 +31,13 @@ referenced by id, not copied.
 id: phc
 version: 2026.09.10           # date-stamped; bump on any change
 title: Primary health centre
+
+stations: [reception, nurse, ...]        # this facility's line, in order
+states: [registered, vitals.recorded, ...]   # its flags; the workflow covers these exactly
+capabilities: [patient.find, ...]        # what a person may do here
+roles:                                   # which capabilities each role holds
+  nurse: [patient.find, vitals.record, ...]
+
 operations: [phc.op.patient-register, ...]   # ids in catalogue/ops
 workflows: [phc.wf.outpatient]
 views: [...]
@@ -36,9 +46,21 @@ metrics: [...]
 ```
 
 All five lists are required, and every id listed must exist, and every
-declaration file in the directory must be listed. Role bundles (which
-capabilities a nurse holds) stay in `vocab.BUNDLES` for now. Compiles to
+declaration file in the directory must be listed. Compiles to
 `catalogue.json["manifest"]`.
+
+The four vocabulary keys are required too, and they are this bundle's whole
+world: `catalogue.vocab.for_bundle(id)` reads them, and
+`kernel/declarations.py` checks closure over them. Every operation the
+manifest lists must hold a capability, a station, preconditions and emits that
+are all in these lists, or the build fails. That is what stops a laboratory
+borrowing a primary health centre's words, which is how a released report came
+to be called `dispensed.complete`; see `bundles/LAB-LOG.md`.
+
+A role holding a capability the bundle does not declare is also a build
+failure. `catalogue/ops/*.md` is shared between bundles, so `catalogue/build.py`
+lints an atom against the union of every bundle's vocabulary (`vocab.every()`)
+and the per bundle closure above is what actually bites.
 
 ## The query grammar
 
@@ -72,6 +94,31 @@ surfaces, verified`, plus `mapping` on a `kind: write` operation. Optional:
 `instrument` on an operation is its default capture method. Instrument
 declarations (section 4) add accelerators on top of it.
 
+### Preconditions: flags, and who acted
+
+A precondition is a flag from the bundle's `states`, optionally `not ` prefixed.
+There is one other form:
+
+```yaml
+preconditions:
+  - result.entered
+  - not result.verified
+  - not actor of lab.op.result-enter     # separation of duties
+```
+
+`actor of <operation id>` is true when the caller has already performed that
+operation on this thread. The kernel reads the thread's own audit trail for
+the answer (`kernel/state.performers`) and hands it to the guard, which
+evaluates it on both surfaces. It fails closed: a caller that does not say who
+it is gets a denial, never a pass. `catalogue/guard.visible` uses the same
+predicate, so where the actor is known the action is absent rather than
+refused on tap; where it is not, the action is drawn and the tap is refused
+with the reason.
+
+Lint refuses an `actor of` naming an operation that does not exist, or one the
+bundle does not load, because a rule that can never fire reads like a
+protection and is not one.
+
 ### The mapping: which answer becomes which column
 
 `writes` says which resources a payload becomes. `mapping` says which answer
@@ -86,6 +133,7 @@ mapping:
     - resource: observation            # must be one of writes
       per_question: [systolic, diastolic, pulse]   # one row per answered question
       fields:
+        created_by: {actor: id}          # required: every row says who wrote it
         category: {const: vital-signs}
         code: {question: link_id}
         value: {question: answer}
@@ -109,6 +157,7 @@ A field's value is a single key source:
 | `{joined: [<link_id>]}` | non empty answers joined with a space |
 | `{note: [<link_id>]}` | non empty answers as labelled paragraphs |
 | `{json: payload}` | the whole payload as sorted JSON |
+| `{actor: id}` | who is performing this operation |
 
 `{question: unit}` reads `styling_metadata.phc.unit` from the questionnaire,
 which is why no adapter repeats a unit: it is written once, next to the range
@@ -124,7 +173,14 @@ Lint refuses, and every one of these is a build failure and not a warning:
   no unit;
 - a required question that is neither mapped nor listed under `ignored`. An
   answer with nowhere to go is a clinical value dropped in silence, so
-  dropping one has to be written down.
+  dropping one has to be written down;
+- a record with no `{actor: id}` field. Every row says who wrote it. A row
+  with a null author is why "the same person must not verify their own
+  result" could be declared nowhere and enforced nowhere.
+
+`{actor: id}` and `{const: ...}` do not read the payload, so a record made
+only of them is still written every time, and an unanswered form is still no
+row rather than a row carrying only its author.
 
 A record whose fields are all `const` is written every time. A record with any
 answer derived field is written only when one of them produced a value, so an
@@ -151,13 +207,13 @@ The order operations happen in, and how each state flag is derived. This is
 | `id, type, title, summary` | yes | `type: workflow` |
 | `subject` | yes | the resource a thread is about; `encounter` today |
 | `steps` | yes | ordered list, see below |
-| `states` | yes | ordered map, flag to rule; must cover every `vocab.STATES` entry |
+| `states` | yes | ordered map, flag to rule; must cover the bundle's `states` exactly |
 
 A step:
 
 | field | required | value |
 |---|---|---|
-| `station` | yes | `vocab.STATIONS` |
+| `station` | yes | one of the bundle's `stations` |
 | `done_when` | yes | a flag; the step is done once it is true |
 | `applies_when` | no | a flag; while it is false the step is skipped, not pending |
 | `operations` | yes | op ids drawn at this station, in the order to offer them; each op's own `station` must match |
@@ -226,7 +282,7 @@ A queue, summary or dashboard declared as a query. The renderer draws each
 |---|---|---|
 | `id, type, title, summary` | yes | `type: view` |
 | `kind` | yes | `queue`, `summary`, `dashboard` |
-| `capability` | yes | `vocab.CAPABILITIES`; who may open it |
+| `capability` | yes | one of the bundle's `capabilities`; who may open it |
 | `workflow` | queue, summary | a workflow id |
 
 Queue fields: `scope` (`today`, `open`, `all`; default `today`), `group_by`

@@ -20,13 +20,16 @@ mapping:
   records:
     - resource: encounter
       fields:
+        created_by: {actor: id}
         status: {const: in_progress}
     - resource: notes
       fields:
+        created_by: {actor: id}
         text: {note: [history, examination, assessment, plan]}
     - resource: condition
       per_item: diagnosis
       fields:
+        created_by: {actor: id}
         code: {item: [code, text]}
         verification_status: {const: confirmed}
 emits: [consult.documented]

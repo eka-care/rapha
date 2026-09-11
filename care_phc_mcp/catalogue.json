@@ -65,10 +65,30 @@
       "assessment.record",
       "handover"
     ],
+    "pathologist": [
+      "worklist.read",
+      "result.verify",
+      "report.release",
+      "reporting.view"
+    ],
     "pharmacist": [
       "patient.find",
       "pharmacy.dispense",
       "handover"
+    ],
+    "phlebotomist": [
+      "worklist.read",
+      "order.accession",
+      "specimen.collect"
+    ],
+    "senior_technologist": [
+      "worklist.read",
+      "result.enter",
+      "result.verify"
+    ],
+    "technologist": [
+      "worklist.read",
+      "result.enter"
     ]
   },
   "capabilities": [
@@ -81,13 +101,19 @@
     "lab.order",
     "lab.result.enter",
     "lab.result.validate",
+    "order.accession",
     "patient.find",
     "patient.register",
     "pharmacy.dispense",
+    "report.release",
     "reporting.view",
+    "result.enter",
+    "result.verify",
     "rx.prescribe",
+    "specimen.collect",
     "visit.household",
-    "vitals.record"
+    "vitals.record",
+    "worklist.read"
   ],
   "instruments": {
     "phc.inst.consult-scribe": {
@@ -263,11 +289,10 @@
   },
   "operations": {
     "lab.op.referral-accession": {
-      "capability": "patient.register",
-      "description": "Somebody outside this laboratory asked for a test. The front desk records who\nthe patient is, who asked, and which panel. Nothing clinical is asserted yet.",
+      "capability": "order.accession",
+      "description": "Somebody outside this laboratory asked for a test. The accession desk records\nwho the patient is, who asked, and which panel. Nothing clinical is asserted\nyet.",
       "emits": [
-        "registered",
-        "lab.ordered"
+        "order.accessioned"
       ],
       "fields": [
         {
@@ -333,11 +358,11 @@
       "irreversibility": "reversible",
       "kind": "write",
       "preconditions": [
-        "not registered"
+        "not order.accessioned"
       ],
       "scope_qualifier": null,
       "short": "Accession",
-      "station": "reception",
+      "station": "accession",
       "summary": "Register the person a referring clinician sent, and the panel they asked for, so the laboratory has a subject and an order to work against.\n",
       "surfaces": [
         "rendered",
@@ -354,10 +379,10 @@
       ]
     },
     "lab.op.report-release": {
-      "capability": "lab.result.validate",
+      "capability": "report.release",
       "description": "The report goes to the referrer. A released result is acted on by somebody\nthis laboratory cannot reach, so the release is irreversible: an agent\ncannot propose it and a person has to tap an un-prefilled confirm.",
       "emits": [
-        "dispensed.complete"
+        "report.released"
       ],
       "fields": [
         {
@@ -392,12 +417,12 @@
       "irreversibility": "irreversible",
       "kind": "write",
       "preconditions": [
-        "lab.validated",
-        "not dispensed.complete"
+        "result.verified",
+        "not report.released"
       ],
       "scope_qualifier": null,
       "short": "Release",
-      "station": "doctor",
+      "station": "release",
       "summary": "Send the verified result out of the laboratory to the clinician who ordered it. Once it has left, it has left.\n",
       "surfaces": [
         "rendered",
@@ -412,10 +437,10 @@
       ]
     },
     "lab.op.result-enter": {
-      "capability": "lab.result.enter",
+      "capability": "result.enter",
       "description": "A number per analyte. Each analyte carries three bands on its own question:\na plausible band that blocks the write, a critical band that raises\n`lab.critical`, and a reference interval that is written down but that\nnothing in the kernel reads.",
       "emits": [
-        "lab.resulted",
+        "result.entered",
         "lab.critical"
       ],
       "fields": [
@@ -492,12 +517,12 @@
       "irreversibility": "correctable",
       "kind": "write",
       "preconditions": [
-        "vitals.recorded",
-        "not lab.resulted"
+        "specimen.collected",
+        "not result.entered"
       ],
       "scope_qualifier": null,
       "short": "Result",
-      "station": "lab",
+      "station": "processing",
       "summary": "The technologist keys or accepts from the analyser one value per analyte, each checked against its own plausible band and its own critical band.\n",
       "surfaces": [
         "rendered",
@@ -513,10 +538,11 @@
       ]
     },
     "lab.op.result-verify": {
-      "capability": "lab.result.validate",
-      "description": "A second person, holding a capability the first does not, says the result is\nright. This is the separation of duties a laboratory runs on.",
+      "capability": "result.verify",
+      "description": "A second person says the result is right. This is the separation of duties a\nlaboratory runs on, and it is the reason this operation exists as its own\nstep rather than as a checkbox on the result form.",
       "emits": [
-        "lab.validated"
+        "result.verified",
+        "result.rejected"
       ],
       "fields": [
         {
@@ -543,13 +569,14 @@
       "irreversibility": "correctable",
       "kind": "write",
       "preconditions": [
-        "lab.resulted",
-        "not lab.validated"
+        "result.entered",
+        "not result.verified",
+        "not actor of lab.op.result-enter"
       ],
       "scope_qualifier": null,
       "short": "Verify",
-      "station": "doctor",
-      "summary": "The pathologist reads the entered values and either verifies the result or rejects it. Only a verified result can be released.\n",
+      "station": "verification",
+      "summary": "A second pair of eyes reads the entered values and either verifies the result or rejects it. Only a verified result can be released.\n",
       "surfaces": [
         "rendered",
         "mcp"
@@ -564,10 +591,10 @@
       ]
     },
     "lab.op.specimen-collect": {
-      "capability": "assessment.record",
+      "capability": "specimen.collect",
       "description": "The sample is drawn and labelled. From here the specimen, not the person, is\nwhat moves through the laboratory.",
       "emits": [
-        "vitals.recorded"
+        "specimen.collected"
       ],
       "fields": [
         {
@@ -602,18 +629,18 @@
       "irreversibility": "correctable",
       "kind": "write",
       "preconditions": [
-        "lab.ordered",
-        "not vitals.recorded"
+        "order.accessioned",
+        "not specimen.collected"
       ],
       "scope_qualifier": null,
       "short": "Collect",
-      "station": "nurse",
+      "station": "phlebotomy",
       "summary": "The phlebotomist records that the sample was drawn, what it is and what it is in, so the bench can start.\n",
       "surfaces": [
         "rendered",
         "mcp"
       ],
-      "title": "Collect and accession a specimen",
+      "title": "Collect and label a specimen",
       "tool": "propose_specimen_collect",
       "type": "operation",
       "verified": "unverified",
@@ -1185,8 +1212,14 @@
     "lab.ordered",
     "lab.resulted",
     "lab.validated",
+    "order.accessioned",
     "registered",
+    "report.released",
+    "result.entered",
+    "result.rejected",
+    "result.verified",
     "rx.confirmed",
+    "specimen.collected",
     "vitals.flagged",
     "vitals.recorded"
   ],

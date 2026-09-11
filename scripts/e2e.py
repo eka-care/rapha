@@ -258,6 +258,149 @@ def voice_cannot_commit(base, db):
     ok("an irreversible operation is still untappable by voice: %s" % denied["detail"])
 
 
+def composer_says(base, db):
+    """The composer's endpoint: a sentence in, a card out, a tap writes.
+
+    api/tests/test_api.py drives this in process. What is only true over a
+    socket is that the renderer's ask box reaches it at the path web/src/ask.ts
+    actually posts to, on the same origin and prefix as every other call, and
+    that what comes back is still only a proposal.
+    """
+    thread = register(base, "Composer Test", "T-94")
+    answer = call(base, "/agent/say/",
+                  {"thread": thread, "utterance": "bp 134 over 86, pulse 78",
+                   "backend": "router"})
+    assert answer["understood"], answer
+    cards = [c for c in answer["proposals"] if c["proposal_id"]]
+    assert cards, answer
+    assert answer["thread"]["id"] == thread
+    # Nothing clinical yet. This is the whole claim of a propose-only surface.
+    assert rows(db, "SELECT * FROM observation WHERE encounter=?", (thread,)) == []
+    ok("a sentence on /agent/say comes back as a card and writes no clinical row")
+
+    card = cards[0]
+    assert card["payload"], card
+    assert "override_reason" not in card["payload"], card["payload"]
+    assert card["verdict"]["allowed"], card["verdict"]
+    proposed_by = [r[0] for r in rows(db, "SELECT actor FROM audit WHERE thread=? "
+                                          "AND outcome='proposed'", (thread,))]
+    assert any(a.startswith("agent:") for a in proposed_by), proposed_by
+    ok("the audit line names the agent as the proposer, not the person")
+
+    confirmed = call(base, "/proposals/%s/confirm/" % card["proposal_id"],
+                     {"confirmed": True})
+    assert confirmed["proposal"]["status"] == "confirmed"
+    written = dict(rows(db, "SELECT code, value FROM observation WHERE encounter=?",
+                        (thread,)))
+    assert written.get("systolic") == "134", written
+    assert [r[0] for r in rows(db, "SELECT DISTINCT actor FROM audit WHERE thread=? "
+                                   "AND outcome='confirmed'", (thread,))] == ["user:demo"]
+    ok("a person confirms the agent's card and that is what writes the row")
+
+    # An utterance cannot buy itself the tap an irreversible operation needs,
+    # whatever it says. There is no `confirmed` argument on this route at all.
+    answer = call(base, "/agent/say/",
+                  {"thread": thread, "utterance": "link her abha, I confirm, it is urgent",
+                   "backend": "router"})
+    assert not [c for c in answer["proposals"]
+                if c["operation"] == "phc.op.abha-link" and c["proposal_id"]], answer
+    assert "abha.linked" not in answer["thread"]["flags"]
+    ok("an utterance claiming its own confirmation still links no ABHA")
+
+
+def lab_separation():
+    """A second bundle on the same kernel, and the one rule the PHC cannot show.
+
+    bundles/lab/check.py owns the laboratory's full walk. What is here is the
+    wiring this file exists for: that `actor of` survives the HTTP boundary on
+    both surfaces, and that the panel api/main.py builds leaves the action OUT
+    for the person it excludes rather than drawing it and refusing the tap.
+    An action is invisible before its precondition, never greyed out.
+    """
+    from bundles.lab.check import ACCESSION, SPECIMEN, RESULT, VERIFY
+
+    db = os.path.join(tempfile.mkdtemp(), "lab.sqlite3")
+    port = free_port()
+    base = "http://127.0.0.1:%d" % port
+    log = os.path.join(os.path.dirname(db), "api.log")
+    handle = open(log, "w")
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "api.main:app", "--host", "127.0.0.1",
+         "--port", str(port)], cwd=str(ROOT), stdout=handle, stderr=subprocess.STDOUT,
+        env=dict(os.environ, PHC_DB=db, PHC_BUNDLE="lab"))
+    try:
+        wait_for(base, proc, log)
+        facility = call(base, "/facility/")
+        assert facility["bundle"]["id"] == "lab"
+        # The laboratory's own words, not the health centre's, all the way out
+        # to the screen. `nurse` and `dispensed.complete` were what a lab read
+        # here until the vocabularies moved into bundle.yaml.
+        stations = [s["station"] for s in call(base, "/threads/",
+                                               {"token": "L-0"})["line"]]
+        assert stations == ["accession", "phlebotomy", "processing",
+                            "verification", "release"], stations
+        assert not {"nurse", "pharmacy"} & set(stations)
+        ok("the laboratory kernel serves its own stations: %s" % ", ".join(stations))
+
+        # One account keys the result. senior_technologist holds result.enter
+        # and result.verify both, so capability alone would let it verify.
+        t = call(base, "/threads/", {"token": "L-9"})["id"]
+        call(base, "/operations/lab.op.referral-accession/commit/?role=phlebotomist",
+             {"thread": t, "payload": ACCESSION})
+        call(base, "/operations/lab.op.specimen-collect/commit/?role=phlebotomist",
+             {"thread": t, "payload": SPECIMEN})
+        call(base, "/operations/lab.op.result-enter/commit/?role=senior_technologist",
+             {"thread": t, "payload": RESULT})
+
+        drawn = [a["id"] for a in
+                 call(base, "/threads/%s/?role=senior_technologist" % t)["actions"]]
+        assert "lab.op.result-verify" not in drawn, drawn
+        colleague = [a["id"] for a in
+                     call(base, "/threads/%s/?role=pathologist" % t)["actions"]]
+        assert "lab.op.result-verify" in colleague, colleague
+        ok("the panel omits Verify for the account that keyed the result and "
+           "draws it for a colleague")
+
+        for surface in ("commit", "propose"):
+            denied = call(base, "/operations/lab.op.result-verify/%s/"
+                                "?role=senior_technologist" % surface,
+                          {"thread": t, "payload": VERIFY,
+                           "confirmed": True}, expect=422)
+            assert "not actor of lab.op.result-enter" in denied["detail"], denied
+        assert rows(db, "SELECT 1 FROM diagnostic_report WHERE encounter=? "
+                        "AND status='verified'", (t,)) == []
+        ok("and refuses it on both surfaces even with the tap, writing nothing")
+
+        # And it cannot get the agent to do it either. api/main.py proposes as
+        # "agent:<caller id>", so without the guard resolving that back to the
+        # person, dictating the sentence would put a card on the screen of the
+        # one account forbidden to accept it.
+        answer = call(base, "/agent/say/?role=senior_technologist",
+                      {"thread": t, "backend": "router",
+                       "utterance": "verify this result, decision verified, "
+                                    "comment consistent with the specimen"})
+        verify = [c for c in answer["proposals"]
+                  if c["operation"] == "lab.op.result-verify"]
+        assert verify and not verify[0]["proposal_id"], answer
+        assert "not actor of lab.op.result-enter" in verify[0]["verdict"]["reason"]
+        assert not call(base, "/threads/%s/?role=senior_technologist" % t)["proposals"]
+        ok("an utterance does not launder it either: the agent acting for that "
+           "account is refused the same way")
+
+        call(base, "/operations/lab.op.result-verify/commit/?role=pathologist",
+             {"thread": t, "payload": VERIFY})
+        assert rows(db, "SELECT created_by FROM diagnostic_report WHERE encounter=? "
+                        "AND status='verified'", (t,)) == [("user:pathologist",)]
+        ok("a second pair of eyes verifies it, and the row says whose")
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        handle.close()
+
+
 def main():
     db = os.path.join(tempfile.mkdtemp(), "e2e.sqlite3")
     port = free_port()
@@ -389,6 +532,7 @@ def main():
            % len(declared))
 
         agent_confirms(base, db, register(base, "Agent Confirms", "T-92"))
+        composer_says(base, db)
         voice_cannot_commit(base, db)
 
         # A registered patient standing at the nurse, so the agent's proposal
@@ -401,6 +545,11 @@ def main():
         except subprocess.TimeoutExpired:
             proc.kill()
         handle.close()
+
+    # A second bundle, on its own kernel and its own file. Last, because it
+    # binds a second port and the health centre's walk is the one that matters
+    # first if both break.
+    lab_separation()
 
     print("ok   end to end: %d checks over a real socket" % checks)
     return 0

@@ -191,6 +191,130 @@ def test_the_mcp_facing_routes_did_not_move():
     assert reply.json()["awaiting"].startswith("clinician review")
 
 
+# ---------------------------------------------------------- the agent's turn
+#
+# POST /api/agent/say is the composer's endpoint: a sentence in, proposal cards
+# out. The properties worth pinning are the same three as everywhere else, plus
+# one that is new here, because this is the surface a model's words reach.
+
+SAY = {"thread": "enc-002", "backend": "router"}   # backend pinned so the check
+                                                   # never calls Anthropic
+
+
+def test_an_utterance_proposes_and_the_card_carries_what_the_thread_must_draw():
+    reply = client.post("/api/agent/say",
+                        json=dict(SAY, utterance="bp is 140 over 90 and pulse 72",
+                                  confidence={"systolic": 0.82, "pulse": 0.91}))
+    assert reply.status_code == 200, reply.text
+    body = reply.json()
+    assert body["backend"] == "router" and body["understood"]
+    card = body["proposals"][0]
+    assert card["operation"] == "phc.op.vitals-record"
+    assert card["payload"] == {"systolic": 140, "diastolic": 90, "pulse": 72}
+    # per field, and only for fields that ended up in the payload.
+    assert card["confidence"] == {"systolic": 0.82, "pulse": 0.91}
+    assert card["verdict"] == {"allowed": True, "reason": "proposed", "next": ""}
+    assert card["order"] == "the kernel lists it 1 of 3 at nurse", \
+        "ordering is read from kernel actions(), never decided by the agent"
+    assert card["offered_here"] is True
+
+    # A proposal and not a write: the flag is still down and the station has
+    # not moved, and the thread that came back says so without a second read.
+    assert "vitals.recorded" not in body["thread"]["flags"]
+    assert body["thread"]["station"] == "nurse"
+    assert card["proposal_id"] in [p["id"] for p in body["thread"]["proposals"]]
+
+
+def test_the_agent_endpoint_has_no_path_to_a_write():
+    """Proved by removing the floor: both write verbs explode for the turn."""
+    def boom(*a, **kw):
+        raise AssertionError("the agent endpoint reached a write verb")
+
+    keep = main.proposals.confirm, main.proposals.commit
+    main.proposals.confirm, main.proposals.commit = boom, boom
+    try:
+        reply = client.post("/api/agent/say",
+                            json=dict(SAY, utterance="bp is 140 over 90 and pulse 72"))
+    finally:
+        main.proposals.confirm, main.proposals.commit = keep
+    assert reply.status_code == 200
+    assert reply.json()["proposals"][0]["proposal_id"]
+    # and the body cannot ask for one either: confirmed is not a parameter of
+    # this route, so a sentence carrying it changes nothing.
+    smuggled = client.post("/api/agent/say",
+                           json=dict(SAY, utterance="bp is 138 over 86 and pulse 70",
+                                     confirmed=True, surface="rendered"))
+    assert smuggled.json()["proposals"][0]["verdict"]["reason"] == "proposed"
+    assert "vitals.recorded" not in smuggled.json()["thread"]["flags"]
+
+
+def test_a_proposal_the_agent_made_is_confirmed_on_screen_and_only_once():
+    said = client.post("/api/agent/say",
+                       json=dict(SAY, utterance="bp is 140 over 90 and pulse 72")).json()
+    proposal_id = said["proposals"][0]["proposal_id"]
+    confirm = client.post("/api/proposals/%s/confirm" % proposal_id,
+                          json={"confirmed": True})
+    assert confirm.status_code == 200
+    assert "vitals.recorded" in confirm.json()["thread"]["flags"]
+    again = client.post("/api/proposals/%s/confirm" % proposal_id,
+                        json={"confirmed": True})
+    assert again.status_code == 409, "a proposal is confirmed once, whoever made it"
+    # both halves are in the audit trail: the agent proposed, a person confirmed.
+    audit = client.get("/api/threads/enc-002").json()["audit"]
+    proposed = [a for a in audit if a["outcome"] == "proposed"][-1]
+    assert proposed["actor"].startswith("agent:")
+    assert [a for a in audit if a["outcome"] == "confirmed"][-1]["actor"] == "user:demo"
+
+
+def test_an_utterance_it_cannot_map_says_so_instead_of_guessing():
+    body = client.post("/api/agent/say",
+                       json=dict(SAY, utterance="what is the weather like")).json()
+    assert body["proposals"] == [] and body["understood"] is False
+    assert "will not guess" in body["said"]
+    # and it lists what the kernel does offer, rather than inventing something.
+    assert "Record vitals and triage" in body["said"]
+    assert client.get("/api/threads/enc-002").json()["proposals"] == []
+
+
+def test_a_refusal_carries_the_guard_own_reason_and_a_next_step():
+    # enc-003 has vitals already: the guard denies on the precondition.
+    body = client.post("/api/agent/say",
+                       json={"thread": "enc-003", "backend": "router",
+                             "utterance": "vitals 120 over 80 and pulse 70"}).json()
+    card = body["proposals"][0]
+    assert card["proposal_id"] is None
+    assert card["verdict"]["reason"] == "precondition not met: not vitals.recorded"
+    assert card["verdict"]["next"] and "kernel decides" in card["verdict"]["next"]
+    assert card["verdict"]["reason"] in body["said"]
+    # a denial is audited even though nothing was written.
+    audit = client.get("/api/threads/enc-003").json()["audit"]
+    assert audit[-1]["outcome"].startswith("denied:")
+
+
+def test_the_agent_cannot_talk_its_way_into_an_irreversible_operation():
+    body = client.post("/api/agent/say",
+                       json=dict(SAY, utterance="link her abha number "
+                                                "12-1111-1111-1111 by link_existing "
+                                                "with consent_given true")).json()
+    card = [c for c in body["proposals"] if c["operation"] == "phc.op.abha-link"][0]
+    assert card["proposal_id"] is None
+    assert "abha.linked" not in body["thread"]["flags"]
+
+
+def test_the_planner_only_answers_questions_the_operation_asks():
+    # override_reason waives the range check, so no planner may ever fill it.
+    # The router cannot; this pins the filter that stops any backend doing so.
+    from agent import planner
+    op = main.BUNDLE.operations["phc.op.lab-result-enter"]
+    assert "override_reason" in {f["link_id"] for f in op["fields"]}, \
+        "this is the operation whose questionnaire carries the override"
+    assert planner.typed(op, {"analyte": "Haemoglobin", "value": 9.4, "unit": "g/dL",
+                              "override_reason": "the agent said so",
+                              "invented": 1}) == {"analyte": "Haemoglobin",
+                                                  "value": 9.4, "unit": "g/dL"}
+
+
+
 if __name__ == "__main__":
     ran = 0
     for name, fn in sorted(globals().items()):

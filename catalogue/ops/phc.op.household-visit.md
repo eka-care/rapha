@@ -20,9 +20,11 @@ mapping:
   records:
     - resource: encounter
       fields:
+        created_by: {actor: id}
         status: {const: in_progress}
     - resource: questionnaire_response
       fields:
+        created_by: {actor: id}
         questionnaire: {const: phc.schema.household-visit-v1}
         payload: {json: payload}
 emits: [consult.documented]

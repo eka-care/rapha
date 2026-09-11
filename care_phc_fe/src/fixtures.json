@@ -466,44 +466,8 @@
             "kind": "write"
           }
         ],
-        "lab": [
-          {
-            "id": "lab.op.result-enter",
-            "tool": "propose_result_enter",
-            "short": "Result",
-            "title": "Enter panel results",
-            "summary": "The technologist keys or accepts from the analyser one value per analyte, each checked against its own plausible band and its own critical band.\n",
-            "station": "lab",
-            "capability": "lab.result.enter",
-            "instrument": "form",
-            "irreversibility": "correctable",
-            "verified": "unverified",
-            "preconditions": [
-              "vitals.recorded",
-              "not lab.resulted"
-            ],
-            "kind": "write"
-          }
-        ],
-        "lab_incharge": [
-          {
-            "id": "lab.op.result-enter",
-            "tool": "propose_result_enter",
-            "short": "Result",
-            "title": "Enter panel results",
-            "summary": "The technologist keys or accepts from the analyser one value per analyte, each checked against its own plausible band and its own critical band.\n",
-            "station": "lab",
-            "capability": "lab.result.enter",
-            "instrument": "form",
-            "irreversibility": "correctable",
-            "verified": "unverified",
-            "preconditions": [
-              "vitals.recorded",
-              "not lab.resulted"
-            ],
-            "kind": "write"
-          }
-        ],
+        "lab": [],
+        "lab_incharge": [],
         "pharmacist": [],
         "asha": [
           {
@@ -738,44 +702,8 @@
             "kind": "write"
           }
         ],
-        "lab": [
-          {
-            "id": "lab.op.result-enter",
-            "tool": "propose_result_enter",
-            "short": "Result",
-            "title": "Enter panel results",
-            "summary": "The technologist keys or accepts from the analyser one value per analyte, each checked against its own plausible band and its own critical band.\n",
-            "station": "lab",
-            "capability": "lab.result.enter",
-            "instrument": "form",
-            "irreversibility": "correctable",
-            "verified": "unverified",
-            "preconditions": [
-              "vitals.recorded",
-              "not lab.resulted"
-            ],
-            "kind": "write"
-          }
-        ],
-        "lab_incharge": [
-          {
-            "id": "lab.op.result-enter",
-            "tool": "propose_result_enter",
-            "short": "Result",
-            "title": "Enter panel results",
-            "summary": "The technologist keys or accepts from the analyser one value per analyte, each checked against its own plausible band and its own critical band.\n",
-            "station": "lab",
-            "capability": "lab.result.enter",
-            "instrument": "form",
-            "irreversibility": "correctable",
-            "verified": "unverified",
-            "preconditions": [
-              "vitals.recorded",
-              "not lab.resulted"
-            ],
-            "kind": "write"
-          }
-        ],
+        "lab": [],
+        "lab_incharge": [],
         "pharmacist": [
           {
             "id": "phc.op.pharmacy-dispense",
@@ -1012,23 +940,6 @@
         ],
         "lab": [
           {
-            "id": "lab.op.result-enter",
-            "tool": "propose_result_enter",
-            "short": "Result",
-            "title": "Enter panel results",
-            "summary": "The technologist keys or accepts from the analyser one value per analyte, each checked against its own plausible band and its own critical band.\n",
-            "station": "lab",
-            "capability": "lab.result.enter",
-            "instrument": "form",
-            "irreversibility": "correctable",
-            "verified": "unverified",
-            "preconditions": [
-              "vitals.recorded",
-              "not lab.resulted"
-            ],
-            "kind": "write"
-          },
-          {
             "id": "phc.op.lab-result-enter",
             "tool": "propose_lab_result_enter",
             "short": "Result",
@@ -1047,23 +958,6 @@
           }
         ],
         "lab_incharge": [
-          {
-            "id": "lab.op.result-enter",
-            "tool": "propose_result_enter",
-            "short": "Result",
-            "title": "Enter panel results",
-            "summary": "The technologist keys or accepts from the analyser one value per analyte, each checked against its own plausible band and its own critical band.\n",
-            "station": "lab",
-            "capability": "lab.result.enter",
-            "instrument": "form",
-            "irreversibility": "correctable",
-            "verified": "unverified",
-            "preconditions": [
-              "vitals.recorded",
-              "not lab.resulted"
-            ],
-            "kind": "write"
-          },
           {
             "id": "phc.op.lab-result-enter",
             "tool": "propose_lab_result_enter",
@@ -1262,44 +1156,8 @@
             "kind": "write"
           }
         ],
-        "lab": [
-          {
-            "id": "lab.op.result-enter",
-            "tool": "propose_result_enter",
-            "short": "Result",
-            "title": "Enter panel results",
-            "summary": "The technologist keys or accepts from the analyser one value per analyte, each checked against its own plausible band and its own critical band.\n",
-            "station": "lab",
-            "capability": "lab.result.enter",
-            "instrument": "form",
-            "irreversibility": "correctable",
-            "verified": "unverified",
-            "preconditions": [
-              "vitals.recorded",
-              "not lab.resulted"
-            ],
-            "kind": "write"
-          }
-        ],
-        "lab_incharge": [
-          {
-            "id": "lab.op.result-enter",
-            "tool": "propose_result_enter",
-            "short": "Result",
-            "title": "Enter panel results",
-            "summary": "The technologist keys or accepts from the analyser one value per analyte, each checked against its own plausible band and its own critical band.\n",
-            "station": "lab",
-            "capability": "lab.result.enter",
-            "instrument": "form",
-            "irreversibility": "correctable",
-            "verified": "unverified",
-            "preconditions": [
-              "vitals.recorded",
-              "not lab.resulted"
-            ],
-            "kind": "write"
-          }
-        ],
+        "lab": [],
+        "lab_incharge": [],
         "pharmacist": [],
         "asha": [
           {

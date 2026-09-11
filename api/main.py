@@ -35,6 +35,7 @@ from fastapi import APIRouter, Body, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from adapters.local.store import SqliteStore, seed
+from agent import turn
 from catalogue import vocab
 from kernel import declarations, proposals, state, views
 from kernel.contracts import ThreadRef
@@ -104,8 +105,12 @@ def ref_or_404(thread: str) -> ThreadRef:
 
 
 def panel(thread: str, user: dict) -> dict:
+    # The caller's id, not just their capabilities: an action whose
+    # precondition names an actor ("not actor of lab.op.result-enter") is then
+    # ABSENT for the person it excludes rather than drawn and refused on the
+    # tap. Invisible before its precondition, never greyed out.
     view = state.thread_view(store, ref_or_404(thread), WORKFLOW, BUNDLE.operations,
-                             caps=set(user["capabilities"]))
+                             caps=set(user["capabilities"]), actor=user["id"])
     return dict(view.to_json(), nudge=_nudge(view))
 
 
@@ -284,6 +289,50 @@ def confirm(proposal_id: str, request: Request, body: dict = Body(default={})):
         confirmed=bool(body.get("confirmed")))
     allowed_or_422(decision)
     return {"proposal": asdict(decided), "thread": panel(proposal.thread, user)}
+
+
+@router.post("/agent/say")
+def say(request: Request, body: dict = Body(default={})):
+    """A sentence in, proposals out. Body: thread, utterance, confidence, backend.
+
+    This is the composer's endpoint, and it is a propose-only surface. It calls
+    agent.turn, which calls the planner in agent/ and then this module's own
+    propose path: kernel.proposals.propose, which takes no confirmed argument
+    and runs the guard on guard.MCP. So the worst an utterance can do is put a
+    card in front of a person. There is no branch here that reaches confirm or
+    commit, and api/tests/test_api.py proves it by making both explode for the
+    duration of a turn.
+
+    `confidence` is the recogniser's per-field map when the utterance was
+    dictated (packages/voice emits link_id -> 0..1). Nothing on this side
+    recognises anything, so a typed utterance carries no confidences rather
+    than a fabricated one.
+
+    `backend` pins the planner for a check; left out it is the llm when
+    ANTHROPIC_API_KEY is set and the deterministic router otherwise.
+    """
+    user = caller(request)
+    thread = thread_of(body)
+    actor = "agent:%s" % user["id"]
+
+    def propose_one(op_id, payload):
+        """(proposal_id | None, the guard's reason, flags raised)."""
+        if op_id not in BUNDLE.operations:
+            return None, "unknown operation %r" % op_id, []
+        decision, proposal = proposals.propose(
+            store, BUNDLE, op_id, thread=thread, payload=payload,
+            caps=set(user["capabilities"]), scopes=set(user["scopes"]), actor=actor)
+        return ((proposal.id if proposal else None), decision.reason,
+                proposal.flags_raised if proposal else [])
+
+    answer = turn.take(
+        str(body.get("utterance") or ""),
+        catalogue=catalogue(),  # the same declarations every other caller plans against
+        view=panel(thread, user), propose=propose_one,
+        confidence=body.get("confidence") or {}, which=body.get("backend"))
+    # The thread as it stands after the turn, so the renderer draws the new
+    # pending cards without a second read. Still pending: see every verdict.
+    return dict(answer, thread=panel(thread, user))
 
 
 @router.post("/proposals/{proposal_id}/reject")

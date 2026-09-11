@@ -7,13 +7,13 @@ title: Release the verified report to the referrer
 summary: >
   Send the verified result out of the laboratory to the clinician who ordered
   it. Once it has left, it has left.
-capability: lab.result.validate
+capability: report.release
 scope_qualifier: null
-station: doctor
+station: release
 instrument: form
 preconditions:
-  - lab.validated
-  - not dispensed.complete
+  - result.verified
+  - not report.released
 irreversibility: irreversible
 input: lab.schema.release-v1
 writes: [questionnaire_response]
@@ -21,9 +21,10 @@ mapping:
   records:
     - resource: questionnaire_response
       fields:
+        created_by: {actor: id}
         questionnaire: {const: lab.schema.release-v1}
         payload: {json: payload}
-emits: [dispensed.complete]
+emits: [report.released]
 surfaces: [rendered, mcp]
 verified:
   status: unverified
@@ -41,14 +42,13 @@ cannot propose it and a person has to tap an un-prefilled confirm.
 
 ## Before you start
 
-The result must be verified and not yet released. You need
-`lab.result.validate`.
+The result must be verified and not yet released. You need `report.release`,
+which the pathologist holds.
 
 ## What happens
 
-The release form is kept whole as a questionnaire response. The flag it
-raises is called `dispensed.complete`, the free slot in the closed vocabulary
-that means something leaving the building. The thread's line is then
+The release form is kept whole as a questionnaire response, carrying whoever
+released it, and `report.released` goes true. The specimen's line is then
 complete.
 
 ## How you know it worked

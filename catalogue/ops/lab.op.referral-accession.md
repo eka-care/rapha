@@ -7,12 +7,12 @@ title: Accession a referred patient and their order
 summary: >
   Register the person a referring clinician sent, and the panel they asked
   for, so the laboratory has a subject and an order to work against.
-capability: patient.register
+capability: order.accession
 scope_qualifier: null
-station: reception
+station: accession
 instrument: form
 preconditions:
-  - not registered
+  - not order.accessioned
 irreversibility: reversible
 input: lab.schema.accession-v1
 writes: [patient, service_request, questionnaire_response]
@@ -20,12 +20,14 @@ mapping:
   records:
     - resource: patient
       fields:
+        created_by: {actor: id}
         name: {answer: name}
         age: {answer: age}
         sex: {answer: sex}
         phone: {answer: phone}
     - resource: service_request
       fields:
+        created_by: {actor: id}
         code: {answer: panel}
         status: {const: active}
     # The referring clinician does not work here and no CARE column on this
@@ -33,9 +35,10 @@ mapping:
     # questionnaire_response and the report view shows it from there.
     - resource: questionnaire_response
       fields:
+        created_by: {actor: id}
         questionnaire: {const: lab.schema.accession-v1}
         payload: {json: payload}
-emits: [registered, lab.ordered]
+emits: [order.accessioned]
 surfaces: [rendered, mcp]
 verified:
   status: unverified
@@ -47,23 +50,25 @@ related:
 
 ## In plain words
 
-Somebody outside this laboratory asked for a test. The front desk records who
-the patient is, who asked, and which panel. Nothing clinical is asserted yet.
+Somebody outside this laboratory asked for a test. The accession desk records
+who the patient is, who asked, and which panel. Nothing clinical is asserted
+yet.
 
 ## Before you start
 
-The thread must be empty. You need `patient.register`; there is no
-`accession` capability in the vocabulary, so the front desk role stands in.
+The thread must carry no order yet. You need `order.accession`, which in this
+bundle the phlebotomist holds.
 
 ## What happens
 
 One form writes three rows: the patient, an active service request carrying
 the panel code, and the form itself as a questionnaire response, which is the
-only place the referrer's name survives. The thread moves to collection.
+only place the referrer's name survives. Every row records who accessioned
+it. The specimen moves to phlebotomy.
 
 ## How you know it worked
 
-The worklist shows the person under collection, and the report view's
+The worklist shows the person under phlebotomy, and the report view's
 Referral section names the referrer.
 
 ## When it goes wrong

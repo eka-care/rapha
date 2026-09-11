@@ -1,23 +1,10 @@
-/* Additions to theme.css, in its vocabulary and nothing else: ink is the only
-   accent, --abdm is identity, colour otherwise means clinical risk. No new
-   hues are introduced here, only new arrangements of the tokens. */
+/* What the prototype had no need of, in its vocabulary and nothing else:
+   ink is the only accent, --abdm is identity, colour otherwise means clinical
+   risk. The shell, the thread, the palette and the modal now live in
+   theme.css, ported from the prototype; what is left here is the questionnaire
+   form, the three states every screen owes, and the view renderer's tables and
+   metric cards, none of which the prototype has. */
 
-.app { min-height: 100%; background: var(--canvas); }
-
-.topbar { display:flex; align-items:center; gap:14px; padding:10px 18px; background:var(--sb);
-  border-bottom:1px solid var(--border); flex-wrap:wrap; position:sticky; top:0; z-index:5; }
-.brand { font-weight:700; font-size:13px; letter-spacing:-.01em; }
-.navtabs { display:flex; gap:2px; background:var(--gray-100); border-radius:var(--r-md); padding:3px; }
-.srcline { display:flex; align-items:center; gap:8px; font-size:10.5px; color:var(--ink-3);
-  font-family:ui-monospace,monospace; }
-.dot { width:7px; height:7px; border-radius:50%; background:var(--gray-300); }
-.dot.up { background:var(--success); }
-.dot.down { background:var(--destructive); }
-.dot.demo { background:var(--warning); }
-
-.main { padding:18px; max-width:1180px; margin:0 auto; }
-.h1 { font-size:17px; font-weight:700; letter-spacing:-.015em; margin:0 0 14px; }
-.crumbs { display:flex; gap:8px; align-items:center; font-size:11px; color:var(--ink-3); margin-bottom:10px; }
 .link { border:none; background:none; color:var(--eka-blue); font:inherit; font-size:11px;
   cursor:pointer; padding:0; text-decoration:underline; }
 
@@ -57,9 +44,7 @@
 .f-group legend { font-size:11px; font-weight:700; padding:0 6px; }
 
 /* ---- the commit and proposal review surface ---- */
-.panelcard { max-width:620px; margin:0 auto 18px; }
-.panelbody { padding:15px; display:grid; gap:14px; }
-.panelfoot { display:flex; gap:8px; padding:12px 15px; border-top:1px solid var(--border); }
+.mod-b { display:grid; gap:14px; align-content:start; }
 .provenance { font-size:11.5px; color:var(--ink-2); background:var(--gray-50);
   border:1px solid var(--border); border-radius:var(--r-sm); padding:10px 12px; line-height:1.55; }
 .transcript { margin-top:7px; font-style:italic; color:var(--ink-3); }
@@ -67,7 +52,13 @@
   border-radius:var(--r-sm); padding:10px 12px; display:grid; gap:4px; }
 .confirmbox { border:1.5px solid var(--destructive-border); background:var(--destructive-bg);
   border-radius:var(--r-md); padding:12px 14px; }
+/* The proposal and audit rows the summary view draws. The thread draws its
+   own, as messages; these are the same records inside a section card. */
+.opcard { border:1px solid var(--border); background:var(--gray-50); border-radius:var(--r-md);
+  padding:10px 12px; min-width:230px; }
 .opcard.prop { background:var(--warning-bg); border-color:var(--warning-border); }
+.op-t { font-size:12px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:7px; }
+.op-m { font-size:10px; color:var(--ink-3); margin-top:4px; font-family:ui-monospace,monospace; }
 
 /* ---- views ---- */
 .cbar.wrap { flex-wrap:wrap; overflow:visible; }
@@ -85,3 +76,13 @@
 .tbl th { text-align:left; font-size:9.5px; text-transform:uppercase; letter-spacing:.07em;
   color:var(--ink-3); padding:5px 8px 5px 0; border-bottom:1px solid var(--border); white-space:nowrap; }
 .tbl td { padding:6px 8px 6px 0; border-bottom:1px dashed var(--border); color:var(--ink-2); }
+
+/* ---- two fixes the prototype never needed ----
+   It had six hand-written patients and no structured answers, so neither of
+   these ever showed up in it. */
+
+/* The 1fr track's min-width is auto, so one long unbreakable value pushes the
+   right rail off the screen. A prescription is exactly such a value. */
+.chatgrid { grid-template-columns: minmax(0,1fr) 300px; }
+.kv b { text-align:right; overflow-wrap:anywhere; }
+.bubble { overflow-wrap:anywhere; }

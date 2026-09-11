@@ -16,8 +16,9 @@ import { useMemo, useState } from "react";
 import { ApiError, type Client } from "./api";
 import { Form, labelled, validate } from "./Form";
 import { questionnaire } from "./declarations";
+import { fmt } from "./messages";
 import type { Operation, Payload, Proposal } from "./types";
-import { Badge, Empty, Failed, human } from "./ui";
+import { Badge, Failed, human } from "./ui";
 import { mountsFor } from "./voice/instruments";
 import { VoiceCapture } from "./voice/VoiceCapture";
 
@@ -56,14 +57,17 @@ export function OperationPanel({
 
   if (!schema) {
     return (
-      <Empty>
+      <div className="mod">
+        <div className="mod-bar" />
+        <div className="state">
         <div className="state-t">No questionnaire for {op.id}.</div>
         <p className="state-p">
           The operation names <b>{op.input}</b> as its input, and there is no such file in
           questionnaires/. Either the id is wrong in catalogue/ops/, or the form was never written.
         </p>
         <button className="cq" onClick={onCancel}>Back</button>
-      </Empty>
+        </div>
+      </div>
     );
   }
 
@@ -131,11 +135,13 @@ export function OperationPanel({
     : [];
 
   return (
-    <div className="card panelcard">
-      <div className="card-h">
+    <div className="mod">
+      <div className="mod-bar" />
+      <div className="mod-h" style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
         <div>
           <div className="eyebrow">{proposal ? "Proposed, not recorded" : "New entry"}</div>
-          <div className="card-t" style={{ marginTop: 2 }}>{op.title}</div>
+          <div className="mod-t" style={{ marginTop: 2 }}>{op.title}</div>
+          <div className="mod-s">{op.summary}</div>
         </div>
         <div className="ml-auto" style={{ display: "flex", gap: 6 }}>
           <Badge>{op.instrument}</Badge>
@@ -143,8 +149,7 @@ export function OperationPanel({
         </div>
       </div>
 
-      <div className="panelbody">
-        <p className="f-hint">{op.summary}</p>
+      <div className="mod-b">
 
         {proposal && (
           <div className="provenance">
@@ -182,8 +187,8 @@ export function OperationPanel({
             <div className="eyebrow">You changed</div>
             {changed.map(([id, text]) => (
               <div key={id}>
-                {text}: <s>{String(proposal.payload?.[id] ?? "empty")}</s> to{" "}
-                <b>{String(payload[id] ?? "empty")}</b>
+                {text}: <s>{fmt(proposal.payload?.[id]) || "empty"}</s> to{" "}
+                <b>{fmt(payload[id]) || "empty"}</b>
               </div>
             ))}
           </div>
@@ -214,13 +219,16 @@ export function OperationPanel({
         {error && <Failed error={error} what="Not saved" onRetry={() => setError(null)} />}
       </div>
 
-      <div className="panelfoot">
+      <div className="mod-f">
+        <span className="f-hint" style={{ flex: 1 }}>
+          Actor, surface, payload and outcome are written to the audit log.
+        </span>
         <button className="cq" onClick={onCancel} disabled={busy}>Cancel</button>
         {proposal && (
           <button className="cq" onClick={reject} disabled={busy}>Reject</button>
         )}
         <button
-          className="cq rose ml-auto"
+          className="cq rose"
           onClick={send}
           disabled={busy || (stage === "confirm" && !confirmed)}
         >

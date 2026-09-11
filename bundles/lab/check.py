@@ -9,9 +9,10 @@ the second half, as check.sh does for scripts/e2e.py.
 
 The checks that matter are the ones a laboratory would fire someone over: a
 release reachable from a machine, a result verified by the person who keyed
-it, a potassium of 6.8 committed without a flag. One of those the kernel
-cannot enforce, and the check below says so with an assert rather than a
-comment. See bundles/LAB-LOG.md.
+it, a potassium of 6.8 committed without a flag. All three are refused, and
+every station, flag, capability and role below is the laboratory's own,
+declared in bundles/lab/bundle.yaml. What the kernel still cannot do is in
+bundles/LAB-LOG.md, and the checks that assert those holes say so.
 """
 from __future__ import annotations
 
@@ -23,7 +24,6 @@ import sys
 import tempfile
 
 from catalogue import guard, vocab
-from catalogue.guard import visible
 from kernel import declarations, mapping, proposals, state, views
 from kernel.tests.test_kernel import Fake
 
@@ -33,10 +33,19 @@ WF = BUNDLE.workflow()
 OPS = BUNDLE.operations
 T = "enc-1"
 
-FRONTDESK = set(vocab.BUNDLES["frontdesk"])
-PHLEBOTOMIST = set(vocab.BUNDLES["nurse"])
-TECHNOLOGIST = set(vocab.BUNDLES["lab"])
-PATHOLOGIST = set(vocab.BUNDLES["lab_incharge"])
+ROLES = vocab.for_bundle("lab").roles
+PHLEBOTOMIST = set(ROLES["phlebotomist"])
+TECHNOLOGIST = set(ROLES["technologist"])
+PATHOLOGIST = set(ROLES["pathologist"])
+# The role that makes the separation of duties rule necessary: one person who
+# may both key and verify. The rule is about the specimen, not the role.
+SENIOR = set(ROLES["senior_technologist"])
+
+# Who is doing it. A row's author and the guard's actor rule both read these.
+A_PHLEB = "user:meena"
+A_TECH = "user:asha"
+A_PATH = "user:ravi"
+A_SENIOR = "user:sunil"
 
 ACCESSION = {"name": "Referred Person", "age": 40, "sex": "female", "phone": "9",
              "referrer_name": "Dr Outside", "referrer_contact": "9000000000",
@@ -55,13 +64,15 @@ def ok(what):
     print("ok   %s" % what)
 
 
-def commit(store, op_id, payload, caps, **kw):
+def commit(store, op_id, payload, caps, actor="user:somebody", **kw):
     return proposals.commit(store, BUNDLE, op_id, thread=T, payload=payload,
-                            caps=caps, actor="someone", **kw)
+                            caps=caps, actor=actor, **kw)
 
 
-def drawn(store, caps):
-    return [op["id"] for op in state.actions(WF, OPS, state.flags(store, T, WF), caps)]
+def drawn(store, caps, actor=None):
+    return [op["id"] for op in state.actions(
+        WF, OPS, state.flags(store, T, WF), caps, actor=actor,
+        performed=state.performers(store, T) if actor else None)]
 
 
 # --------------------------------------------------------------------------
@@ -69,56 +80,98 @@ def drawn(store, caps):
 # --------------------------------------------------------------------------
 
 def check_the_declaration_drives_a_line_the_phc_never_had():
-    assert [s.station for s in WF.steps] == ["reception", "nurse", "lab", "doctor"]
-    assert not any(op["capability"] in ("rx.prescribe", "encounter.document")
-                   for op in OPS.values()), "a lab neither consults nor prescribes"
+    assert [s.station for s in WF.steps] == \
+        ["accession", "phlebotomy", "processing", "verification", "release"]
+    phc = vocab.for_bundle("phc")
+    # lab.critical is the one name both vocabularies happen to use, and in a
+    # laboratory it is not a lie. It keeps the name because the questionnaire
+    # that raises it says `flags: lab.critical`, and questionnaires/ is not
+    # this bundle's directory to edit.
+    assert set(WF.states) & set(phc.states) == {"lab.critical"}, \
+        "a lab flag is wearing a primary health centre's name"
+    assert not ({op["capability"] for op in OPS.values()} & set(phc.capabilities))
+    assert not (set(ROLES) & set(phc.roles)), "a lab role is a PHC role"
     for op_id, op in sorted(OPS.items()):
         for record in op["mapping"]:
             from adapters.local.store import TABLES
             missing = sorted(set(record["fields"]) - set(TABLES[record["resource"]]))
             assert not missing, "%s maps %s which the adapter lacks" % (op_id, missing)
-    ok("lab bundle loads with zero kernel changes; 4 stations, no consult, no rx")
+    ok("the lab declares its own vocabulary: 5 stations, 7 flags, 7 capabilities, "
+       "4 roles, and not one word of them is the PHC's")
+
+
+def check_a_bundle_cannot_borrow_another_bundles_words():
+    """The closure that stops leak 2 coming back. Hand the lab manifest a PHC
+    operation and every borrowed word has to be a build failure, not a screen
+    that says `dispensed.complete` to a laboratory."""
+    import json
+    import yaml
+    from catalogue.build import parse
+    path = declarations.BUNDLES / "lab"
+    manifest = yaml.safe_load((path / "bundle.yaml").read_text())
+    manifest["operations"] = list(manifest["operations"]) + ["phc.op.vitals-record"]
+    decls = {fm["id"]: (fm, body)
+             for fm, body in (parse(f) for f in sorted(path.glob("*.md")))}
+    ops = json.loads((ROOT / "catalogue" / "catalogue.json").read_text())["operations"]
+    bad = " | ".join(declarations.lint(manifest, decls, ops))
+    for expected in ("capability 'vitals.record' is not this bundle's",
+                     "station 'nurse' is not this bundle's line",
+                     "precondition names state 'registered'",
+                     "emits 'vitals.flagged'"):
+        assert expected in bad, bad
+    borrowed = dict(manifest, capabilities=list(manifest["capabilities"]) + ["nope"],
+                    roles=dict(manifest["roles"], intruder=["vitals.record"]))
+    assert any("role 'intruder' holds 'vitals.record'" in line
+               for line in declarations.lint(borrowed, decls, ops))
+    ok("a PHC operation listed by the lab manifest fails the build on every "
+       "borrowed word, and so does a role holding a capability this bundle "
+       "does not declare")
 
 
 def check_an_action_is_absent_before_its_precondition():
     store = Fake()
-    assert state.station(WF, state.flags(store, T, WF)) == "reception"
-    assert drawn(store, FRONTDESK) == ["lab.op.referral-accession"]
+    assert state.station(WF, state.flags(store, T, WF)) == "accession"
+    assert drawn(store, PHLEBOTOMIST) == ["lab.op.referral-accession"]
     assert drawn(store, PATHOLOGIST) == [], "the pathologist has nothing to do yet"
     assert drawn(store, TECHNOLOGIST) == []
-    ok("an empty thread stands at accession and only the front desk sees an action")
+    ok("an empty thread stands at accession and only the accession desk sees an action")
 
-    assert commit(store, "lab.op.referral-accession", ACCESSION, FRONTDESK)
+    assert commit(store, "lab.op.referral-accession", ACCESSION, PHLEBOTOMIST,
+                  actor=A_PHLEB)
     known = state.flags(store, T, WF)
-    assert {"registered", "lab.ordered", "abha.pending"} <= known
-    assert state.station(WF, known) == "nurse"
-    assert drawn(store, FRONTDESK) == [], "accession is gone, not greyed out"
-    assert drawn(store, PHLEBOTOMIST) == ["lab.op.specimen-collect"]
+    assert known == {"order.accessioned"}, known
+    assert state.station(WF, known) == "phlebotomy"
+    assert drawn(store, PHLEBOTOMIST) == ["lab.op.specimen-collect"], \
+        "accession is gone, not greyed out"
     assert "Dr Outside" in store.rows["questionnaire_response"][0]["payload"]
-    ok("accession writes patient, order and the referrer; the line moves to the draw room")
+    assert {r["created_by"] for r in store.rows["patient"]} == {A_PHLEB}, \
+        "a row with no author is what made separation of duties unenforceable"
+    ok("accession writes patient, order and the referrer, each row signed; "
+       "the specimen moves to phlebotomy")
 
-    assert commit(store, "lab.op.specimen-collect", SPECIMEN, PHLEBOTOMIST)
-    assert state.station(WF, state.flags(store, T, WF)) == "lab"
+    assert commit(store, "lab.op.specimen-collect", SPECIMEN, PHLEBOTOMIST, actor=A_PHLEB)
+    assert state.station(WF, state.flags(store, T, WF)) == "processing"
     assert drawn(store, TECHNOLOGIST) == ["lab.op.result-enter"]
     assert "lab.op.result-verify" not in drawn(store, PATHOLOGIST)
-    ok("a collected specimen stands at the bench; verify does not exist yet")
+    ok("a collected specimen stands at processing; verify does not exist yet")
 
 
 def check_ranges_are_per_analyte():
     store = _at_bench()
-    d = commit(store, "lab.op.result-enter", dict(RESULT, potassium=14), TECHNOLOGIST)
+    d = commit(store, "lab.op.result-enter", dict(RESULT, potassium=14), TECHNOLOGIST, actor=A_TECH)
     assert not d and "potassium is 14" in d.reason and "outside 1 to 10" in d.reason, d.reason
     assert "observation" not in store.rows, "a blocked value wrote nothing"
-    d = commit(store, "lab.op.result-enter", dict(RESULT, glucose=5), TECHNOLOGIST)
+    d = commit(store, "lab.op.result-enter", dict(RESULT, glucose=5), TECHNOLOGIST, actor=A_TECH)
     assert not d and "glucose is 5" in d.reason and "outside 10 to 1500" in d.reason
     ok("each analyte blocks on its own band: potassium 14 and glucose 5 refused")
 
-    d = commit(store, "lab.op.result-enter", dict(RESULT, potassium=6.8), TECHNOLOGIST)
+    d = commit(store, "lab.op.result-enter", dict(RESULT, potassium=6.8), TECHNOLOGIST, actor=A_TECH)
     assert d, d.reason
     assert "lab.critical" in store.stored, "6.8 is plausible and critical"
     rows = {r["code"]: r for r in store.rows["observation"]}
-    assert rows["potassium"] == {"category": "laboratory", "code": "potassium",
-                                 "value": 6.8, "unit": "mmol/L", "_thread": T}
+    assert rows["potassium"] == {"created_by": A_TECH, "category": "laboratory",
+                                 "code": "potassium", "value": 6.8,
+                                 "unit": "mmol/L", "_thread": T}
     assert set(rows) == {"glucose", "creatinine", "sodium", "potassium"}, \
         "the unanswered CBC analytes are no row, not an empty row"
     assert store.rows["diagnostic_report"][0]["status"] == "preliminary"
@@ -130,13 +183,14 @@ def check_ranges_are_per_analyte():
     assert not d
     d = commit(store2, "lab.op.result-enter",
                dict(RESULT, potassium=14, override_reason="repeated, analyser agrees"),
-               TECHNOLOGIST)
+               TECHNOLOGIST, actor=A_TECH)
     assert d, d.reason
     assert store2.log[-1].payload["override_reason"], "the reason is on the audit line"
     ok("an override needs a recorded reason, and the reason lands in the audit")
 
     store3 = _at_bench()
-    assert commit(store3, "lab.op.result-enter", dict(RESULT, sodium=133), TECHNOLOGIST)
+    assert commit(store3, "lab.op.result-enter", dict(RESULT, sodium=133), TECHNOLOGIST,
+                  actor=A_TECH)
     assert "lab.critical" not in store3.stored
     ok("sodium 133 is outside the reference interval and raises NOTHING: "
        "the grammar has no abnormal flag, only critical (bundles/LAB-LOG.md, leak 7)")
@@ -144,58 +198,91 @@ def check_ranges_are_per_analyte():
 
 def _at_bench():
     store = Fake()
-    assert commit(store, "lab.op.referral-accession", ACCESSION, FRONTDESK)
-    assert commit(store, "lab.op.specimen-collect", SPECIMEN, PHLEBOTOMIST)
+    assert commit(store, "lab.op.referral-accession", ACCESSION, PHLEBOTOMIST,
+                  actor=A_PHLEB)
+    assert commit(store, "lab.op.specimen-collect", SPECIMEN, PHLEBOTOMIST, actor=A_PHLEB)
     return store
 
 
 def _verified():
     store = _at_bench()
-    assert commit(store, "lab.op.result-enter", RESULT, TECHNOLOGIST)
-    assert commit(store, "lab.op.result-verify", VERIFY, PATHOLOGIST)
+    assert commit(store, "lab.op.result-enter", RESULT, TECHNOLOGIST, actor=A_TECH)
+    assert commit(store, "lab.op.result-verify", VERIFY, PATHOLOGIST, actor=A_PATH)
     return store
 
 
 def _released():
     store = _verified()
-    assert commit(store, "lab.op.report-release", RELEASE, PATHOLOGIST, confirmed=True)
+    assert commit(store, "lab.op.report-release", RELEASE, PATHOLOGIST, actor=A_PATH,
+                  confirmed=True)
     return store
 
 
 def check_separation_of_duties():
     store = _at_bench()
-    assert commit(store, "lab.op.result-enter", RESULT, TECHNOLOGIST)
+    assert commit(store, "lab.op.result-enter", RESULT, TECHNOLOGIST, actor=A_TECH)
     known = state.flags(store, T, WF)
-    assert state.station(WF, known) == "doctor"
+    assert state.station(WF, known) == "verification"
     assert drawn(store, TECHNOLOGIST) == [], "the technologist cannot verify"
     assert drawn(store, PATHOLOGIST) == ["lab.op.result-verify"], \
         "verify is drawn, release is not: it does not exist until verified"
-    d = commit(store, "lab.op.result-verify", VERIFY, TECHNOLOGIST)
-    assert not d and "missing capability lab.result.validate" in d.reason
+    d = commit(store, "lab.op.result-verify", VERIFY, TECHNOLOGIST, actor=A_TECH)
+    assert not d and "missing capability result.verify" in d.reason
     ok("entered by one capability, verified by another; the technologist is refused")
 
-    # The honest negative. The pathologist role holds lab.result.enter too, so
-    # the kernel would let the same person key and verify. Nothing in the
-    # guard compares the actor on the audit line with the actor now. This
-    # assert documents the hole; it is not a feature.
-    assert visible(OPS["lab.op.result-enter"], PATHOLOGIST, state.flags(_at_bench(), T, WF)), \
-        "if this ever fails, the vocabulary changed; update bundles/LAB-LOG.md leak 1"
-    ok("KNOWN HOLE: the pathologist role can also enter results; the guard has no "
-       "'not the same actor' rule (bundles/LAB-LOG.md, leak 1)")
-
-    rejected = _at_bench()
-    assert commit(rejected, "lab.op.result-enter", RESULT, TECHNOLOGIST)
-    assert commit(rejected, "lab.op.result-verify", dict(decision="rejected"), PATHOLOGIST)
-    assert "lab.validated" not in state.flags(rejected, T, WF)
-    assert drawn(rejected, TECHNOLOGIST) == [], \
-        "a rejected result strands the thread: no amend loop is declarable"
-    ok("a rejection does not verify, and it strands the specimen (bundles/LAB-LOG.md, leak 5)")
-
-    assert commit(store, "lab.op.result-verify", VERIFY, PATHOLOGIST)
-    assert "lab.validated" in state.flags(store, T, WF)
+    assert commit(store, "lab.op.result-verify", VERIFY, PATHOLOGIST, actor=A_PATH)
+    assert "result.verified" in state.flags(store, T, WF)
     assert drawn(store, PATHOLOGIST) == ["lab.op.report-release"]
     assert store.rows["notes"][0]["text"].startswith("Comment:")
-    ok("verified: the release action now exists")
+    assert store.rows["notes"][0]["created_by"] == A_PATH
+    ok("verified by a second person: the release action now exists")
+
+
+def check_the_same_person_cannot_verify_their_own_result():
+    """The check the whole exercise was missing. A capability split is a rule
+    about roles; this is a rule about the specimen, and it holds even when one
+    person holds both capabilities, which in a small laboratory they do."""
+    store = _at_bench()
+    assert SENIOR >= {"result.enter", "result.verify"}, \
+        "this check is meaningless unless one role holds both"
+    assert commit(store, "lab.op.result-enter", RESULT, SENIOR, actor=A_SENIOR)
+
+    d = commit(store, "lab.op.result-verify", VERIFY, SENIOR, actor=A_SENIOR)
+    assert not d, "the same person verified their own result"
+    assert "not actor of lab.op.result-enter" in d.reason, d.reason
+    assert "diagnostic_report" in store.rows and \
+        all(r["status"] != "verified" for r in store.rows["diagnostic_report"]), \
+        "nothing was written by the refused verification"
+    assert store.log[-1].outcome.startswith("denied"), "the refusal is on the audit"
+    ok("the person who keyed the result is REFUSED verifying it, holding both "
+       "capabilities, on the rendered surface")
+
+    _, proposal = proposals.propose(store, BUNDLE, "lab.op.result-verify", thread=T,
+                                    payload=VERIFY, caps=SENIOR, actor=A_SENIOR)
+    assert proposal is None, "the machine surface let the same actor through"
+    ok("and refused on the machine surface too: propose returns no proposal")
+
+    assert "lab.op.result-verify" not in drawn(store, SENIOR, actor=A_SENIOR), \
+        "the action a person may not take must be absent, not greyed out"
+    assert "lab.op.result-verify" in drawn(store, SENIOR, actor="user:other-senior")
+    ok("the button is invisible to the person who entered and present for a colleague")
+
+    assert commit(store, "lab.op.result-verify", VERIFY, SENIOR, actor="user:other-senior")
+    assert "result.verified" in state.flags(store, T, WF)
+    ok("a second senior technologist verifies the same specimen and it passes")
+
+
+def check_a_rejection_strands_the_specimen():
+    rejected = _at_bench()
+    assert commit(rejected, "lab.op.result-enter", RESULT, TECHNOLOGIST, actor=A_TECH)
+    assert commit(rejected, "lab.op.result-verify", dict(decision="rejected"),
+                  PATHOLOGIST, actor=A_PATH)
+    known = state.flags(rejected, T, WF)
+    assert "result.verified" not in known and "result.rejected" in known
+    assert drawn(rejected, TECHNOLOGIST, actor=A_TECH) == [], \
+        "a rejected result strands the thread: no amend loop is declarable"
+    ok("a rejection raises result.rejected, does not verify, and strands the "
+       "specimen (bundles/LAB-LOG.md, leak 5)")
 
 
 def check_release_is_irreversible_and_human():
@@ -203,19 +290,21 @@ def check_release_is_irreversible_and_human():
     d, prop = proposals.propose(store, BUNDLE, "lab.op.report-release", thread=T,
                                 payload=RELEASE, caps=PATHOLOGIST, actor="agent")
     assert not d and prop is None and "rendered surface" in d.reason, d.reason
-    d = commit(store, "lab.op.report-release", RELEASE, PATHOLOGIST)
+    d = commit(store, "lab.op.report-release", RELEASE, PATHOLOGIST, actor=A_PATH)
     assert not d and "explicit confirm" in d.reason
     assert "questionnaire_response" in store.rows and \
         all(r["questionnaire"] != "lab.schema.release-v1"
             for r in store.rows["questionnaire_response"]), "nothing released yet"
     ok("release: refused over the machine surface, refused on screen without the tap")
 
-    assert commit(store, "lab.op.report-release", RELEASE, PATHOLOGIST, confirmed=True)
+    assert commit(store, "lab.op.report-release", RELEASE, PATHOLOGIST, actor=A_PATH,
+                  confirmed=True)
     known = state.flags(store, T, WF)
-    assert "dispensed.complete" in known and state.station(WF, known) is None
-    assert [s.status for s in state.line(WF, known)] == ["done"] * 4
-    d = commit(store, "lab.op.report-release", RELEASE, PATHOLOGIST, confirmed=True)
-    assert not d and "precondition not met: not dispensed.complete" in d.reason
+    assert "report.released" in known and state.station(WF, known) is None
+    assert [s.status for s in state.line(WF, known)] == ["done"] * 5
+    d = commit(store, "lab.op.report-release", RELEASE, PATHOLOGIST, actor=A_PATH,
+               confirmed=True)
+    assert not d and "precondition not met: not report.released" in d.reason
     ok("with the tap it releases, the line completes, and a second release is refused")
 
     outcomes = [r.outcome for r in store.audit(T)]
@@ -229,9 +318,10 @@ def check_views_and_metrics():
     store._threads = [state.c.ThreadRef(id=T, workflow=WF.id, subject={"name": "Referred Person"},
                                         opened_at="2026-09-11T00:00:00Z")]
     q = views.resolve(BUNDLE, "lab.view.worklist", store)
-    assert [g["key"] for g in q.groups] == ["reception", "nurse", "lab", "doctor", None]
+    assert [g["key"] for g in q.groups] == \
+        ["accession", "phlebotomy", "processing", "verification", "release", None]
     assert q.rows[0].station is None
-    assert q.rows[0].badges == {"abha.pending": "mute", "dispensed.complete": "ok"}
+    assert q.rows[0].badges == {"report.released": "ok"}
     ok("the worklist groups by station in line order, released under Complete")
 
     r = views.resolve(BUNDLE, "lab.view.report", store, thread=T, caps=PATHOLOGIST)
@@ -276,52 +366,84 @@ def e2e():
         ok("the API starts as a laboratory: PHC_BUNDLE=lab, no other change")
 
         t = h.call(base, "/threads/", {"token": "L-1"})["id"]
-        assert h.call(base, "/threads/%s/?role=lab_incharge" % t)["actions"] == []
-        panel = h.call(base, "/threads/%s/?role=frontdesk" % t)
+        assert h.call(base, "/threads/%s/?role=pathologist" % t)["actions"] == []
+        panel = h.call(base, "/threads/%s/?role=phlebotomist" % t)
         assert [a["id"] for a in panel["actions"]] == ["lab.op.referral-accession"]
-        assert [s["station"] for s in panel["line"]] == ["reception", "nurse", "lab", "doctor"]
-        ok("a new thread draws the lab line and only accession, only to the front desk")
+        assert [s["station"] for s in panel["line"]] == \
+            ["accession", "phlebotomy", "processing", "verification", "release"]
+        ok("a new thread draws the lab line and only accession, only to the accession desk")
 
-        h.call(base, "/operations/lab.op.referral-accession/commit/?role=frontdesk",
+        h.call(base, "/operations/lab.op.referral-accession/commit/?role=phlebotomist",
                {"thread": t, "payload": ACCESSION})
-        h.call(base, "/operations/lab.op.specimen-collect/commit/?role=nurse",
+        h.call(base, "/operations/lab.op.specimen-collect/commit/?role=phlebotomist",
                {"thread": t, "payload": SPECIMEN})
+        assert h.rows(db, "SELECT created_by FROM specimen WHERE encounter=?", (t,)) == \
+            [("user:phlebotomist",)], "the row does not say who drew the specimen"
         assert h.rows(db, "SELECT code, status FROM specimen WHERE encounter=?", (t,)) == \
             [("venous-blood", "available")]
         assert h.rows(db, "SELECT code FROM service_request WHERE encounter=?", (t,)) == [("bmp",)]
         ok("accession and collection land as rows in the file")
 
-        denied = h.call(base, "/operations/lab.op.result-enter/commit/?role=lab",
+        denied = h.call(base, "/operations/lab.op.result-enter/commit/?role=technologist",
                         {"thread": t, "payload": dict(RESULT, potassium=14)}, expect=422)
         assert "potassium is 14" in denied["detail"]
-        proposed = h.call(base, "/operations/lab.op.result-enter/propose/?role=lab",
+        proposed = h.call(base, "/operations/lab.op.result-enter/propose/?role=technologist",
                           {"thread": t, "payload": dict(RESULT, potassium=6.8)})
         assert proposed["flags_raised"] == ["lab.critical"]
         assert h.rows(db, "SELECT * FROM observation WHERE encounter=?", (t,)) == []
         ok("an implausible potassium is refused; a critical one is proposed, not written")
 
-        confirmed = h.call(base, "/proposals/%s/confirm/?role=lab" % proposed["proposal_id"],
-                           {"confirmed": True})
+        confirmed = h.call(base, "/proposals/%s/confirm/?role=technologist"
+                           % proposed["proposal_id"], {"confirmed": True})
         assert "lab.critical" in confirmed["thread"]["flags"]
-        assert confirmed["thread"]["station"] == "doctor"
+        assert confirmed["thread"]["station"] == "verification"
         landed = dict(h.rows(db, "SELECT code, value FROM observation WHERE encounter=?", (t,)))
         assert landed["potassium"] == "6.8" and len(landed) == 4, landed
-        ok("confirmed by the technologist: four analyte rows, the flag, the line at the pathologist")
+        assert h.rows(db, "SELECT DISTINCT created_by FROM observation WHERE encounter=?",
+                      (t,)) == [("user:technologist",)]
+        ok("confirmed by the technologist: four analyte rows in their name, the flag, "
+           "the line at verification")
 
-        denied = h.call(base, "/operations/lab.op.result-verify/commit/?role=lab",
+        denied = h.call(base, "/operations/lab.op.result-verify/commit/?role=technologist",
                         {"thread": t, "payload": VERIFY}, expect=422)
-        assert "missing capability lab.result.validate" in denied["detail"]
-        h.call(base, "/operations/lab.op.result-verify/commit/?role=lab_incharge",
+        assert "missing capability result.verify" in denied["detail"]
+        h.call(base, "/operations/lab.op.result-verify/commit/?role=pathologist",
                {"thread": t, "payload": VERIFY})
         ok("the technologist role cannot verify over HTTP; the pathologist role can")
 
-        denied = h.call(base, "/operations/lab.op.report-release/propose/?role=lab_incharge",
+        # Separation of duties over the socket, on a second specimen. There is
+        # no authentication here, so the actor is "user:<role>": one person
+        # keying and verifying is one role doing both, which is exactly what a
+        # senior technologist would do at 2am with nobody else in the building.
+        t2 = h.call(base, "/threads/", {"token": "L-2"})["id"]
+        h.call(base, "/operations/lab.op.referral-accession/commit/?role=phlebotomist",
+               {"thread": t2, "payload": ACCESSION})
+        h.call(base, "/operations/lab.op.specimen-collect/commit/?role=phlebotomist",
+               {"thread": t2, "payload": SPECIMEN})
+        h.call(base, "/operations/lab.op.result-enter/commit/?role=senior_technologist",
+               {"thread": t2, "payload": RESULT})
+        denied = h.call(base, "/operations/lab.op.result-verify/commit/?role=senior_technologist",
+                        {"thread": t2, "payload": VERIFY}, expect=422)
+        assert "not actor of lab.op.result-enter" in denied["detail"], denied
+        denied = h.call(base, "/operations/lab.op.result-verify/propose/?role=senior_technologist",
+                        {"thread": t2, "payload": VERIFY}, expect=422)
+        assert "not actor of lab.op.result-enter" in denied["detail"], denied
+        assert h.rows(db, "SELECT status FROM diagnostic_report WHERE encounter=? "
+                          "AND status='verified'", (t2,)) == []
+        h.call(base, "/operations/lab.op.result-verify/commit/?role=pathologist",
+               {"thread": t2, "payload": VERIFY})
+        assert h.rows(db, "SELECT created_by FROM diagnostic_report WHERE encounter=? "
+                          "AND status='verified'", (t2,)) == [("user:pathologist",)]
+        ok("over HTTP: the account that keyed the result is refused verifying it on "
+           "both surfaces, and a second person verifies it")
+
+        denied = h.call(base, "/operations/lab.op.report-release/propose/?role=pathologist",
                         {"thread": t, "payload": RELEASE}, expect=422)
         assert "rendered surface" in denied["detail"]
-        denied = h.call(base, "/operations/lab.op.report-release/commit/?role=lab_incharge",
+        denied = h.call(base, "/operations/lab.op.report-release/commit/?role=pathologist",
                         {"thread": t, "payload": RELEASE}, expect=422)
         assert "explicit confirm" in denied["detail"]
-        released = h.call(base, "/operations/lab.op.report-release/commit/?role=lab_incharge",
+        released = h.call(base, "/operations/lab.op.report-release/commit/?role=pathologist",
                           {"thread": t, "payload": RELEASE, "confirmed": True})
         assert released["thread"]["station"] is None
         assert h.rows(db, "SELECT questionnaire FROM questionnaire_response WHERE encounter=? "
@@ -334,7 +456,7 @@ def e2e():
         # open is a dead nav tab. This board was exactly that until api/main.py
         # stopped building its demo role out of a hand written list of five.
         h.call(base, "/views/lab.view.turnaround/")
-        board = h.call(base, "/views/lab.view.turnaround/?role=lab_incharge")
+        board = h.call(base, "/views/lab.view.turnaround/?role=pathologist")
         got = {m["metric"]: m for m in board["rows"]}
         assert got["lab.metric.accessioned"]["numerator"] >= 1
         assert got["lab.metric.released"]["numerator"] >= 1
@@ -402,4 +524,4 @@ if __name__ == "__main__":
         print("warn lab e2e skipped: SKIP_E2E is set")
     else:
         e2e()
-    print("ok   bundles/lab: %d checks, kernel unchanged" % checks)
+    print("ok   bundles/lab: %d checks, on its own vocabulary" % checks)

@@ -22,6 +22,7 @@ mapping:
     - resource: observation
       per_question: [systolic, diastolic, pulse, spo2, weight, temperature]
       fields:
+        created_by: {actor: id}
         category: {const: vital-signs}
         code: {question: link_id}
         value: {question: answer}

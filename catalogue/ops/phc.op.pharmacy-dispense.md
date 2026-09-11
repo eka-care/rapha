@@ -25,12 +25,14 @@ mapping:
     - resource: medication_dispense
       per_item: dispenses
       fields:
+        created_by: {actor: id}
         medication: {item: [medication, drug, code]}
         quantity: {item: [quantity, qty]}
         status: {const: completed}
     - resource: inventory_item
       per_item: dispenses
       fields:
+        created_by: {actor: id}
         code: {item: [medication, drug, code]}
         quantity: {minus: [quantity, qty]}
         status: {const: issued}
