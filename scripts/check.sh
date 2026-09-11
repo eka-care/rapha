@@ -63,6 +63,9 @@ if [ -d web/node_modules ]; then
   # on the voice path can write. Both are asserted here; neither needs a mic.
   (cd web && node --experimental-strip-types src/voice/voice.check.ts)
   (cd web && node --experimental-strip-types src/scribe/scribe.check.ts)
+  # One primary action per station, everything else in overflow: pure rules
+  # over declarations, checked without a browser.
+  (cd web && node --experimental-strip-types src/loops.check.ts)
   echo "ok   web renderer typechecks and builds"
 else
   echo "warn web: run (cd web && npm install) to check the renderer"

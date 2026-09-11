@@ -25,6 +25,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Icon, iconFor } from "./icons";
+import { weigh } from "./loops";
 import {
   agentLine, clock, composer, header, messages, queueViewFor,
   type Ctx, type Kv, type Msg, type Pill, type Said, type Tag,
@@ -55,7 +56,10 @@ export function Thread({
   const head = header(thread, queue);
   const msgs = messages(thread, ctx, said);
   const line = agentLine(thread, ctx);
-  const bar = composer(thread, cat);
+  // The agent's bubble now carries the one primary action and its overflow;
+  // an operation pill down here would be the same operation offered twice.
+  // A summary is a view, not an operation, so it still belongs in the bar.
+  const summaries = composer(thread, cat).pills.filter((p) => p.kind === "summary");
 
   return (
     <div className="chatgrid">
@@ -86,21 +90,23 @@ export function Thread({
             .map((m) => (
               <Message key={m.id} m={m} renderProposal={renderProposal} onReject={onReject} />
             ))}
-          <AgentBubble line={line} onAction={onAction} />
+          <AgentBubble line={line} closes={thread.closes} onAction={onAction} onMore={onMore} />
         </Scroll>
 
         <div className="composer">
-          <div className="cbar">
-            {bar.pills.map((p) => (
-              <PillButton
-                key={`${p.kind}-${p.op?.id ?? p.view?.id ?? p.label}`}
-                p={p}
-                onAction={onAction}
-                onSummary={onSummary}
-                onMore={onMore}
-              />
-            ))}
-          </div>
+          {summaries.length > 0 && (
+            <div className="cbar">
+              {summaries.map((p) => (
+                <PillButton
+                  key={`${p.kind}-${p.view?.id ?? p.label}`}
+                  p={p}
+                  onAction={onAction}
+                  onSummary={onSummary}
+                  onMore={onMore}
+                />
+              ))}
+            </div>
+          )}
           <Ask asking={asking} onSay={onSay} about={head.name} />
         </div>
       </div>
@@ -275,28 +281,32 @@ function Refusals({ msgs }: { msgs: Msg[] }) {
 // ---------------------------------------------------------------- the agent
 
 function AgentBubble({
-  line, onAction,
+  line, closes, onAction, onMore,
 }: {
   line: ReturnType<typeof agentLine>;
+  closes: string | null;
   onAction: (op: Operation) => void;
+  onMore: () => void;
 }) {
+  const { primary, overflow } = weigh(line.actions, closes);
   return (
     <Bubble av="agent" meta={<>Agent · now</>}>
       {line.sentences.join(" ")}
-      {line.actions.length > 0 && (
-        <div className="props">
-          {line.actions.map((op, i) => (
-            <button key={op.id} className={`prop${i === 0 ? " primary" : ""}`}
-                    title={op.summary} onClick={() => onAction(op)}>
-              <Icon name={iconFor(op)} />
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span className="p-l">{op.title}</span>
-              </span>
-              <span className={`p-tag ${tagClass(op)}`}>
-                {op.irreversibility === "irreversible" ? "irreversible" : op.instrument}
-              </span>
-            </button>
-          ))}
+      {primary && (
+        <div className="acts">
+          <button className="prop primary" style={{ flex: 1, minWidth: 0 }}
+                  title={primary.summary} onClick={() => onAction(primary)}>
+            <Icon name={iconFor(primary)} />
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span className="p-l">{primary.title}</span>
+            </span>
+            <span className={`p-tag ${tagClass(primary)}`}>
+              {primary.irreversibility === "irreversible" ? "irreversible" : primary.instrument}
+            </span>
+          </button>
+          {overflow.length > 0 && (
+            <button className="cq" onClick={onMore}>{overflow.length} more</button>
+          )}
         </div>
       )}
     </Bubble>

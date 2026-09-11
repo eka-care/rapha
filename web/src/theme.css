@@ -221,6 +221,7 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .quote{border-left:2px solid var(--violet-border);padding-left:10px;font-style:italic;
   color:var(--ink-3);font-size:12px;line-height:1.55;margin-top:7px}
 .props{margin-top:11px;display:flex;flex-direction:column;gap:6px}
+.acts{margin-top:11px;display:flex;gap:8px;align-items:stretch}
 .prop{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
   border:1px solid var(--border);background:var(--surface);border-radius:var(--r-md);
   padding:9px 11px;cursor:pointer;font:inherit;color:var(--ink);transition:.15s var(--ease)}
