@@ -115,7 +115,17 @@ export function raisedFlags(schema: Questionnaire, payload: Payload): string[] {
   for (const q of walk(schema.questions)) {
     const phc = phcOf(q);
     const v = payload[q.link_id];
-    if (!phc.critical || !phc.flags || v === undefined || v === null || v === "") continue;
+    if (!phc.flags || v === undefined || v === null || v === "") continue;
+    // A question with `flags` and no `critical` band is a consent: it has no
+    // physiological range to be outside of, and it raises its flag when the
+    // answer is yes. Mirrors catalogue/validate.flags() and is as strict: only
+    // a real boolean true, so a missing answer or the string "yes" raises
+    // nothing. The server is authoritative either way; this keeps the form's
+    // preview badge honest.
+    if (!phc.critical) {
+      if (v === true) out.add(phc.flags);
+      continue;
+    }
     const n = typeof v === "boolean" ? null : Number(typeof v === "string" ? v.trim() : v);
     if (n === null || !Number.isFinite(n)) continue;
     if (!(phc.critical.low <= n && n <= phc.critical.high)) out.add(phc.flags);

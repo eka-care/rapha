@@ -173,7 +173,11 @@ def test_the_seed_puts_people_at_different_points_in_the_line():
     threads = store.threads(workflow="phc.wf.outpatient", scope="today")
     assert len(threads) == 6
     assert {t.subject.get("name") for t in threads} >= {"Ramesh Kumar", "Meera Patel"}
-    assert store.stored_flags("enc-003") == frozenset({"vitals.flagged"})
+    # The seed declares enc-003's consent to ambient capture as well, which is
+    # what makes the scribe offerable on the demo day. capture.consented is not
+    # here because it is composed by the workflow and never stored.
+    assert store.stored_flags("enc-003") == frozenset({"vitals.flagged", "capture.agreed"})
+    assert store.stored_flags("enc-004") == frozenset({"capture.declined"})
     assert store.count("medication_dispense", thread="enc-006", where={}) == 2
     assert store.count("medication_dispense", thread="enc-005", where={}) == 0
 

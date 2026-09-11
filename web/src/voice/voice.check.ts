@@ -84,8 +84,8 @@ const scribe = mount("scribe", cm) as any;
 ok(scribe, "the consultation offers the declared scribe");
 ok(scribe.targets.length > 0, "the scribe has somewhere to put prose");
 ok(
-  scribe.targets.every((q: any) => q.type === "text"),
-  "the scribe targets text questions only, never a number",
+  scribe.targets.every((q: any) => q.type === "text" || q.type === "structured"),
+  "the scribe targets prose and lists only, never a number",
 );
 ok(!mount("scribe", vm), "the scribe is not offered on vitals");
 ok(!mount("constrained-voice", cm), "the number grammar is not offered on the consultation");

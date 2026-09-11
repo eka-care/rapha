@@ -22,9 +22,10 @@ import { useId, useMemo, useState } from "react";
 import { ApiError, type Client } from "./api";
 import { Form, labelled, validate } from "./Form";
 import { questionnaire } from "./declarations";
-import { fmt } from "./messages";
+import { CONSENT, fmt } from "./messages";
 import type { Operation, Payload, Proposal } from "./types";
 import { Badge, Failed, human } from "./ui";
+import { Recorder } from "./scribe/Recorder";
 import { mountsFor } from "./voice/instruments";
 import { VoiceCapture } from "./voice/VoiceCapture";
 
@@ -183,15 +184,44 @@ export function OperationPanel({
         )}
 
         <VoiceCapture
-          mounts={mounts}
+          mounts={mounts.filter((m) => m.kind !== "scribe")}
           operation={op.id}
-          flags={flags ?? []}
           payload={payload}
           disabled={busy}
           ids={ids}
           onValues={fromInstrument}
-          onText={(link_id, text) => fromInstrument({ [link_id]: text }, { [link_id]: 0.6 })}
         />
+
+        {/* The scribe, which is a recording and not a microphone in this
+            browser, so it is drawn by its own component with its own bar. It
+            appears only where the declaration allows it AND the visit carries
+            capture consent; without the consent the reason is said in words and
+            the keyboard below is the whole of the fallback. The kernel refuses
+            it a second time besides, which is the check that counts. */}
+        {mounts.filter((m) => m.kind === "scribe").map((m) =>
+          (flags ?? []).includes(CONSENT) ? (
+            <Recorder
+              key={m.id}
+              mount={m as Extract<typeof m, { kind: "scribe" }>}
+              thread={thread}
+              operation={op.id}
+              schema={schema}
+              payload={payload}
+              ids={ids}
+              disabled={busy}
+              onValues={fromInstrument}
+            />
+          ) : (
+            <div className="v-row" key={m.id}>
+              <span className="v-off">Scribe off</span>
+              <div className="f-hint">
+                Capture consent is not recorded on this visit, so nothing is recorded. Ask the
+                patient, record the consent, and {m.title.toLowerCase()} appears here. Type the note
+                meanwhile: it is the same record, and declining is not a barrier to care.
+              </div>
+            </div>
+          ),
+        )}
 
         {missing.length > 0 && !tried && (
           <div className="missing">

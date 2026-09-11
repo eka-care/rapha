@@ -48,12 +48,14 @@ threads:
       - {resource: observation, category: vital-signs, code: systolic, value: 186, unit: "mm[Hg]"}
       - {resource: observation, category: vital-signs, code: diastolic, value: 112, unit: "mm[Hg]"}
       - {resource: observation, category: vital-signs, code: pulse, value: 92, unit: "/min"}
-    flags: [vitals.flagged]
+    # Agreed to the recording at the desk, so the scribe is offerable at the
+    # doctor. capture.consented is composed from this, not stored.
+    flags: [vitals.flagged, capture.agreed]
     audit:
       - operation: phc.op.patient-register
         actor: "user:frontdesk"
         payload: {name: Ramesh Kumar, age: 61, sex: male, phone: "9800000003",
-                  village: Bhagwanpur, category: general}
+                  village: Bhagwanpur, category: general, capture_consent: true}
       - operation: phc.op.vitals-record
         actor: "user:nurse"
         payload: {systolic: 186, diastolic: 112, pulse: 92, spo2: 97,
@@ -74,11 +76,14 @@ threads:
       - {resource: observation, category: vital-signs, code: pulse, value: 92, unit: "/min"}
       - {resource: notes, text: "Fever three days, no red flags on examination."}
       - {resource: service_request, code: CBC, status: active}
+    # Said no to the recording. The consultation was typed, the queue badges
+    # the visit declined, and nothing asks again.
+    flags: [capture.declined]
     audit:
       - operation: phc.op.patient-register
         actor: "user:frontdesk"
         payload: {name: Iqbal Ahmed, age: 52, sex: male, phone: "9800000004",
-                  village: Sonpur, category: general}
+                  village: Sonpur, category: general, capture_declined: true}
       - operation: phc.op.vitals-record
         actor: "user:nurse"
         payload: {systolic: 118, diastolic: 76, pulse: 92, spo2: 98,

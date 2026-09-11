@@ -14,6 +14,7 @@ badges:
   vitals.flagged: crit
   lab.critical: crit
   dispensed.partial: mute
+  capture.declined: mute
 ---
 
 ## In plain words
@@ -21,3 +22,6 @@ badges:
 The queue every station looks at. One tab per station, a count on each, and a
 Complete tab for patients whose line has finished. A patient appears under
 the station they are at, which the workflow decides, not the screen.
+
+A visit the patient declined recording on carries a quiet badge here, so the
+next station can see the answer instead of asking for it again.

@@ -88,12 +88,25 @@ def make_validator(schema):
 
 
 def flags(schema, payload):
-    """State flags this payload raises. Critical values promote an action."""
+    """State flags this payload raises. Critical values promote an action, and
+    a question that declares `flags` with no `critical` band raises its flag
+    when the answer is yes.
+
+    The second form is what a consent is. A consent has no physiological range
+    to be outside of, so requiring `critical` here is what left
+    capture.consented declared, gated on, and raised by nothing. Deliberately
+    strict: only a real boolean true raises, so a missing answer and a string
+    fail closed to no flag.
+    """
     raised = set()
     for q in walk(schema["questions"]):
         phc, value = _phc(q), payload.get(q["link_id"])
         crit, flag = phc.get("critical"), phc.get("flags")
-        if not (crit and flag) or value in (None, ""):
+        if not flag or value in (None, ""):
+            continue
+        if not crit:
+            if value is True:
+                raised.add(flag)
             continue
         try:
             value = float(value)

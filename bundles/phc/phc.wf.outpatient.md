@@ -53,7 +53,11 @@ states:
       - "not dispensed.complete"
   followup.booked:
     exists: {resource: token_booking, where: {status: booked}}
-  capture.consented: {stored: true}
+  capture.agreed: {stored: true}
+  capture.declined: {stored: true}
+  capture.withdrawn: {stored: true}
+  capture.consented:
+    all_of: [capture.agreed, "not capture.declined", "not capture.withdrawn"]
   vitals.flagged: {stored: true}
   lab.critical: {stored: true}
 ---
@@ -65,10 +69,32 @@ consultation with the doctor, and then the lab and the pharmacy only if the
 doctor ordered a test or wrote a prescription. A patient nobody sent to the
 lab is not waiting at the lab; they have skipped it.
 
-Every state flag above is derived from records at read time, except the three
-marked stored, which no record can answer: whether the patient consented to
-ambient capture this visit, and whether a vital or a lab value crossed a
-critical threshold. Those thresholds are ours, so those flags are ours.
+Every state flag above is derived from records at read time, except the five
+marked stored, which no record can answer: the three halves of this visit's
+capture consent, and whether a vital or a lab value crossed a critical
+threshold. Those thresholds are ours, so those flags are ours.
+
+## Consent to ambient capture
+
+`capture.consented` is the flag every scribe is gated on, and it is not
+stored. It is composed, because the store can raise a flag and cannot lower
+one, and a consent that cannot be withdrawn is not a consent:
+
+- `capture.agreed` is raised by the consent question on the registration
+  form, which is read out at the desk.
+- `capture.declined` is raised by its own answer on the same form, so a visit
+  the patient said no to is visibly declined rather than merely unconsented
+  and no station asks again. Ticking both is a contradiction, and the safe
+  answer wins: declined beats agreed.
+- `capture.withdrawn` is raised by the stop question on the consultation
+  form. From that commit the gate is false and nothing listens for the rest
+  of the visit. Records already confirmed are rows, and rows are untouched.
+- A visit with none of the three was never asked. That is not the same as a
+  decline and is not drawn as one.
+
+All three are thread flags, and a thread is one encounter, so consent is
+scoped to the visit and the next encounter starts with nothing raised. There
+is nothing patient scoped to leak.
 
 This declaration is care_phc/thread.py LINE and derive() written down.
 kernel/tests/test_contracts.py asserts the two agree, step for step, until

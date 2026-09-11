@@ -9,17 +9,9 @@
  *  the instrument declarations; nothing here knows what a systolic is.
  */
 import { useEffect, useRef, useState } from "react";
-import {
-  available,
-  captureValue,
-  dictate,
-  type Draft,
-} from "../../../packages/voice/src/index.ts";
+import { available, captureValue, type Draft } from "../../../packages/voice/src/index.ts";
 import type { Mount } from "./instruments";
 import "./voice.css";
-
-/** The flag the scribe declaration requires before anything may listen. */
-const CONSENT = "capture.consented";
 
 /** Recogniser error codes to the one thing the person should do next. The
  *  codes are the Web Speech API's; anything unlisted is shown as it came. */
@@ -38,50 +30,36 @@ function nextStep(reason: string): string {
 export function VoiceCapture({
   mounts,
   operation,
-  flags,
   payload,
   disabled,
   ids,
   onValues,
-  onText,
 }: {
+  /** Every mount except the scribe: a scribe is a recording that leaves this
+   *  machine, and web/src/scribe/Recorder draws it. Mixing the two controls on
+   *  one bar is exactly the confusion this file must not create. */
   mounts: Mount[];
   operation: string;
-  /** Thread flags. The scribe declaration says capture only where consented. */
-  flags: string[];
   payload: Record<string, unknown>;
   disabled?: boolean;
   /** The Form prefix, so the cursor lands in this panel's field and not in
    *  another panel's field with the same link_id. */
   ids: string;
   onValues: (values: Record<string, number>, confidence: Record<string, number>) => void;
-  onText: (link_id: string, text: string) => void;
 }) {
   const [live, setLive] = useState<string | null>(null);
   const [heard, setHeard] = useState<Draft | null>(null);
-  const [target, setTarget] = useState<string>("");
   const abort = useRef<AbortController | null>(null);
-  const session = useRef<{ stop: () => void } | null>(null);
 
   // Leaving the panel stops the microphone. A capture that outlived its screen
   // would be a live mic with no indicator, which is the one thing this must
   // never be.
-  useEffect(
-    () => () => {
-      abort.current?.abort();
-      session.current?.stop();
-    },
-    [],
-  );
+  useEffect(() => () => abort.current?.abort(), []);
 
   if (!mounts.length) return null;
 
   const supported = available();
-  const consented = flags.includes(CONSENT);
-  const stop = () => {
-    abort.current?.abort();
-    session.current?.stop();
-  };
+  const stop = () => abort.current?.abort();
 
   const listen = async (m: Extract<Mount, { kind: "constrained-voice" }>) => {
     setHeard(null);
@@ -109,18 +87,6 @@ export function VoiceCapture({
     onValues(draft.values, draft.confidence);
   };
 
-  const startDictation = (m: Extract<Mount, { kind: "scribe" }>, linkId: string) => {
-    setHeard(null);
-    const base = String(payload[linkId] ?? "");
-    const s = dictate({ onText: (t) => onText(linkId, base ? `${base} ${t}` : t) });
-    session.current = s;
-    setLive(m.id);
-    void s.done.then(() => {
-      session.current = null;
-      setLive(null);
-    });
-  };
-
   return (
     <div className="v-bar">
       {live && (
@@ -132,6 +98,7 @@ export function VoiceCapture({
       )}
 
       {mounts.map((m) => {
+        if (m.kind === "scribe") return null;   // web/src/scribe draws that one
         if (m.kind === "device") {
           return (
             <div className="v-row" key={m.id}>
@@ -151,48 +118,6 @@ export function VoiceCapture({
               <div className="f-hint">
                 This browser has no speech recognition, so {m.title.toLowerCase()} is not offered.
                 Chrome or Edge have it. Everything below can be typed, which is the same record.
-              </div>
-            </div>
-          );
-        }
-
-        if (m.kind === "scribe") {
-          const chosen = target || m.targets[0].link_id;
-          if (!consented) {
-            return (
-              <div className="v-row" key={m.id}>
-                <span className="v-off">Scribe off</span>
-                <div className="f-hint">
-                  Capture consent is not recorded on this thread, so nothing listens. Ask the
-                  patient, record the consent, and the scribe appears here. Type the note meanwhile.
-                </div>
-              </div>
-            );
-          }
-          return (
-            <div className="v-row" key={m.id}>
-              <button
-                className={`cq v-mic${live === m.id ? " on" : ""}`}
-                disabled={disabled || (live !== null && live !== m.id)}
-                onClick={() => (live === m.id ? stop() : startDictation(m, chosen))}
-              >
-                {live === m.id ? "Stop dictating" : "Dictate"}
-              </button>
-              {m.targets.length > 1 && (
-                <select
-                  className="f-in v-pick"
-                  value={chosen}
-                  disabled={live === m.id}
-                  onChange={(e) => setTarget(e.target.value)}
-                >
-                  {m.targets.map((q) => (
-                    <option key={q.link_id} value={q.link_id}>into {q.text}</option>
-                  ))}
-                </select>
-              )}
-              <div className="f-hint">
-                Prose only, into {m.targets.find((q) => q.link_id === chosen)?.text}. It arrives as a
-                draft you edit. No number is ever taken this way.
               </div>
             </div>
           );

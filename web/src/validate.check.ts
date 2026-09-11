@@ -29,6 +29,15 @@ const CASES: [string, Record<string, unknown>][] = [
   ["phc.schema.register-v1", { name: "A", age: "41.5", sex: "female", phone: "9", village: "V" }],
   ["phc.schema.consult-v1", {}],
   ["phc.schema.dispense-v1", {}],
+  // The consent questions. A flag with no critical band is the second form of
+  // raisedFlags, and until these cases existed the browser and the server
+  // disagreed about it with nothing to notice.
+  ["phc.schema.register-v1", { name: "A", age: 41, sex: "female", phone: "9", village: "V", capture_consent: true }],
+  ["phc.schema.register-v1", { name: "A", age: 41, sex: "female", phone: "9", village: "V", capture_declined: true }],
+  ["phc.schema.register-v1", { name: "A", age: 41, sex: "female", phone: "9", village: "V", capture_consent: true, capture_declined: true }],
+  ["phc.schema.register-v1", { name: "A", age: 41, sex: "female", phone: "9", village: "V", capture_consent: "yes" }],
+  ["phc.schema.register-v1", { name: "A", age: 41, sex: "female", phone: "9", village: "V", capture_consent: false }],
+  ["phc.schema.consult-v1", { assessment: "viral fever", capture_stop: true }],
 ];
 
 const py = `

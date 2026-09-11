@@ -7,5 +7,5 @@ import react from "@vitejs/plugin-react";
 // and the glob in src/declarations.ts.
 export default defineConfig({
   plugins: [react()],
-  server: { port: 5173, fs: { allow: [".."] } },
+  server: { port: Number(process.env.PORT) || 5173, fs: { allow: [".."] } },
 });

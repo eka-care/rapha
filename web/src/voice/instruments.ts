@@ -78,11 +78,16 @@ export function mountsFor(
       for (const q of questions) labels[q.link_id] = q.text;
       out.push({ ...common, kind: "constrained-voice", fields, labels });
     } else if (d.kind === "scribe") {
-      // Narrative only. A scribe declaration that named a number would be a
-      // declaration bug, and the filter here is what stops it reaching a
-      // discrete field: dictation is never allowed near one.
+      // Narrative and structured, never a number. A scribe declaration that
+      // named a number would be a declaration bug, and the filter here is what
+      // stops it reaching a discrete field: no recording goes near one. A
+      // structured answer (a diagnosis, a medication) is a list of words and is
+      // allowed, and it lands unconfirmed in the form's own row editor like
+      // every other drafted value.
       const targets = questions.filter(
-        (q) => q.type === "text" && (named.size === 0 || named.has(q.link_id)),
+        (q) =>
+          (q.type === "text" || q.type === "structured") &&
+          (named.size === 0 || named.has(q.link_id)),
       );
       if (!targets.length) continue;
       out.push({ ...common, kind: "scribe", targets });

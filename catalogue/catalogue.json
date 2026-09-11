@@ -746,6 +746,13 @@
           "required": false,
           "text": "Plan",
           "type": "text"
+        },
+        {
+          "link_id": "capture_stop",
+          "options": null,
+          "required": false,
+          "text": "The patient asked to stop the recording. Tick Yes and capture stops for the rest of this visit and the sound from here on is discarded. What was already checked and confirmed stays in the record.",
+          "type": "boolean"
         }
       ],
       "id": "phc.op.consult-document",
@@ -757,7 +764,7 @@
         "registered"
       ],
       "scope_qualifier": null,
-      "short": "Scribe",
+      "short": "Consult",
       "station": "doctor",
       "summary": "Write down what the patient said, what was found, and what the doctor concluded.\n",
       "surfaces": [
@@ -1001,6 +1008,20 @@
           "required": false,
           "text": "Patient category",
           "type": "choice"
+        },
+        {
+          "link_id": "capture_consent",
+          "options": null,
+          "required": false,
+          "text": "Recording this visit. Read it out: \"With your permission we record your conversation with the doctor, so the notes write themselves. Only the staff treating you here can see it. The sound is deleted as soon as the doctor has checked and confirmed the notes, and the notes stay in your record. This is for today's visit only, and you can stop it at any time. If you say no you are seen in exactly the same way and the doctor types instead.\" Tick Yes only if the patient agreed.",
+          "type": "boolean"
+        },
+        {
+          "link_id": "capture_declined",
+          "options": null,
+          "required": false,
+          "text": "The patient said no to recording. Tick Yes and the visit is marked declined, so nothing listens and no station asks again. Their care is unchanged.",
+          "type": "boolean"
         }
       ],
       "id": "phc.op.patient-register",
@@ -1203,7 +1224,10 @@
   "states": [
     "abha.linked",
     "abha.pending",
+    "capture.agreed",
     "capture.consented",
+    "capture.declined",
+    "capture.withdrawn",
     "consult.documented",
     "dispensed.complete",
     "dispensed.partial",
@@ -1359,6 +1383,7 @@
     "phc.view.station-queue": {
       "badges": {
         "abha.pending": "warn",
+        "capture.declined": "mute",
         "dispensed.partial": "mute",
         "lab.critical": "crit",
         "vitals.flagged": "crit"
@@ -1402,7 +1427,20 @@
             "not abha.linked"
           ]
         },
+        "capture.agreed": {
+          "stored": true
+        },
         "capture.consented": {
+          "all_of": [
+            "capture.agreed",
+            "not capture.declined",
+            "not capture.withdrawn"
+          ]
+        },
+        "capture.declined": {
+          "stored": true
+        },
+        "capture.withdrawn": {
           "stored": true
         },
         "consult.documented": {
@@ -1533,7 +1571,9 @@
         }
       ],
       "stored": [
-        "capture.consented",
+        "capture.agreed",
+        "capture.declined",
+        "capture.withdrawn",
         "vitals.flagged",
         "lab.critical"
       ],

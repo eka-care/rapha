@@ -33,10 +33,12 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Body, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
 
 from adapters.local.store import SqliteStore, seed
 from agent import turn
-from catalogue import vocab
+from api import scribe
+from catalogue import validate, vocab
 from kernel import declarations, proposals, state, views
 from kernel.contracts import ThreadRef
 
@@ -366,6 +368,157 @@ def reject(proposal_id: str, request: Request, body: dict = Body(default={})):
     decided = proposals.reject(store, proposal, actor=user["id"],
                                reason=str(body.get("reason") or ""))
     return {"proposal": asdict(decided), "thread": panel(proposal.thread, user)}
+
+
+# ------------------------------------------------------------------ the scribe
+# Audio in, a draft out. The draft is kernel.contracts.Draft's shape and it is
+# not a write: api/scribe.py has no Store, these routes hand it none, and a
+# value still arrives in the renderer's editable fields to be tapped. The
+# ordinary commit route is the only way any of it reaches a row.
+
+CONSENT = "capture.consented"
+
+
+def scribe_targets(user):
+    """({operation_id: [link_id]}, instrument_id) for this caller.
+
+    Declaration driven twice over: which operations at all is the scribe
+    instrument's own `operations` list, and which of those this person may
+    document is the operation's capability. Nothing here names a bundle's
+    words, so a bundle with no scribe declaration gets an empty answer and the
+    route refuses.
+    """
+    caps = set(user["capabilities"])
+    targets, instrument = {}, ""
+    for decl in BUNDLE.instruments.values():
+        if decl.kind != "scribe" or decl.commit != "tap" or decl.readback != "required":
+            continue
+        instrument = instrument or decl.id
+        for op_id in decl.operations:
+            op = BUNDLE.operations.get(op_id)
+            if not op or op["capability"] not in caps:
+                continue
+            schema = validate.load(op["input"])
+            named = set(decl.fields or [])
+            targets[op_id] = [q["link_id"] for q in validate.walk(schema["questions"])
+                              if not named or q["link_id"] in named]
+    return targets, instrument
+
+
+def collect_if_consent_stands(session):
+    """Collect a draft only while the visit still consents to being recorded.
+
+    Every path that could bring a draft back goes through here, because E.3's
+    withdrawal is mid visit by definition and the flag that records it is
+    raised on a form neither of those paths knows about. Whoever turns the
+    consent off, the next collect is a withdrawal instead and the job's result
+    is never read. The browser's Stop button is the DELETE route and does not
+    need this; a poll and a webhook do.
+    """
+    if CONSENT not in set(state.flags(store, session["thread"], WORKFLOW)):
+        return scribe.withdraw(session)
+    return scribe.collect(session)
+
+
+def scribe_or_404(session_id):
+    session = scribe.SESSIONS.get(session_id)
+    if not session:
+        raise HTTPException(404, "no such scribe session %r. Nothing was kept."
+                            % session_id)
+    return session
+
+
+@router.post("/scribe/sessions")
+async def scribe_start(request: Request, thread: str = None, format: str = None):
+    """The browser posts one recording here, as the raw body.
+
+    Three refusals before a byte leaves this machine, in this order: consent,
+    capability, and a connector that can be reached. Addendum E.3 is the first
+    of them: a visit without `capture.consented` is not recorded, and the
+    answer says so in words a receptionist could read to the patient.
+
+    The audio is bytes in this process and one temporary file in scribe.start,
+    deleted in its `finally`. It is never written under this repository, never
+    logged, and the transaction id that identifies it at the service is not
+    returned to the browser.
+    """
+    user = caller(request)
+    thread_id = thread_of({"thread": thread})
+    if CONSENT not in set(state.flags(store, thread_id, WORKFLOW)):
+        raise HTTPException(403, "Capture consent is not recorded on this visit, so "
+                                 "nothing may be recorded. Ask, record the consent, "
+                                 "or type the note: the record is the same either way.")
+    targets, instrument = scribe_targets(user)
+    if not targets:
+        raise HTTPException(403, "No operation open to you here is declared for a "
+                                 "scribe. Type the note.")
+    audio = await request.body()
+    try:
+        txn = await run_in_threadpool(
+            scribe.start, audio, suffix=_suffix(format or request.headers.get("content-type")))
+    except scribe.ScribeError as broke:
+        raise HTTPException(503, str(broke))
+    session = scribe.begin(thread_id, user["id"], txn, targets, instrument=instrument)
+    return scribe.public(session)
+
+
+def _suffix(content_type):
+    """The extension the service will recognise, from what the browser said it
+    recorded. Chrome gives audio/webm, Safari audio/mp4. An unknown type is
+    sent as .webm rather than guessed at more cleverly than that."""
+    kind = str(content_type or "").split(";")[0].strip().lower()
+    return {"audio/webm": ".webm", "audio/ogg": ".ogg", "audio/mp4": ".mp4",
+            "audio/mpeg": ".mp3", "audio/wav": ".wav", "audio/x-wav": ".wav",
+            "audio/wave": ".wav"}.get(kind, ".webm")
+
+
+@router.get("/scribe/sessions/{session_id}")
+async def scribe_status(session_id: str, request: Request):
+    """Whether the draft is ready. The browser polls this; the webhook below
+    only shortens the wait. Either way the answer is the same object.
+
+    Consent is re-read here and not only at the start, because E.3's withdrawal
+    is mid visit by definition: a patient who says stop while the job is still
+    running has withdrawn, and the flag that says so is raised on a form this
+    route knows nothing about. Whoever turns it off, the next poll is the last
+    one and it returns no draft. The browser's own Stop button takes the DELETE
+    below; this is the same rule for the half of the world that is not the
+    browser.
+    """
+    caller(request)
+    session = await run_in_threadpool(collect_if_consent_stands, scribe_or_404(session_id))
+    return scribe.public(session)
+
+
+@router.delete("/scribe/sessions/{session_id}")
+def scribe_withdraw(session_id: str, request: Request):
+    """Withdrawal, mid visit. Nothing further is fetched and any draft already
+    held is dropped. Records already confirmed stand, because they are rows and
+    this never touched them."""
+    caller(request)
+    return scribe.public(scribe.withdraw(scribe_or_404(session_id)))
+
+
+@router.post("/scribe/webhook")
+def scribe_webhook(body: dict = Body(default={})):
+    """Eka's `v2rx.completed` callback.
+
+    The body is data, not instruction: the only thing read out of it is the
+    transaction id, and the only thing that happens is the same collect the
+    poll above does, for a session this kernel started itself. A call naming a
+    transaction nobody here started does nothing at all.
+
+    Unauthenticated, because the sender is not this browser and there is no
+    authentication in this demo at all. It is also unreached: nothing outside
+    this machine can call localhost, so this has never taken a live delivery.
+    """
+    payload = body.get("payload") if isinstance(body.get("payload"), dict) else body
+    txn = str((payload or {}).get("transaction_id") or "")
+    session = scribe.by_txn(txn) if txn else None
+    if not session:
+        return {"ok": True, "collected": False}
+    collect_if_consent_stands(session)
+    return {"ok": True, "collected": session["status"] == "ready"}
 
 
 # ---------------------------------------------------------------------- app

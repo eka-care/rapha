@@ -281,7 +281,7 @@ open http://localhost:5173/#/threads/enc-002
 ## 5. The checks
 
 ```sh
-sh scripts/check.sh                 # everything, about 20 seconds, 273 ok lines
+sh scripts/check.sh                 # everything, about 20 seconds, 315 ok lines
 ```
 
 That runs the linters, every Python and Go unit check, the browser-side checks,
@@ -317,9 +317,82 @@ port.
   There is no voice route on the kernel and there is no surface argument on
   `commit()`. A body claiming `"surface": "voice"` is recorded as `rendered`,
   because the kernel names the surface and the caller does not.
-- **Nothing raises `capture.consented`,** so the scribe on the consultation is
-  gated off and says so on screen. To see it, raise the flag by hand:
-  `python3 -c "import sqlite3,datetime;c=sqlite3.connect('phc.sqlite3');c.execute('insert into thread_flag values (?,?,?,?,?)',('f1','enc-002','capture.consented','you',datetime.datetime.now().isoformat()));c.commit()"`
+- **Capture consent is asked at the desk and composed by the workflow.** The
+  registration form carries the consent question and its own decline answer,
+  the consultation form carries the stop question, and
+  `phc.wf.outpatient` composes `capture.consented` from the three:
+  agreed, and neither declined nor withdrawn. So the scribe appears when
+  somebody said yes, the queue badges a visit that said no, a withdrawal turns
+  it off for the rest of the visit, and nothing carries to the next encounter,
+  because a thread is one visit. The seeded day shows all three: enc-003
+  consented and standing at the doctor, enc-004 declined, enc-005 never asked.
+  `python3 -m bundles.phc.check` is the nine checks, and needs no network.
+  Withdrawal is enforced on the server and not only in the browser: every path
+  that could bring a draft back re-reads the flag first, so a recording still
+  running at the gateway when the patient says stop is never collected, by the
+  poll or by the webhook, and a second recording cannot be started. What is
+  still missing is a one tap withdrawal: stopping capture rides on the
+  consultation commit, because a bundle cannot declare an operation of its own,
+  and `assessment` is required on that form, so a withdrawal cannot be recorded
+  without also writing a note.
+- **The ambient scribe is wired and runs against the live Eka gateway.** The
+  browser records with `MediaRecorder`, posts the audio as the raw body to
+  `POST /scribe/sessions?thread=`, and polls `GET /scribe/sessions/{id}`. The
+  credentials never leave the server: `api/scribe.py` holds them, writes one
+  temporary file because the SDK takes paths, uploads it, and deletes it in a
+  `finally`. What comes back is a `Draft` and nothing else. It lands in the
+  ordinary form fields at confidence 0, drawn as "Heard, not certain (0%).
+  Read it back before you commit", and the panel's own tap is what writes.
+  There is no scribe route on the kernel that writes anything, and
+  `api/scribe.py` has no `Store`.
+
+  Verified end to end on 2026-09-11 against `https://api.eka.care`, with a 77
+  second synthetic consultation: consent yes at registration raises
+  `capture.agreed`, the workflow composes `capture.consented`, the scribe is
+  offered at the doctor, the draft comes back in 10 to 21 seconds, the doctor
+  edits it on screen, and the edited value is what lands in SQLite. The same
+  recording drafts the prescription, waiting on that form.
+
+  Two sentences worth reading twice. The doctor dictated **Cetirizine 10 mg**
+  and Eka returned **"Antihistamine 10 mg tablet"**, twice, on two separate
+  uploads of the same audio. A previous run heard "No" as "Number". The prose
+  is good and the discrete values are not, which is the whole reason a drafted
+  drug name is a discrete value behind a readback and a tap.
+
+  Three things to know:
+
+  - **Audio retention on the served path is zero, not fifteen minutes.** The
+    one temporary file is deleted immediately after the upload returns,
+    whether it succeeded or not, and a live run leaves no `phc-scribe-*` file
+    behind. `AUDIO_GRACE_SECONDS = 900` and `AUDIO_MAX_HOLD_SECONDS = 21600`
+    in `care_phc/connectors/scribe/base.py` belong to `AudioRetention`, which
+    works and deletes real files under its own 22 checks, and which **nothing
+    the API runs imports**. Read those constants as a proposal, not as the
+    behaviour. **Nothing here deletes the recording at Eka's end**, which is
+    now the copy that matters, and no call that would has been tried.
+  - **There are two scribe implementations and only one is wired.**
+    `api/scribe.py` serves the routes. `care_phc/connectors/scribe/` has the
+    boundary, the retention rule and the poll loop, and no caller. They map
+    the same response twice. The split already cost one bug: Eka answers
+    **202** with a partial body, the transcript `success` and
+    `eka_emr_template` still `in-progress`, and the SDK helper
+    `get_session_status` throws the status code away, so `api/scribe.running()`
+    read an empty draft as a finished one and latched the session to `failed`.
+    The connector, which reads the raw status code, never had it. The API now
+    reads each row's own `status` instead. Merging the two is the next job.
+  - **No real microphone, and no webhook has ever been delivered.** The
+    Browser pane blocks `getUserMedia`; the refusal path is real and says so
+    in words, and every run above stubbed `MediaRecorder` with a real audio
+    file. `POST /scribe/webhook` is checked against a synthetic body only:
+    nothing outside this machine can reach localhost. Polling is what runs.
+- **The audit cannot tell a dictated note from a typed one.** A confirmed
+  scribe draft writes one audit line: `phc.op.consult-document`, `user:mo`,
+  `rendered`, with the final payload. That is correct by design, since the
+  kernel names the surface and a tap is a tap, but it means "was this note
+  drafted by a machine" is a question the record cannot answer. The `scribe`
+  badge on a posted card is the operation atom's static `instrument` field,
+  so a hand typed consultation carries it too. Report it to the architect
+  before anyone reads it as provenance.
 - **No authentication.** The role comes from `?role=` or `X-PHC-Role` and
   defaults to a union role holding every capability. This is a localhost demo.
 - **No CARE is running.** `adapters/local` is the only adapter that has

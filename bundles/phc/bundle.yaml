@@ -46,6 +46,9 @@ states:
   - registered
   - abha.linked
   - abha.pending
+  - capture.agreed
+  - capture.declined
+  - capture.withdrawn
   - capture.consented
   - vitals.recorded
   - vitals.flagged

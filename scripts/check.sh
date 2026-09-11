@@ -18,8 +18,10 @@ python3 -m kernel.tests.test_contracts
 python3 -m kernel.tests.test_kernel
 python3 -m kernel.tests.test_mapping
 python3 -m bundles.lab.check      # a second bundle on the same kernel; SKIP_E2E=1 skips its socket half
+python3 -m bundles.phc.check      # capture consent: raised, declined, scoped to the visit, withdrawable
 
 echo "\n== the adapter and the service =="
+python3 -m api.scribe          # the scribe's response reading, against a recorded live answer
 python3 -m adapters.local.tests.test_store
 python3 -m adapters.care.tests.test_store    # adapter 1, CARE REST, fake transport
 python3 -m adapters.care.tests.test_live     # READ ONLY against a public CARE; skipped when offline or SKIP_E2E
@@ -34,6 +36,10 @@ python3 -m agent.tests.test_live      # binds a port; SKIP_E2E=1 skips that half
 # than fail on a machine that has not installed the SDK.
 if python3 -c 'import ekacare' 2>/dev/null; then
   python3 -m care_phc.connectors.abdm.check
+  # The scribe connector, against a recorded real response. No credential, no
+  # socket, no recording: the live upload it was recorded from is in the
+  # docstring, not in this script.
+  python3 -m care_phc.connectors.scribe.check
 else
   echo "warn abdm connector skipped: python3 -m pip install --user ekacare"
 fi
@@ -56,6 +62,7 @@ if [ -d web/node_modules ]; then
   # Which fields take voice comes from the instrument declarations, and nothing
   # on the voice path can write. Both are asserted here; neither needs a mic.
   (cd web && node --experimental-strip-types src/voice/voice.check.ts)
+  (cd web && node --experimental-strip-types src/scribe/scribe.check.ts)
   echo "ok   web renderer typechecks and builds"
 else
   echo "warn web: run (cd web && npm install) to check the renderer"
