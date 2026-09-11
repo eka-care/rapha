@@ -125,6 +125,10 @@ const threadOf = (r: Row): ThreadView => ({
   nudge: r.flags.includes("vitals.flagged")
     ? "Blood pressure is flagged. The doctor sees this before the patient sits down."
     : "",
+  // The kernel derives this from the workflow's own done_when/emits; this
+  // mock has no workflow declaration to derive it from, so it stays absent
+  // until a later task teaches the mock to read one.
+  closes: null,
 });
 
 const queue = (): ViewResult => ({

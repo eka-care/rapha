@@ -100,6 +100,18 @@ def check_the_declaration_drives_a_line_the_phc_never_had():
        "4 roles, and not one word of them is the PHC's")
 
 
+def check_the_loop_derivations_are_the_kernels_not_the_phcs():
+    """The loop derivations are kernel behaviour, not the health centre's. This
+    bundle's line must resolve a closer for every station it declares, from its
+    own done_when flags, with no phc.* anywhere in the answer.
+    """
+    for step in WF.steps:
+        closer = state.loop_closer(WF, OPS, step.station)
+        assert closer is not None, f"{step.station} has no operation emitting {step.done_when}"
+        assert not closer.startswith("phc."), f"lab station {step.station} closed by {closer}"
+    ok("every laboratory station resolves its own closer, and none of them is the PHC's")
+
+
 def check_the_seed_is_the_laboratorys_own():
     """Leak 10, closed. The seed used to live in adapters/local/store.py and
     ran under whatever bundle was loaded, so a laboratory opened on six

@@ -579,6 +579,35 @@ def test_an_operation_no_step_draws_is_neither_a_button_nor_a_write():
     assert s.count("questionnaire_response", thread=T, where={}) == 0
 
 
+def test_loop_closer_is_the_operation_that_emits_done_when():
+    """A station's loop closes on the operation that satisfies its step.
+
+    Derived, never declared: adding a `loop:` key to every bundle would be a
+    second place to state what `done_when` and `emits` already say, and so a
+    second place to be wrong.
+    """
+    assert state.loop_closer(WF, OPS, "reception") == "phc.op.patient-register"
+    assert state.loop_closer(WF, OPS, "nurse") == "phc.op.vitals-record"
+    # The doctor's step draws four operations and only one of them ends it.
+    # rx-prescribe and lab-order live INSIDE the doctor's loop.
+    assert state.loop_closer(WF, OPS, "doctor") == "phc.op.consult-document"
+    assert state.loop_closer(WF, OPS, "nowhere") is None
+
+
+def test_loop_opener_is_the_only_operation_that_needs_an_empty_thread():
+    """`not registered` is the signature of an operation that starts a subject."""
+    assert state.loop_opener(WF, OPS) == "phc.op.patient-register"
+
+
+def test_thread_view_carries_what_closes_this_station():
+    store = Fake()
+    ref = _refs(T)[0]
+    caps = set(vocab.for_bundle("phc").roles["frontdesk"])
+    view = state.thread_view(store, ref, WF, OPS, caps=caps)
+    assert view.station == "reception"
+    assert view.closes == "phc.op.patient-register"
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

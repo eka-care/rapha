@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from catalogue import vocab
+from catalogue import guard, vocab
 from catalogue.guard import visible
 from kernel import contracts as c
 
@@ -132,6 +132,53 @@ def drawn_by(workflow, op_id):
     return any(op_id in (step.operations or []) for step in workflow.steps)
 
 
+def loop_closer(workflow, operations, station):
+    """The operation at `station` that ends this role's task there.
+
+    A step declares `done_when`, and exactly one of its operations emits that
+    flag. That operation is the close of the loop; the rest of the step's
+    operations happen inside it. The doctor's step draws four operations and
+    `consult.documented` names one of them, which is what keeps rx-prescribe
+    and lab-order from reading as ends of the consultation.
+
+    Returns None for a station this workflow has no step for, and for a step
+    whose done_when no operation at that station emits — a bundle may declare
+    a flag raised somewhere else, and that is a line with no close, not a
+    crash.
+    """
+    for step in workflow.steps:
+        if step.station != station:
+            continue
+        for op_id in step.operations:
+            op = operations.get(op_id)
+            if op is not None and step.done_when in (op.get("emits") or []):
+                return op_id
+    return None
+
+
+def loop_opener(workflow, operations):
+    """The operation that starts a new subject: the one whose preconditions
+    hold against an empty thread.
+
+    Everything else on the line needs `registered` or something later, so this
+    picks out registration without naming it. A bundle with no such operation
+    (a laboratory that only ever receives specimens) returns None, and roles
+    there loop on their queue instead of on new subjects.
+    """
+    for step in workflow.steps:
+        for op_id in step.operations:
+            op = operations.get(op_id)
+            if op is None:
+                continue
+            # Reaching for the underscore-prefixed predicate deliberately:
+            # guard.visible also checks capability, which is a property of
+            # who is looking, not of the workflow. This is a property of the
+            # workflow alone, so it goes straight to the precondition check.
+            if guard._preconditions_met(op, frozenset())[0]:
+                return op_id
+    return None
+
+
 def actions(workflow, operations, known, caps, station_filter=None,
             actor=None, performed=None):
     """Quick actions to draw, ordered. Addendum SSD.2: a table, not a model.
@@ -184,6 +231,7 @@ def thread_view(store, ref, workflow, operations, *, caps, nudge="", actor=None)
         id=ref.id, workflow=workflow.id, subject=dict(ref.subject),
         flags=sorted(known), station=station(workflow, known),
         line=line(workflow, known),
+        closes=loop_closer(workflow, operations, station(workflow, known)),
         actions=actions(workflow, operations, known, caps, actor=actor,
                         performed=performers(store, ref.id) if actor else None),
         proposals=store.proposals(ref.id, status="pending"),

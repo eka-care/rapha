@@ -150,6 +150,10 @@ export type ThreadView = {
   flags: string[]; station: string | null; line: StepStatus[];
   actions: Operation[]; proposals: Proposal[]; audit: AuditRecord[];
   capabilities: string[]; held: string[]; nudge?: string;
+  /** The operation whose commit ends this role's task at this station, from
+   *  the step's own done_when. The renderer never derives this: `applies_when`
+   *  steps mean only the kernel knows which station is current. */
+  closes: string | null;
 };
 
 export type QueueRow = {

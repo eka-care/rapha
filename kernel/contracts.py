@@ -410,6 +410,7 @@ class ThreadView:
     capabilities: list              # every capability
     held: list                      # the caller's
     nudge: str = ""
+    closes: Optional[str] = None    # loop_closer for `station`; None once complete
 
     def to_json(self) -> dict:
         return asdict(self)
