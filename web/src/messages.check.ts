@@ -165,37 +165,23 @@ assert.ok(
 
 // ---------------------------------------------------------------- composer
 
+// The scribe shortcut, the capped action list and the "More" pill used to be
+// tested here. loops.ts (loops.check.ts) now owns that behaviour: the agent's
+// bubble draws the one primary action and its overflow, so composer() has
+// only the summary pills left to be responsible for.
 const bar = composer(thread, cat);
 assert.ok(bar.pills.length > 0);
 for (const p of bar.pills) {
   assert.ok(!("disabled" in p), "a pill is never disabled: an unavailable action is absent");
 }
-assert.equal(
-  bar.pills.filter((p) => p.kind === "action").length <= 6, true,
-  "six visible actions at most; the rest live behind the palette",
+assert.ok(
+  bar.pills.every((p) => p.kind === "summary"),
+  "the composer offers summary views only; an operation is offered once, by the agent's own bubble",
 );
-assert.equal(bar.pills.filter((p) => p.primary).length <= 1, true, "one emphasis at most");
 assert.ok(
   bar.pills.some((p) => p.kind === "summary"),
   "every summary view this workflow declares is a pill on the thread",
 );
-assert.equal(bar.consentMissing, true, "the consult declares a scribe and consent is not recorded");
-assert.ok(
-  !bar.pills.some((p) => p.kind === "scribe"),
-  "no consent, no scribe pill: the instrument declaration gates it, not this renderer",
-);
-
-const consented = composer({ ...thread, flags: [...thread.flags, "capture.consented"] }, cat);
-assert.ok(consented.pills.some((p) => p.kind === "scribe"), "with consent the scribe pill appears");
-assert.equal(consented.consentMissing, false);
-
-// More than six actions caps at six and offers the palette for the rest.
-const many = composer(
-  { ...thread, actions: Object.values(cat.operations).slice(0, 9) },
-  cat,
-);
-assert.equal(many.pills.filter((p) => p.kind === "action").length, 6);
-assert.ok(many.pills.some((p) => p.kind === "more"));
 
 assert.ok(summariesFor(cat, WF).length >= 1);
 

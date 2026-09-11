@@ -260,55 +260,19 @@ export type Pill = {
  *  bundle's word: no capture happens anywhere without it. */
 export const CONSENT = "capture.consented";
 
-const MAX_PILLS = 6;              // spec D: a hard cap of six visible actions
-
-/** The composer's pill row.
+/** The composer's pill row: one pill per summary view this workflow declares.
  *
- *  Order: the scribe, then the actions the kernel returned in the order it
- *  returned them, then More if it capped, then one pill per summary view this
- *  workflow declares. Nothing is ever disabled.
+ *  This used to also carry a scribe shortcut, a capped action list and a
+ *  "More" pill for the actions it could not fit. Those were the same
+ *  operations the agent's own bubble already offers, so loops.ts (weigh())
+ *  now draws the one primary action and its overflow there instead, and this
+ *  function only has to say which summaries exist. Nothing is ever disabled.
  */
-export function composer(thread: ThreadView, cat: Catalogue): { pills: Pill[]; consentMissing: boolean } {
-  const actions = thread.actions ?? [];
-  const flags = thread.flags ?? [];
-  const live = new Set(actions.map((o) => o.id));
-
-  // A scribe is an instrument declaration, not an operation id: whichever
-  // operation it names, if that operation is offered here, the scribe pill is
-  // its shortcut and carries the instrument's own title.
-  const scribes = Object.values(cat.instruments ?? {}).filter(
-    (d) => d.kind === "scribe" && (d.operations ?? []).some((id) => live.has(id)),
-  );
-  const consented = flags.includes(CONSENT);
-  const scribeOp = scribes.length
-    ? actions.find((o) => (scribes[0].operations ?? []).includes(o.id))
-    : undefined;
-
-  const pills: Pill[] = [];
-  if (scribeOp && consented) {
-    pills.push({ op: scribeOp, label: scribes[0].title, kind: "scribe", primary: true });
-  }
-
-  const rest = actions.filter((o) => o.id !== (pills[0]?.op?.id ?? ""));
-  const shown = rest.slice(0, MAX_PILLS);
-  // Without a scribe the emphasis goes to the first action standing at this
-  // thread's own station, which is the one the person in front of the patient
-  // is here to do.
-  const primaryId = pills.length ? "" : shown.find((o) => o.station === thread.station)?.id ?? "";
-  for (const op of shown) {
-    pills.push({
-      op, label: op.short, kind: "action",
-      primary: op.id === primaryId,
-      irreversible: op.irreversibility === "irreversible",
-    });
-  }
-  if (rest.length > shown.length) pills.push({ label: "More", kind: "more" });
-
-  for (const v of summariesFor(cat, thread.workflow)) {
-    pills.push({ view: v, label: v.title ?? title(v.id), kind: "summary" });
-  }
-
-  return { pills, consentMissing: !!scribeOp && !consented };
+export function composer(thread: ThreadView, cat: Catalogue): { pills: Pill[] } {
+  const pills: Pill[] = summariesFor(cat, thread.workflow).map((v) => ({
+    view: v, label: v.title ?? title(v.id), kind: "summary" as const,
+  }));
+  return { pills };
 }
 
 /** A summary view belongs to a thread, not to the nav. One that names a
