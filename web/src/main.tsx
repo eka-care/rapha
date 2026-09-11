@@ -10,7 +10,7 @@
  *  Every write in this file goes through OperationPanel, in a modal, and needs
  *  a tap in it. Nothing on this page commits; it opens the screen that can.
  */
-import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
+import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ABHA_OP, ABHA_PENDING, mobileHint } from "./abha/sdk";
 import { API_BASE, DEMO_ROLE, api, currentRole, setRole, useAsync } from "./api";
@@ -19,7 +19,7 @@ import { CloseCard } from "./CloseCard";
 import { questionnaire } from "./declarations";
 import { Home } from "./Home";
 import { Icon, IconSheet } from "./icons";
-import { cue, type Cue } from "./loops";
+import { cue, opensOnArrival, weigh, type Cue } from "./loops";
 import { clock, header, queueViewFor, type Ctx, type Said } from "./messages";
 import { mockApi } from "./mock";
 import { OperationPanel, proposalOperation } from "./OperationPanel";
@@ -128,6 +128,18 @@ function App() {
   // on screen next. Without this, leaving and returning to a station shows a
   // stale card for a loop that already moved on.
   useEffect(() => { setClosed(null); }, [route.id]);
+
+  // The instrument is the screen, not a thing a button offers to fetch. Once
+  // per thread: reopening after a person closes it is a trap, not a default.
+  const openedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (route.kind !== "thread" || !thread.data || modal || closed) return;
+    if (openedFor.current === route.id) return;
+    const { primary } = weigh(thread.data.actions, thread.data.closes);
+    if (!opensOnArrival(primary)) return;
+    openedFor.current = route.id;
+    setModal({ op: primary!, thread: route.id });
+  }, [route.kind, route.id, thread.data, modal, closed]);
 
   useEffect(() => {
     if (!thread.data) return;

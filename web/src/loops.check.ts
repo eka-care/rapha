@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { cue, weigh } from "./loops.ts";
+import { cue, opensOnArrival, weigh } from "./loops.ts";
 import type { Operation, QueueRow } from "./types";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -74,5 +74,15 @@ ok(elsewhere.kind === "empty", "another station's queue is not this role's work"
 const quiet = cue({ station: "nurse", opener: null, queue: [], closed: "enc-1" });
 ok(quiet.kind === "empty", "an empty queue is an empty cue");
 ok(!/\d/.test(quiet.label), "the empty cue states no count it does not have");
+
+// -- how much AI a role touches is declared, never coded --------------------
+ok(opensOnArrival(register), "registration opens on arrival");
+ok(register.instrument === "form", "and it is a form, which is why front desk sees no AI");
+ok(op("phc.op.vitals-record").instrument === "device", "vitals declares a device");
+ok(op("phc.op.consult-document").instrument === "scribe", "the consultation declares the scribe");
+ok(!opensOnArrival(undefined), "nothing to open is not an open");
+
+// Irreversible work is never opened for someone who did not ask for it.
+ok(!opensOnArrival(op("phc.op.abha-link")), "an irreversible operation waits to be asked for");
 
 console.log(`ok   ${checks} loop checks`);

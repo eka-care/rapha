@@ -32,6 +32,18 @@ export type Cue =
   | { kind: "next"; thread: string; label: string }
   | { kind: "empty"; label: string };
 
+/** Whether arriving at a thread should open this operation's instrument
+ *  straight away, rather than draw a button that offers to.
+ *
+ *  Everything correctable opens. An irreversible operation does not: opening a
+ *  national identity journey over the screen every time someone arrives is how
+ *  a person learns to dismiss it, and dismissing is the habit that makes the
+ *  confirm step meaningless.
+ */
+export function opensOnArrival(op: Operation | undefined): boolean {
+  return !!op && op.irreversibility !== "irreversible";
+}
+
 export function cue(a: {
   station: string | null;
   opener: Operation | null;
