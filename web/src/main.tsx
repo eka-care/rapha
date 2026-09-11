@@ -15,9 +15,11 @@ import { createRoot } from "react-dom/client";
 import { ABHA_OP, ABHA_PENDING, mobileHint } from "./abha/sdk";
 import { API_BASE, DEMO_ROLE, api, currentRole, setRole, useAsync } from "./api";
 import { ask, NO_AGENT } from "./ask";
+import { CloseCard } from "./CloseCard";
 import { questionnaire } from "./declarations";
 import { Home } from "./Home";
 import { Icon, IconSheet } from "./icons";
+import { cue, type Cue } from "./loops";
 import { clock, header, queueViewFor, type Ctx, type Said } from "./messages";
 import { mockApi } from "./mock";
 import { OperationPanel, proposalOperation } from "./OperationPanel";
@@ -27,7 +29,9 @@ import {
   navViews, Overlay, recents, remember, Sheet, Sidebar, toast, Toast, useTheme, type Recent,
 } from "./Shell";
 import { Thread } from "./Thread";
-import type { Catalogue, MetricValue, Operation, Payload, Proposal, ThreadView, ViewDecl, ViewResult } from "./types";
+import type {
+  Catalogue, Facility, MetricValue, Operation, Payload, Proposal, QueueRow, ThreadView, ViewDecl, ViewResult,
+} from "./types";
 import { Boundary, Failed, Loading, human, title } from "./ui";
 import { ViewRenderer } from "./ViewRenderer";
 import "./theme.css";
@@ -118,6 +122,12 @@ function App() {
   const [sheet, setSheet] = useState<{ view: ViewDecl; thread: string } | null>(null);
   const [said, setSaid] = useState<Record<string, Said[]>>(loadSaid);
   const [asking, setAsking] = useState(false);
+  const [closed, setClosed] = useState<{ what: string; cue: Cue } | null>(null);
+
+  // A close card is about the thread that just closed, not whichever one is
+  // on screen next. Without this, leaving and returning to a station shows a
+  // stale card for a loop that already moved on.
+  useEffect(() => { setClosed(null); }, [route.id]);
 
   useEffect(() => {
     if (!thread.data) return;
@@ -192,6 +202,23 @@ function App() {
   const openThread = (id: string) => {
     setPalette(false);
     go(`#/threads/${id}`);
+  };
+
+  /** Read `closes` before reloading, because the reload is what changes it. */
+  const finish = (op: Operation) => {
+    const wasClosing = thread.data?.closes === op.id;
+    thread.reload();
+    loaded.reload();
+    if (!wasClosing || !cat.data) return;
+    setClosed({
+      what: op.title,
+      cue: cue({
+        station: thread.data?.station ?? null,
+        opener: openerFor(cat.data, thread.data?.workflow, fac.data),
+        queue: (queues[0]?.result.rows ?? []) as QueueRow[],
+        closed: route.id,
+      }),
+    });
   };
 
   /** After a write, the journey the kernel now says is available here.
@@ -348,6 +375,19 @@ function App() {
                 <>
                   {thread.loading && <Loading what="this thread" />}
                   {thread.error && <Failed error={thread.error} onRetry={thread.reload} />}
+                  {closed && (
+                    <CloseCard
+                      what={closed.what}
+                      wentTo={thread.data?.station ?? null}
+                      cue={closed.cue}
+                      onCue={() => {
+                        const c = closed.cue;
+                        setClosed(null);
+                        if (c.kind === "open") void register();
+                        else if (c.kind === "next") openThread(c.thread);
+                      }}
+                    />
+                  )}
                   {thread.data && (
                     <Thread
                       thread={thread.data}
@@ -367,9 +407,7 @@ function App() {
                           instruments={cat.data?.instruments}
                           flags={thread.data?.flags ?? []}
                           onDone={(carried) => {
-                            toast("Recorded. The proposal is closed.");
-                            thread.reload();
-                            loaded.reload();
+                            finish(proposalOperation(p, cat.data?.operations ?? {}));
                             void offerJourney(route.id, p.operation, thread.data?.workflow, carried);
                           }}
                         />
@@ -435,10 +473,8 @@ function App() {
             seed={modal.seed}
             onCancel={() => setModal(null)}
             onDone={(carried) => {
-              toast(`${modal.op.title} committed`);
               setModal(null);
-              thread.reload();
-              loaded.reload();
+              finish(modal.op);
               void offerJourney(
                 modal.thread, modal.op.id, thread.data?.workflow, carried,
                 // Whether that panel mounted the journey itself, which is the
@@ -473,6 +509,16 @@ function App() {
       <Toast />
     </div>
   );
+}
+
+/** The workflow's opener, but only for someone who may actually perform it.
+ *  A nurse who cannot register must be cued to their queue, not to a button
+ *  the guard will refuse. */
+function openerFor(cat: Catalogue, workflow: string | undefined, facility?: Facility) {
+  const id = firstOperation(cat, workflow);
+  const op = id ? cat.operations?.[id] : undefined;
+  if (!op) return null;
+  return facility?.user?.capabilities?.includes(op.capability) ? op : null;
 }
 
 /** The topbar's two lines. On a thread the second is where the baton stands

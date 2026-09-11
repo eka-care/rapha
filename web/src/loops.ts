@@ -4,7 +4,7 @@
  *  precondition is unmet or whose capability is not held is absent, never
  *  disabled. So everything here is a question of weight, not permission.
  */
-import type { Operation } from "./types";
+import type { Operation, QueueRow } from "./types";
 
 /** One filled button, everything else one level down.
  *
@@ -19,4 +19,34 @@ export function weigh(
 ): { primary?: Operation; overflow: Operation[] } {
   const primary = actions.find((op) => op.id === closes) ?? actions[0];
   return { primary, overflow: actions.filter((op) => op.id !== primary?.id) };
+}
+
+/** What a role is offered once its task at a station is done.
+ *
+ *  Two shapes, because there are two kinds of role: one that starts new
+ *  subjects (it holds the workflow's opener) and one that works a queue. The
+ *  difference is derived from the declarations, not from a list of job titles.
+ */
+export type Cue =
+  | { kind: "open"; op: Operation; label: string }
+  | { kind: "next"; thread: string; label: string }
+  | { kind: "empty"; label: string };
+
+export function cue(a: {
+  station: string | null;
+  opener: Operation | null;
+  queue: QueueRow[];
+  /** The thread whose loop just closed. It may still be in the queue result,
+   *  which was read before the commit; offering it back is a loop with no
+   *  exit. */
+  closed: string;
+}): Cue {
+  if (a.opener) return { kind: "open", op: a.opener, label: a.opener.title };
+  const waiting = a.queue.filter((r) => r.station === a.station && r.thread !== a.closed);
+  const first = waiting[0];
+  if (!first) return { kind: "empty", label: "Nobody waiting" };
+  const name = typeof first.subject.name === "string" && first.subject.name
+    ? first.subject.name
+    : String(first.subject.token ?? first.thread);
+  return { kind: "next", thread: first.thread, label: name };
 }
