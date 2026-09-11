@@ -594,9 +594,44 @@ def test_loop_closer_is_the_operation_that_emits_done_when():
     assert state.loop_closer(WF, OPS, "nowhere") is None
 
 
+def test_loop_closer_is_not_fooled_by_declaration_order():
+    """Every real bundle happens to declare its emitter first in the step's
+    operation list, so a `loop_closer` that just returned
+    `step.operations[0]` would pass every check above without ever reading
+    `done_when` or `emits`. This fixture puts the emitter second to catch
+    exactly that shortcut."""
+    step = c.Step(station="s", done_when="flag.done",
+                 operations=["op.other", "op.emitter"])
+    wf = c.Workflow(id="wf.fixture", title="", summary="", subject="thing",
+                    steps=[step], states={}, stored=[])
+    ops = {
+        "op.other": {"id": "op.other", "emits": ["flag.other"]},
+        "op.emitter": {"id": "op.emitter", "emits": ["flag.done"]},
+    }
+    assert state.loop_closer(wf, ops, "s") == "op.emitter"
+
+
 def test_loop_opener_is_the_only_operation_that_needs_an_empty_thread():
     """`not registered` is the signature of an operation that starts a subject."""
     assert state.loop_opener(WF, OPS) == "phc.op.patient-register"
+
+
+def test_loop_opener_is_not_fooled_by_declaration_order():
+    """phc.op.patient-register is both the correct opener and literally the
+    first operation of the first step, so a `loop_opener` that just returned
+    `steps[0].operations[0]` would pass the check above without ever reading
+    `preconditions`. This fixture puts the precondition-satisfying operation
+    in the second step, behind an operation whose precondition an empty
+    thread does not hold."""
+    step1 = c.Step(station="a", done_when="flag.a", operations=["op.needs-flag"])
+    step2 = c.Step(station="b", done_when="flag.b", operations=["op.opener"])
+    wf = c.Workflow(id="wf.fixture", title="", summary="", subject="thing",
+                    steps=[step1, step2], states={}, stored=[])
+    ops = {
+        "op.needs-flag": {"id": "op.needs-flag", "preconditions": ["flag.a"]},
+        "op.opener": {"id": "op.opener", "preconditions": []},
+    }
+    assert state.loop_opener(wf, ops) == "op.opener"
 
 
 def test_thread_view_carries_what_closes_this_station():
