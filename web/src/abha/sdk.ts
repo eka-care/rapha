@@ -47,6 +47,13 @@
  */
 export const ABHA_OP = "phc.op.abha-link";
 
+/** What an operation emits when it has just made a patient who has no national
+ *  account yet. It is the bundle's own word for "an ABHA belongs here", and it
+ *  is what decides whether the create-on-miss opens the journey: the health
+ *  centre's registration emits it, the laboratory's accession does not, and
+ *  neither file mentions the other. */
+export const ABHA_PENDING = "abha.pending";
+
 /** GET /abha/config. The server names the environment; the browser does not
  *  choose it and no credential is in here. */
 export type AbhaConfig = {
@@ -60,7 +67,11 @@ export type AbhaConfig = {
 };
 
 export type AbhaOutcome =
-  | { kind: "linked"; number: string; address: string; name: string }
+  /** `raw` is the success payload exactly as the SDK fired it, kept because
+   *  the identifier is not all of it: the profile underneath carries the
+   *  demographics a registration form asks for. Read with demographicsFrom,
+   *  never indexed. */
+  | { kind: "linked"; number: string; address: string; name: string; raw: unknown }
   /** The patient is registered, tokened and seen with ABHA pending. This is a
    *  first class outcome and not an error: a patient who cannot finish the
    *  journey at the counter must never be a patient who cannot be seen. */
@@ -71,7 +82,11 @@ export type AbhaOutcome =
 // ------------------------------------------------------------ the result
 
 const NUMBER_KEYS = ["abha_number"];
-const ADDRESS_KEYS = ["abha_address", "phr_address", "health_id"];
+/** `health-ids` is an array, and the bundle fills it BOTH ways: three call
+ *  sites build `[profile.abha_address]`, a list of plain strings, and the
+ *  branch the mock declares builds a list of objects. So it is an address key
+ *  AND it is walked into. */
+const ADDRESS_KEYS = ["abha_address", "phr_address", "health_id", "health-ids"];
 const NAME_KEYS = ["fln", "name", "full_name"];
 
 /** Pull the identifier out of whatever the journey handed back.
@@ -89,6 +104,7 @@ export function identifierFrom(result: unknown): { number: string; address: stri
   const seen = new Set<unknown>();
 
   const take = (slot: "number" | "address" | "name", value: unknown) => {
+    if (Array.isArray(value)) return value.forEach((v) => take(slot, v));
     const text = typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
     if (text && !found[slot]) found[slot] = text;
   };
@@ -113,7 +129,7 @@ export function identifierFrom(result: unknown): { number: string; address: stri
     // there is one traversal here and not two.
     for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
       if (NUMBER_KEYS.includes(key)) take("number", value);
-      else if (ADDRESS_KEYS.includes(key)) take("address", value);
+      else if (ADDRESS_KEYS.includes(key)) { take("address", value); walk(value); }
       else if (NAME_KEYS.includes(key)) take("name", value);
       else walk(value);
     }
@@ -161,4 +177,146 @@ export function environmentLine(config: AbhaConfig): { text: string; danger: boo
   return config.environment === "production"
     ? { text: "Production: real OTPs, real accounts.", danger: true }
     : { text: "staging", danger: false };
+}
+
+// ------------------------------------------------------- the demographics
+
+/** The ABHA profile, read off the loaded staging bundle
+ *  (@eka-care/abha-stg@0.1.126) on 2026-09-11 and not off the reference. Its
+ *  own `getMockAuthVerifyResponse` is the declaration of the success shape,
+ *  and every branch that fires onAbhaSuccess builds `data.profile` out of
+ *  exactly these keys:
+ *
+ *    fln fn mn ln gen dob mobile oid uuid profile_photo abha_number
+ *    kyc_verified pincode address state_code state_name district_code
+ *    district_name sub_district_code sub_district_name town_code town_name
+ *    village_code village_name ward_code ward_name health-ids
+ *
+ *  So it is not four fields. It is a name in four spellings, a gender code, a
+ *  date of birth and a whole address down to the ward.
+ *
+ *  Two traps, both real in that bundle:
+ *  - `gen` is the code, not the word: the SDK's own picker is
+ *    `[{id:"M",name:"Male"},{id:"F",name:"Female"},{id:"O",name:"Other"}]`.
+ *  - `dob` is assembled as `${year}-${month}-${day}` from three fields that
+ *    may all be missing, so a real payload can carry the literal string
+ *    "undefined-NaN-NaN". One branch passes the gateway's `date_of_birth`
+ *    straight through instead, which is day first. Hence the strict parse
+ *    below: anything that is not plainly a date produces no age at all.
+ */
+const PROFILE_KEYS = [
+  "fln", "fn", "mn", "ln", "gen", "dob", "mobile", "abha_number",
+  "pincode", "address", "state_name", "district_name", "sub_district_name",
+  "town_name", "village_name", "ward_name",
+];
+
+/** The profile, wherever in the payload it is. Same reason identifierFrom
+ *  walks: six call sites fire onAbhaSuccess and the wrapper around the profile
+ *  is not the same in all of them. */
+export function profileFrom(result: unknown): Record<string, string> {
+  const found: Record<string, string> = {};
+  const seen = new Set<unknown>();
+  const walkIt = (node: unknown) => {
+    if (typeof node === "string") {
+      const text = node.trim();
+      if (text.startsWith("{")) {
+        try { walkIt(JSON.parse(text)); } catch { /* a plain string */ }
+      }
+      return;
+    }
+    if (!node || typeof node !== "object" || seen.has(node)) return;
+    seen.add(node);
+    for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+      if (PROFILE_KEYS.includes(key)) {
+        const text = typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
+        if (text && !found[key]) found[key] = text;
+      } else walkIt(value);
+    }
+  };
+  walkIt(result);
+  return found;
+}
+
+const GENDERS: Record<string, string> = { M: "male", F: "female", O: "other" };
+
+/** Completed years, or nothing. A date this cannot read plainly is not
+ *  guessed at: an age is a required answer on the form and a wrong one is
+ *  worse than an empty one. */
+export function ageFrom(dob: string): string {
+  const parts = /^(\d{1,4})[-/](\d{1,2})[-/](\d{1,4})$/.exec(dob.trim());
+  if (!parts) return "";
+  const [, a, m, b] = parts;
+  const [y, d] = a.length === 4 ? [a, b] : [b, a];
+  if (y.length !== 4) return "";
+  const born = new Date(Number(y), Number(m) - 1, Number(d));
+  if (born.getMonth() !== Number(m) - 1 || born.getDate() !== Number(d)) return "";
+  const now = new Date();
+  let age = now.getFullYear() - born.getFullYear();
+  const before =
+    now.getMonth() < born.getMonth() ||
+    (now.getMonth() === born.getMonth() && now.getDate() < born.getDate());
+  if (before) age -= 1;
+  return age >= 0 && age <= 150 ? String(age) : "";
+}
+
+/** Profile key to questionnaire answer. The right hand side is this bundle's
+ *  vocabulary and the left is the national one; a bundle that asks for a
+ *  district gets a district here without anybody editing this file, and a
+ *  bundle that does not ask is not told. */
+const DEMOGRAPHICS: Record<string, (p: Record<string, string>) => string> = {
+  name: (p) => p.fln || [p.fn, p.mn, p.ln].filter(Boolean).join(" "),
+  age: (p) => ageFrom(p.dob ?? ""),
+  date_of_birth: (p) => p.dob ?? "",
+  sex: (p) => GENDERS[(p.gen ?? "").toUpperCase()] ?? "",
+  gender: (p) => GENDERS[(p.gen ?? "").toUpperCase()] ?? "",
+  phone: (p) => p.mobile ?? "",
+  mobile: (p) => p.mobile ?? "",
+  village: (p) => p.village_name ?? "",
+  town: (p) => p.town_name ?? "",
+  ward: (p) => p.ward_name ?? "",
+  sub_district: (p) => p.sub_district_name ?? "",
+  district: (p) => p.district_name ?? "",
+  state: (p) => p.state_name ?? "",
+  pincode: (p) => p.pincode ?? "",
+  address: (p) => p.address ?? "",
+};
+
+/** What an authenticated ABHA journey can answer on THIS questionnaire.
+ *
+ *  Asked of the questions rather than of a field list, because a value the
+ *  form cannot show is worse than no value: a `choice` whose answer is not one
+ *  of its own options renders as an empty select over a payload that still
+ *  carries the answer, which is a commit nobody read. So an answer is written
+ *  only when the question exists, the question has no option list or the value
+ *  is on it, and the profile actually carried it.
+ *
+ *  Nothing here can fill a consent or a confirm. Those are not demographics,
+ *  they are a person saying yes, and a journey cannot say it for them: the
+ *  left hand column above is the whole of what this can write.
+ */
+export function demographicsFrom(
+  result: unknown,
+  questions: { link_id: string; type: string; answer_option?: { value: string }[] }[],
+): Record<string, string> {
+  const profile = profileFrom(result);
+  const out: Record<string, string> = {};
+  for (const q of questions) {
+    const value = DEMOGRAPHICS[q.link_id]?.(profile) ?? "";
+    if (!value) continue;
+    const options = q.answer_option?.map((o) => o.value);
+    if (options && !options.includes(value)) continue;
+    out[q.link_id] = value;
+  }
+  return out;
+}
+
+/** What the clerk typed in the palette, if it was a mobile number, so that
+ *  nobody types it twice. The SDK's own `handleIdentifier` strips spaces and
+ *  dashes and accepts +91, and `isValidMobile` is the leading digit rule
+ *  below; this is the same test, run before the journey is opened rather than
+ *  after, because a search string that is a name must not become an
+ *  identifier. */
+export function mobileHint(typed: string | undefined): string | undefined {
+  const digits = (typed ?? "").replace(/[\s-]/g, "").replace(/^\+?91/, "");
+  return /^[6-9]\d{9}$/.test(digits) ? digits : undefined;
 }

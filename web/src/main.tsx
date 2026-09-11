@@ -12,7 +12,7 @@
  */
 import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { ABHA_OP } from "./abha/sdk";
+import { ABHA_OP, ABHA_PENDING, mobileHint } from "./abha/sdk";
 import { API_BASE, DEMO_ROLE, api, currentRole, setRole, useAsync } from "./api";
 import { ask, NO_AGENT } from "./ask";
 import { questionnaire } from "./declarations";
@@ -27,7 +27,7 @@ import {
   navViews, Overlay, recents, remember, Sheet, Sidebar, toast, Toast, useTheme, type Recent,
 } from "./Shell";
 import { Thread } from "./Thread";
-import type { Catalogue, MetricValue, Operation, Proposal, ThreadView, ViewDecl, ViewResult } from "./types";
+import type { Catalogue, MetricValue, Operation, Payload, Proposal, ThreadView, ViewDecl, ViewResult } from "./types";
 import { Boundary, Failed, Loading, human, title } from "./ui";
 import { ViewRenderer } from "./ViewRenderer";
 import "./theme.css";
@@ -108,7 +108,13 @@ function App() {
 
   const [recent, setRecent] = useState<Recent[]>(recents);
   const [palette, setPalette] = useState(false);
-  const [modal, setModal] = useState<{ op: Operation; thread: string; proposal?: Proposal } | null>(null);
+  const [modal, setModal] = useState<{
+    op: Operation; thread: string; proposal?: Proposal;
+    /** A mobile number the clerk typed in the palette, for the journey. */
+    mobile?: string;
+    /** Answers already obtained by a journey on the previous panel. */
+    seed?: Payload;
+  } | null>(null);
   const [sheet, setSheet] = useState<{ view: ViewDecl; thread: string } | null>(null);
   const [said, setSaid] = useState<Record<string, Said[]>>(loadSaid);
   const [asking, setAsking] = useState(false);
@@ -203,7 +209,10 @@ function App() {
    *  default and search the exception, which manufactures duplicate patients
    *  and duplicate ABHAs. Registration is downstream of a search that already
    *  missed, so the same rule points the other way here. */
-  const offerJourney = async (id: string, justCommitted: string, workflow?: string) => {
+  const offerJourney = async (
+    id: string, justCommitted: string, workflow?: string,
+    carried?: Payload, alreadyAsked?: boolean,
+  ) => {
     // Only out of registration. The kernel offers phc.op.abha-link on a thread
     // for as long as the patient is unlinked, which is right for the action
     // list and would be wrong here: opening a national identity journey over
@@ -211,10 +220,18 @@ function App() {
     // "The first operation of the workflow's first step" is the bundle's own
     // answer to "what registers somebody", the same one register() uses.
     if (!cat.data || justCommitted !== firstOperation(cat.data, workflow)) return;
+    // The journey already ran, on the registration panel, and the clerk left
+    // it without an identifier. Reopening it two seconds later is how a person
+    // learns to dismiss it; the patient is ABHA pending and on the worklist,
+    // which is what that path is for.
+    if (alreadyAsked && !carried) return;
     try {
       const panel = await client.thread(id);
       const op = panel.actions.find((a) => a.id === ABHA_OP);
-      if (op) setModal({ op, thread: id });
+      // `seed` rather than a second journey: the identifier is already known,
+      // and the consent and the method on that form are still a person's to
+      // answer, behind its own un-prefilled confirm.
+      if (op) setModal({ op, thread: id, seed: carried });
     } catch {
       /* the thread reload below is what tells the person where this stands */
     }
@@ -223,7 +240,7 @@ function App() {
   /** Create on miss: open an empty thread, which writes an encounter row and
    *  no clinical fact, then open the first operation of the workflow's first
    *  step. Whichever operation that is, is the bundle's answer. */
-  const register = async () => {
+  const register = async (typed?: string) => {
     if (!cat.data) return;
     try {
       const opened = await client.openThread({});
@@ -231,7 +248,10 @@ function App() {
       go(`#/threads/${opened.id}`);
       const id = firstOperation(cat.data, opened.workflow);
       const op = id ? cat.data.operations?.[id] : undefined;
-      if (op) setModal({ op, thread: opened.id });
+      // The panel decides whether this operation opens the journey first; all
+      // this screen adds is what the clerk already typed, when that was a
+      // mobile number, so nobody types the same ten digits twice.
+      if (op) setModal({ op, thread: opened.id, mobile: mobileHint(typed) });
       toast(`Opened ${opened.id}`);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Could not open a thread");
@@ -346,11 +366,11 @@ function App() {
                           proposal={p}
                           instruments={cat.data?.instruments}
                           flags={thread.data?.flags ?? []}
-                          onDone={() => {
+                          onDone={(carried) => {
                             toast("Recorded. The proposal is closed.");
                             thread.reload();
                             loaded.reload();
-                            void offerJourney(route.id, p.operation, thread.data?.workflow);
+                            void offerJourney(route.id, p.operation, thread.data?.workflow, carried);
                           }}
                         />
                       )}
@@ -392,7 +412,7 @@ function App() {
               go("#/ask");
               say("workspace", q);
             }}
-            onRegister={register}
+            onRegister={(typed: string) => void register(typed)}
             onAction={(t: string, op: Operation) => {
               setPalette(false);
               go(`#/threads/${t}`);
@@ -411,13 +431,22 @@ function App() {
             proposal={modal.proposal}
             instruments={cat.data.instruments}
             flags={thread.data?.flags ?? []}
+            mobile={modal.mobile}
+            seed={modal.seed}
             onCancel={() => setModal(null)}
-            onDone={() => {
+            onDone={(carried) => {
               toast(`${modal.op.title} committed`);
               setModal(null);
               thread.reload();
               loaded.reload();
-              void offerJourney(modal.thread, modal.op.id, thread.data?.workflow);
+              void offerJourney(
+                modal.thread, modal.op.id, thread.data?.workflow, carried,
+                // Whether that panel mounted the journey itself, which is the
+                // same declaration the panel reads. A proposal keeps the plain
+                // form, so a registration confirmed from a card is still
+                // offered the journey here.
+                !modal.proposal && !!modal.op.emits?.includes(ABHA_PENDING),
+              );
             }}
           />
         </Overlay>

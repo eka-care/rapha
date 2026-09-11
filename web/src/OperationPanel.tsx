@@ -19,10 +19,11 @@
  *  single client call below are the same ones the modal uses.
  */
 import { useId, useMemo, useState } from "react";
-import { ABHA_OP, payloadFor, type AbhaOutcome } from "./abha/sdk";
+import { ABHA_OP, ABHA_PENDING, demographicsFrom, payloadFor, type AbhaOutcome } from "./abha/sdk";
 import { Journey } from "./abha/Journey";
 import { ApiError, type Client } from "./api";
 import { Form, labelled, validate } from "./Form";
+import { walk } from "./validate";
 import { questionnaire } from "./declarations";
 import { CONSENT, fmt } from "./messages";
 import type { Operation, Payload, Proposal } from "./types";
@@ -33,11 +34,25 @@ import { VoiceCapture } from "./voice/VoiceCapture";
 
 const IRREVERSIBLE = "irreversible";
 
+/** The chip under a field the journey filled. Two words, because the point is
+ *  that this was not typed here, and the field's own highlight already says
+ *  read me again. */
+const FROM_ABHA = "From ABHA";
+
 export function OperationPanel({
-  op, thread, client, proposal, instruments, flags, inline, onDone, onCancel,
+  op, thread, client, proposal, instruments, flags, inline, mobile, seed, onDone, onCancel,
 }: {
   op: Operation;
   thread: string;
+  /** A mobile number the clerk has already typed, from the search that missed.
+   *  Handed to the journey so nobody types it twice; a hint, never an answer on
+   *  this form. */
+  mobile?: string;
+  /** Answers this panel opens with, already obtained rather than typed. The
+   *  ABHA link panel gets one of these when the journey ran during
+   *  registration: the identifier is known, so asking for the journey a second
+   *  time would be asking the patient for a second one time password. */
+  seed?: Payload;
   /** Drawn inside the thread rather than over it. No Cancel: there is nothing
    *  to close, the card is the conversation. */
   inline?: boolean;
@@ -50,15 +65,27 @@ export function OperationPanel({
    *  care which, so demo mode cannot write to a real store by accident. */
   client: Client;
   proposal?: Proposal;
-  onDone: () => void;
+  /** `carried` is what this commit learned that the NEXT panel needs: the ABHA
+   *  identifier, when the journey ran on this screen. */
+  onDone: (carried?: Payload) => void;
   onCancel?: () => void;
 }) {
   const schema = questionnaire(op.input);
-  const [payload, setPayload] = useState<Payload>({ ...(proposal?.payload ?? {}) });
+  const [payload, setPayload] = useState<Payload>({ ...(proposal?.payload ?? seed ?? {}) });
   /** Per link_id, how sure the instrument that produced the value was. A
    *  value under 0.9 draws the field as unconfirmed. Typing over a value
    *  clears its entry: a number a person typed is not a heard number. */
   const [heard, setHeard] = useState<Record<string, number>>({});
+  /** Which fields came back from the ABHA journey rather than off the keyboard.
+   *  Marked on the form the same way an instrument's values are, and cleared
+   *  field by field the moment somebody types over one. */
+  const [fromAbha, setFromAbha] = useState<Record<string, string>>(() =>
+    Object.fromEntries(Object.keys(seed ?? {}).map((id) => [id, FROM_ABHA])),
+  );
+  /** The identifier this screen's journey produced, handed to whoever opens
+   *  the next panel. Never committed from here: registration does not write an
+   *  ABHA number, the link operation does. */
+  const [carried, setCarried] = useState<Payload | undefined>(undefined);
   const [tried, setTried] = useState(false);
   const [stage, setStage] = useState<"edit" | "confirm">("edit");
   const [confirmed, setConfirmed] = useState(false);
@@ -97,20 +124,32 @@ export function OperationPanel({
    *
    *  The guard refuses this operation to every surface but this one and
    *  refuses it again without `confirmed`, so nothing here shortens the path:
-   *  the journey fills the fields, and the tap below is still the write. */
-  const mountsJourney = op.id === ABHA_OP && !proposal;
+   *  the journey fills the fields, and the tap below is still the write.
+   *
+   *  A registration is the other screen it belongs on, and which operation
+   *  that is, is the bundle's own answer: `abha.pending` is what an operation
+   *  emits when it has just made a patient who has no national account yet.
+   *  The health centre's registration says it, the laboratory's accession does
+   *  not, and neither file mentions the other. There the journey fills the
+   *  demographics; on the link panel, the identifier. The order is the point:
+   *  a clerk should not type a name and a mobile that ABDM already holds. */
+  const registration = !!op.emits?.includes(ABHA_PENDING);
+  const mountsJourney = !proposal && !seed && (op.id === ABHA_OP || registration);
   const showForm = !mountsJourney || journeyDone;
   const invalidate = () => {
     setConfirmed(false);           // an edit invalidates a confirm, always
     if (stage === "confirm") setStage("edit");
   };
+  /** A value somebody typed over is theirs, whatever produced it first. Both
+   *  marks are dropped per field, not wholesale. */
+  const untouched = <T,>(was: Record<string, T>, next: Payload) =>
+    Object.fromEntries(
+      Object.entries(was).filter(([id]) => String(next[id] ?? "") === String(payload[id] ?? "")),
+    );
   const edit = (next: Payload) => {
     setPayload(next);
-    setHeard((was) =>
-      Object.fromEntries(
-        Object.entries(was).filter(([id]) => String(next[id] ?? "") === String(payload[id] ?? "")),
-      ),
-    );
+    setHeard((was) => untouched(was, next));
+    setFromAbha((was) => untouched(was, next));
     invalidate();
   };
 
@@ -120,6 +159,19 @@ export function OperationPanel({
   const fromInstrument = (values: Record<string, unknown>, confidence: Record<string, number>) => {
     setPayload((was) => ({ ...was, ...values }));
     setHeard((was) => ({ ...was, ...confidence }));
+    invalidate();
+  };
+
+  /** What the ABHA journey produced. Same fields, same tap, and no instrument
+   *  confidence attached: this value was returned by a gateway, not heard by a
+   *  recogniser, and marking it "unsure" would be as untrue as marking it
+   *  certain. It is marked with where it came from instead. */
+  const fromJourney = (values: Record<string, unknown>) => {
+    setPayload((was) => ({ ...was, ...values }));
+    setFromAbha((was) => ({
+      ...was,
+      ...Object.fromEntries(Object.keys(values).map((id) => [id, FROM_ABHA])),
+    }));
     invalidate();
   };
   const mounts = mountsFor(instruments, op, schema);
@@ -136,7 +188,7 @@ export function OperationPanel({
     try {
       if (proposal) await client.confirm(proposal.id, { payload, confirmed });
       else await client.commit(op.id, { thread, payload, confirmed });
-      onDone();
+      onDone(carried);
     } catch (e) {
       setError(e instanceof ApiError ? e : new ApiError(String(e), "This is a bug in the renderer."));
     } finally {
@@ -229,16 +281,34 @@ export function OperationPanel({
 
         {mountsJourney && (
           <Journey
-            onSkipPath={onCancel}
+            mobile={mobile}
+            /* On the link panel the way out is to close it. On a registration
+               panel it is to reveal the empty form underneath, which is the
+               whole of "register now, link later" and is also what a clerk
+               gets when the SDK will not load at all. */
+            onSkipPath={registration ? () => setJourneyDone(true) : onCancel}
             onOutcome={(outcome: AbhaOutcome) => {
-              if (outcome.kind !== "linked") return;
+              if (outcome.kind !== "linked") {
+                // A skipped, closed or failed journey fills nothing. On a
+                // registration panel the form still opens, empty, and the
+                // patient is registered ABHA pending as before.
+                if (registration) setJourneyDone(true);
+                return;
+              }
               // Straight into the same editable fields a person used to type
-              // into, with no instrument confidence attached: this value was
-              // returned by a gateway, not heard by a recogniser, and marking
-              // it "unsure" would be as untrue as marking it certain. Only the
-              // identifier: the journey does not know the other two answers and
-              // this screen does not invent them.
-              fromInstrument(payloadFor(outcome), {});
+              // into. Which answers those are is the operation's: the link
+              // panel takes the identifier and nothing else, a registration
+              // form takes the demographics the profile actually carried and
+              // leaves every field it did not empty.
+              const filled = registration
+                ? demographicsFrom(outcome.raw, walk(schema.questions))
+                : payloadFor(outcome);
+              fromJourney(filled);
+              // The identifier is not registration's to write. It is handed to
+              // whoever opens the link panel next, so the patient is not asked
+              // for a second one time password to say what is already known.
+              const id = payloadFor(outcome);
+              if (registration && id.abha_number) setCarried(id as Payload);
               setJourneyDone(true);
             }}
           />
@@ -256,6 +326,7 @@ export function OperationPanel({
           onChange={edit}
           problems={tried ? problems : []}
           confidence={{ ...(proposal?.confidence ?? {}), ...heard }}
+          sources={fromAbha}
           disabled={busy}
         />}
 

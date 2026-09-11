@@ -28,7 +28,9 @@ export function Palette({
   onOpenThread: (id: string) => void;
   onGo: (hash: string) => void;
   onAsk: (q: string) => void;
-  onRegister: () => void;
+  /** What the clerk typed goes with it. The journey the next screen opens can
+   *  use a mobile number, and the clerk has already typed it once. */
+  onRegister: (typed: string) => void;
   onAction: (thread: string, op: Operation) => void;
 }) {
   const [q, setQ] = useState("");
@@ -77,7 +79,7 @@ export function Palette({
           <p style={{ fontSize: 12.5, margin: "12px 0 14px", lineHeight: 1.6 }}>
             No match for "<b>{q.trim()}</b>". Opening a new one creates a permanent record.
           </p>
-          <button className="btn btn-b" style={{ margin: "0 auto" }} onClick={onRegister}>
+          <button className="btn btn-b" style={{ margin: "0 auto" }} onClick={() => onRegister(q.trim())}>
             <Icon name="plus" size="sm" />{word}
           </button>
         </div>
@@ -110,7 +112,7 @@ export function Palette({
             })}
             {missed && (
               <div style={{ padding: "8px 9px", marginTop: 4, borderTop: "1px solid var(--border)" }}>
-                <button className="qa-b" style={{ width: "100%" }} onClick={onRegister}>
+                <button className="qa-b" style={{ width: "100%" }} onClick={() => onRegister(q.trim())}>
                   <Icon name="plus" size="sm" />{word}
                 </button>
               </div>

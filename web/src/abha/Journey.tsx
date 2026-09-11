@@ -65,7 +65,7 @@ function load(config: AbhaConfig): Promise<void> {
 }
 
 export function Journey({
-  onOutcome, onSkipPath,
+  onOutcome, onSkipPath, mobile,
 }: {
   /** Every outcome, including the ones that are not a link. The panel decides
    *  what to do with each; this component never writes. */
@@ -73,6 +73,9 @@ export function Journey({
   /** "Register without an ABHA", one tap, from any outcome that is not a link.
    *  It has to be exactly as easy as finishing the journey. */
   onSkipPath?: () => void;
+  /** A mobile number the clerk has already typed, from the search that missed.
+   *  Handing it over saves typing it a second time at the counter. */
+  mobile?: string;
 }) {
   const [config, setConfig] = useState<AbhaConfig | null>(null);
   const [failure, setFailure] = useState("");
@@ -136,16 +139,17 @@ export function Journey({
           // The SDK's own skip, which is the whole of "register now, link
           // later". Without this the journey has no way out but a failure.
           skipABHAEnable: true,
-          // `data.mobile` would prefill the number the patient gave at
-          // registration and save them typing it again. Not passed: the panel
-          // does not carry the subject, and the SDK asks for it anyway. Worth
-          // adding the day somebody times the counter.
+          // What the clerk already typed into the palette. `mobile` seeds the
+          // store's identifier value and `identifier`/`identifier_type` go to
+          // the SDK's own handleIdentifier, which is the one that selects the
+          // mobile journey; the bundle reads all three off `data`.
+          ...(mobile ? { mobile, identifier: mobile, identifier_type: "mobile" } : {}),
           ...(got.hip_id ? { hipId: got.hip_id } : {}),
         },
         // The bundle reads the caller's `onSuccess` and calls it internally as
         // onAbhaSuccess. There is no onAbhaFailure prop; `onError` is it.
         onSuccess: (raw: unknown) => {
-          latest.current({ kind: "linked", ...identifierFrom(raw) });
+          latest.current({ kind: "linked", raw, ...identifierFrom(raw) });
         },
         onError: (e: { error?: string } | string) => {
           const reason = typeof e === "string" ? e : e?.error || "The journey reported an error.";

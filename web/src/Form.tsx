@@ -152,7 +152,7 @@ function Add({ disabled, onClick }: { disabled?: boolean; onClick: () => void })
 }
 
 export function Form({
-  schema, op, value, onChange, problems, confidence, disabled, ids = "f",
+  schema, op, value, onChange, problems, confidence, sources, disabled, ids = "f",
 }: {
   schema: Questionnaire;
   /** The operation this form commits. Only a structured question needs it, to
@@ -164,6 +164,11 @@ export function Form({
    *  scold someone for not having typed yet. */
   problems: { link_id: string; message: string }[];
   confidence?: Record<string, number>;
+  /** Where a value came from, per field, when it was not typed here: the ABHA
+   *  journey's name for itself. Same highlight the unconfirmed instrument
+   *  values get, because it is the same instruction to the reader, and the
+   *  chip says which instrument rather than making them guess. */
+  sources?: Record<string, string>;
   disabled?: boolean;
   /** The prefix for every field's DOM id. Two of these forms can be on screen
    *  at once now, one per pending proposal, so the ids cannot be the link_id
@@ -205,7 +210,8 @@ export function Form({
 
     const phc = phcOf(q);
     const mine = problems.filter((p) => p.link_id === q.link_id);
-    const unsure = confidence?.[q.link_id] !== undefined && confidence[q.link_id] < SURE;
+    const from = sources?.[q.link_id];
+    const unsure = from !== undefined || (confidence?.[q.link_id] !== undefined && confidence[q.link_id] < SURE);
     const critical = outsideCritical(q, value[q.link_id]);
     return (
       <div className={`f-field${mine.length ? " bad" : ""}${unsure ? " unsure" : ""}`} key={q.link_id}>
@@ -224,7 +230,7 @@ export function Form({
           <div className="f-hint">Range depends on {phc.range_from}</div>
         )}
         {unsure && (
-          <div className="f-hint unsure">{unsureHint(confidence?.[q.link_id] ?? 0)}</div>
+          <div className="f-hint unsure">{from ?? unsureHint(confidence?.[q.link_id] ?? 0)}</div>
         )}
         {critical && !mine.length && (
           <span className="badge b-crit">Outside range{phc.flags ? ` · ${phc.flags}` : ""}</span>
