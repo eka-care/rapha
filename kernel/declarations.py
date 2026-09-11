@@ -48,18 +48,39 @@ class DeclarationError(Exception):
 @dataclasses.dataclass(frozen=True)
 class Bundle:
     """One loaded declaration package. `operations` are the compiled entries
-    catalogue.json already holds; the kernel does not recompile them."""
+    catalogue.json already holds; the kernel does not recompile them.
+
+    `seed` is the facility's own demo day, read from bundles/<id>/seed.yaml,
+    and it defaults to none. It is fixture data and not a declaration: the
+    adapter writes it, the renderer never sees it, and it stays out of
+    catalogue.json. It lives here because a seed speaks a facility's words,
+    and one kept in the adapter put six outpatients on a laboratory's bench.
+    """
     manifest: c.Manifest
     operations: dict
     workflows: dict
     views: dict
     instruments: dict
     metrics: dict
+    seed: list = dataclasses.field(default_factory=list)
 
     def workflow(self, wid: Optional[str] = None) -> c.Workflow:
         if wid is None:
             (wid,) = self.workflows
         return self.workflows[wid]
+
+
+def load_seed(path):
+    """The threads bundles/<id>/seed.yaml declares, or none.
+
+    A bundle need not have one. No seed is not an error and not an empty
+    screen worth apologising for: it is a facility whose demo day has not
+    been written, and the kernel starts with an empty queue.
+    """
+    f = pathlib.Path(path) / "seed.yaml"
+    if not f.exists():
+        return []
+    return list((yaml.safe_load(f.read_text()) or {}).get("threads") or [])
 
 
 # --------------------------------------------------------------------------
@@ -235,7 +256,43 @@ def _lint_metric(fm, fail):
                resources=vocab.CARE_RESOURCES, allow_window=True)
 
 
-def lint(manifest, decls, ops):
+def _lint_seed(threads, manifest, voc):
+    """Check the demo day against the facility's own words.
+
+    The one failure this exists for: a seeded proposal naming an operation
+    the bundle does not load. That is what put a pending Amoxicillin on a
+    laboratory thread, drawn as an agent card the kernel would then 404.
+    """
+    bad, seen = [], set()
+    for i, t in enumerate(threads or []):
+        where = "seed.yaml thread %d" % (i + 1)
+        if not isinstance(t, dict) or not t.get("id"):
+            bad.append(f"{where}: needs an 'id'")
+            continue
+        where = "seed.yaml '%s'" % t["id"]
+        if t["id"] in seen:
+            bad.append(f"{where}: two threads share this id")
+        seen.add(t["id"])
+        for key in set(t) - {"id", "token", "status", "patient", "rows",
+                             "flags", "proposals", "audit"}:
+            bad.append(f"{where}: unknown key '{key}'")
+        for row in t.get("rows") or []:
+            if not isinstance(row, dict) or "resource" not in row:
+                bad.append(f"{where}: a row needs a 'resource'")
+            elif row["resource"] not in vocab.CARE_RESOURCES:
+                bad.append(f"{where}: unknown resource '{row['resource']}'")
+        for flag in t.get("flags") or []:
+            if flag not in voc.states:
+                bad.append(f"{where}: flag '{flag}' is not this bundle's vocabulary")
+        for entry in (t.get("proposals") or []) + (t.get("audit") or []):
+            op = entry.get("operation")
+            if op not in (manifest["operations"] or []):
+                bad.append(f"{where}: names operation '{op}', which this bundle "
+                           f"does not load")
+    return bad
+
+
+def lint(manifest, decls, ops, seed=()):
     """Return a list of failure strings. Empty means the bundle is sound.
 
     `decls` is {id: (frontmatter, body)} for the bundle directory, `ops` the
@@ -258,6 +315,7 @@ def lint(manifest, decls, ops):
     # how a released report came to be called `dispensed.complete`.
     voc = vocab.from_manifest(manifest)
     bad += voc.problems()
+    bad += _lint_seed(seed, manifest, voc)
 
     listed = {i for k in ("workflows", "views", "instruments", "metrics")
               for i in manifest[k] or []}
@@ -369,8 +427,9 @@ def load(bundle_id="phc", catalogue=None):
     # Which answer becomes which column lives on the operation atom, so it is
     # linted here with everything else that references a questionnaire, and
     # attached to the operations this bundle loads. See kernel/mapping.py.
+    seed = load_seed(path)
     mappings, bad_mappings = mapping.load()
-    bad = lint(manifest, decls, ops) + bad_mappings
+    bad = lint(manifest, decls, ops, seed) + bad_mappings
     if bad:
         raise DeclarationError("\n".join(bad))
 
@@ -393,7 +452,8 @@ def load(bundle_id="phc", catalogue=None):
                                ("operations", "workflows", "views", "instruments", "metrics")}),
         operations={oid: dict(ops[oid], mapping=mappings.get(oid, []))
                     for oid in manifest["operations"]},
-        workflows=workflows, views=views, instruments=instruments, metrics=metrics)
+        workflows=workflows, views=views, instruments=instruments, metrics=metrics,
+        seed=seed)
 
 
 def compile_json(bundle):
@@ -452,7 +512,7 @@ def main():
     print(f"ok   bundle {bundle.manifest.id} {bundle.manifest.version}: "
           f"{len(bundle.operations)} operations, {len(bundle.workflows)} workflows, "
           f"{len(bundle.views)} views, {len(bundle.instruments)} instruments, "
-          f"{len(bundle.metrics)} metrics", file=sys.stderr if "--json" in sys.argv else sys.stdout)
+          f"{len(bundle.metrics)} metrics, {len(bundle.seed)} seeded threads", file=sys.stderr if "--json" in sys.argv else sys.stdout)
     if "--json" in sys.argv:
         print(json.dumps(compile_json(bundle), indent=2, sort_keys=True))
     return 0

@@ -41,6 +41,7 @@ export function VoiceCapture({
   flags,
   payload,
   disabled,
+  ids,
   onValues,
   onText,
 }: {
@@ -50,6 +51,9 @@ export function VoiceCapture({
   flags: string[];
   payload: Record<string, unknown>;
   disabled?: boolean;
+  /** The Form prefix, so the cursor lands in this panel's field and not in
+   *  another panel's field with the same link_id. */
+  ids: string;
   onValues: (values: Record<string, number>, confidence: Record<string, number>) => void;
   onText: (link_id: string, text: string) => void;
 }) {
@@ -99,7 +103,7 @@ export function VoiceCapture({
       const next =
         m.fields.find((f) => payload[f.linkId] === undefined || payload[f.linkId] === "") ??
         m.fields[0];
-      document.getElementById(`f-${next.linkId}`)?.focus();
+      document.getElementById(`${ids}-${next.linkId}`)?.focus();
       return;
     }
     onValues(draft.values, draft.confidence);

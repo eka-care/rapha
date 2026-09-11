@@ -1,0 +1,107 @@
+# The primary health centre's own demo day. Declared data, not Python.
+#
+# This was adapters/local/store.py SEED_PEOPLE until 2026.09.13, where it ran
+# under whatever bundle was loaded, so a laboratory opened on six outpatients
+# with tokens like A01 and a pending Amoxicillin. A seed belongs to the
+# facility whose words it speaks, so it lives here. A bundle that declares no
+# seed starts empty, which is a supported outcome and not a crash.
+#
+# Six people standing at six points of phc.wf.outpatient, so no screen is
+# empty: reception, nurse, doctor, lab, pharmacy, and one finished line.
+#
+# Shape, linted by kernel/declarations.py:
+#   id       the thread, which is an encounter row
+#   token    what is called out in the waiting area
+#   status   the encounter's own status; "completed" closes it at reception
+#   patient  one patient row, joined to the thread by the adapter
+#   rows     one row each, `resource` plus that table's columns, in order
+#   flags    stored thread flags; must be this bundle's declared states
+#   proposals  a write awaiting a person; the operation must be one this
+#              bundle loads, which is what stops a PHC prescription from
+#              being offered on a laboratory thread
+threads:
+  # Walked in, not registered. Stands at reception with no patient row at all.
+  - id: enc-001
+    token: A01
+    status: in_progress
+
+  # Registered, waiting for the nurse.
+  - id: enc-002
+    token: A02
+    status: in_progress
+    patient: {name: Kamala Devi, age: 34, sex: female, phone: "9800000002",
+              village: Sonpur, category: general}
+
+  # Vitals taken and the blood pressure is high. Stands at the doctor.
+  - id: enc-003
+    token: A03
+    status: in_progress
+    patient: {name: Ramesh Kumar, age: 61, sex: male, phone: "9800000003",
+              village: Bhagwanpur, category: general,
+              abha_number: "12-3456-7890-1234"}
+    rows:
+      - {resource: observation, category: vital-signs, code: systolic, value: 186, unit: "mm[Hg]"}
+      - {resource: observation, category: vital-signs, code: diastolic, value: 112, unit: "mm[Hg]"}
+      - {resource: observation, category: vital-signs, code: pulse, value: 92, unit: "/min"}
+    flags: [vitals.flagged]
+
+  # Seen and sent to the laboratory. Carries the one proposal a person has
+  # not yet accepted, so the confirm path has a subject the moment the app
+  # starts: the agent read the note over MCP and offered a prescription.
+  - id: enc-004
+    token: A04
+    status: in_progress
+    patient: {name: Iqbal Ahmed, age: 52, sex: male, phone: "9800000004",
+              village: Sonpur, category: general,
+              abha_number: "12-3456-7890-5678"}
+    rows:
+      - {resource: observation, category: vital-signs, code: systolic, value: 118, unit: "mm[Hg]"}
+      - {resource: observation, category: vital-signs, code: diastolic, value: 76, unit: "mm[Hg]"}
+      - {resource: observation, category: vital-signs, code: pulse, value: 92, unit: "/min"}
+      - {resource: notes, text: "Fever three days, no red flags on examination."}
+      - {resource: service_request, code: CBC, status: active}
+    proposals:
+      - id: seed-prop-001
+        operation: phc.op.rx-prescribe
+        proposed_by: "agent:demo"
+        surface: mcp
+        payload:
+          medications:
+            - {medication: Amoxicillin 500mg, dosage_instruction: 1 cap TDS x 5 days}
+
+  # Prescribed, waiting at the pharmacy.
+  - id: enc-005
+    token: A05
+    status: in_progress
+    patient: {name: Sunita Bai, age: 27, sex: female, phone: "9800000005",
+              village: Rampur, category: general}
+    rows:
+      - {resource: observation, category: vital-signs, code: systolic, value: 118, unit: "mm[Hg]"}
+      - {resource: observation, category: vital-signs, code: diastolic, value: 76, unit: "mm[Hg]"}
+      - {resource: observation, category: vital-signs, code: pulse, value: 92, unit: "/min"}
+      - {resource: notes, text: "Fever three days, no red flags on examination."}
+      - {resource: medication_request, medication: Paracetamol 500mg,
+         dosage_instruction: 1 tab TDS x 3 days, status: active}
+      - {resource: medication_request, medication: ORS sachet,
+         dosage_instruction: 1 sachet after each loose stool, status: active}
+
+  # Dispensed and closed. Stands nowhere; the line is complete.
+  - id: enc-006
+    token: A06
+    status: completed
+    patient: {name: Meera Patel, age: 45, sex: female, phone: "9800000006",
+              village: Rampur, category: general,
+              abha_number: "12-3456-7890-9012"}
+    rows:
+      - {resource: observation, category: vital-signs, code: systolic, value: 118, unit: "mm[Hg]"}
+      - {resource: observation, category: vital-signs, code: diastolic, value: 76, unit: "mm[Hg]"}
+      - {resource: observation, category: vital-signs, code: pulse, value: 92, unit: "/min"}
+      - {resource: notes, text: "Fever three days, no red flags on examination."}
+      - {resource: medication_request, medication: Paracetamol 500mg,
+         dosage_instruction: 1 tab TDS x 3 days, status: active}
+      - {resource: medication_request, medication: ORS sachet,
+         dosage_instruction: 1 sachet after each loose stool, status: active}
+      - {resource: medication_dispense, medication: Paracetamol 500mg,
+         quantity: "1", status: completed}
+      - {resource: medication_dispense, medication: ORS sachet,
+         quantity: "1", status: completed}

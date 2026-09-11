@@ -38,11 +38,12 @@ Honest limits
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 import threading
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from kernel.contracts import AuditRecord, Proposal, ThreadRef
 
@@ -86,6 +87,15 @@ TABLES = {
 THREAD_COLUMN = {"encounter": "id", "thread_flag": "thread", "patient": None}
 DEFAULT_THREAD_COLUMN = "encounter"
 
+# The kernel's own two records join and date themselves differently from a
+# clinical resource: {table: (thread column, date column)}. thread_flag does
+# not, so it stays in THREAD_COLUMN above.
+KERNEL_RECORD = {"proposal": ("thread", "created_at"), "audit": ("thread", "at")}
+
+# What the seed writes as the author of a thread it opened. It is how a demo
+# thread is told from a real one, which is what roll_seed_forward() needs.
+SEED_ACTOR = "seed"
+
 _IDENT = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 
@@ -115,6 +125,61 @@ class SqliteStore:
             cols = ", ".join(
                 "%s TEXT%s" % (c, " PRIMARY KEY" if c == "id" else "") for c in columns)
             self.db.execute("CREATE TABLE IF NOT EXISTS %s (%s)" % (table, cols))
+        self.roll_seed_forward()
+
+    def roll_seed_forward(self):
+        """Move a stale demo day to today, and return how many days it moved.
+
+        Every queue view is `scope: today`, which is what a queue means, so a
+        file seeded yesterday drew an empty workspace this morning and the
+        documented fix was "delete the SQLite file and restart". That throws
+        away whatever was done on it. Instead, the seeded threads walk
+        forward: the whole demo day shifts by whole days, keeping the time of
+        day and the order of every row inside it.
+
+        Only threads the seed opened move, found by `encounter.created_by =
+        'seed'`, and only rows dated on the seed's own day, so real work done
+        on a seeded thread after that day keeps the date it happened on and
+        nothing is ever pushed into the future. A thread a person opened is
+        never touched: "today" still means today for real work.
+
+        Called from __init__, so every process that opens the file gets it,
+        including the ones this adapter does not own.
+        """
+        row = self.db.execute("SELECT MAX(created_date) AS d FROM encounter"
+                              " WHERE created_by = ?", [SEED_ACTOR]).fetchone()
+        if not row or not row["d"]:
+            return 0
+        try:
+            seeded_on = date.fromisoformat(row["d"][:10])
+        except ValueError:
+            return 0        # a hand edited date is not worth a dead constructor
+        days = (datetime.now(timezone.utc).date() - seeded_on).days
+        if days <= 0:
+            return 0
+        cutoff = (seeded_on + timedelta(days=1)).isoformat()
+        threads = [r["id"] for r in self.db.execute(
+            "SELECT id FROM encounter WHERE created_by = ?", [SEED_ACTOR]).fetchall()]
+        marks = ", ".join("?" * len(threads))
+        for table in TABLES:
+            join, column = KERNEL_RECORD.get(
+                table, (THREAD_COLUMN.get(table, DEFAULT_THREAD_COLUMN),
+                        "created_date"))
+            if table == "encounter":
+                where = "id IN (%s)" % marks
+            elif table == "patient":
+                where = ("id IN (SELECT patient FROM encounter WHERE id IN (%s))"
+                         % marks)
+            else:
+                where = "%s IN (%s)" % (join, marks)
+            # SQLite's datetime() understands the +00:00 suffix and drops it,
+            # returning "YYYY-MM-DD HH:MM:SS". Everything that compares these
+            # columns compares strings, so the isoformat spelling is put back.
+            self.db.execute(
+                "UPDATE %s SET %s = replace(datetime(%s, ?), ' ', 'T') || '+00:00'"
+                " WHERE %s AND %s < ?" % (table, column, column, where, column),
+                ["+%d days" % days] + threads + [cutoff])
+        return days
 
     @property
     def db(self):
@@ -401,95 +466,86 @@ def _start_of(window):
 
 
 # --------------------------------------------------------------------------
-# Seed. A handful of patients standing at different points in the line, so the
-# queue, the badges and the confirm flow all have something to draw.
+# Seed. Declared data, written here.
+#
+# The rows are the bundle's (bundles/<id>/seed.yaml) and this function is the
+# only thing that knows how to put them on disk. Until 2026.09.13 the rows
+# themselves lived up there in Python, so every bundle got a primary health
+# centre's demo day: a laboratory opened on six outpatients with tokens like
+# A01 and a pending Amoxicillin on a specimen. A third bundle now brings its
+# own seed without touching this file, and a bundle with no seed.yaml starts
+# empty, which is a supported outcome.
 # --------------------------------------------------------------------------
 
-SEED_PEOPLE = [
-    # (encounter, token, patient fields, how far along)
-    ("enc-001", "A01", dict(name="Lakshmi Bai", age=29, sex="female",
-                            village="Sonpur", phone="9800000001"), "walk_in"),
-    ("enc-002", "A02", dict(name="Kamala Devi", age=34, sex="female",
-                            village="Sonpur", phone="9800000002"), "registered"),
-    ("enc-003", "A03", dict(name="Ramesh Kumar", age=61, sex="male",
-                            village="Bhagwanpur", phone="9800000003",
-                            abha_number="12-3456-7890-1234"), "vitals_critical"),
-    ("enc-004", "A04", dict(name="Iqbal Ahmed", age=52, sex="male",
-                            village="Sonpur", phone="9800000004",
-                            abha_number="12-3456-7890-5678"), "at_lab"),
-    ("enc-005", "A05", dict(name="Sunita Bai", age=27, sex="female",
-                            village="Rampur", phone="9800000005"), "at_pharmacy"),
-    ("enc-006", "A06", dict(name="Meera Patel", age=45, sex="female",
-                            village="Rampur", phone="9800000006",
-                            abha_number="12-3456-7890-9012"), "complete"),
-]
+def declared_seed(bundle_id=None):
+    """The active bundle's seed rows. Empty when it declares none.
+
+    Imported here rather than at module scope: an adapter reaching into the
+    kernel's loader at import time would invert the layering in
+    kernel/ARCHITECTURE.md. Inside one function it is what it looks like, a
+    caller asking the kernel where a facility's fixtures live.
+    """
+    from kernel import declarations
+    return declarations.load(bundle_id or os.environ.get("PHC_BUNDLE", "phc")).seed
 
 
-def seed(store):
-    """Populate an empty store. Returns the encounter ids, in queue order."""
+def seed(store, threads=None):
+    """Populate an empty store from a bundle's declared seed.
+
+    `threads` is what Bundle.seed holds; None means the bundle PHC_BUNDLE
+    names, which is the bundle api/main.py loaded. Returns the thread ids in
+    declaration order, so an empty seed returns an empty list and writes
+    nothing.
+
+    Row ids are `seed-NNNN` in declaration order because select() orders by
+    created_date then id and every seeded row shares one stamp: without it a
+    report would list four analytes in whatever order uuid4 chose.
+    """
+    if threads is None:
+        threads = declared_seed()
     stamp = now()
-    for i, (enc, token, person, stage) in enumerate(SEED_PEOPLE):
-        store.db.execute(
-            "INSERT INTO encounter (id, patient, status, token, created_by, created_date)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            [enc, None if stage == "walk_in" else "pat-%03d" % (i + 1),
-             "completed" if stage == "complete" else "in_progress",
-             token, "seed", stamp])
-        if stage == "walk_in":
-            continue
-        store.db.execute(
-            "INSERT INTO patient (id, name, age, sex, phone, village, category,"
-            " abha_number, created_by, created_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            ["pat-%03d" % (i + 1), person["name"], str(person["age"]), person["sex"],
-             person["phone"], person["village"], "general",
-             person.get("abha_number"), "seed", stamp])
-        if stage == "registered":
-            continue
+    serial = [0]
 
-        vitals = [("systolic", 186 if stage == "vitals_critical" else 118, "mm[Hg]"),
-                  ("diastolic", 112 if stage == "vitals_critical" else 76, "mm[Hg]"),
-                  ("pulse", 92, "/min")]
-        for code, value, unit in vitals:
-            store._put("observation", {"category": "vital-signs", "code": code,
-                                        "value": value, "unit": unit,
-                                        "created_by": "seed", "created_date": stamp},
-                        thread=enc)
-        if stage == "vitals_critical":
-            store.raise_flag(enc, "vitals.flagged", actor="seed")
-            continue
+    def row_id():
+        serial[0] += 1
+        return "seed-%04d" % serial[0]
 
-        store._put("notes", {"text": "Fever three days, no red flags on examination.",
-                              "created_by": "seed", "created_date": stamp}, thread=enc)
-        if stage == "at_lab":
-            store._put("service_request", {"code": "CBC", "status": "active",
-                                            "created_by": "seed",
-                                            "created_date": stamp}, thread=enc)
-            continue
+    def stamped(record):
+        return dict({"id": row_id(), "created_by": SEED_ACTOR,
+                     "created_date": stamp}, **record)
 
-        for medication, dose in (("Paracetamol 500mg", "1 tab TDS x 3 days"),
-                                 ("ORS sachet", "1 sachet after each loose stool")):
-            store._put("medication_request",
-                        {"medication": medication, "dosage_instruction": dose,
-                         "status": "active", "created_by": "seed",
-                         "created_date": stamp}, thread=enc)
-        if stage == "at_pharmacy":
-            continue
-
-        for medication in ("Paracetamol 500mg", "ORS sachet"):
-            store._put("medication_dispense",
-                        {"medication": medication, "quantity": "1", "status": "completed",
-                         "created_by": "seed", "created_date": stamp}, thread=enc)
-
-    # One proposal waiting for a human, so the confirm path has a subject on
-    # screen the moment the app starts. Proposed by the agent, over MCP.
-    store.put_proposal(Proposal(
-        id="prop-seed-001", thread="enc-004", operation="phc.op.rx-prescribe",
-        payload={"medications": [{"medication": "Amoxicillin 500mg",
-                                  "dosage_instruction": "1 cap TDS x 5 days"}]},
-        proposed_by="agent:demo", surface="mcp", status="pending", created_at=stamp))
-    store.append_audit(AuditRecord(
-        id=new_id("aud"), thread="enc-004", operation="phc.op.rx-prescribe",
-        actor="agent:demo", surface="mcp",
-        payload={"medications": [{"medication": "Amoxicillin 500mg"}]},
-        outcome="proposed", at=stamp, proposal="prop-seed-001"))
-    return [e for e, *_ in SEED_PEOPLE]
+    for t in threads:
+        thread = t["id"]
+        store._put("encounter", {"id": thread, "token": t.get("token"),
+                                 "status": t.get("status") or "in_progress",
+                                 "created_by": SEED_ACTOR, "created_date": stamp},
+                   thread=thread)
+        if t.get("patient"):
+            # write(), not _put(): attaching the person to the thread is the
+            # adapter's own join and it is already written down once.
+            store.write("patient", stamped(t["patient"]), thread=thread)
+        for record in t.get("rows") or []:
+            record = dict(record)
+            store._put(record.pop("resource"), stamped(record), thread=thread)
+        for flag in t.get("flags") or []:
+            store.raise_flag(thread, flag, actor=SEED_ACTOR)
+        for entry in t.get("audit") or []:
+            # A seeded thread that claims work was done has to say who did it:
+            # "not actor of lab.op.result-enter" is evaluated against this
+            # trail, so without these rows the demo day cannot show the rule.
+            store.append_audit(AuditRecord(
+                id=row_id(), thread=thread, operation=entry["operation"],
+                actor=entry.get("actor"), surface=entry.get("surface", "rendered"),
+                payload={}, outcome=entry.get("outcome", "confirmed"), at=stamp))
+        for p in t.get("proposals") or []:
+            pid = p.get("id") or row_id()
+            payload = p.get("payload") or {}
+            store.put_proposal(Proposal(
+                id=pid, thread=thread, operation=p["operation"], payload=payload,
+                proposed_by=p.get("proposed_by"), surface=p.get("surface", "mcp"),
+                status=p.get("status", "pending"), created_at=stamp))
+            store.append_audit(AuditRecord(
+                id=row_id(), thread=thread, operation=p["operation"],
+                actor=p.get("proposed_by"), surface=p.get("surface", "mcp"),
+                payload=payload, outcome="proposed", at=stamp, proposal=pid))
+    return [t["id"] for t in threads]

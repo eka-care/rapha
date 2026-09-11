@@ -30,6 +30,15 @@
 .f-in:focus { border-color:var(--eka-blue); background:var(--surface); }
 .f-rows { display:grid; gap:6px; justify-items:start; }
 .f-rows .f-in { width:100%; }
+/* One row of a structured answer: the sub fields the operation's mapping
+   names, side by side, numbered so two rows do not read as one. */
+/* flex and not grid: repeat(auto-fit) is invalid beside an intrinsic track,
+   so a template with `auto` in it is dropped whole and every field stacks. */
+.f-item { display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; width:100%; }
+.f-item-n { flex:0 0 auto; font-size:10px; color:var(--ink-3);
+  font-family:ui-monospace,monospace; padding-bottom:10px; }
+.f-sub { flex:1 1 130px; min-width:0; display:grid; gap:4px; }
+.f-sub > span { font-size:10px; color:var(--ink-3); }
 .f-check { display:flex; align-items:center; gap:8px; font-size:12.5px; }
 .f-check.big { padding:8px 0; font-weight:600; }
 .f-check input { width:16px; height:16px; accent-color:var(--ink); }
@@ -52,6 +61,17 @@
   border-radius:var(--r-sm); padding:10px 12px; display:grid; gap:4px; }
 .confirmbox { border:1.5px solid var(--destructive-border); background:var(--destructive-bg);
   border-radius:var(--r-md); padding:12px 14px; }
+/* The same commit surface, inside the conversation instead of over it. A
+   proposal is reviewed where it was made; nothing about the review changes. */
+.mod.inline { width:100%; max-height:none; box-shadow:none; animation:none;
+  border:1px solid var(--warning-border); border-radius:var(--r-md); }
+.mod.inline .mod-bar { display:none; }
+.mod.inline .mod-h { padding:12px 14px 10px; }
+.mod.inline .mod-b { padding:13px 14px; overflow-y:visible; }
+.mod.inline .mod-f { padding:11px 14px; flex-wrap:wrap; }
+.missing { font-size:11px; color:var(--ink-2); background:var(--warning-bg);
+  border:1px solid var(--warning-border); border-radius:var(--r-sm); padding:9px 11px;
+  line-height:1.5; }
 /* The proposal and audit rows the summary view draws. The thread draws its
    own, as messages; these are the same records inside a section card. */
 .opcard { border:1px solid var(--border); background:var(--gray-50); border-radius:var(--r-md);

@@ -52,14 +52,6 @@ if [ -d web/node_modules ]; then
 else
   echo "warn web: run (cd web && npm install) to check the renderer"
 fi
-python3 scripts/gen-fixtures.py
-if [ -d care_phc_fe/node_modules ]; then
-  (cd care_phc_fe && npx tsc -b && npm run build >/dev/null)
-  echo "ok   care_phc_fe typechecks and builds"
-else
-  echo "warn care_phc_fe: run npm install to check the frontend"
-fi
-
 echo "\n== end to end, over a real socket =="
 # Starts uvicorn on a free port against a throwaway SQLite file, walks a
 # patient through the line, and drives the Go MCP binary at it. The only check

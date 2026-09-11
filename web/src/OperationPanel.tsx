@@ -11,8 +11,14 @@
  *  box that nothing prefills, and any edit empties it again. The guard denies
  *  an irreversible write from any surface but this one and denies it again
  *  without `confirmed`, so this screen is the only way through, on purpose.
+ *
+ *  `inline` draws the same screen inside the thread instead of over it, which
+ *  is where a proposal belongs: a card the person reads, edits and confirms
+ *  without leaving the conversation the agent proposed it in. Only the chrome
+ *  differs. The payload, the validation, the diff, the confirm stage and the
+ *  single client call below are the same ones the modal uses.
  */
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { ApiError, type Client } from "./api";
 import { Form, labelled, validate } from "./Form";
 import { questionnaire } from "./declarations";
@@ -25,10 +31,13 @@ import { VoiceCapture } from "./voice/VoiceCapture";
 const IRREVERSIBLE = "irreversible";
 
 export function OperationPanel({
-  op, thread, client, proposal, instruments, flags, onDone, onCancel,
+  op, thread, client, proposal, instruments, flags, inline, onDone, onCancel,
 }: {
   op: Operation;
   thread: string;
+  /** Drawn inside the thread rather than over it. No Cancel: there is nothing
+   *  to close, the card is the conversation. */
+  inline?: boolean;
   /** The compiled instrument declarations. Which capture controls appear on
    *  this screen is entirely their answer, never this file's. */
   instruments?: Record<string, unknown>;
@@ -39,7 +48,7 @@ export function OperationPanel({
   client: Client;
   proposal?: Proposal;
   onDone: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
 }) {
   const schema = questionnaire(op.input);
   const [payload, setPayload] = useState<Payload>({ ...(proposal?.payload ?? {}) });
@@ -51,13 +60,15 @@ export function OperationPanel({
   const [stage, setStage] = useState<"edit" | "confirm">("edit");
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Two of these are on screen whenever a thread holds two pending proposals.
+  const ids = useId();
   const [error, setError] = useState<ApiError | null>(null);
 
   const problems = useMemo(() => (schema ? validate(schema, payload) : []), [schema, payload]);
 
   if (!schema) {
     return (
-      <div className="mod">
+      <div className={inline ? "mod inline" : "mod"}>
         <div className="mod-bar" />
         <div className="state">
         <div className="state-t">No questionnaire for {op.id}.</div>
@@ -65,7 +76,7 @@ export function OperationPanel({
           The operation names <b>{op.input}</b> as its input, and there is no such file in
           questionnaires/. Either the id is wrong in catalogue/ops/, or the form was never written.
         </p>
-        <button className="cq" onClick={onCancel}>Back</button>
+        {onCancel && <button className="cq" onClick={onCancel}>Back</button>}
         </div>
       </div>
     );
@@ -130,12 +141,20 @@ export function OperationPanel({
     }
   };
 
+  // What a person still owes this form before it can be sent. Shown before
+  // they have tried, because a machine filled this in and the gap it left is
+  // the first thing to say about it, not a scolding after the tap.
+  const labels = new Map(labelled(schema, payload).map(([id, text]) => [id, text]));
+  const missing = problems
+    .filter((p) => p.message.endsWith("is required"))
+    .map((p) => labels.get(p.link_id) ?? p.link_id);
+
   const changed = proposal
     ? labelled(schema, payload).filter(([id]) => String(proposal.payload?.[id] ?? "") !== String(payload[id] ?? ""))
     : [];
 
   return (
-    <div className="mod">
+    <div className={inline ? "mod inline" : "mod"}>
       <div className="mod-bar" />
       <div className="mod-h" style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
         <div>
@@ -169,12 +188,22 @@ export function OperationPanel({
           flags={flags ?? []}
           payload={payload}
           disabled={busy}
+          ids={ids}
           onValues={fromInstrument}
           onText={(link_id, text) => fromInstrument({ [link_id]: text }, { [link_id]: 0.6 })}
         />
 
+        {missing.length > 0 && !tried && (
+          <div className="missing">
+            Still missing: {missing.join(", ")}. Fill {missing.length === 1 ? "it" : "them"} in below.
+            Nothing is sent until you tap {irreversible ? "Continue" : proposal ? "Confirm" : "Commit"}.
+          </div>
+        )}
+
         <Form
           schema={schema}
+          op={op}
+          ids={ids}
           value={payload}
           onChange={edit}
           problems={tried ? problems : []}
@@ -223,7 +252,7 @@ export function OperationPanel({
         <span className="f-hint" style={{ flex: 1 }}>
           Actor, surface, payload and outcome are written to the audit log.
         </span>
-        <button className="cq" onClick={onCancel} disabled={busy}>Cancel</button>
+        {onCancel && <button className="cq" onClick={onCancel} disabled={busy}>Cancel</button>}
         {proposal && (
           <button className="cq" onClick={reject} disabled={busy}>Reject</button>
         )}

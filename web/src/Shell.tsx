@@ -10,6 +10,7 @@
  *  the same code draws the laboratory's words.
  */
 import { useEffect, useState } from "react";
+import { API_BASE } from "./api";
 import { Icon, iconForView } from "./icons";
 import type { Catalogue, Facility, ViewDecl, ViewResult } from "./types";
 import { human, title } from "./ui";
@@ -17,7 +18,12 @@ import { human, title } from "./ui";
 // ------------------------------------------------------------------ recents
 
 export type Recent = { id: string; name: string };
-const RECENTS = "phc.recents";
+// Keyed by the kernel, because a thread id means nothing on a different one.
+// Two kernels on two ports are two facilities; without this the laboratory's
+// sidebar opened on the health centre's patients, left there by an earlier
+// session, and clicking one was a 404. Same browser, same origin, different
+// facility, and only this key knows the difference.
+const RECENTS = "phc.recents." + API_BASE;
 
 /** Per viewer, not shared, and a convenience rather than a record: the kernel
  *  has no notion of a browsing history and should not grow one for this. */
@@ -111,7 +117,7 @@ export function Sidebar({
     return () => removeEventListener("click", shut);
   }, []);
 
-  const nav = navViews(cat);
+  const nav = navViews(cat, facility?.user?.capabilities);
   const roles = facility?.roles ?? [];
   // vocab.BUNDLES is the kernel's whole role table and the demo union role is
   // not in it, so the caller's own capability list from /facility is the only
@@ -222,18 +228,27 @@ export function Sidebar({
   );
 }
 
-/** Nav is every declared view that is not a summary, in the order the manifest
- *  listed them. A summary belongs to a thread, not to the sidebar. Nothing is
- *  keyed to a view id: a bundle that declares a fourth view gets a fourth
- *  entry with no change here. */
-export function navViews(cat: Catalogue | undefined): ViewDecl[] {
+/** Nav is every declared view that is not a summary AND whose capability the
+ *  caller holds, in the order the manifest listed them. A summary belongs to a
+ *  thread, not to the sidebar. Nothing is keyed to a view id: a bundle that
+ *  declares a fourth view gets a fourth entry with no change here.
+ *
+ *  The capability filter is the same rule the thread obeys: a thing you cannot
+ *  do is absent, not drawn and then refused. Without it the laboratory drew
+ *  "Turnaround today" for a technologist, who holds no `reporting.view`, and
+ *  tapping it produced a 403 panel. `held` undefined means the caller is not
+ *  known yet, and an unfiltered nav is better than an empty sidebar while
+ *  /facility is in flight. */
+export function navViews(cat: Catalogue | undefined, held?: string[]): ViewDecl[] {
   const all = cat?.views ?? {};
   const order = cat?.manifest?.views ?? Object.keys(all);
+  const mine = held ? new Set(held) : null;
   const seen = new Set<string>();
   const out: ViewDecl[] = [];
   for (const id of [...order, ...Object.keys(all)]) {
     const v = all[id];
     if (!v || v.kind === "summary" || seen.has(id)) continue;
+    if (mine && v.capability && !mine.has(v.capability)) continue;
     seen.add(id);
     out.push(v);
   }

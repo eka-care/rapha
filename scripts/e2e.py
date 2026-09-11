@@ -203,6 +203,71 @@ def agent_confirms(base, db, thread):
     ok("a person confirming it on the rendered surface is what writes the row")
 
 
+def thread_confirms_edited(base, db):
+    """The path the thread's own card takes: an utterance, then a person who
+    corrects the machine's number and taps.
+
+    composer_says() above confirms with no payload, which is the agent's
+    values accepted verbatim. This is the other half, and the one the renderer
+    actually posts: web/src/OperationPanel sends `{payload, confirmed}` from
+    the form on screen, so what reaches the store is what the person read and
+    edited, never what was proposed. Three things have to hold for that to be
+    safe rather than a second machine surface with a nicer name: the card must
+    reach the thread a clinician opens, the guard must run again on the EDITED
+    payload (an edit is not a pass), and the proposal must close once.
+    """
+    thread = register(base, "Thread Confirm", "T-95")
+    answer = call(base, "/agent/say/",
+                  {"thread": thread, "utterance": "bp 138 over 86, pulse 74",
+                   "backend": "router"})
+    pid = [c["proposal_id"] for c in answer["proposals"] if c["proposal_id"]][0]
+
+    # The card as the thread draws it. web/src/messages.ts builds the bubble
+    # from exactly this, and OperationPanel prefills the form from `payload`.
+    panel = call(base, "/threads/%s/" % thread)
+    card = [p for p in panel["proposals"] if p["id"] == pid][0]
+    assert card["status"] == "pending" and card["surface"] == "mcp", card
+    assert str(card["payload"]["systolic"]) == "138", card["payload"]
+    ok("the utterance's card is on the thread with the values the form prefills")
+
+    # A person corrects it to something the guard refuses. The machine's
+    # proposal being allowed buys the edited payload nothing.
+    edited = dict(card["payload"], systolic=400)
+    denied = call(base, "/proposals/%s/confirm/" % pid,
+                  {"payload": edited, "confirmed": True}, expect=422)
+    assert "outside 70 to 250" in denied["detail"], denied
+    assert rows(db, "SELECT * FROM observation WHERE encounter=?", (thread,)) == []
+    ok("an edit is guarded again on confirm: out of range is refused and writes nothing")
+
+    # And the correction a clinician actually meant.
+    edited = dict(card["payload"], systolic=152)
+    confirmed = call(base, "/proposals/%s/confirm/" % pid,
+                     {"payload": edited, "confirmed": True})
+    assert confirmed["proposal"]["status"] == "confirmed"
+    written = dict(rows(db, "SELECT code, value FROM observation WHERE encounter=?",
+                        (thread,)))
+    assert written.get("systolic") == "152", written
+    assert written.get("pulse") == "74", written
+    ok("the edited value is what lands in the database, not the one proposed")
+
+    # The thread the renderer re-reads after the tap: the card is gone from
+    # pending and the posted operation is in the audit, which is the message
+    # that replaces it in the conversation.
+    after = confirmed["thread"]
+    assert not [p for p in after["proposals"] if p["id"] == pid], after["proposals"]
+    assert any(a["operation"] == "phc.op.vitals-record" and a["outcome"] == "confirmed"
+               and a["surface"] == "rendered" for a in after["audit"]), after["audit"]
+    assert "vitals.recorded" in after["flags"], after["flags"]
+    ok("the confirmed card leaves the pending list and posts to the thread as rendered")
+
+    again = call(base, "/proposals/%s/confirm/" % pid,
+                 {"payload": edited, "confirmed": True}, expect=409)
+    assert "confirmed once" in again["detail"], again
+    assert len(rows(db, "SELECT * FROM observation WHERE encounter=? AND code='systolic'",
+                    (thread,))) == 1
+    ok("a second tap on the same card is refused: one proposal writes one row")
+
+
 def voice_cannot_commit(base, db):
     """A spoken value has no route of its own, and cannot buy itself a tap.
 
@@ -533,6 +598,7 @@ def main():
 
         agent_confirms(base, db, register(base, "Agent Confirms", "T-92"))
         composer_says(base, db)
+        thread_confirms_edited(base, db)
         voice_cannot_commit(base, db)
 
         # A registered patient standing at the nurse, so the agent's proposal

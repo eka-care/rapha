@@ -6,14 +6,21 @@
  *  behaviour below is driven by the declaration: type, required,
  *  answer_option, and styling_metadata.phc range / critical / unit.
  */
-import type { Payload, Question, Questionnaire } from "./types";
-import { phcOf, validate, raisedFlags, rangeBlocked, walk } from "./validate";
+import type { Operation, Payload, Question, Questionnaire } from "./types";
+import { blankRow, itemFields, toRow, type ItemField } from "./structured";
+import { enabled, phcOf, prune, validate, raisedFlags, rangeBlocked, walk } from "./validate";
 
 export { validate, rangeBlocked, raisedFlags };
 
 /** A value below this arrived from an instrument that is not sure it heard
  *  right. contracts.Draft says the renderer must highlight it for re-reading. */
 const SURE = 0.9;
+
+/** The one answer that is not a clinical value: the sentence someone typed to
+ *  get past a range block. catalogue/validate.py knows it by this name too. */
+const OVERRIDE = "override_reason";
+
+const answeredHere = (v: unknown) => v !== undefined && v !== null && v !== "";
 
 function outsideCritical(q: Question, v: unknown): boolean {
   const crit = phcOf(q).critical;
@@ -23,9 +30,10 @@ function outsideCritical(q: Question, v: unknown): boolean {
 }
 
 function Widget({
-  q, value, onChange, disabled,
+  q, op, value, onChange, disabled, ids,
 }: {
-  q: Question; value: unknown; onChange: (v: unknown) => void; disabled?: boolean;
+  q: Question; op?: Operation; value: unknown; onChange: (v: unknown) => void;
+  disabled?: boolean; ids: string;
 }) {
   const set = (v: unknown) => onChange(v);
   const str = value === undefined || value === null ? "" : String(value);
@@ -49,57 +57,102 @@ function Widget({
         </select>
       );
     case "text":
-      return <textarea className="f-in" id={`f-${q.link_id}`} rows={4} value={str} disabled={disabled}
+      return <textarea className="f-in" id={`${ids}-${q.link_id}`} rows={4} value={str} disabled={disabled}
                        onChange={(e) => set(e.target.value)} />;
     case "integer":
     case "decimal":
       // The id is how an instrument that refused to guess hands the cursor
       // back to this field. inputMode makes it a keypad on a phone.
       return (
-        <input className="f-in" id={`f-${q.link_id}`} inputMode="decimal" value={str} disabled={disabled}
+        <input className="f-in" id={`${ids}-${q.link_id}`} inputMode="decimal" value={str} disabled={disabled}
                step={q.type === "integer" ? 1 : "any"} type="number"
                onChange={(e) => set(e.target.value === "" ? undefined : e.target.value)} />
       );
     case "structured":
-      return <Structured q={q} value={value} onChange={set} disabled={disabled} />;
+      return <Structured q={q} op={op} value={value} onChange={set} disabled={disabled} />;
     default:
       return <input className="f-in" value={str} disabled={disabled} onChange={(e) => set(e.target.value)} />;
   }
 }
 
 /** A structured answer is a CARE resource, not a string: a medication request
- *  wants a drug from a catalogue, a dose and a duration. There is no such
- *  catalogue on this machine, so this is a repeating free-text list and it
- *  says so. It is honest, it round-trips, and it is not a prescribing UI. */
+ *  wants a drug and a dose, a dispense wants a drug and a quantity. Which sub
+ *  fields those are is declared, in the operation's own mapping, so each row
+ *  is one labelled input per field the kernel will read off it. See
+ *  structured.ts.
+ *
+ *  There is still no catalogue of drugs or tests on this machine, so each
+ *  field is typed rather than picked, and the hint says so. An operation that
+ *  declares no mapping for this question falls back to the single free text
+ *  row, which is what every one of them drew before.
+ */
 function Structured({
-  q, value, onChange, disabled,
+  q, op, value, onChange, disabled,
 }: {
-  q: Question; value: unknown; onChange: (v: unknown) => void; disabled?: boolean;
+  q: Question; op?: Operation; value: unknown; onChange: (v: unknown) => void; disabled?: boolean;
 }) {
-  const rows: string[] = Array.isArray(value) ? (value as string[]) : value ? [String(value)] : [""];
-  const write = (next: string[]) => onChange(next.filter((r) => r.trim() !== ""));
+  const fields = itemFields(op, q.link_id);
+  const listed = Array.isArray(value) ? value : value === undefined || value === "" ? [] : [value];
+  const rows = (listed.length ? listed : [""]).map((v) => toRow(v, fields));
+  const write = (next: Record<string, unknown>[]) => onChange(next.filter((r) => !blankRow(r)));
+  const edit = (i: number, key: string, text: string) =>
+    write(rows.map((r, j) => (j === i ? { ...r, [key]: text } : r)));
+
+  if (!fields.length) {
+    // Nothing declares this answer's shape, so it stays what it was: one line
+    // per item, which kernel/mapping.py reads as {code: <it>}.
+    return (
+      <div className="f-rows">
+        {rows.map((row, i) => (
+          <input key={i} className="f-in" value={String(row.code ?? "")} disabled={disabled}
+                 placeholder={`${q.structured_type ?? "entry"} ${i + 1}`}
+                 onChange={(e) => edit(i, "code", e.target.value)} />
+        ))}
+        <Add disabled={disabled} onClick={() => onChange([...rows.filter((r) => !blankRow(r)), {}])} />
+        <div className="f-hint">
+          {op?.id ?? "This operation"} declares no fields for {q.link_id}, so this is one free text
+          line per {q.structured_type ?? "entry"} and what you write is what is sent.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="f-rows">
       {rows.map((row, i) => (
-        <input key={i} className="f-in" value={row} disabled={disabled}
-               placeholder={`${q.structured_type ?? "entry"} ${i + 1}`}
-               onChange={(e) => write(rows.map((r, j) => (j === i ? e.target.value : r)))} />
+        <div className="f-item" key={i}>
+          <span className="f-item-n">{i + 1}</span>
+          {fields.map((f: ItemField) => (
+            <label className="f-sub" key={f.key}>
+              <span>{f.label}</span>
+              <input className="f-in" value={String(row[f.key] ?? "")} disabled={disabled}
+                     onChange={(e) => edit(i, f.key, e.target.value)} />
+            </label>
+          ))}
+        </div>
       ))}
-      <button type="button" className="cq" disabled={disabled} onClick={() => onChange([...rows.filter(Boolean), ""])}>
-        Add another
-      </button>
+      <Add disabled={disabled} onClick={() => onChange([...rows.filter((r) => !blankRow(r)), {}])} />
       <div className="f-hint">
-        Typed as free text. A {q.structured_type ?? "structured"} picker is not built, so what you
-        write here is what is sent.
+        One {fields[0].resource} per row, with the fields {op?.id ?? "this operation"} maps. Typed,
+        not picked: there is no catalogue of {q.structured_type ?? "these"} on this machine.
       </div>
     </div>
   );
 }
 
+function Add({ disabled, onClick }: { disabled?: boolean; onClick: () => void }) {
+  return (
+    <button type="button" className="cq" disabled={disabled} onClick={onClick}>Add another</button>
+  );
+}
+
 export function Form({
-  schema, value, onChange, problems, confidence, disabled,
+  schema, op, value, onChange, problems, confidence, disabled, ids = "f",
 }: {
   schema: Questionnaire;
+  /** The operation this form commits. Only a structured question needs it, to
+   *  find the sub fields its rows carry. */
+  op?: Operation;
   value: Payload;
   onChange: (next: Payload) => void;
   /** Shown only once the person has tried to commit, so a form does not
@@ -107,12 +160,19 @@ export function Form({
   problems: { link_id: string; message: string }[];
   confidence?: Record<string, number>;
   disabled?: boolean;
+  /** The prefix for every field's DOM id. Two of these forms can be on screen
+   *  at once now, one per pending proposal, so the ids cannot be the link_id
+   *  alone: the instrument that hands the cursor back would find the first
+   *  form on the page rather than its own. */
+  ids?: string;
 }) {
   const set = (link_id: string, v: unknown) => {
     const next = { ...value };
     if (v === undefined) delete next[link_id];
     else next[link_id] = v;
-    onChange(next);
+    // An answer that switches a question off takes that question's answer with
+    // it. The server does not, so leaving it would commit a glucose on a CBC.
+    onChange(prune(schema, next));
   };
   const blocked = rangeBlocked(schema, value);
   const flags = raisedFlags(schema, value);
@@ -127,6 +187,16 @@ export function Form({
       );
     }
     if (q.type === "display") return <div className="f-hint" key={q.link_id}>{q.text}</div>;
+    // A question this payload has switched off is not asked. It is still drawn
+    // if it somehow holds an answer, because a value that would be sent must
+    // never be off screen: that is the whole difference between hiding a
+    // question and hiding a value.
+    // A required question is always asked: see prune() on why.
+    if (!q.required && !enabled(q, value) && !answeredHere(value[q.link_id])) return null;
+    // The override reason has one control on this form and it is below, next to
+    // the sentence saying what an override costs. A schema that declares the
+    // question as well is not drawn twice.
+    if (q.link_id === OVERRIDE) return null;
 
     const phc = phcOf(q);
     const mine = problems.filter((p) => p.link_id === q.link_id);
@@ -139,7 +209,8 @@ export function Form({
           {q.required && <span className="f-req">required</span>}
           {phc.unit && <span className="f-unit">{phc.unit}</span>}
         </label>
-        <Widget q={q} value={value[q.link_id]} onChange={(v) => set(q.link_id, v)} disabled={disabled} />
+        <Widget q={q} op={op} ids={ids} value={value[q.link_id]}
+                onChange={(v) => set(q.link_id, v)} disabled={disabled} />
         {phc.range && (
           <div className="f-hint">Usual range {phc.range.low} to {phc.range.high}{phc.unit ? ` ${phc.unit}` : ""}</div>
         )}
@@ -169,8 +240,8 @@ export function Form({
             Reason for overriding the range<span className="f-req">required</span>
           </label>
           <textarea className="f-in" rows={2} disabled={disabled}
-                    value={String(value.override_reason ?? "")}
-                    onChange={(e) => set("override_reason", e.target.value || undefined)} />
+                    value={String(value[OVERRIDE] ?? "")}
+                    onChange={(e) => set(OVERRIDE, e.target.value || undefined)} />
           <div className="f-hint">
             A value outside the usual range is not refused, it is recorded with your reason.
             The reason is written to the audit trail and cannot be removed later.

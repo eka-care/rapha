@@ -16,10 +16,11 @@ There are two backends because tonight has no API key and a demo has to run:
            operation ids from it.
 
 Neither backend can bypass the guard, and neither is trusted to have got the
-payload right: both produce Proposed, both go through verdicts(), and
-verdicts() never passes confirmed. An irreversible operation is denied on this
-surface before the guard even looks at confirmation, which is the property the
-CLI demonstrates.
+payload right. Nothing in this module runs the guard: a plan is proposed
+through the kernel, which runs it on the machine surface, and there is no
+argument anywhere on this path that could set confirmed. An irreversible
+operation is denied on that surface before the guard even looks at
+confirmation, which is the property the CLI demonstrates.
 
 Honest about what is unverified: route() is exercised by the check in
 agent/tests/test_planner.py. llm() has never been run, because this machine has
@@ -34,8 +35,6 @@ import pathlib
 import re
 from dataclasses import dataclass
 
-from catalogue import guard, validate
-
 CATALOGUE = pathlib.Path(__file__).parents[1] / "catalogue" / "catalogue.json"
 MODEL = "claude-opus-5"
 
@@ -48,16 +47,10 @@ class Proposed:
     why: str
     backend: str
     score: float = 0.0
-
-
-@dataclass(frozen=True)
-class Verdict:
-    proposed: Proposed
-    decision: guard.Decision
-
-    @property
-    def outcome(self) -> str:
-        return self.decision.audit.get("outcome", "")
+    # What the planner heard but would not resolve, in its own words. A
+    # question is the honest alternative to a guess; it is not a decision and
+    # nothing reads it back as one.
+    ask: tuple = ()
 
 
 def load(path=CATALOGUE) -> dict:
@@ -136,35 +129,166 @@ _NUM = r"(\d+(?:\.\d+)?)"
 _PAIR = re.compile(r"\b(\d{2,3})\s*(?:/|over)\s*(\d{2,3})\b")
 
 
+# Spoken names for a questionnaire field, keyed by link_id. ONE list, and it
+# lives in packages/voice because that is where it already existed, where it is
+# richest, and where it is data rather than code: grammar.ts imports this same
+# JSON. Two lists would drift, and the way you find out is a clinician saying
+# "temp 37.2" into a box that only knows "temperature". The better home is the
+# questionnaire itself, beside the unit and the range that styling_metadata.phc
+# already carries; that is an edit to questionnaires/ and not part of this
+# change.
+SPOKEN_FIELDS = json.loads(
+    (pathlib.Path(__file__).parents[1] / "packages" / "voice" / "src" / "spoken.json")
+    .read_text())
+
+
 def _aliases(f: dict):
-    """Spoken names for one field: its link_id and the distinctive words of its
-    label. Ambiguous words are dropped by the caller, not resolved."""
-    return {f["link_id"].lower()} | {w for w in _words(f["text"]) if len(w) > 2}
+    """Spoken names for one field: its link_id, the distinctive words of its
+    label, and the spoken names packages/voice already knew. Ambiguous words
+    are dropped by the caller, not resolved."""
+    return ({f["link_id"].lower()}
+            | {a.lower() for a in SPOKEN_FIELDS.get(f["link_id"], ())}
+            | {w for w in _words(f["text"]) if len(w) > 2})
 
 
-def extract(op: dict, utterance: str) -> dict:
-    """Fill in only what is unambiguous. A thin payload is the normal outcome:
-    the rest is typed at the rendered surface, and the guard denies a proposal
-    that is missing a required answer rather than the planner inventing one."""
-    text = utterance.lower()
-    payload = {}
-    ids = {f["link_id"] for f in op["fields"]}
+# Between a field's name and its answer: "assessment is X", "history: X",
+# "assessment of X", and the bare "assessment X". Matches empty, which is the
+# last of those.
+_LEADIN = re.compile(r"[\s:=,-]*(?:(?:is|was|are|were|of|reads|shows|says)\b)?[\s:=,-]*")
+# A later field name only ends the clause when it is being used as a label:
+# either it is followed by a lead-in ("plan is amlodipine") or it opens a fresh
+# clause ("..., examination chest clear"). "history of hypertension" is neither,
+# so it stays inside the answer it was said in.
+_LABELLED = re.compile(r"\s*(?:[:=-]|(?:is|was|are|were)\b)")
+
+
+def _is_label(text: str, start: int, end: int) -> bool:
+    before = text[:start].rstrip()
+    return bool(_LABELLED.match(text, end)) or before == "" or before[-1] in ",.;"
+
+
+def _clauses(fields: list, unique: dict, text: str, utterance: str) -> dict:
+    """Text answers, sliced out of the utterance by the words themselves.
+
+    A field's own name marks where its answer starts; the answer runs to the
+    end of what was said, or to the next word the form owns that is being used
+    as a label, whichever comes first. Nothing is invented: every character
+    returned was spoken.
+
+    Two vocabularies, deliberately different sizes. Only an unambiguous field
+    name may START a clause, because starting one is a claim about which field
+    the words belong to. Anything the operation declares may END one: an
+    ambiguous field name, a numeric field's name, a declared answer option.
+    Ending a clause early only ever gives a person less to correct.
+
+    ponytail: one clause per field, first mention wins, and a declared word
+    that opens a clause of its own always ends the one before it, so "history:
+    pain, plan to come back" ends the history at "pain". The upgrade path is a
+    real chunker, and it is not worth it until a transcript proves it is needed.
+    """
+    def marks(words):
+        found = []
+        for word in words:
+            for m in re.finditer(r"\b%s\b" % re.escape(word), text):
+                found.append((m.start(), m.end()))
+        return sorted(found)
+
+    owned = set()
+    for f in fields:
+        owned |= _aliases(f)
+        for option in f["options"] or []:
+            owned |= {w for w in re.split(r"[^a-z0-9]+", option.lower()) if w}
+    ends = marks(owned)
+
+    starts = sorted((s, e, link_id) for alias, link_id in unique.items()
+                    for s, e in marks([alias]))
+
+    out, claimed = {}, []
+    for start, end, link_id in starts:
+        # A name said inside somebody else's answer is part of that answer, not
+        # a label of its own: "assessment of history of asthma" is one clause,
+        # and the history in it is not a second.
+        if link_id in out or any(b <= start < e for b, e in claimed):
+            continue
+        begin = _LEADIN.match(text, end).end()
+        stop = len(text)
+        for other_start, other_end in ends:
+            if other_start >= begin and _is_label(text, other_start, other_end):
+                stop = other_start
+                break
+        value = utterance[begin:stop].strip(" \t\n.,;:-")
+        if len(value) > 1:
+            out[link_id] = value
+            claimed.append((begin, stop))
+    return out
+
+
+def _choice(f: dict, text: str):
+    """One declared answer_option, or a question. Never a guess.
+
+    Matched against the values the questionnaire declares, so "venous blood"
+    finds "venous-blood" and nothing has to be spelled with a hyphen out loud.
+    When two options fit the words equally well the pair is named and asked
+    about, because picking one of them is exactly the kind of quiet decision
+    this whole system exists to refuse.
+    """
+    words = {o: [w for w in re.split(r"[^a-z0-9]+", o.lower()) if w] for o in f["options"]}
+    fits = [o for o, ws in words.items()
+            if ws and re.search(r"\b%s\b" % r"\W+".join(re.escape(w) for w in ws), text)]
+    if not fits:
+        # No whole option was said. A single word of one, and only one, option
+        # is still the option; a word two of them share is a question.
+        fits = [o for o, ws in words.items()
+                if any(w not in STOP and re.search(r"\b%s\b" % re.escape(w), text) for w in ws)]
+    if len(fits) == 1:
+        return fits[0], None
+    if len(fits) > 1:
+        return None, ("Which did you mean for %s: %s?"
+                      % (f["text"], " or ".join([", ".join(fits[:-1]), fits[-1]])))
+    return None, None
+
+
+def extract(op: dict, utterance: str):
+    """Fill in only what is unambiguous. Returns (payload, questions).
+
+    A thin payload is the normal outcome and the correct one: the rest is typed
+    at the rendered surface, and the guard denies a proposal that is missing a
+    required answer rather than the planner inventing one. Nothing here writes
+    a value the utterance did not contain, in any of the four shapes it reads:
+    the blood pressure pair, a number beside a field name, a declared choice,
+    and a text clause introduced by the field's own name.
+    """
+    low = str(utterance).lower()
+    if len(low) != len(utterance):
+        # A case fold that changed the width would misalign every text slice.
+        utterance = low
+    text = low
+    payload, asks = {}, []
+    # typed() strips override_reason before the guard ever sees it, so this
+    # planner can never answer it. A field it cannot answer should not be
+    # taking alias words off the fields it can: "Reason for accepting a value
+    # outside the plausible band" was quietly making "value" ambiguous.
+    fields = [f for f in op["fields"] if f["link_id"] != "override_reason"]
+    ids = {f["link_id"] for f in fields}
 
     # "140/90" and "140 over 90", the way blood pressure is actually said.
     pair = _PAIR.search(text)
     if pair and {"systolic", "diastolic"} <= ids:
         payload["systolic"] = int(pair.group(1))
         payload["diastolic"] = int(pair.group(2))
-        text = text[: pair.start()] + " " + text[pair.end():]
+        # Blanked in place rather than cut out, so the offsets a text clause is
+        # sliced with still line up with the utterance.
+        text = text[: pair.start()] + " " * (pair.end() - pair.start()) + text[pair.end():]
 
     # A word that names more than one field names none of them.
     seen = {}
-    for f in op["fields"]:
+    for f in fields:
         for alias in _aliases(f):
             seen.setdefault(alias, []).append(f["link_id"])
-    unique = {a: ids[0] for a, ids in seen.items() if len(ids) == 1}
+    unique = {a: names[0] for a, names in seen.items() if len(names) == 1}
+    clauses = _clauses(fields, unique, text, utterance)
 
-    for f in op["fields"]:
+    for f in fields:
         if f["link_id"] in payload:
             continue
         names = sorted(a for a in _aliases(f) if unique.get(a) == f["link_id"])
@@ -175,10 +299,14 @@ def extract(op: dict, utterance: str) -> dict:
                 value = float(m.group(1))
                 payload[f["link_id"]] = int(value) if f["type"] == "integer" else value
         elif f["type"] == "choice" and f["options"]:
-            hits = [o for o in f["options"] if re.search(r"\b%s\b" % re.escape(o.lower()), text)]
-            if len(hits) == 1:
-                payload[f["link_id"]] = hits[0]
-    return payload
+            value, ask = _choice(f, text)
+            if value is not None:
+                payload[f["link_id"]] = value
+            elif ask:
+                asks.append(ask)
+        elif f["type"] in ("text", "string") and f["link_id"] in clauses:
+            payload[f["link_id"]] = clauses[f["link_id"]]
+    return payload, tuple(asks)
 
 
 def typed(op: dict, payload) -> dict:
@@ -211,12 +339,14 @@ def route(utterance: str, catalogue: dict, *, limit: int = 3) -> list:
         score = sum(kws[w] for w in hits)
         if score < STRONG:
             continue
+        payload, ask = extract(op, utterance)
         scored.append(Proposed(
             operation=op["id"],
-            payload=extract(op, utterance),
+            payload=payload,
             why="matched " + ", ".join(hits),
             backend="router",
             score=score,
+            ask=ask,
         ))
     scored.sort(key=lambda p: (-p.score, p.operation))
     return scored[:limit]
@@ -356,35 +486,6 @@ def plan(utterance: str, catalogue: dict, *, caps, state, which: str = None) -> 
     if which == "llm":
         return llm(utterance, catalogue, caps=caps, state=state)
     return route(utterance, catalogue)
-
-
-# --------------------------------------------------------------------------
-# The guard. Every plan, from either backend, goes through here.
-# --------------------------------------------------------------------------
-
-def verdicts(proposals, catalogue: dict, *, caps, state, actor="agent", scopes=None) -> list:
-    """Run the guard over a plan on the machine surface.
-
-    Note what is not passed: confirmed. There is no argument to this function
-    that could set it, so no planner, prompt or utterance can reach it. A write
-    that survives comes back "proposed" and waits for a person.
-    """
-    out = []
-    for p in proposals:
-        op = catalogue["operations"][p.operation]
-        schema = validate.load(op["input"])
-        decision = guard.evaluate(
-            op,
-            caps=caps,
-            state=state,
-            payload=p.payload,
-            surface=guard.MCP,
-            validate=validate.make_validator(schema),
-            actor=actor,
-            scopes=scopes,
-        )
-        out.append(Verdict(p, decision))
-    return out
 
 
 # --------------------------------------------------------------------------

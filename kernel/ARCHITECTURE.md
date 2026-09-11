@@ -25,7 +25,7 @@ declared in a bundle and drawn by a generic renderer.
          ^                ^                     ^
          |                |                     |
    RENDERER          MCP / AGENT           ANALYTICS
-   care_phc_fe/      care_phc_mcp/         analytics/
+   web/              care_phc_mcp/         analytics/
    draws declared    tools from            evaluates Metric
    forms and views   catalogue.json,       locally; nothing
    from ThreadView   proposes only         leaves the machine
@@ -117,3 +117,23 @@ patched one:
   argument, so it is a machine surface like any other. `web/` replaced
   `care_phc_fe/` as the renderer; the older one still builds and is still
   fixture driven.
+
+## What moved after that, 2026.09.14
+
+- **`care_phc_fe/` is deleted.** It was the module-federation remote the table
+  above gives to the frontend agent: a CARE plugin exposing `./manifest` with
+  an encounter tab and a `/phc/queue` route, drawn from `fixtures.json`, which
+  `scripts/gen-fixtures.py` precomputed from `care_phc/thread.py`. `web/`
+  replaced it as the renderer and reads the kernel API instead of a fixture,
+  so the second one was a prototype nobody shipped that still had to compile,
+  still had 72MB of `node_modules`, and still claimed a port. Nothing was moved
+  out of it: every CSS class it defined already exists in `web/src/theme.css`,
+  and its two components are the pre-kernel ancestors of `web/src/Thread.tsx`
+  and `web/src/ViewRenderer.tsx`. `scripts/gen-fixtures.py` went with it,
+  having had exactly one consumer. `web/src/mock.ts` is the demo data now and
+  is its own thing, behind a button in the header.
+
+  What is lost with it is the only worked example of the care_fe federation
+  shape (`@originjs/vite-plugin-federation`, `exposes: { "./manifest": ... }`,
+  port 10123). It is in the history at `9253069:care_phc_fe/vite.config.mts`
+  if adapter 1 ever wants it, and `care_eka_scribe_fe` is the upstream one.

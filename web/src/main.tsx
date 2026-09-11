@@ -59,7 +59,7 @@ const go = (hash: string) => {
 
 /** Questions a person typed. The kernel stores none of them, so they live
  *  here, per thread, per browser, and the empty state says so. */
-const SAID = "phc.said";
+const SAID = "phc.said." + API_BASE;
 const loadSaid = (): Record<string, Said[]> => {
   try {
     return JSON.parse(localStorage.getItem(SAID) || "{}");
@@ -80,10 +80,11 @@ function App() {
   const cat = useAsync<Catalogue>(() => client.catalogue(), [demo, role]);
   const fac = useAsync(() => client.facility(), [demo, role]);
 
-  // One read per non-summary view, shared by the nav counts, Home and the
-  // palette. A view the role may not open answers 403; that is an answer, not
-  // a crash, so it drops out of the list.
-  const nav = useMemo(() => navViews(cat.data), [cat.data]);
+  // One read per view the caller may open, shared by the nav counts, Home and
+  // the palette. navViews has already dropped the ones whose capability this
+  // role does not hold, so this normally asks for nothing it cannot have; a
+  // 403 that gets through anyway is an answer, not a crash, and drops out.
+  const nav = useMemo(() => navViews(cat.data, fac.data?.user?.capabilities), [cat.data, fac.data]);
   const loaded = useAsync<Loaded[]>(
     () =>
       Promise.all(
@@ -304,9 +305,22 @@ function App() {
                       asking={asking}
                       onSay={(t) => say(route.id, t, route.id)}
                       onAction={(op) => setModal({ op, thread: route.id })}
-                      onReview={(p) =>
-                        setModal({ op: proposalOperation(p, cat.data?.operations ?? {}), thread: route.id, proposal: p })
-                      }
+                      renderProposal={(p) => (
+                        <OperationPanel
+                          inline
+                          op={proposalOperation(p, cat.data?.operations ?? {})}
+                          thread={route.id}
+                          client={client}
+                          proposal={p}
+                          instruments={cat.data?.instruments}
+                          flags={thread.data?.flags ?? []}
+                          onDone={() => {
+                            toast("Recorded. The proposal is closed.");
+                            thread.reload();
+                            loaded.reload();
+                          }}
+                        />
+                      )}
                       onReject={async (p) => {
                         try {
                           await client.reject(p.id, {});

@@ -11,6 +11,13 @@
  *  operation, and it cannot write: every write leaves through a callback to
  *  the shell, which opens the modal.
  *
+ *  A pending proposal is the one message that is not read-only. It carries the
+ *  commit surface itself, drawn inside the bubble, so the values a machine
+ *  filled in are read, corrected and confirmed without leaving the thread. This
+ *  file does not draw it and cannot: the shell passes it in as renderProposal,
+ *  so the only thing on this screen that can write is a thing this screen did
+ *  not build.
+ *
  *  The rule that matters most here is the one you cannot see: an action whose
  *  precondition is unmet, or whose capability is not held, is absent. Nothing
  *  below can render a disabled pill, because thread.actions never contains
@@ -27,7 +34,7 @@ import { Badge, human } from "./ui";
 import { Line } from "./ViewRenderer";
 
 export function Thread({
-  thread, cat, ctx, role, said, asking, onSay, onAction, onReview, onReject, onSummary, onMore,
+  thread, cat, ctx, role, said, asking, onSay, onAction, renderProposal, onReject, onSummary, onMore,
 }: {
   thread: ThreadView;
   cat: Catalogue;
@@ -39,7 +46,8 @@ export function Thread({
   asking?: boolean;
   onSay: (text: string) => void;
   onAction: (op: Operation) => void;
-  onReview: (p: Proposal) => void;
+  /** The commit surface for one pending proposal, built by the shell. */
+  renderProposal: (p: Proposal) => React.ReactNode;
   onReject: (p: Proposal) => void;
   onSummary: (v: ViewDecl) => void;
   onMore: () => void;
@@ -76,7 +84,9 @@ export function Thread({
           <Refusals msgs={msgs} />
           {msgs
             .filter((m) => !(m.kind === "denied" && m.old))
-            .map((m) => <Message key={m.id} m={m} onReview={onReview} onReject={onReject} />)}
+            .map((m) => (
+              <Message key={m.id} m={m} renderProposal={renderProposal} onReject={onReject} />
+            ))}
           <AgentBubble line={line} onAction={onAction} consentMissing={bar.consentMissing} />
         </Scroll>
 
@@ -113,8 +123,12 @@ function Scroll({ msgs, children }: { msgs: Msg[]; children: React.ReactNode }) 
 // ------------------------------------------------------------------ messages
 
 function Message({
-  m, onReview, onReject,
-}: { m: Msg; onReview: (p: Proposal) => void; onReject: (p: Proposal) => void }) {
+  m, renderProposal, onReject,
+}: {
+  m: Msg;
+  renderProposal: (p: Proposal) => React.ReactNode;
+  onReject: (p: Proposal) => void;
+}) {
   if (m.kind === "said" && m.who === "user") {
     return (
       <div className="msg right">
@@ -164,29 +178,25 @@ function Message({
           <>
             Proposed by {m.by}, and the visit has moved past it. Confirming it would be refused,
             so there is nothing to review. Rejecting it clears it from the thread.
+            <Values values={m.values} />
+            <div className="props">
+              <button className="prop" onClick={() => onReject(m.proposal)}>
+                <Icon name="alert" />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span className="p-l">Reject</span>
+                  <div className="p-s">Records the refusal against this proposal and writes nothing else.</div>
+                </span>
+              </button>
+            </div>
           </>
         ) : (
-          <>Proposed by {m.by}. Nothing in it has been recorded.</>
+          <>
+            Proposed by {m.by}. Nothing in it has been recorded, and nothing will be until you
+            read the values below and tap. Correct anything that is wrong first: what is sent is
+            what is on screen, not what was proposed.
+            <div className="inlinepanel">{renderProposal(m.proposal)}</div>
+          </>
         )}
-        <Values values={m.values} unsure={!m.stale} />
-        <div className="props">
-          {!m.stale && (
-            <button className="prop primary" onClick={() => onReview(m.proposal)}>
-              <Icon name="check" />
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span className="p-l">Review and commit</span>
-                <div className="p-s">Opens the values in editable fields. Your tap is the write.</div>
-              </span>
-            </button>
-          )}
-          <button className="prop" onClick={() => onReject(m.proposal)}>
-            <Icon name="alert" />
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span className="p-l">Reject</span>
-              <div className="p-s">Records the refusal against this proposal and writes nothing else.</div>
-            </span>
-          </button>
-        </div>
       </Bubble>
     );
   }
@@ -227,7 +237,7 @@ function Bubble({
 
 /** The values that were recorded, labelled by the questionnaire. A committed
  *  row that shows no values is a receipt for something invisible. */
-function Values({ values, unsure }: { values: Kv[]; unsure?: boolean }) {
+function Values({ values }: { values: Kv[] }) {
   if (!values.length) return null;
   return (
     <div className="kvbox">
@@ -237,11 +247,6 @@ function Values({ values, unsure }: { values: Kv[]; unsure?: boolean }) {
           <b>{v.value}</b>
         </div>
       ))}
-      {unsure && (
-        <div className="kv">
-          <span style={{ fontStyle: "italic" }}>Unconfirmed until a person taps</span>
-        </div>
-      )}
     </div>
   );
 }

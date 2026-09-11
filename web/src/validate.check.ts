@@ -8,7 +8,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
-import { raisedFlags, validate } from "./validate.ts";
+import { enabled, prune, raisedFlags, validate, walk } from "./validate.ts";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const load = (id: string) => JSON.parse(readFileSync(`${root}questionnaires/${id}.json`, "utf8"));
@@ -58,4 +58,51 @@ CASES.forEach(([id, payload], i) => {
   }
 });
 
+// ------------------------------------------------------------ enable_when
+//
+// The server does not read enable_when (bundles/LAB-LOG.md 13), so there is
+// nothing to diff against here: these assert the renderer's own promise, that
+// a question the payload switched off is neither asked nor sent.
+
+const panel = load("lab.schema.panel-result-v1");
+const analytes = (payload: Record<string, unknown>) =>
+  walk(panel.questions).filter((q) => enabled(q, payload)).map((q) => q.link_id);
+
+// Nothing chosen: no analyte is asked, and the panel question itself still is.
+assert.deepEqual(analytes({}), ["panel", "override_reason"]);
+assert.deepEqual(analytes({ panel: "cbc" }),
+  ["panel", "haemoglobin", "wbc", "platelets", "override_reason"]);
+assert.deepEqual(analytes({ panel: "bmp" }),
+  ["panel", "glucose", "creatinine", "sodium", "potassium", "override_reason"]);
+
+// Switching the panel takes the other panel's answers with it, because the
+// server would accept them: a glucose on a CBC commits.
+assert.deepEqual(prune(panel, { panel: "bmp", glucose: 90, haemoglobin: 13 }),
+  { panel: "bmp", glucose: 90 });
+assert.deepEqual(prune(panel, { panel: "cbc", haemoglobin: 13 }),
+  { panel: "cbc", haemoglobin: 13 });
+// Nothing chosen yet means nothing analyte-shaped survives.
+assert.deepEqual(prune(panel, { haemoglobin: 13 }), {});
+
+// `exists`, the other operator in the questionnaires.
+const labResult = load("phc.schema.lab-result-v1");
+const override = walk(labResult.questions).find((q) => q.link_id === "override_reason")!;
+assert.equal(enabled(override, {}), false);
+assert.equal(enabled(override, { value: 4.2 }), true);
+
+// A question that is both required and conditional is asked anyway: the
+// server asks for it regardless, so hiding it would build a form that cannot
+// be committed and will not say why.
+const req = { link_id: "r", text: "r", type: "string", required: true,
+  enable_when: [{ question: "panel", operator: "equals", answer: "cbc" }] };
+assert.deepEqual(prune({ ...panel, questions: [...panel.questions, req] },
+  { panel: "bmp", r: "kept" }), { panel: "bmp", r: "kept" });
+
+// An operator this renderer has never heard of must not hide anything: a
+// hidden required field is a form that cannot be completed and will not say
+// why.
+assert.equal(enabled({ link_id: "x", text: "x", type: "string",
+  enable_when: [{ question: "panel", operator: "matches-regex", answer: "c.*" }] }, {}), true);
+
 console.log(`ok   web validator matches catalogue/validate.py on ${CASES.length} cases`);
+console.log("ok   enable_when hides the questions the chosen panel does not use");

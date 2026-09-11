@@ -18,8 +18,9 @@ Reuse, not rewrite
 - Operation is exactly the compiled entry catalogue/build.py already writes,
   which care_phc_mcp/catalogue.go already reads. New keys only get added.
 - The station and state vocabularies stay in catalogue/vocab.py.
-- The thread JSON keeps the field names care_phc_fe/src/types.ts uses, with
-  two renames called out on ThreadView.
+- The thread JSON keeps the field names the renderer's types.ts uses, with
+  two renames called out on ThreadView. That was care_phc_fe/src/types.ts when
+  this was written; it is web/src/types.ts now, and care_phc_fe is deleted.
 
 The five declaration types
 --------------------------
@@ -389,7 +390,8 @@ class StepStatus:
 class ThreadView:
     """GET /api/v1/phc/threads/{id}/
 
-    Same fields care_phc_fe/src/types.ts Thread has, with two changes the
+    Same fields the renderer's Thread type has (care_phc_fe/src/types.ts when
+    this was written, web/src/types.ts now), with two changes the
     frontend agent owns tonight: `patient` is now `subject`, because a thread
     can be about an encounter, a household or anything the workflow names;
     and `line` is returned instead of the frontend's hard-coded LINE constant,

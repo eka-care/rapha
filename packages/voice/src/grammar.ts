@@ -19,6 +19,15 @@
  * grammar.check.ts can run it with no browser.
  */
 
+/** Extra spoken names the questionnaire text does not contain, keyed by
+ *  link_id. One list, read here and by agent/planner.py, so the microphone and
+ *  the keyless router hear the same words: "temp 37.2" has to mean what
+ *  "temperature 37.2" means on both. It is JSON rather than TypeScript for
+ *  exactly that reason. The better home is the questionnaire itself, beside
+ *  the unit and the range in styling_metadata.phc; moving it there is an edit
+ *  to questionnaires/ and not part of this change. */
+import SPOKEN from "./spoken.json" with { type: "json" };
+
 export type FieldSpec = {
   linkId: string;
   type: "integer" | "decimal";
@@ -270,15 +279,6 @@ export function parse(transcript: string, fields: FieldSpec[]): Parsed {
   return { ok: true, values, confidence };
 }
 
-/** Extra spoken names the questionnaire text does not contain. */
-const SPOKEN: Record<string, string[]> = {
-  systolic: ["systolic", "bp", "b p", "blood pressure", "pressure", "upper"],
-  diastolic: ["diastolic", "lower"],
-  pulse: ["pulse", "heart rate", "hr"],
-  spo2: ["spo2", "sats", "saturation", "oxygen"],
-  weight: ["weight", "wt"],
-  temperature: ["temperature", "temp", "fever"],
-};
 
 type Question = {
   link_id: string;
@@ -298,7 +298,7 @@ export function fieldsFrom(schema: { questions: Question[] }): FieldSpec[] {
   for (const q of schema.questions) {
     if (q.type !== "integer" && q.type !== "decimal") continue;
     const phc = q.styling_metadata?.phc ?? {};
-    const aliases = new Set(SPOKEN[q.link_id] ?? []);
+    const aliases = new Set((SPOKEN as Record<string, string[]>)[q.link_id] ?? []);
     aliases.add(q.text.toLowerCase());
     fields.push({
       linkId: q.link_id,

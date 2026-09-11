@@ -71,6 +71,8 @@ def respond(kernel, catalogue: dict, view: dict, utterance: str,
         lines.append("    heard    %s" % p.why)
         lines.append("    order    %s" % planner.explain_order(p, actions, view.get("station")))
         lines.append("    payload  %s" % json.dumps(p.payload, sort_keys=True))
+        for question in p.ask:
+            lines.append("    ask      %s%s%s" % (YELLOW, question, OFF))
         try:
             answer = kernel.propose(p.operation, view["id"], p.payload)
         except client.Refused as no:

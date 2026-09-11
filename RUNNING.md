@@ -1,7 +1,18 @@
 # Running this
 
-Three processes, in this order: compile, serve, draw. Nothing here needs CARE,
-a network, or a database server. Python 3.9 and Node 22+ are the whole of it.
+Three processes, in this order: compile, serve, draw. Two facilities at once is
+four, which is the whole demo:
+
+```sh
+python3 -m catalogue.build && python3 -m kernel.declarations
+sh api/run.sh                                                   # PHC   :8000
+PHC_BUNDLE=lab PHC_DB=lab.sqlite3 PORT=8001 sh api/run.sh        # LAB   :8001
+(cd web && npm run dev)                                          #       :5173
+(cd web && VITE_API_BASE=http://localhost:8001 npx vite --port 5174)
+```
+
+Nothing here needs CARE, a network, or a database server. Python 3.9 and
+Node 22+ are the whole of it.
 
 ## 0. Once
 
@@ -34,10 +45,17 @@ nothing. That is the whole build system.
 sh api/run.sh                       # http://127.0.0.1:8000
 ```
 
-On first start it creates `phc.sqlite3` in the repo root and seeds six threads,
+On first start it creates `phc.sqlite3` in the repo root and writes whatever
+`bundles/<id>/seed.yaml` declares, which for the health centre is six threads,
 one standing at each station, so no screen is ever empty. Delete the file to
 reseed. `PHC_DB` moves it, `PHC_BUNDLE` picks a different bundle, `PORT`
 changes the port.
+
+Every queue view is `scope: today`, so a demo file made last week would
+otherwise open on an empty workspace. It does not: `SqliteStore` walks the
+seeded threads forward to today whenever it opens the file. Only rows dated on
+the seed's own day move, and a thread a person opened is never touched, so real
+work keeps its real date and nothing is ever pushed into the future.
 
 Check it:
 
@@ -62,8 +80,12 @@ release`), its own operations, its own flags, its own capabilities and roles,
 and its own worklist, report and turnaround board. All of those are declared
 in `bundles/lab/bundle.yaml` and closed against that bundle alone, so a lab
 declaration naming `nurse` or `vitals.recorded` fails the linter. Give it its
-own `PHC_DB`: the seed itself is still the PHC's, so its six patients turn up
-on the laboratory's worklist either way (see `bundles/LAB-LOG.md`).
+own `PHC_DB`: a bundle declares its own fixtures in `bundles/<id>/seed.yaml`,
+and the laboratory's are seven specimens with their own names, accession
+numbers, panels and referring clinicians. A bundle with no `seed.yaml` opens
+empty and does not crash. What a bundle still cannot do is listed in
+`bundles/LAB-LOG.md`, which is the honest answer to "does one kernel run
+another facility": mostly, and read the log before believing the screens.
 
 Three things the switch does not carry, all of them real:
 
@@ -96,8 +118,48 @@ It reads `VITE_API_BASE`, default `http://localhost:8000`. The header carries a
 "Use demo data" toggle that draws every screen from a fixture and refuses every
 write, for when the API is not up.
 
-Note `care_phc_fe/` (the older, fixture-driven prototype) also runs on 5173.
-Run one at a time, or give the second one `--port 5174`.
+To watch both facilities at once, run a second Vite against the second kernel:
+
+```sh
+(cd web && VITE_API_BASE=http://localhost:8001 npx vite --port 5174)
+```
+
+Everything this browser remembers is keyed by that `VITE_API_BASE` (recents,
+the questions typed into a composer), because a thread id means nothing on a
+different kernel. The role and the theme are not: a role the other kernel does
+not declare falls back to its demo account with a toast saying so.
+
+### What you are looking at
+
+A workspace, not a tabbed forms application. Nothing in `web/src` is written
+for a bundle; every word below comes from a declaration on the kernel it is
+pointed at.
+
+- **The sidebar.** The manifest's title and version. `New chat`, which opens a
+  workspace thread scoped to no patient. `Search`, which is the palette.
+  Then one nav entry per declared view that is not a summary AND whose
+  capability this role holds, with a live count from that view's own read; then
+  the last ten threads this browser opened; then the role, its capability count
+  and a menu of every role the kernel declares.
+- **A patient is a conversation.** Open a thread and the record is a stream of
+  messages: what somebody said, what the agent said, one card per posted
+  operation with its values labelled by the questionnaire, one card per refusal,
+  and a pending proposal with its own commit surface inside the bubble. The
+  agent always speaks last: where the visit stands, and up to five things this
+  role can do here, each with the reason and an instrument tag. The composer is
+  quick-action pills plus an ask box.
+- **What you cannot do is absent.** Not greyed. `kernel/state.actions()`
+  returns only what the guard says is visible, so the renderer has nothing to
+  grey out; the reason for an absence is the agent's second sentence, and the
+  right rail's "Capabilities held" card is where the shape of the hidden part
+  is visible. The nav obeys the same rule.
+- **The palette** (⌘K, the sidebar button, or the topbar pill). Find first:
+  threads by name, phone, token and village, declared views, and the agent.
+  Selecting one previews it before you commit to it. A query that matches
+  nothing offers Register, under the sentence saying a new record is permanent.
+- **The right rail.** The workflow's own steps with where the baton is, the
+  care unit accrued from the audit, every capability with the held ones lit,
+  and the audit trail with its refusals.
 
 ## 4. The agent surfaces, optional
 
@@ -148,9 +210,12 @@ past the guard on the machine surface before it is printed, and none of them
 can commit: `agent/client.py` holds no verb that would, and refuses to
 assemble a URL containing `/confirm` or `/commit` before it opens a socket.
 
-What it leaves behind is a proposal id. Open that thread in the renderer and it
-is at the top of the panel, "awaiting a person", with a Review button; the
-values are editable and the tap is what writes. Watch it happen:
+What it leaves behind is a proposal id. Open that thread in the renderer and
+the proposal is a message in the conversation, badged "awaiting a person", with
+the commit surface drawn inside the bubble: the values a machine filled in,
+editable, with the questionnaire's own ranges and a "You changed" diff under
+them. What is sent is what is on screen after the edits, the guard runs again
+on that payload, and the tap is what writes. Watch it happen:
 
 ```sh
 python3 -m agent "bp 138 over 86, pulse 74" --thread enc-002
@@ -160,7 +225,7 @@ open http://localhost:5173/#/threads/enc-002
 ## 5. The checks
 
 ```sh
-sh scripts/check.sh                 # everything, about 13 seconds, 237 ok lines
+sh scripts/check.sh                 # everything, about 15 seconds, 247 ok lines
 ```
 
 That runs the linters, every Python and Go unit check, the browser-side checks,
@@ -168,10 +233,12 @@ That runs the linters, every Python and Go unit check, the browser-side checks,
 half), and `scripts/e2e.py`, which starts its own uvicorn on a free port, walks
 a patient through the line over HTTP, reads the SQLite file to prove the row
 landed, drives the Go MCP binary at it, posts a sentence to `/agent/say` and
-confirms what comes back, then starts a second kernel as the laboratory and
-proves that the account which keyed a result cannot verify it: not on the
-panel, not on either surface, and not by asking the agent to do it. `SKIP_E2E=1`
-skips the two steps that bind a port.
+confirms what comes back, confirms one of those cards with an EDITED payload
+and proves the edited value is what lands rather than the proposed one, then
+starts a second kernel as the laboratory and proves that the account which
+keyed a result cannot verify it: not on the panel, not on either surface, and
+not by asking the agent to do it. `SKIP_E2E=1` skips the two steps that bind a
+port.
 
 ## What is not wired
 
@@ -207,24 +274,28 @@ skips the two steps that bind a port.
   refuses to write it: "not a step of phc.wf.outpatient". The atom stays in
   `catalogue/ops` for a bundle that declares a household workflow. Nothing here
   declares one yet.
-- **The lab bundle's seed is the PHC's six patients.** A bundle now declares
-  its own `stations`, `states`, `capabilities` and `roles` in
-  `bundles/<id>/bundle.yaml`, and `kernel/declarations.py` closes them per
-  bundle, so a laboratory's line reads `accession, phlebotomy, processing,
-  verification, release` and its roles are `phlebotomist, technologist,
-  pathologist, senior_technologist`. What is still the PHC's is
-  `adapters/local/store.seed`: open the lab on a fresh database and five
-  outpatients are standing at the accession desk with tokens like `A01`, and
-  one seeded proposal names an operation the lab does not declare. Every
-  remaining leak is listed in `bundles/LAB-LOG.md`, which is the honest answer
-  to "does one kernel run another facility": mostly, and read the log before
-  believing the screens.
+- **A seeded day has no clock in it.** The seed grammar declares rows, not
+  times, so every row a bundle seeds shares one timestamp: turnaround on the
+  demo day is zero and the order of rows inside a thread is declaration order,
+  held by sequential `seed-NNNN` ids. Nothing reads those durations anyway,
+  which is `bundles/LAB-LOG.md` leak 3.
 
-- **A seeded thread is only on today's line for one day.** Every queue view is
-  `scope: today` and the seed dates its rows when the file is created, so a
-  database made yesterday draws an empty workspace this morning. Delete the
-  SQLite file and restart. There is no code fix here that is not a lie about
-  what a queue means.
+- **A seeded posted operation shows its title and no values.** A seed's audit
+  lines carry no payload, and `web/src/messages.ts` builds a posted card's
+  values from the payload in the audit. So on a seeded thread "Enter panel
+  results" is a receipt for something invisible, even though the rows it wrote
+  are in `observation` and the laboratory report view shows them. Anything
+  committed in this session draws its values in full. Fixing it means either
+  writing payloads into both `seed.yaml` files by hand or teaching the card to
+  read rows, and the second one is a kernel change.
+
+- **`enable_when` is the renderer's rule and not the kernel's.** The lab's
+  result questionnaire hides the analytes the chosen panel does not use and
+  prunes them out of the payload it sends, so a glucose never rides along on a
+  CBC from the screen. `catalogue/validate.py` does not know the keyword at
+  all, so a machine surface that puts one in the payload is not refused. The
+  renderer is doing the whole of what a renderer can do here; the gap is on the
+  server, and it is `bundles/LAB-LOG.md` leak 13.
 
 - **Separation of duties is declared, not authenticated.** `actor of` and
   `not actor of` are real preconditions, enforced on both surfaces and read by

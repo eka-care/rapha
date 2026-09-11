@@ -178,6 +178,53 @@ def test_the_seed_puts_people_at_different_points_in_the_line():
     assert store.count("medication_dispense", thread="enc-005", where={}) == 0
 
 
+def test_a_bundle_with_no_seed_starts_empty_and_does_not_crash():
+    """Seed is optional. A facility whose demo day nobody has written gets an
+    empty queue, not a traceback and not another facility's patients."""
+    import tempfile
+
+    empty = SqliteStore(":memory:")
+    assert seed(empty, []) == []
+    assert empty.threads(workflow="anything", scope="today") == []
+    for table in TABLES:
+        assert empty.db.execute("SELECT COUNT(*) FROM %s" % table).fetchone()[0] == 0
+    # A bundle directory with no seed.yaml is what "no seed" looks like on
+    # disk, and that is where the default of none is decided.
+    assert declarations.load_seed(tempfile.mkdtemp()) == []
+
+
+def test_a_stale_demo_day_walks_forward_and_real_work_stays_put():
+    """A file seeded yesterday used to draw an empty workspace this morning,
+    because every queue view is scope: today. The seeded threads move; a
+    thread a person opened does not, and nothing lands in the future."""
+    import tempfile
+    from datetime import datetime, timedelta, timezone
+
+    path = os.path.join(tempfile.mkdtemp(), "stale.sqlite3")
+    store = SqliteStore(path)
+    seed(store)
+    mine = store.open_thread(token="T-9", actor="user:nurse")
+    dated = [(t, "created_at" if t == "proposal" else "at" if t == "audit"
+              else "created_date") for t in TABLES]
+    for table, column in dated:
+        store.db.execute(
+            "UPDATE %s SET %s = replace(datetime(%s, '-3 days'), ' ', 'T')"
+            " || '+00:00'" % (table, column, column))
+    assert store.threads(workflow="w", scope="today") == []
+
+    reopened = SqliteStore(path)          # roll_seed_forward runs in __init__
+    today = [t.id for t in reopened.threads(workflow="w", scope="today")]
+    assert len(today) == 6, today
+    assert mine not in today, "a thread a person opened is not the demo day"
+    tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+    for table, column in dated:
+        late = reopened.db.execute(
+            "SELECT COUNT(*) FROM %s WHERE %s >= ?" % (table, column),
+            [tomorrow]).fetchone()[0]
+        assert late == 0, "%s was pushed into the future" % table
+    assert SqliteStore(path).roll_seed_forward() == 0, "rolling twice moves nothing"
+
+
 def test_two_threads_writing_at_once_do_not_corrupt_the_file():
     """The regression this exists for: FastAPI runs sync endpoints in a thread
     pool, and one sqlite3 connection shared across those threads corrupts the

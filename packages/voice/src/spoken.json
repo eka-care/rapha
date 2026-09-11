@@ -1,0 +1,8 @@
+{
+  "systolic": ["systolic", "bp", "b p", "blood pressure", "pressure", "upper"],
+  "diastolic": ["diastolic", "lower"],
+  "pulse": ["pulse", "heart rate", "hr"],
+  "spo2": ["spo2", "sats", "saturation", "oxygen"],
+  "weight": ["weight", "wt"],
+  "temperature": ["temperature", "temp", "fever"]
+}

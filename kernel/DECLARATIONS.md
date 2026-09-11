@@ -62,6 +62,49 @@ failure. `catalogue/ops/*.md` is shared between bundles, so `catalogue/build.py`
 lints an atom against the union of every bundle's vocabulary (`vocab.every()`)
 and the per bundle closure above is what actually bites.
 
+## The seed file, optional
+
+`bundles/<id>/seed.yaml` is the facility's demo day: threads standing at
+different points of its own line, so no screen opens empty. It is the one
+piece of a bundle that is fixture data rather than a declaration, and it is
+optional. A bundle with no `seed.yaml` starts with an empty queue, which is a
+supported outcome and not a crash.
+
+```yaml
+threads:
+  - id: lab-004                      # the thread, which is an encounter row
+    token: 25-0414                   # what the waiting area or the rack calls it
+    status: in_progress              # or completed, to close it
+    patient: {name: ..., age: 66}    # one patient row; omit for a thread with no subject yet
+    rows:                            # one row each: `resource` plus that table's columns
+      - {resource: observation, category: laboratory, code: potassium, value: 6.8, unit: mmol/L,
+         created_by: "user:technologist"}
+    flags: [lab.critical]            # stored flags; must be this bundle's states
+    audit:                           # who did what, so `actor of` rules can fire
+      - {operation: lab.op.result-enter, actor: "user:technologist"}
+    proposals:                       # a write awaiting a person
+      - {operation: lab.op.result-enter, proposed_by: "device:analyser", surface: mcp,
+         payload: {...}}
+```
+
+Linted with everything else: a resource must be a CARE resource, a flag must
+be one of this bundle's `states`, and an operation named by a proposal or an
+audit line must be one this bundle loads. That last rule is the one this file
+exists for. The seed used to live in `adapters/local/store.py`, where it ran
+under whatever bundle was loaded, so a laboratory opened on six outpatients
+with tokens like `A01` and a pending prescription on a specimen thread; see
+`bundles/LAB-LOG.md` leak 10.
+
+It compiles into `declarations.Bundle.seed` and into nothing else. It is not
+in `catalogue.json`: the renderer and the MCP server have no business reading
+a facility's fixtures. `adapters/local/store.seed(store, threads)` writes it.
+
+Seeded threads carry `created_by: seed` on the encounter, and that is how the
+adapter finds them again: `SqliteStore.roll_seed_forward()` moves a stale demo
+day to today on open, so a file seeded last week still draws a line under a
+`scope: today` queue. Real threads and work done after the seed's own day are
+never moved.
+
 ## The query grammar
 
 One shape, shared by workflow states, summary sections and metrics, so an

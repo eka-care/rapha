@@ -16,14 +16,16 @@
  *   - a refused audit row never renders as a posted record.
  */
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  actorOf, agentLine, clock, composer, header, messages, queueViewFor, summariesFor,
+  actorOf, agentLine, clock, composer, fmt, header, messages, queueViewFor, summariesFor,
   type Ctx,
 } from "./messages.ts";
 import { firstOperation, isAsk, rows } from "./search.ts";
-import type { Catalogue, Questionnaire, ThreadView, ViewDecl, ViewResult } from "./types";
+import { blankRow, itemFields, toRow } from "./structured.ts";
+import type { Catalogue, Operation, Questionnaire, ThreadView, ViewDecl, ViewResult } from "./types";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const read = (p: string) => readFileSync(root + p, "utf8");
@@ -268,11 +270,70 @@ assert.equal(isAsk("Kamala"), false);
 // whichever the bundle says that is.
 assert.equal(firstOperation(cat, WF), cat.workflows![WF].steps[0].operations[0]);
 
+// ------------------------------------------ a structured answer has fields
+//
+// The sub fields of a structured question are not in the questionnaire. They
+// are in the operation's own mapping, which is what makes a real control for
+// one possible without a word of PHC in the renderer.
+
+// catalogue/catalogue.json keeps `operations` catalogue-wide, from
+// catalogue/build.py, and the mapping is attached per bundle by
+// kernel/declarations.py. The API merges the two on /catalogue and so does
+// this, from the same code, rather than from a copy of what it should say.
+const mapped: Record<string, Operation> = JSON.parse(
+  execFileSync("python3", ["-c", `
+import json, sys
+sys.path.insert(0, ${JSON.stringify(root.replace(/\/$/, ""))})
+from kernel import declarations
+print(json.dumps(declarations.load().operations))
+`], { encoding: "utf8" }),
+);
+for (const [id, op] of Object.entries(mapped)) cat.operations[id] = op;
+
+for (const [id, link_id, expected] of [
+  ["phc.op.rx-prescribe", "medications", ["medication", "dosage_instruction"]],
+  ["phc.op.lab-order", "investigations", ["code"]],
+  // Two records, both per_item, and the second names the same keys: one field
+  // each, not four.
+  ["phc.op.pharmacy-dispense", "dispenses", ["medication", "quantity"]],
+  ["phc.op.consult-document", "diagnosis", ["code"]],
+] as [string, string, string[]][]) {
+  const op = cat.operations[id];
+  assert.ok(op, `${id} is not in the catalogue`);
+  assert.deepEqual(itemFields(op, link_id).map((f) => f.key), expected, id);
+  // Every field must name the resource its row becomes, or the form cannot
+  // say what one row is.
+  for (const f of itemFields(op, link_id)) assert.ok(f.resource, `${id} ${f.key} has no resource`);
+}
+
+// An operation with no mapping for that question gets nothing back, and the
+// form falls to the free text row it always drew.
+assert.deepEqual(itemFields(cat.operations["phc.op.vitals-record"], "medications"), []);
+assert.deepEqual(itemFields(undefined, "medications"), []);
+
+// A row the kernel sent as a bare string keeps its text where mapping.items()
+// would have looked for it, so opening a proposal never loses a line.
+const rxFields = itemFields(cat.operations["phc.op.rx-prescribe"], "medications");
+assert.deepEqual(toRow("Amoxicillin 500mg", rxFields), { medication: "Amoxicillin 500mg" });
+assert.deepEqual(toRow({ medication: "A", dosage_instruction: "B" }, rxFields),
+  { medication: "A", dosage_instruction: "B" });
+assert.deepEqual(toRow("CBC", []), { code: "CBC" });
+assert.equal(blankRow({ medication: "", dosage_instruction: "  " }), true);
+assert.equal(blankRow({ medication: "A" }), false);
+
+// And a card reads one back with the names on it rather than as a run-on
+// string. This is the whole difference between a record and a sentence.
+assert.equal(fmt([{ medication: "Amoxicillin 500mg", dosage_instruction: "1 cap TDS" }]),
+  "Medication: Amoxicillin 500mg, Dosage instruction: 1 cap TDS");
+assert.equal(fmt([{ code: "CBC" }, { code: "RBS" }]), "CBC; RBS");
+assert.equal(fmt("plain"), "plain");
+
 // ------------------------------------------------------- no write from here
 
 // The thread screen composes from these four modules. If a commit or a confirm
 // ever appears in one of them, the conversation has become a machine surface.
-for (const file of ["src/messages.ts", "src/search.ts", "src/ask.ts", "src/Thread.tsx"]) {
+for (const file of ["src/messages.ts", "src/search.ts", "src/ask.ts", "src/Thread.tsx",
+                    "src/structured.ts"]) {
   const body = read(`web/${file}`)
     .split("\n")
     .filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l))          // prose about commits is fine
@@ -283,3 +344,4 @@ for (const file of ["src/messages.ts", "src/search.ts", "src/ask.ts", "src/Threa
 }
 
 console.log("ok   thread messages, agent line, composer, header and palette rows");
+console.log("ok   a structured answer's fields come from the operation's own mapping");

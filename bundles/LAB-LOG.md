@@ -15,11 +15,12 @@ embeds the catalogue.
 things in this file and neither could be fixed from inside a bundle, so on
 2026.09.12 the kernel changed: an `{actor: id}` mapping source and an
 `actor of <operation>` precondition (leak 1), and per bundle vocabularies
-declared in `bundle.yaml` (leaks 2 and 4). Those three are struck through
-below with what was actually done. Everything not struck through still stands,
-and `check.py` still asserts each one with a running assert rather than a
-comment. `api/`, `web/`, the Go source and `questionnaires/` are still
-untouched.
+declared in `bundle.yaml` (leaks 2 and 4). On 2026.09.13 `adapters/` changed
+too, for leak 10: a bundle now declares its own seed, so a laboratory stops
+opening on six outpatients. Those four are struck through below with what was
+actually done. Everything not struck through still stands, and `check.py`
+still asserts each one with a running assert rather than a comment. `api/`,
+`web/`, the Go source and `questionnaires/` are still untouched.
 
 ## 1. ~~Separation of duties cannot be enforced. Only approximated.~~ FIXED
 
@@ -215,30 +216,63 @@ issued time, `observation` no interpretation or reference range. Did: the whole 
 The adapter was not changed, which kept the exercise honest, but it means
 the referring clinician exists only as a JSON string.
 
-## 10. The seed is the PHC's, and it runs under any bundle.
+## 10. ~~The seed is the PHC's, and it runs under any bundle.~~ FIXED
 
-`adapters/local/store.py seed()` runs on any empty database. Under
-`PHC_BUNDLE=lab` the worklist opens with six PHC patients carrying vitals and
-prescriptions. Wanted: fixtures declared by the bundle. Did: nothing;
-`check.py` asserts the six intruders are still there.
+`adapters/local/store.py seed()` held six PHC patients in Python and ran on
+any empty database. Under `PHC_BUNDLE=lab` the worklist opened with Kamala
+Devi, Ramesh Kumar, Sunita Bai, Meera Patel and Iqbal Ahmed standing at the
+accession desk with tokens like `A01`, and a pending `phc.op.rx-prescribe`
+offering Amoxicillin on a specimen thread: an operation this bundle does not
+declare, drawn as an agent card the kernel would then 404. Wanted: fixtures
+declared by the bundle. Did, at first: nothing; `check.py` asserted the six
+intruders were still there.
 
-Now that the rest of the words are the laboratory's, this is the loudest thing
-left on the screen and the first thing a visitor sees. On `:8001` today the
-specimen line reads Accession 5, and the five names standing there are Kamala
-Devi, Ramesh Kumar, Sunita Bai, Meera Patel and Iqbal Ahmed, with tokens like
-`A01`. One seeded proposal is worse than a name: it is a pending
-`phc.op.rx-prescribe` on a laboratory thread, an operation this bundle does not
-declare, and the renderer draws it as a superseded agent card offering
-Amoxicillin. It cannot be confirmed (the kernel 404s the operation) but it
-should never have been drawn. A `seed` on the Bundle, defaulting to none, is
-the shape.
+Fixed, 2026.09.13. A seed is declared data in `bundles/<id>/seed.yaml` and
+`declarations.Bundle` carries it, defaulting to none:
 
-The demo role half of this is fixed by leak 2: `api/main.py` builds its role
+- `adapters/local/store.seed(store, threads)` writes what it is given and
+  knows nothing about a facility. `threads` defaults to the bundle
+  `PHC_BUNDLE` names, which is the bundle `api/main.py` loaded, so the seed
+  and the declarations can no longer disagree about which facility this is.
+- The PHC's six moved into `bundles/phc/seed.yaml` verbatim, ids, tokens and
+  all, so every check that knew them still knows them.
+- The laboratory has its own: seven specimens, one at each of accession,
+  phlebotomy, processing, verification and release, one rejected and stranded
+  at verification, one released. Referring clinicians, panels, analyte values
+  with their units, and an audit trail saying who keyed what.
+- Lint refuses a seed that names an operation the bundle does not load, which
+  is the Amoxicillin, and a flag outside the bundle's own `states`.
+- A third bundle brings its own without touching `adapters/`. A bundle with no
+  `seed.yaml` starts empty and does not crash; `adapters/local/tests/test_store.py`
+  asserts that.
+
+`check_the_seed_is_the_laboratorys_own` walks every value of every row the lab
+seed writes against the PHC's whole vocabulary, less the words the laboratory
+also declares, matched on word boundaries because `lab` is a PHC station and
+`lab-001` is a laboratory thread. `check_a_seeded_result_carries_who_keyed_it`
+proves the demo day can show the rule this bundle exists for: on the seeded
+critical specimen, Verify is absent for `user:technologist` and present for
+`user:pathologist`. The socket half asserts the same over HTTP.
+
+Seen on `:8123` with `PHC_BUNDLE=lab`: accession 1, phlebotomy 1, processing 1,
+verification 2, release 1, complete 1; a crit badge on Devi Prasad, a warn
+badge on the haemolysed specimen, and the one pending card is the analyser
+offering a bench result, not a prescription.
+
+The demo role half of this was fixed by leak 2: `api/main.py` builds its role
 table from `vocab.BUNDLES`, which is now the loaded bundle's roles, so under
 `PHC_BUNDLE=lab` the demo account is the union of the laboratory's four roles
 and holds no PHC capability at all. It does hold `result.enter` and
 `result.verify` together, so the demo account is refused verifying a result it
 entered, which is the rule working rather than a leak.
+
+### What the seed grammar still cannot say
+
+A row is a row. There is no way to declare "three days ago" or "eleven minutes
+after accession", so every seeded row shares one timestamp and turnaround on
+the demo day is zero. Row order inside a thread is declaration order, held by
+sequential `seed-NNNN` ids rather than by time. Leak 3 is why nothing reads
+those durations anyway.
 
 ## 11. `catalogue.json` holds one bundle. The MCP server embeds it at build.
 

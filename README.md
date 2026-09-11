@@ -18,7 +18,7 @@ catalogue/          the operation atoms, the linter, the compiler, the guard
   build.py            lint and compile atoms -> catalogue.json
   guard.py            the four checks CARE does not do
 care_phc/           backend plug: thread state, community layer, connectors
-care_phc_fe/        frontend remote: themed shell, quick actions, stations
+web/                the renderer: a chat workspace drawn from the declarations
 care_phc_mcp/       MCP server, tools generated from catalogue.json
 questionnaires/     Phase 0 forms, authored not coded
 plan-archive/       the ABDM Developer Portal plan this repo used to hold

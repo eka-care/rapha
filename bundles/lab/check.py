@@ -100,6 +100,75 @@ def check_the_declaration_drives_a_line_the_phc_never_had():
        "4 roles, and not one word of them is the PHC's")
 
 
+def check_the_seed_is_the_laboratorys_own():
+    """Leak 10, closed. The seed used to live in adapters/local/store.py and
+    ran under whatever bundle was loaded, so a laboratory opened on six
+    outpatients with tokens like A01 and a pending Amoxicillin on a specimen
+    thread. It is declared data in bundles/<id>/seed.yaml now, and this walks
+    every value of every row it wrote looking for a primary health centre.
+    """
+    from adapters.local.store import TABLES, SqliteStore, seed
+    store = SqliteStore(":memory:")
+    threads = seed(store, BUNDLE.seed)
+    assert threads, "the laboratory declares no seed"
+
+    import re
+    phc_bundle = declarations.load("phc")
+    phc = vocab.for_bundle("phc")
+    lab = vocab.for_bundle("lab")
+    # Every word the PHC owns, less the ones the laboratory also declares.
+    # lab.critical is the only overlap and it is not a lie here; see the check
+    # above.
+    banned = ((set(phc.states) | set(phc.capabilities) | set(phc.stations)
+               | set(phc.roles) | set(phc_bundle.manifest.operations)
+               | {t["patient"]["name"] for t in phc_bundle.seed if t.get("patient")})
+              - (set(lab.states) | set(lab.capabilities) | set(lab.stations)
+                 | set(lab.roles) | set(OPS)))
+    # Whole words: "lab" is a PHC station and "lab-001" is a laboratory thread.
+    edge = re.compile("|".join(r"(?<![\w.-])%s(?![\w.-])" % re.escape(w)
+                               for w in sorted(banned)))
+    for table in TABLES:
+        for row in store.db.execute("SELECT * FROM %s" % table).fetchall():
+            blob = " ".join(str(v) for v in tuple(row) if v is not None)
+            hit = edge.search(blob)
+            assert not hit, "%s row carries the PHC's word %r: %s" % (
+                table, hit.group(0), blob)
+
+    # And it draws the laboratory's own line, with something at every station.
+    caps = set().union(*ROLES.values())
+    standing = {}
+    for ref in store.threads(workflow=WF.id, scope="today"):
+        view = state.thread_view(store, ref, WF, OPS, caps=caps, actor="user:demo")
+        standing.setdefault(view.station, []).append(ref.id)
+    assert set(standing) == {s.station for s in WF.steps} | {None}, standing
+    assert "lab.critical" in state.flags(store, "lab-004", WF)
+    assert "result.rejected" in state.flags(store, "lab-005", WF)
+    # The one proposal on the demo day is the analyser offering a result the
+    # bench has not accepted, and it is an operation this bundle loads.
+    pending = [p for t in threads for p in store.proposals(t, status="pending")]
+    assert [p.operation for p in pending] == ["lab.op.result-enter"], pending
+    ok("the seed is the laboratory's own: %d specimens, one at every station, "
+       "and not one PHC word in any row" % len(threads))
+
+
+def check_a_seeded_result_carries_who_keyed_it():
+    """The separation of duties rule reads the thread's audit trail, so a
+    seeded thread that claims a result was entered has to say by whom. Without
+    it the demo day cannot show the rule that the laboratory exists to prove."""
+    from adapters.local.store import SqliteStore, seed
+    store = SqliteStore(":memory:")
+    seed(store, BUNDLE.seed)
+    flags = state.flags(store, "lab-004", WF)
+    performed = state.performers(store, "lab-004")
+    assert performed.get("lab.op.result-enter") == {"user:technologist"}, performed
+    for actor, expect in (("user:technologist", False), ("user:pathologist", True)):
+        drawn = [op["id"] for op in state.actions(WF, OPS, flags, SENIOR,
+                                                  actor=actor, performed=performed)]
+        assert ("lab.op.result-verify" in drawn) is expect, (actor, drawn)
+    ok("on the seeded critical specimen the Verify action is absent for the "
+       "technologist who keyed it and present for the pathologist")
+
+
 def check_a_bundle_cannot_borrow_another_bundles_words():
     """The closure that stops leak 2 coming back. Hand the lab manifest a PHC
     operation and every borrowed word has to be a build failure, not a screen
@@ -465,10 +534,19 @@ def e2e():
         ok("report, turnaround board and worklist all resolve from the lab "
            "declarations, and the board opens for the account the browser is")
 
-        # The seed is the adapter's and it is a PHC's. It runs regardless of bundle.
-        seeded = [r for r in worklist["rows"] if r["thread"].startswith("enc-00")]
-        assert len(seeded) == 6, "the PHC seed still runs under the lab bundle (bundles/LAB-LOG.md, leak 10)"
-        ok("KNOWN LEAK: six PHC patients are seeded into the laboratory's worklist")
+        # Leak 10, closed, over the socket this time: the demo day this
+        # kernel seeded into its own file is the laboratory's.
+        seeded = [r for r in worklist["rows"] if r["thread"].startswith("lab-")]
+        assert len(seeded) == len(BUNDLE.seed), seeded
+        phc_threads = {t["id"] for t in declarations.load("phc").seed}
+        assert not [r for r in worklist["rows"] if r["thread"] in phc_threads], \
+            "a PHC thread is on the laboratory's worklist"
+        names = {r["subject"].get("name") for r in worklist["rows"]}
+        assert not (names & {"Kamala Devi", "Ramesh Kumar", "Sunita Bai"}), names
+        stations = {r["station"] for r in seeded}
+        assert stations <= {s.station for s in WF.steps} | {None}, stations
+        ok("the worklist the API seeded on its own file is the laboratory's own "
+           "demo day, at the laboratory's own stations")
 
         mcp_tools(base)
     finally:

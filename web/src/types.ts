@@ -26,6 +26,10 @@ export type Question = {
   repeats?: boolean;
   answer_option?: { value: string }[];
   structured_type?: string;
+  /** Ask this question only when every condition holds. In the questionnaires
+   *  since they were written, in no code until now; catalogue/validate.py does
+   *  not read it either, so it governs what is offered, not what is accepted. */
+  enable_when?: { question: string; operator: string; answer: unknown }[];
   questions?: Question[];
   styling_metadata?: { phc?: Phc };
 };
@@ -66,6 +70,18 @@ export type Operation = {
   verified: string;
   tool: string;
   description: string;
+  /** How this operation's payload becomes rows, from the atom's own
+   *  frontmatter (kernel/mapping.py). A structured question has no sub schema,
+   *  so the `{item: [...]}` sources here are the only declaration of which
+   *  sub fields one of its rows may carry. See structured.ts. */
+  mapping?: MappingRecord[];
+};
+
+export type MappingRecord = {
+  resource: string;
+  per_item?: string | null;
+  per_question?: string[] | null;
+  fields: Record<string, Record<string, unknown>>;
 };
 
 export type ViewDecl = {

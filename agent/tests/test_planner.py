@@ -11,7 +11,7 @@ backend is not exercised here, which is stated rather than hidden.
 """
 import pathlib
 
-from catalogue import validate, vocab
+from catalogue import guard, validate, vocab
 
 from agent import planner
 
@@ -19,6 +19,25 @@ CAT = planner.load()
 OPS = CAT["operations"]
 ALL_CAPS = set(vocab.CAPABILITIES)
 ALL_STATES = set(vocab.STATES)
+
+
+def verdicts(proposals, catalogue, *, caps, state, actor="agent"):
+    """Run the guard over a plan, on the machine surface.
+
+    This lives in the check, not in agent/planner.py, because nothing shipping
+    calls it: the kernel runs the guard when a proposal is POSTed, and a second
+    copy in the planner was one more place a confirmed argument could appear.
+    Note what is not passed here either, and could not be by any utterance.
+    """
+    out = []
+    for p in proposals:
+        op = catalogue["operations"][p.operation]
+        schema = validate.load(op["input"])
+        out.append(guard.evaluate(op, caps=caps, state=state, payload=p.payload,
+                                  surface=guard.MCP,
+                                  validate=validate.make_validator(schema),
+                                  actor=actor, scopes=None))
+    return out
 
 
 def sample_payload(op):
@@ -51,10 +70,11 @@ def test_no_plan_can_ever_commit():
     proposals = [planner.Proposed(op_id, sample_payload(op), "check", "router")
                  for op_id, op in OPS.items()]
     seen = set()
-    for v in planner.verdicts(proposals, CAT, caps=ALL_CAPS, state=ALL_STATES):
-        seen.add(v.outcome.split(":")[0])
-        assert v.outcome != "allowed", f"{v.proposed.operation} came back committable"
-        assert v.decision.audit["surface"] == planner.guard.MCP
+    for p, d in zip(proposals, verdicts(proposals, CAT, caps=ALL_CAPS, state=ALL_STATES)):
+        outcome = d.audit.get("outcome", "")
+        seen.add(outcome.split(":")[0])
+        assert outcome != "allowed", f"{p.operation} came back committable"
+        assert d.audit["surface"] == guard.MCP
     assert "proposed" in seen, "the check proved nothing: no proposal survived"
 
 
@@ -62,9 +82,9 @@ def test_an_irreversible_operation_is_refused_however_good_the_payload():
     op = OPS["phc.op.abha-link"]
     assert op["irreversibility"] == "irreversible", "this test picked the wrong atom"
     p = planner.Proposed(op["id"], sample_payload(op), "check", "router")
-    v = planner.verdicts([p], CAT, caps=ALL_CAPS, state={"registered"})[0]
-    assert not v.decision.allowed
-    assert "human confirmation" in v.decision.reason
+    d = verdicts([p], CAT, caps=ALL_CAPS, state={"registered"})[0]
+    assert not d.allowed
+    assert "human confirmation" in d.reason
 
 
 def test_the_planner_has_no_way_to_confirm_anything():
@@ -99,27 +119,100 @@ def test_the_router_refuses_rather_than_guessing():
         assert planner.route(utterance, CAT) == [], f"{utterance!r} produced a plan"
 
 
+def fill(op, utterance):
+    payload, _ = planner.extract(op, utterance)
+    return payload
+
+
+def asked(op, utterance):
+    return planner.extract(op, utterance)[1]
+
+
 def test_it_fills_in_only_the_numbers_it_is_sure_about():
     op = OPS["phc.op.vitals-record"]
-    got = planner.extract(op, "bp 140/90, pulse 72, spo2 97")
+    got = fill(op, "bp 140/90, pulse 72, spo2 97")
     assert got == {"systolic": 140, "diastolic": 90, "pulse": 72, "spo2": 97}
-    assert planner.extract(op, "bp is 140 over 90")["diastolic"] == 90
+    assert fill(op, "bp is 140 over 90")["diastolic"] == 90
     # A number with no field named next to it is left for the person to type.
-    assert planner.extract(op, "she is about 62 kilos today") == {}
+    assert fill(op, "she is about 62 kilos today") == {}
     # And a spoken number is not the router's job at all: packages/voice parses
     # it at the microphone, where it can be read back before anyone commits.
-    assert planner.extract(op, "systolic one forty") == {}
+    assert fill(op, "systolic one forty") == {}
+
+
+def test_the_field_names_are_the_ones_packages_voice_already_knew():
+    """One alias list, in packages/voice/src/spoken.json, read by both. Before
+    this, "temperature 37.2" parsed here and "temp 37.2" did not, while the
+    microphone understood both."""
+    op = OPS["phc.op.vitals-record"]
+    assert fill(op, "temp 37.2") == {"temperature": 37.2}
+    assert fill(op, "temperature 37.2") == {"temperature": 37.2}
+    assert fill(op, "sats 97 and hr 88") == {"spo2": 97, "pulse": 88}
+    assert planner.SPOKEN_FIELDS["temperature"] == ["temperature", "temp", "fever"]
+
+
+def test_it_fills_text_answers_from_the_words_that_named_them():
+    op = OPS["phc.op.consult-document"]
+    got = fill(op, "document the consultation, assessment is hypertension poorly controlled")
+    assert got == {"assessment": "hypertension poorly controlled"}, got
+    # A colon, and a second labelled clause that ends the first.
+    got = fill(op, "history: cough for three days. plan is amlodipine 5mg daily")
+    assert got == {"history": "cough for three days",
+                   "plan": "amlodipine 5mg daily"}, got
+    # The bare form, with no lead-in word at all, several clauses in a row.
+    assert fill(op, "examination chest clear")["examination"] == "chest clear"
+    assert fill(op, "opd note, history: fever three days, examination chest clear, "
+                    "assessment viral fever, plan is paracetamol") == {
+        "history": "fever three days", "examination": "chest clear",
+        "assessment": "viral fever", "plan": "paracetamol"}
+    # A field name inside a clause is not a new label unless it is used as one.
+    assert fill(op, "assessment of history of asthma")["assessment"] == "history of asthma"
+    # Nothing named, nothing filled. The clinician finishes it on screen.
+    assert fill(op, "document the consultation") == {}
+
+
+def test_a_clause_ends_where_the_form_s_own_next_word_begins():
+    """Text, numbers and a choice in one breath, which is how it is said. A
+    clause stops at the next word the operation declares, so the phone number
+    does not swallow the sex that followed it."""
+    got = fill(OPS["phc.op.patient-register"],
+               "register her, name is Sunita Devi, age 34, village Yadiki, "
+               "phone 9876543210, female")
+    assert got == {"name": "Sunita Devi", "age": 34, "village": "Yadiki",
+                   "phone": "9876543210", "sex": "female"}, got
+    # override_reason can never be answered here, so it does not get to make
+    # "value" an ambiguous name for the field that can be.
+    lab = fill(OPS["phc.op.lab-result-enter"],
+               "bench result, analyte is glucose, value 5.4, unit mmol per litre")
+    assert lab == {"analyte": "glucose", "value": 5.4, "unit": "mmol per litre"}, lab
+
+
+def test_a_choice_is_matched_against_the_declared_options():
+    op = OPS["phc.op.household-visit"]
+    assert fill(op, "household visit, immunisation")["visit_type"] == "immunisation"
+    # The option value is spelled with an underscore and nobody says that.
+    assert fill(op, "household visit for tb followup")["visit_type"] == "tb_followup"
+
+
+def test_an_ambiguous_choice_is_asked_about_rather_than_guessed():
+    op = OPS["phc.op.household-visit"]
+    payload, ask = planner.extract(op, "household visit for the followup")
+    assert "visit_type" not in payload, "it guessed between two options"
+    assert len(ask) == 1 and "tb_followup or ncd_followup" in ask[0], ask
+    assert ask[0].endswith("?")
+    # And the unambiguous form asks nothing.
+    assert asked(op, "household visit for tb followup") == ()
 
 
 def test_it_does_not_invent_the_answers_it_cannot_hear():
     op = OPS["phc.op.patient-register"]
-    got = planner.extract(op, "register a new female patient, age 34, from Yadiki")
+    got = fill(op, "register a new female patient, age 34, from Yadiki")
     assert got["age"] == 34 and got["sex"] == "female"
     assert "name" not in got and "village" not in got, "the router invented an answer"
     # Which is why it is denied, not committed, with the name still missing.
-    v = planner.verdicts([planner.Proposed(op["id"], got, "check", "router")],
-                         CAT, caps=ALL_CAPS, state=set())[0]
-    assert not v.decision.allowed and "name is required" in v.decision.reason
+    d = verdicts([planner.Proposed(op["id"], got, "check", "router")],
+                 CAT, caps=ALL_CAPS, state=set())[0]
+    assert not d.allowed and "name is required" in d.reason
 
 
 class _Block:

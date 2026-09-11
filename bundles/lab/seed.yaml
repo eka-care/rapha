@@ -1,0 +1,212 @@
+# The laboratory's own demo day. Nothing on this screen is a primary health
+# centre's: no outpatient, no token A01, no prescription. Seven specimens
+# standing at seven points of lab.wf.specimen, so the worklist, the report,
+# the badges, the turnaround board and the confirm flow all draw something
+# true. Same shape as bundles/phc/seed.yaml; see the comment there.
+#
+# Actors are written as `user:<role>` because there is no authentication and
+# that is what api/main.py calls a caller. It is what makes the separation of
+# duties visible on a seeded thread: the audit line below says
+# user:technologist keyed the result on lab-004, so the Verify action is
+# absent for that role and present for the pathologist.
+threads:
+  # A referral slip on the accession desk. Nobody has keyed it yet, so there
+  # is no patient row: lab.op.referral-accession is what writes one.
+  - id: lab-001
+    token: 25-0417
+    status: in_progress
+
+  # Accessioned. Waiting for the draw.
+  - id: lab-002
+    token: 25-0416
+    status: in_progress
+    patient: {name: Anjali Rao, age: 34, sex: female, phone: "9440000021",
+              created_by: "user:phlebotomist"}
+    rows:
+      - {resource: service_request, code: cbc, status: active,
+         created_by: "user:phlebotomist"}
+      - resource: questionnaire_response
+        questionnaire: lab.schema.accession-v1
+        created_by: "user:phlebotomist"
+        payload: {name: Anjali Rao, age: 34, sex: female, phone: "9440000021",
+                  referrer_name: Dr Nandini Rao, referrer_contact: "9440000090",
+                  panel: cbc}
+    audit:
+      - {operation: lab.op.referral-accession, actor: "user:phlebotomist"}
+
+  # Drawn and labelled. On the bench, waiting to be run. The analyser has
+  # already offered a full set of values and a person has not accepted them:
+  # a device proposes, a tap commits.
+  - id: lab-003
+    token: 25-0415
+    status: in_progress
+    patient: {name: Faizal Sheikh, age: 47, sex: male, phone: "9440000022",
+              created_by: "user:phlebotomist"}
+    rows:
+      - {resource: service_request, code: bmp, status: active,
+         created_by: "user:phlebotomist"}
+      - resource: questionnaire_response
+        questionnaire: lab.schema.accession-v1
+        created_by: "user:phlebotomist"
+        payload: {name: Faizal Sheikh, age: 47, sex: male, phone: "9440000022",
+                  referrer_name: Dr Ipsita Barua, referrer_contact: "9440000091",
+                  panel: bmp}
+      - {resource: specimen, code: venous-blood, status: available,
+         created_by: "user:phlebotomist"}
+    audit:
+      - {operation: lab.op.referral-accession, actor: "user:phlebotomist"}
+      - {operation: lab.op.specimen-collect, actor: "user:phlebotomist"}
+    proposals:
+      - operation: lab.op.result-enter
+        proposed_by: "device:analyser"
+        surface: mcp
+        payload: {panel: bmp, glucose: 96, creatinine: 0.9, sodium: 139, potassium: 4.1}
+
+  # Run, and one analyte is over its critical band. Standing at verification.
+  # The technologist who keyed it cannot verify it; the pathologist can.
+  - id: lab-004
+    token: 25-0414
+    status: in_progress
+    patient: {name: Devi Prasad, age: 66, sex: male, phone: "9440000023",
+              created_by: "user:phlebotomist"}
+    rows:
+      - {resource: service_request, code: bmp, status: active,
+         created_by: "user:phlebotomist"}
+      - resource: questionnaire_response
+        questionnaire: lab.schema.accession-v1
+        created_by: "user:phlebotomist"
+        payload: {name: Devi Prasad, age: 66, sex: male, phone: "9440000023",
+                  referrer_name: Dr Shobha Menon, referrer_contact: "9440000092",
+                  panel: bmp}
+      - {resource: specimen, code: venous-blood, status: available,
+         created_by: "user:phlebotomist"}
+      - {resource: observation, category: laboratory, code: glucose, value: 412,
+         unit: mg/dL, created_by: "user:technologist"}
+      - {resource: observation, category: laboratory, code: creatinine, value: 2.4,
+         unit: mg/dL, created_by: "user:technologist"}
+      - {resource: observation, category: laboratory, code: sodium, value: 131,
+         unit: mmol/L, created_by: "user:technologist"}
+      - {resource: observation, category: laboratory, code: potassium, value: 6.8,
+         unit: mmol/L, created_by: "user:technologist"}
+      - {resource: diagnostic_report, code: bmp, status: preliminary,
+         created_by: "user:technologist"}
+    flags: [lab.critical]
+    audit:
+      - {operation: lab.op.referral-accession, actor: "user:phlebotomist"}
+      - {operation: lab.op.specimen-collect, actor: "user:phlebotomist"}
+      - {operation: lab.op.result-enter, actor: "user:technologist"}
+
+  # Rejected by the pathologist. This one is stranded at verification and the
+  # worklist badges it warn, because this bundle has no amend loop. It is on
+  # the screen because it is true, not because it is tidy.
+  - id: lab-005
+    token: 25-0413
+    status: in_progress
+    patient: {name: Rukmini Shetty, age: 41, sex: female, phone: "9440000024",
+              created_by: "user:phlebotomist"}
+    rows:
+      - {resource: service_request, code: cbc, status: active,
+         created_by: "user:phlebotomist"}
+      - resource: questionnaire_response
+        questionnaire: lab.schema.accession-v1
+        created_by: "user:phlebotomist"
+        payload: {name: Rukmini Shetty, age: 41, sex: female, phone: "9440000024",
+                  referrer_name: Dr Nandini Rao, referrer_contact: "9440000090",
+                  panel: cbc}
+      - {resource: specimen, code: venous-blood, status: available,
+         created_by: "user:phlebotomist"}
+      - {resource: observation, category: laboratory, code: haemoglobin, value: 9.1,
+         unit: g/dL, created_by: "user:technologist"}
+      - {resource: observation, category: laboratory, code: wbc, value: 7.2,
+         unit: 10*3/uL, created_by: "user:technologist"}
+      - {resource: observation, category: laboratory, code: platelets, value: 188,
+         unit: 10*3/uL, created_by: "user:technologist"}
+      - {resource: diagnostic_report, code: cbc, status: preliminary,
+         created_by: "user:technologist"}
+      - {resource: diagnostic_report, code: verification, status: rejected,
+         created_by: "user:pathologist"}
+      - {resource: notes, text: "Specimen haemolysed. Recollect before reporting.",
+         created_by: "user:pathologist"}
+    audit:
+      - {operation: lab.op.referral-accession, actor: "user:phlebotomist"}
+      - {operation: lab.op.specimen-collect, actor: "user:phlebotomist"}
+      - {operation: lab.op.result-enter, actor: "user:technologist"}
+      - {operation: lab.op.result-verify, actor: "user:pathologist"}
+
+  # Verified by a second person. Waiting to be released to the referrer.
+  - id: lab-006
+    token: 25-0412
+    status: in_progress
+    patient: {name: Sunanda Iyer, age: 29, sex: female, phone: "9440000025",
+              created_by: "user:phlebotomist"}
+    rows:
+      - {resource: service_request, code: cbc, status: active,
+         created_by: "user:phlebotomist"}
+      - resource: questionnaire_response
+        questionnaire: lab.schema.accession-v1
+        created_by: "user:phlebotomist"
+        payload: {name: Sunanda Iyer, age: 29, sex: female, phone: "9440000025",
+                  referrer_name: Dr Ipsita Barua, referrer_contact: "9440000091",
+                  panel: cbc}
+      - {resource: specimen, code: venous-blood, status: available,
+         created_by: "user:phlebotomist"}
+      - {resource: observation, category: laboratory, code: haemoglobin, value: 11.2,
+         unit: g/dL, created_by: "user:technologist"}
+      - {resource: observation, category: laboratory, code: wbc, value: 6.4,
+         unit: 10*3/uL, created_by: "user:technologist"}
+      - {resource: observation, category: laboratory, code: platelets, value: 233,
+         unit: 10*3/uL, created_by: "user:technologist"}
+      - {resource: diagnostic_report, code: cbc, status: preliminary,
+         created_by: "user:technologist"}
+      - {resource: diagnostic_report, code: verification, status: verified,
+         created_by: "user:pathologist"}
+      - {resource: notes, text: "Mild anaemia. Values consistent with the specimen.",
+         created_by: "user:pathologist"}
+    audit:
+      - {operation: lab.op.referral-accession, actor: "user:phlebotomist"}
+      - {operation: lab.op.specimen-collect, actor: "user:phlebotomist"}
+      - {operation: lab.op.result-enter, actor: "user:technologist"}
+      - {operation: lab.op.result-verify, actor: "user:pathologist"}
+
+  # Released. The line is complete and this one stands nowhere.
+  - id: lab-007
+    token: 25-0411
+    status: completed
+    patient: {name: Mohan Bhat, age: 58, sex: male, phone: "9440000026",
+              created_by: "user:phlebotomist"}
+    rows:
+      - {resource: service_request, code: bmp, status: active,
+         created_by: "user:phlebotomist"}
+      - resource: questionnaire_response
+        questionnaire: lab.schema.accession-v1
+        created_by: "user:phlebotomist"
+        payload: {name: Mohan Bhat, age: 58, sex: male, phone: "9440000026",
+                  referrer_name: Dr Shobha Menon, referrer_contact: "9440000092",
+                  panel: bmp}
+      - {resource: specimen, code: venous-blood, status: available,
+         created_by: "user:phlebotomist"}
+      - {resource: observation, category: laboratory, code: glucose, value: 104,
+         unit: mg/dL, created_by: "user:technologist"}
+      - {resource: observation, category: laboratory, code: creatinine, value: 1.0,
+         unit: mg/dL, created_by: "user:technologist"}
+      - {resource: observation, category: laboratory, code: sodium, value: 140,
+         unit: mmol/L, created_by: "user:technologist"}
+      - {resource: observation, category: laboratory, code: potassium, value: 4.3,
+         unit: mmol/L, created_by: "user:technologist"}
+      - {resource: diagnostic_report, code: bmp, status: preliminary,
+         created_by: "user:technologist"}
+      - {resource: diagnostic_report, code: verification, status: verified,
+         created_by: "user:pathologist"}
+      - {resource: notes, text: "Within the reference intervals held on the panel.",
+         created_by: "user:pathologist"}
+      - resource: questionnaire_response
+        questionnaire: lab.schema.release-v1
+        created_by: "user:pathologist"
+        payload: {channel: portal, attest: true,
+                  note: Released to the referring clinician's portal.}
+    audit:
+      - {operation: lab.op.referral-accession, actor: "user:phlebotomist"}
+      - {operation: lab.op.specimen-collect, actor: "user:phlebotomist"}
+      - {operation: lab.op.result-enter, actor: "user:technologist"}
+      - {operation: lab.op.result-verify, actor: "user:pathologist"}
+      - {operation: lab.op.report-release, actor: "user:pathologist"}

@@ -136,3 +136,52 @@ export function rangeBlocked(schema: Questionnaire, payload: Payload): boolean {
 function py(n: number, kind: string): string {
   return kind === "decimal" && Number.isInteger(n) ? `${n}.0` : String(n);
 }
+
+// -------------------------------------------------------------- enable_when
+
+/** Whether a question is asked at all, given what is answered so far.
+ *
+ *  `enable_when` is in the questionnaires and was in no code: every analyte of
+ *  every panel drew at once, with critical band warnings on fields the chosen
+ *  panel does not use. catalogue/validate.py does not read it either
+ *  (bundles/LAB-LOG.md 13: a glucose on a CBC still commits), so this is the
+ *  renderer refusing to offer the field, not the server refusing the value.
+ *
+ *  An operator this renderer does not know never hides a question. Hiding on a
+ *  guess is how a required field disappears.
+ */
+export function enabled(q: Question, payload: Payload): boolean {
+  for (const c of q.enable_when ?? []) {
+    const v = payload[c.question];
+    const has = answered(v);
+    if (c.operator === "exists") {
+      if (has !== (c.answer !== false)) return false;
+    } else if (c.operator === "equals") {
+      if (!has || String(v) !== String(c.answer)) return false;
+    } else if (c.operator === "not_equals") {
+      if (has && String(v) === String(c.answer)) return false;
+    }
+  }
+  return true;
+}
+
+/** The payload with the answers to switched-off questions removed. Changing
+ *  the panel from cbc to bmp leaves a haemoglobin behind, and the server does
+ *  not refuse it, so what is not on screen must not be in the payload either.
+ *  Loops because one hidden question can hide the next; each pass removes at
+ *  least one key, so it ends. */
+export function prune(schema: Questionnaire, payload: Payload): Payload {
+  // A required question is never dropped and never hidden. The server asks for
+  // it whatever else is answered (catalogue/validate.py does not read
+  // enable_when), so clearing it would build a form that cannot be committed
+  // and will not say why. A questionnaire that declares one both required and
+  // conditional is contradicting itself, and this is the side to err on.
+  const questions = walk(schema.questions).filter((q) => !q.required);
+  let out = payload;
+  for (;;) {
+    const drop = questions.filter((q) => q.link_id in out && !enabled(q, out));
+    if (!drop.length) return out;
+    out = { ...out };
+    for (const q of drop) delete out[q.link_id];
+  }
+}

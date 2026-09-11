@@ -22,6 +22,8 @@ than a 1.0 nobody measured.
 """
 from __future__ import annotations
 
+import dataclasses
+
 from agent import planner
 
 UNSURE = ("I do not know which operation that is, and I will not guess: a "
@@ -95,6 +97,9 @@ def card(op, proposed, decision_reason, proposal_id, flags_raised, *,
         "payload": proposed.payload,
         "confidence": heard_with(confidence, proposed.payload),
         "heard": proposed.why,
+        # What the planner heard and would not resolve. Empty is the usual
+        # case; a question here is the alternative to a guess, not to a refusal.
+        "ask": list(proposed.ask),
         "verdict": {
             "allowed": allowed,
             # The guard's words, unedited. Paraphrasing a refusal is how an
@@ -130,6 +135,10 @@ def say(cards, actions) -> str:
             lines.append("%s was refused: %s. %s"
                          % (c["title"], c["verdict"]["reason"].rstrip(". "),
                             c["verdict"]["next"]))
+    # A question the planner would not answer for itself, asked out loud. It
+    # comes before the reassurance so it is not the last thing read past.
+    for c in cards:
+        lines.extend(c.get("ask") or [])
     if any(c["verdict"]["allowed"] for c in cards):
         lines.append("Nothing is recorded until you confirm it on screen. "
                      "I have no way to do that.")
@@ -170,8 +179,9 @@ def take(utterance: str, *, catalogue: dict, view: dict, propose,
         # The trust boundary, again, at the last moment before the guard: a
         # planner answers the questionnaire's own questions and nothing else,
         # and never override_reason. A model must not grant itself an override.
-        p = planner.Proposed(p.operation, planner.typed(op, p.payload), p.why,
-                             p.backend, p.score)
+        # dataclasses.replace, so a new field on Proposed cannot be silently
+        # dropped here by a constructor that was not updated with it.
+        p = dataclasses.replace(p, payload=planner.typed(op, p.payload))
         proposal_id, reason, flags = propose(p.operation, p.payload)
         cards.append(card(op, p, reason, proposal_id, flags, actions=actions,
                           station=view.get("station"), confidence=confidence))
@@ -196,15 +206,19 @@ def demo():
                 "preconditions": [], "irreversibility": "correctable",
                 "instrument": None, "input": "q", "fields": fields}
 
-    def field(link_id, type_="integer"):
+    def field(link_id, type_="integer", options=None):
         return {"link_id": link_id, "type": type_, "text": link_id,
-                "required": True, "options": []}
+                "required": True, "options": options or []}
 
     cat = {"operations": {
         "x.op.vitals": op("x.op.vitals", "Record vitals", "vitals.record",
                           [field("systolic"), field("diastolic"), field("pulse")]),
         "x.op.dispense": op("x.op.dispense", "Dispense", "pharmacy.dispense",
                             [field("medicines", "string")]),
+        "x.op.visit": op("x.op.visit", "Visit", "household.visit",
+                         [field("visit_type", "choice",
+                                ["tb_followup", "ncd_followup"]),
+                          field("narrative", "text")]),
     }}
     view = {"id": "t-1", "station": "nurse", "flags": [], "held": ["vitals.record"],
             "actions": [{"id": "x.op.vitals", "station": "nurse",
@@ -262,7 +276,23 @@ def demo():
                              {"systolic": 120, "override_reason": "because I said so"})
     assert stripped == {"systolic": 120}
 
-    assert [s[0] for s in sent] == ["x.op.vitals", "x.op.vitals", "x.op.dispense"]
+    # A choice the words do not settle is asked about, out loud, in the reply,
+    # and the field is left empty rather than filled with the likelier of two.
+    both = take("visit, the followup went fine", catalogue=cat, view=view,
+                propose=propose, which="router")
+    card_ = both["proposals"][0]
+    assert "visit_type" not in card_["payload"], "it guessed between two options"
+    assert card_["ask"] and "tb_followup or ncd_followup" in card_["ask"][0]
+    assert card_["ask"][0] in both["said"], "the question never reached the clinician"
+
+    # And an utterance that names an operation but fills nothing still puts the
+    # proposal in front of a person, with the guard stating what is missing.
+    thin = take("visit", catalogue=cat, view=view, propose=propose, which="router")
+    assert thin["understood"] and thin["proposals"][0]["payload"] == {}
+    assert thin["proposals"][0]["ask"] == []
+
+    assert [s[0] for s in sent] == ["x.op.vitals", "x.op.vitals", "x.op.dispense",
+                                    "x.op.visit", "x.op.visit"]
 
     # The key is the switch, with nothing to configure, and it reaches here:
     # ANTHROPIC_API_KEY set and no explicit backend takes the llm branch of

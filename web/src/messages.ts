@@ -114,13 +114,23 @@ function outsideCritical(crit: { low: number; high: number } | undefined, v: unk
   return Number.isFinite(n) && !(crit.low <= n && n <= crit.high);
 }
 
-/** A structured answer is a list of CARE resources, and there is no picker on
- *  this machine that could have produced a nicer one. Reading its values out
- *  is at least a sentence; the whole record is one pill away in the summary. */
+/** A structured answer is a list of CARE resources, one row per resource, and
+ *  each row carries the sub fields the operation's mapping named. Those names
+ *  are the only thing that makes the row readable, so a card keeps them: a
+ *  prescription read back as "Amoxicillin 500mg 1 cap TDS" is a string, and
+ *  "Medication: Amoxicillin 500mg, Dosage instruction: 1 cap TDS" is a record.
+ *
+ *  A row with one field is just its value: naming the single column adds a
+ *  word and no information.
+ */
 export const fmt = (v: unknown): string => {
   if (v === null || v === undefined) return "";
   if (Array.isArray(v)) return v.map(fmt).join("; ");
-  if (typeof v === "object") return Object.values(v as Record<string, unknown>).map(fmt).join(" ");
+  if (typeof v === "object") {
+    const entries = Object.entries(v as Record<string, unknown>).filter(([, x]) => fmt(x) !== "");
+    if (entries.length === 1) return fmt(entries[0][1]);
+    return entries.map(([k, x]) => `${title(k)}: ${fmt(x)}`).join(", ");
+  }
   return String(v);
 };
 
