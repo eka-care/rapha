@@ -58,12 +58,17 @@ the journey involves one time passwords sent to them.
 
 ## What happens
 
-The clerk offers the ABHA journey. It is skippable. If the patient declines or
+Eka's own ABHA web SDK is mounted on this screen, not a form this product
+drew. It is skippable, by the SDK's own Skip ABHA. If the patient declines or
 has no time, the record is flagged ABHA pending and joins the unlinked
 worklist, which whoever is free picks up at the next contact.
 
-If the patient proceeds, the connector runs the create or link journey and the
-returned identifier is written to the patient record.
+If the patient proceeds, the journey returns an identifier, it lands in the
+field below it as a readback, and the tap on this panel is what writes it to
+the patient record. The other two answers on this form are asked of the person
+who watched the journey: the success payload says neither whether an account
+was created or logged into, nor that the patient consented, and filling them in
+from a guess would record the software's answer as the clerk's.
 
 ## How you know it worked
 

@@ -137,7 +137,15 @@ def actions(workflow, operations, known, caps, station_filter=None,
     """Quick actions to draw, ordered. Addendum SSD.2: a table, not a model.
 
     Ordering is by the declared line, so the next thing to do at this
-    thread's current station sorts first.
+    thread's current station sorts first. Inside one station it is the order
+    the step declares its operations in, because contracts.Step says that list
+    is ordered and a bundle writing it down is a bundle saying which of the
+    things at this station is the point. This used to fall through to the
+    operation id, which is alphabetical and means nothing: adding
+    phc.op.capture-withdraw to the doctor put "stop recording this visit"
+    ahead of "document a consultation" as the headline advice at every
+    consented visit, on a line where the reason the doctor is there is the
+    consultation.
 
     `actor` and `performed` (from performers() above) are what make an
     `actor of` precondition invisible rather than refused on tap. Without
@@ -145,6 +153,10 @@ def actions(workflow, operations, known, caps, station_filter=None,
     catalogue/guard.visible.
     """
     order = {step.station: i for i, step in enumerate(workflow.steps)}
+    seat = {}                       # op id -> where its step lists it
+    for step in workflow.steps:
+        for i, op_id in enumerate(step.operations):
+            seat.setdefault(op_id, i)
     here = station(workflow, known)
     # Only what this workflow's steps actually draw. A manifest may list an
     # atom from catalogue/ops that no station of this line has a place for;
@@ -154,7 +166,8 @@ def actions(workflow, operations, known, caps, station_filter=None,
               if drawn_by(workflow, op["id"])
               and visible(op, caps, known, actor, performed)
               and (station_filter is None or op["station"] == station_filter)]
-    picked.sort(key=lambda op: (op["station"] != here, order.get(op["station"], 99), op["id"]))
+    picked.sort(key=lambda op: (op["station"] != here, order.get(op["station"], 99),
+                                seat.get(op["id"], 99), op["id"]))
     return picked
 
 

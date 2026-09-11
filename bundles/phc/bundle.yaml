@@ -15,6 +15,7 @@ operations:
   - phc.op.abha-link
   - phc.op.vitals-record
   - phc.op.consult-document
+  - phc.op.capture-withdraw
   - phc.op.rx-prescribe
   - phc.op.lab-order
   - phc.op.lab-result-enter

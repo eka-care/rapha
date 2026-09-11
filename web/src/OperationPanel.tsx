@@ -19,6 +19,8 @@
  *  single client call below are the same ones the modal uses.
  */
 import { useId, useMemo, useState } from "react";
+import { ABHA_OP, payloadFor, type AbhaOutcome } from "./abha/sdk";
+import { Journey } from "./abha/Journey";
 import { ApiError, type Client } from "./api";
 import { Form, labelled, validate } from "./Form";
 import { questionnaire } from "./declarations";
@@ -61,6 +63,10 @@ export function OperationPanel({
   const [stage, setStage] = useState<"edit" | "confirm">("edit");
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** Whether the ABHA journey below has handed back an identifier. Declared
+   *  with the other hooks and not beside the flag that reads it, because the
+   *  "no questionnaire" branch above returns early. */
+  const [journeyDone, setJourneyDone] = useState(false);
   // Two of these are on screen whenever a thread holds two pending proposals.
   const ids = useId();
   const [error, setError] = useState<ApiError | null>(null);
@@ -84,6 +90,20 @@ export function OperationPanel({
   }
 
   const irreversible = op.irreversibility === IRREVERSIBLE;
+
+  /** The ABHA operation is the one form in this product that is not a form.
+   *  Its questionnaire is still what the kernel validates, but every answer
+   *  comes back from Eka's own journey rather than being typed, so the fields
+   *  are a readback and they do not appear until there is something to read
+   *  back. Reviewing a proposal is the exception and keeps the plain form: a
+   *  proposal is a payload somebody else produced, and re-running a national
+   *  identity journey is not how you read one.
+   *
+   *  The guard refuses this operation to every surface but this one and
+   *  refuses it again without `confirmed`, so nothing here shortens the path:
+   *  the journey fills the fields, and the tap below is still the write. */
+  const mountsJourney = op.id === ABHA_OP && !proposal;
+  const showForm = !mountsJourney || journeyDone;
   const invalidate = () => {
     setConfirmed(false);           // an edit invalidates a confirm, always
     if (stage === "confirm") setStage("edit");
@@ -223,14 +243,31 @@ export function OperationPanel({
           ),
         )}
 
-        {missing.length > 0 && !tried && (
+        {mountsJourney && (
+          <Journey
+            onSkipPath={onCancel}
+            onOutcome={(outcome: AbhaOutcome) => {
+              if (outcome.kind !== "linked") return;
+              // Straight into the same editable fields a person used to type
+              // into, with no instrument confidence attached: this value was
+              // returned by a gateway, not heard by a recogniser, and marking
+              // it "unsure" would be as untrue as marking it certain. Only the
+              // identifier: the journey does not know the other two answers and
+              // this screen does not invent them.
+              fromInstrument(payloadFor(outcome), {});
+              setJourneyDone(true);
+            }}
+          />
+        )}
+
+        {showForm && missing.length > 0 && !tried && (
           <div className="missing">
             Still missing: {missing.join(", ")}. Fill {missing.length === 1 ? "it" : "them"} in below.
             Nothing is sent until you tap {irreversible ? "Continue" : proposal ? "Confirm" : "Commit"}.
           </div>
         )}
 
-        <Form
+        {showForm && <Form
           schema={schema}
           op={op}
           ids={ids}
@@ -239,7 +276,7 @@ export function OperationPanel({
           problems={tried ? problems : []}
           confidence={{ ...(proposal?.confidence ?? {}), ...heard }}
           disabled={busy}
-        />
+        />}
 
         {proposal && changed.length > 0 && (
           <div className="diff">
@@ -286,13 +323,13 @@ export function OperationPanel({
         {proposal && (
           <button className="cq" onClick={reject} disabled={busy}>Reject</button>
         )}
-        <button
+        {showForm && <button
           className="cq rose"
           onClick={send}
           disabled={busy || (stage === "confirm" && !confirmed)}
         >
           {busy ? "Sending..." : stage === "confirm" ? "Commit" : proposal ? "Confirm" : irreversible ? "Continue" : "Commit"}
-        </button>
+        </button>}
       </div>
     </div>
   );

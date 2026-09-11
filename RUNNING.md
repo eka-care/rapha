@@ -8,7 +8,7 @@ python3 -m catalogue.build && python3 -m kernel.declarations
 sh api/run.sh                                                   # PHC   :8000
 PHC_BUNDLE=lab PHC_DB=lab.sqlite3 PORT=8001 sh api/run.sh        # LAB   :8001
 (cd web && npm run dev)                                          #       :5173
-(cd web && VITE_API_BASE=http://localhost:8001 npx vite --port 5174)
+(cd web && npm run dev:lab -- --port 5174)                       #       :5174
 ```
 
 Nothing here needs CARE, a network, or a database server. Python 3.9 and
@@ -103,7 +103,7 @@ Three things the switch does not carry, all of them real:
   start a second Vite on the second port:
 
   ```sh
-  VITE_API_BASE=http://localhost:8001 npm --prefix web run dev -- --port 5174
+  npm --prefix web run dev:lab -- --port 5174
   ```
 
   Its nav tabs, forms and line all come from that kernel. Nothing in `web/` is
@@ -177,7 +177,7 @@ write, for when the API is not up.
 To watch both facilities at once, run a second Vite against the second kernel:
 
 ```sh
-(cd web && VITE_API_BASE=http://localhost:8001 npx vite --port 5174)
+(cd web && npm run dev:lab -- --port 5174)
 ```
 
 Everything this browser remembers is keyed by that `VITE_API_BASE` (recents,
@@ -281,7 +281,7 @@ open http://localhost:5173/#/threads/enc-002
 ## 5. The checks
 
 ```sh
-sh scripts/check.sh                 # everything, about 20 seconds, 315 ok lines
+sh scripts/check.sh                 # everything, about 20 seconds, 319 ok lines
 ```
 
 That runs the linters, every Python and Go unit check, the browser-side checks,
@@ -319,30 +319,45 @@ port.
   because the kernel names the surface and the caller does not.
 - **Capture consent is asked at the desk and composed by the workflow.** The
   registration form carries the consent question and its own decline answer,
-  the consultation form carries the stop question, and
+  `phc.op.capture-withdraw` is the one tap stop, and
   `phc.wf.outpatient` composes `capture.consented` from the three:
   agreed, and neither declined nor withdrawn. So the scribe appears when
   somebody said yes, the queue badges a visit that said no, a withdrawal turns
   it off for the rest of the visit, and nothing carries to the next encounter,
   because a thread is one visit. The seeded day shows all three: enc-003
   consented and standing at the doctor, enc-004 declined, enc-005 never asked.
-  `python3 -m bundles.phc.check` is the nine checks, and needs no network.
+  `python3 -m bundles.phc.check` is the twelve checks, and needs no network.
   Withdrawal is enforced on the server and not only in the browser: every path
   that could bring a draft back re-reads the flag first, so a recording still
   running at the gateway when the patient says stop is never collected, by the
-  poll or by the webhook, and a second recording cannot be started. What is
-  still missing is a one tap withdrawal: stopping capture rides on the
-  consultation commit, because a bundle cannot declare an operation of its own,
-  and `assessment` is required on that form, so a withdrawal cannot be recorded
-  without also writing a note.
+  poll or by the webhook, and a second recording cannot be started.
+
+  Withdrawal used to ride on the consultation commit, where `assessment` is
+  required, so a consent could not be withdrawn without also writing a clinical
+  note. It is now `phc.op.capture-withdraw`: its own action at the doctor, one
+  question, no clinical resource written, absent when there is nothing to
+  withdraw. **Its one question is `required`, and that word is load bearing.**
+  With it optional the renderer omitted the unticked box, the payload was `{}`,
+  `validate.flags` raises only on a real `true`, and the commit was allowed:
+  a card saying the recording had been stopped, a care unit accrued, and the
+  scribe still offered. One hole is still open and is checked as open rather
+  than left to be found: an explicit `{"capture_stop": false}` is still an
+  answer to `catalogue/validate`, so a caller that sends it is allowed and
+  raises nothing. No rendered surface can produce it. Closing it needs a
+  "must be true" rule in `catalogue/validate.py` mirrored in
+  `web/src/validate.ts`.
 - **The ambient scribe is wired and runs against the live Eka gateway.** The
   browser records with `MediaRecorder`, posts the audio as the raw body to
   `POST /scribe/sessions?thread=`, and polls `GET /scribe/sessions/{id}`. The
   credentials never leave the server: `api/scribe.py` holds them, writes one
   temporary file because the SDK takes paths, uploads it, and deletes it in a
   `finally`. What comes back is a `Draft` and nothing else. It lands in the
-  ordinary form fields at confidence 0, drawn as "Heard, not certain (0%).
-  Read it back before you commit", and the panel's own tap is what writes.
+  ordinary form fields at confidence 0, and the panel's own tap is what
+  writes. Zero there means "not scored", not "nought per cent sure": Eka
+  reports no per field recognition confidence, so the field is drawn as
+  "Filled by an instrument, not typed. Nothing scored this value, so read it
+  back against what was said before you commit." A real score, which today
+  only `packages/voice` produces, still draws its percentage.
   There is no scribe route on the kernel that writes anything, and
   `api/scribe.py` has no `Store`.
 
@@ -411,9 +426,12 @@ port.
   back with its errors. `python3 -m care_phc.connectors.abdm.check` is its
   16 checks and needs no network. Three things to know:
 
-  - **Nothing in the kernel calls it.** `phc.op.abha-link` writes an ABHA
-    number to a patient row in the store. It does not reach ABDM, and no
-    route here does. The connector is wiring waiting for an operation.
+  - **Nothing in the kernel calls it, and the browser no longer needs it
+    to.** `phc.op.abha-link` writes an ABHA number to a patient row in the
+    store. It does not reach ABDM, and no Python route here does. The
+    identifier it writes now comes from Eka's own web SDK in the browser: see
+    "The ABHA journey" below. The connector is still wiring waiting for a
+    server side operation.
   - **Creating an ABHA is not finished.** The journey past the OTP raises
     `NotImplementedError`, and `testuser99` on the sandbox still answers 500
     `couldn't connect with ABDM servers`, which is the gateway's own words
@@ -424,6 +442,59 @@ port.
     URL rather than that one. The SDK is an extra install:
     `python3 -m pip install --user ekacare`; `check.sh` skips the connector
     with a warning when it is missing.
+- **The ABHA journey is Eka's web SDK, mounted, not a form we drew.** It was
+  a hand built modal with a "Journey" dropdown, a bare ABHA number field and a
+  consent checkbox, on an operation that could not create an ABHA at all. Now
+  `web/src/abha/Journey.tsx` loads the script the kernel names, mounts
+  `window.initAbhaApp` into its own container, and hands the outcome to the
+  panel. It has no client, calls no commit and no confirm, and cannot write:
+  same shape as `web/src/scribe/Recorder.tsx`, for the same reason.
+
+  - **Registering a patient opens it.** `web/src/main.tsx` asks the kernel for
+    this thread's actions after the workflow's first operation commits and
+    opens `phc.op.abha-link` only if the guard is offering it. Opening a chat
+    never runs this: auto-initiating the journey on every new conversation
+    would make create the default and search the exception, which manufactures
+    duplicate patients and duplicate ABHAs. Registration is downstream of a
+    search that already missed, so the rule points the other way there. The
+    "register now, link later" path is the SDK's own `skipABHAEnable` plus
+    `onSkipAbha`, not a declining to ask: skip and the patient is registered,
+    tokened, seen, and on the unlinked worklist.
+  - **Staging by default, and it says which on screen.** `GET /abha/config`
+    names the package. `ABHA_ENV=staging` (the default) serves
+    `@eka-care/abha-stg` under a plain line; `ABHA_ENV=production` serves
+    `@eka-care/abha` under a red "PRODUCTION ABHA. Real OTPs, real permanent
+    accounts." Anything else is a 500 naming the two. **No credential reaches
+    the browser.** The SDK's `clientId` is a platform name it branches on, not
+    an API client id, so `EKA_CLIENT_ID` is not in that response and the secret
+    half of that pair stays in this process. `ABHA_HIP_ID` and `ABHA_THEME`
+    are settings and are empty here. Switching the environment needs a page
+    reload as well as a restart: the loader short circuits when
+    `window.initAbhaApp` is already defined.
+  - **Four things the SDK reference gets wrong**, read off the loaded staging
+    bundle rather than the documentation. `window.closeAbhaApp` is undefined
+    until the first mount, because `initAbhaApp` sets it as its last statement
+    and returns the same function; it stays defined after unmounting, so its
+    presence proves nothing and the returned handle is what to keep. There is
+    no `onAbhaFailure` prop: the string is not in the bundle, and `onError` is
+    the failure callback. `create_abha_with_mobile` is not a method the shipped
+    script has. And `ABHA_INIT_FLOW` is `data.flow`, not `method`. The live
+    enums are recorded at the head of `web/src/abha/sdk.ts`.
+  - **`onAbhaClose` fires after a success and after a skip**, twice on one
+    observed skip, so the first outcome wins in `Journey` or a completed link
+    is followed by "closed before it finished".
+  - **What is still not proven.** No real ABHA has been created or logged into
+    from here. Everything past the first screen of the staging journey is
+    unverified: no identity entered, no OTP sent. The linked branch was driven
+    by stubbing `window.initAbhaApp` with the SDK's own declared success shape,
+    which proves this side of the boundary and nothing about ABDM. Whether the
+    journey completes without an Eka session token is untested. The
+    questionnaire's other two answers, `method` and `consent_given`, are asked
+    of the person who watched the journey rather than filled in by it: the
+    success payload distinguishes neither a create from a link nor a consent,
+    and prefilling them would record the software's guess as the clerk's
+    answer. Both are `ignored` by the mapping, so neither reaches the row.
+
 - **`phc.op.household-visit` is in the PHC manifest and in no PHC step.** It
   stands at `community`, and the outpatient line has no such station, so
   `kernel/state.drawn_by` keeps it off every thread and `kernel/proposals`

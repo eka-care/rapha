@@ -432,20 +432,22 @@ def test_consent_withdrawn_while_the_job_runs_stops_the_poll_and_the_webhook():
     """E.3, on the server and not only in the browser.
 
     The Stop button is a DELETE and the test above covers it. This is the other
-    half: the patient says stop, the doctor ticks the consultation form's stop
-    question, and the recording that is still running at the service must not
-    come back. Before this guard the next poll answered with the full draft.
+    half: the patient says stop, the doctor commits the withdrawal, and the
+    recording that is still running at the service must not come back. Before
+    this guard the next poll answered with the full draft.
+
+    The withdrawal used to ride on the consultation form, which meant it could
+    not be recorded without also writing a note. It is now its own operation
+    with its own one question form, so this posts that instead.
     """
     fake = fake_scribe(RUNNING)
     started = client.post("/api/scribe/sessions?thread=enc-003", content=AUDIO,
                           headers={"Content-Type": "audio/webm"}).json()
     assert started["status"] == "running"
 
-    stop = client.post("/api/operations/phc.op.consult-document/commit?role=mo",
+    stop = client.post("/api/operations/phc.op.capture-withdraw/commit?role=mo",
                        json={"thread": "enc-003", "confirmed": True,
-                             "payload": {"history": "typed by hand",
-                                         "assessment": "viral fever",
-                                         "capture_stop": True}})
+                             "payload": {"capture_stop": True}})
     assert stop.status_code == 200, stop.text
     assert "capture.withdrawn" in stop.json()["thread"]["flags"]
     assert "capture.consented" not in stop.json()["thread"]["flags"]

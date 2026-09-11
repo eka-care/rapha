@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "slug": "phc-capture-withdraw-v1",
+  "title": "Stop recording this visit",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.capture-withdraw"
+    }
+  },
+  "questions": [
+    {
+      "link_id": "capture_stop",
+      "text": "The patient asked to stop the recording. Tick Yes and capture stops for the rest of this visit and the sound from here on is discarded. What was already checked and confirmed stays in the record.",
+      "type": "boolean",
+      "required": true,
+      "styling_metadata": {
+        "phc": {
+          "flags": "capture.withdrawn"
+        }
+      }
+    }
+  ]
+}

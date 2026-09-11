@@ -28,6 +28,7 @@ Run: api/run.sh   (uvicorn api.main:app --port 8000)
 """
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import asdict
 
@@ -368,6 +369,55 @@ def reject(proposal_id: str, request: Request, body: dict = Body(default={})):
     decided = proposals.reject(store, proposal, actor=user["id"],
                                reason=str(body.get("reason") or ""))
     return {"proposal": asdict(decided), "thread": panel(proposal.thread, user)}
+
+
+# --------------------------------------------------------------- the ABHA SDK
+# Eka ships a real ABHA web SDK. The renderer mounts it; this route is the only
+# thing that tells the renderer WHICH one. Nothing here is a credential.
+#
+# Two things learned by reading the loaded bundle rather than the reference:
+#
+#   - The SDK's `clientId` is not an API client id. It is a platform name the
+#     SDK branches on ("www-eka", "androidp", "patient-app-ios", "androiddoc",
+#     "doctor-app-ios", "doctor-ipad-ios", "doc-web", "ext"), and anything else
+#     falls through to its "phr" default. So EKA_CLIENT_ID does not belong in
+#     it and is not sent here: the secret half of that pair is this process's
+#     and stays this process's.
+#   - The staging package hardcodes its own environment (`setEnv({env: "DEV"})`
+#     inside initAbhaApp), so which package is loaded IS which environment. It
+#     defaults to staging, because a production ABHA journey sends real one time
+#     passwords to real phones and creates permanent national health accounts,
+#     and a demo must not do that by accident. ABHA_ENV=production is the
+#     deliberate opt in.
+
+ABHA_PACKAGES = {"staging": "@eka-care/abha-stg", "production": "@eka-care/abha"}
+
+
+@router.get("/abha/config")
+def abha_config():
+    """Which ABHA SDK the browser should load, and how to address it."""
+    env = (os.environ.get("ABHA_ENV") or "staging").strip().lower()
+    if env not in ABHA_PACKAGES:
+        raise HTTPException(
+            500, "ABHA_ENV=%r is not an environment. It is staging or production." % env)
+    package = ABHA_PACKAGES[env]
+    base = "https://unpkg.com/%s/dist/sdk/abha" % package
+    theme = os.environ.get("ABHA_THEME")
+    return {
+        "environment": env,
+        "package": package,
+        "script": "%s/js/abha.js" % base,
+        "css": "%s/css/abha.css" % base,
+        # A platform name, not a secret. "ext" is the SDK's own name for an
+        # external clinical surface, which is what this renderer is.
+        "client_id": os.environ.get("ABHA_CLIENT_ID") or "ext",
+        # Passed to the SDK's generateThemeCSS. Absent is fine and common.
+        "theme": json.loads(theme) if theme else None,
+        # The facility's HIP id, when this deployment has one. The SDK sends it
+        # as an X-Hip-Id header. None here is honest: this repository has no
+        # onboarded bridge, and the journey says so rather than pretending.
+        "hip_id": os.environ.get("ABHA_HIP_ID") or None,
+    }
 
 
 # ------------------------------------------------------------------ the scribe

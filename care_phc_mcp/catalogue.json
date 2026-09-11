@@ -198,6 +198,7 @@
       "phc.op.abha-link",
       "phc.op.vitals-record",
       "phc.op.consult-document",
+      "phc.op.capture-withdraw",
       "phc.op.rx-prescribe",
       "phc.op.lab-order",
       "phc.op.lab-result-enter",
@@ -705,6 +706,45 @@
         "patient"
       ]
     },
+    "phc.op.capture-withdraw": {
+      "capability": "encounter.document",
+      "description": "The patient changes their mind. One tick and the scribe is off for the rest\nof the visit. This used to ride on the consultation form, where `assessment`\nis required, so a consent could not be withdrawn without also writing a note.\nStopping a recording is not a clinical act and must not require one.",
+      "emits": [
+        "capture.withdrawn"
+      ],
+      "fields": [
+        {
+          "link_id": "capture_stop",
+          "options": null,
+          "required": true,
+          "text": "The patient asked to stop the recording. Tick Yes and capture stops for the rest of this visit and the sound from here on is discarded. What was already checked and confirmed stays in the record.",
+          "type": "boolean"
+        }
+      ],
+      "id": "phc.op.capture-withdraw",
+      "input": "phc.schema.capture-withdraw-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "capture.consented"
+      ],
+      "scope_qualifier": null,
+      "short": "Stop recording",
+      "station": "doctor",
+      "summary": "The patient has asked to stop the recording. Capture stops for the rest of this visit, and nothing clinical has to be written to do it.\n",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Stop recording this visit",
+      "tool": "propose_capture_withdraw",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "questionnaire_response"
+      ]
+    },
     "phc.op.consult-document": {
       "capability": "encounter.document",
       "description": "The doctor's note. This is narrative, and narrative is the one thing ambient\ncapture is genuinely good at, because context recovers a dropped word and the\nclinician catches the rest on review.",
@@ -746,13 +786,6 @@
           "required": false,
           "text": "Plan",
           "type": "text"
-        },
-        {
-          "link_id": "capture_stop",
-          "options": null,
-          "required": false,
-          "text": "The patient asked to stop the recording. Tick Yes and capture stops for the rest of this visit and the sound from here on is discarded. What was already checked and confirmed stays in the record.",
-          "type": "boolean"
         }
       ],
       "id": "phc.op.consult-document",
@@ -1549,7 +1582,8 @@
           "operations": [
             "phc.op.consult-document",
             "phc.op.rx-prescribe",
-            "phc.op.lab-order"
+            "phc.op.lab-order",
+            "phc.op.capture-withdraw"
           ],
           "station": "doctor"
         },

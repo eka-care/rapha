@@ -12,6 +12,7 @@
  */
 import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { ABHA_OP } from "./abha/sdk";
 import { API_BASE, DEMO_ROLE, api, currentRole, setRole, useAsync } from "./api";
 import { ask, NO_AGENT } from "./ask";
 import { questionnaire } from "./declarations";
@@ -187,6 +188,38 @@ function App() {
     go(`#/threads/${id}`);
   };
 
+  /** After a write, the journey the kernel now says is available here.
+   *
+   *  This is what makes the real ABHA journey the default path out of
+   *  registration rather than something a clerk has to remember. It is not a
+   *  hard coded "after register, do ABHA": it asks the kernel for this
+   *  thread's actions again and opens the ABHA one only if the guard is
+   *  offering it, which it does when the patient is registered, not yet
+   *  linked, still at the station that declares the operation, and this role
+   *  holds the capability. Anything else and nothing opens.
+   *
+   *  Opening a chat never runs this. The product spec's rule is about a new
+   *  conversation, where auto-initiating the journey would make create the
+   *  default and search the exception, which manufactures duplicate patients
+   *  and duplicate ABHAs. Registration is downstream of a search that already
+   *  missed, so the same rule points the other way here. */
+  const offerJourney = async (id: string, justCommitted: string, workflow?: string) => {
+    // Only out of registration. The kernel offers phc.op.abha-link on a thread
+    // for as long as the patient is unlinked, which is right for the action
+    // list and would be wrong here: opening a national identity journey over
+    // the screen after every vitals entry is how a clerk learns to dismiss it.
+    // "The first operation of the workflow's first step" is the bundle's own
+    // answer to "what registers somebody", the same one register() uses.
+    if (!cat.data || justCommitted !== firstOperation(cat.data, workflow)) return;
+    try {
+      const panel = await client.thread(id);
+      const op = panel.actions.find((a) => a.id === ABHA_OP);
+      if (op) setModal({ op, thread: id });
+    } catch {
+      /* the thread reload below is what tells the person where this stands */
+    }
+  };
+
   /** Create on miss: open an empty thread, which writes an encounter row and
    *  no clinical fact, then open the first operation of the workflow's first
    *  step. Whichever operation that is, is the bundle's answer. */
@@ -318,6 +351,7 @@ function App() {
                             toast("Recorded. The proposal is closed.");
                             thread.reload();
                             loaded.reload();
+                            void offerJourney(route.id, p.operation, thread.data?.workflow);
                           }}
                         />
                       )}
@@ -385,6 +419,7 @@ function App() {
               setModal(null);
               thread.reload();
               loaded.reload();
+              void offerJourney(modal.thread, modal.op.id, thread.data?.workflow);
             }}
           />
         </Overlay>

@@ -15,7 +15,8 @@ steps:
     operations: [phc.op.vitals-record]
   - station: doctor
     done_when: consult.documented
-    operations: [phc.op.consult-document, phc.op.rx-prescribe, phc.op.lab-order]
+    operations: [phc.op.consult-document, phc.op.rx-prescribe, phc.op.lab-order,
+                 phc.op.capture-withdraw]
   - station: lab
     done_when: lab.resulted
     applies_when: lab.ordered
@@ -86,9 +87,13 @@ one, and a consent that cannot be withdrawn is not a consent:
   the patient said no to is visibly declined rather than merely unconsented
   and no station asks again. Ticking both is a contradiction, and the safe
   answer wins: declined beats agreed.
-- `capture.withdrawn` is raised by the stop question on the consultation
-  form. From that commit the gate is false and nothing listens for the rest
-  of the visit. Records already confirmed are rows, and rows are untouched.
+- `capture.withdrawn` is raised by `phc.op.capture-withdraw`, which is its
+  own action at the doctor and asks one question. From that commit the gate
+  is false and nothing listens for the rest of the visit. Records already
+  confirmed are rows, and rows are untouched. It rode on the consultation
+  form until now, where `assessment` is required, so withdrawing a consent
+  meant writing a note as well. Its precondition is `capture.consented`, so
+  the action is absent when there is nothing to withdraw.
 - A visit with none of the three was never asked. That is not the same as a
   decline and is not drawn as one.
 

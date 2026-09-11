@@ -27,7 +27,11 @@ export type ScribeDraft = {
   values: Record<string, unknown>;
   /** Per link_id, 0 to 1. Eka reports no per field score, so every one of
    *  these is 0: the panel draws anything under 0.9 as unconfirmed, which is
-   *  exactly what a scribe draft is. */
+   *  exactly what a scribe draft is. Zero here means "not scored" and not
+   *  "nought per cent sure", and web/src/Form.tsx says so in words rather than
+   *  drawing a percentage nobody measured. The only confidence Eka's response
+   *  carries is a boolean about whether a diagnosis matched a code, and
+   *  audio_matrix is about the recording rather than the words. */
   confidence: Record<string, number>;
   transcript: string;
 };

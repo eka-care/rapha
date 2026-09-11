@@ -9,13 +9,15 @@ made the scribe permanently off and the consent theatre. It is composed now:
 
     capture.agreed     the consent question on the registration form
     capture.declined   its own answer on the same form, a first class no
-    capture.withdrawn  the stop question on the consultation form
+    capture.withdrawn  phc.op.capture-withdraw, one question, its own action
     capture.consented  agreed, and neither declined nor withdrawn
 
-The checks below are the four sentences that have to stay true: consenting
-offers the scribe, declining is visibly declined, neither leaks to the next
-visit, and a withdrawal turns the gate off without touching a record anybody
-already confirmed.
+The checks below are the sentences that have to stay true: consenting offers
+the scribe, declining is visibly declined, neither leaks to the next visit,
+and a withdrawal turns the gate off without writing a note and without
+touching a record anybody already confirmed. Withdrawal rode on the
+consultation commit until now, where assessment is required, so stopping a
+recording meant writing a clinical note as well. It is its own operation.
 """
 from __future__ import annotations
 
@@ -156,24 +158,122 @@ def check_consent_does_not_leak_to_the_next_encounter():
        "raised, on the same day and the same store")
 
 
-def check_withdrawal_stops_capture_and_leaves_confirmed_records_alone():
+def check_withdrawal_is_its_own_operation_and_writes_no_note():
     store, thread = register({"capture_consent": True})
     assert commit(store, thread, "phc.op.consult-document", CONSULT, actor="user:mo")
     before = store.count("notes", thread=thread, where={})
     assert before == 1 and "capture.consented" in flags(store, thread)
 
-    assert commit(store, thread, "phc.op.consult-document",
-                  dict(CONSULT, assessment="Patient asked to stop recording.",
-                       capture_stop=True), actor="user:mo")
+    decision = commit(store, thread, "phc.op.capture-withdraw",
+                      {"capture_stop": True}, actor="user:mo")
+    assert decision, decision.reason
     known = flags(store, thread)
     assert "capture.withdrawn" in known, sorted(known)
     assert "capture.agreed" in known, "the consent that was given is not erased"
     assert "capture.consented" not in known, "withdrawn and still listening"
     assert not scribe_offerable(store, thread)
-    assert store.count("notes", thread=thread, where={}) == before + 1, \
-        "a confirmed record went missing at withdrawal"
-    ok("withdrawal mid visit turns the gate off for the rest of the visit and "
-       "every record already confirmed stands")
+    assert store.count("notes", thread=thread, where={}) == before, \
+        "stopping a recording wrote a clinical note"
+    ok("a withdrawal turns the gate off on its own, with no assessment and no "
+       "note written, and the note committed before it still stands")
+
+
+def check_the_consultation_form_no_longer_withdraws():
+    """One way to withdraw, not two. The stop question is off the consult form,
+    so a consultation cannot raise the flag as a side effect and a withdrawal
+    cannot be held hostage by a required assessment."""
+    consult = validate.load(OPS["phc.op.consult-document"]["input"])
+    asked = [q["link_id"] for q in validate.walk(consult["questions"])
+             if q["link_id"].startswith("capture")]
+    assert not asked, asked
+    assert validate.flags(consult, dict(CONSULT, capture_stop=True)) == set()
+
+    store, thread = register({"capture_consent": True})
+    refused = commit(store, thread, "phc.op.consult-document",
+                     dict(CONSULT, capture_stop=True), actor="user:mo")
+    assert not refused and "not a question on this form" in refused.reason, refused
+
+    # And the withdrawal form asks nothing clinical, so it cannot demand one.
+    withdraw = validate.load(OPS["phc.op.capture-withdraw"]["input"])
+    assert [q["link_id"] for q in validate.walk(withdraw["questions"])] == ["capture_stop"]
+    assert validate.flags(withdraw, {"capture_stop": True}) == {"capture.withdrawn"}
+    assert validate.flags(withdraw, {"capture_stop": "yes"}) == set()
+    ok("the stop question is on the withdrawal form and nowhere else: the "
+       "consultation refuses it, and the withdrawal asks nothing clinical")
+
+
+def can_withdraw(store, thread):
+    """The renderer's rule for whether the action is drawn at all, which is
+    kernel/state.actions over the guard's own visible()."""
+    live = {op["id"] for op in state.actions(WF, OPS, flags(store, thread), CAPS)}
+    return "phc.op.capture-withdraw" in live
+
+
+def check_the_withdrawal_action_is_invisible_with_nothing_to_withdraw():
+    never, thread = register({})
+    assert not can_withdraw(never, thread), "offered to a visit nobody asked"
+
+    declined, thread = register({"capture_declined": True})
+    assert not can_withdraw(declined, thread), "offered to a visit that said no"
+
+    store, thread = register({"capture_consent": True})
+    assert can_withdraw(store, thread), "consented and no way to stop it"
+    assert commit(store, thread, "phc.op.capture-withdraw", {"capture_stop": True},
+                  actor="user:mo")
+    assert not can_withdraw(store, thread), "offered twice on one visit"
+    # Absent means absent, on the tap as well as on the screen.
+    again = commit(store, thread, "phc.op.capture-withdraw", {"capture_stop": True},
+                   actor="user:mo")
+    assert not again and "capture.consented" in again.reason, again.reason
+    ok("the withdrawal is absent when consent was never given, when it was "
+       "declined and once it has already been withdrawn, on both the screen "
+       "and the tap")
+
+
+def check_a_withdrawal_that_says_nothing_is_refused_rather_than_allowed():
+    """The stop question is `required`, and that one word is load bearing.
+
+    It was `required: false`, matching the two consent questions on the
+    registration form, and on screen that read as an allowed withdrawal that
+    withdrew nothing: the renderer omits an unticked boolean, so the payload
+    was `{}`, validate.flags raises only on a real `True`, and the commit was
+    recorded, drew a card, accrued a care unit and left `capture.consented`
+    standing with the scribe still offered. Tapping Stop and being told it
+    worked while the recording continues is the one outcome this whole
+    operation exists to prevent.
+
+    Optional is right for a consent, where not answering means nobody asked
+    and every gate stays shut. It is wrong for a withdrawal, where the gate is
+    already open and the answer is the only thing that shuts it.
+
+    What `required` does NOT close, asserted below so nobody reads this check
+    as more than it is: an explicit `false` is an answer. catalogue/validate
+    counts `link_id in payload and payload[link_id] not in (None, "")` as
+    answered, and `False` passes that, so a caller that sends the key with a
+    false value is still allowed and still raises nothing. No rendered surface
+    can produce it, because the renderer omits an unticked boolean, but the MCP
+    surface and any HTTP client can. Closing it needs a "must be true" rule in
+    catalogue/validate.py mirrored in web/src/validate.ts, which is a change to
+    shared validation and not this bundle's to make.
+    """
+    store, thread = register({"capture_consent": True})
+    empty = commit(store, thread, "phc.op.capture-withdraw", {}, actor="user:mo")
+    assert not empty and "capture_stop is required" in empty.reason, empty.reason
+    assert "capture.withdrawn" not in flags(store, thread)
+    assert scribe_offerable(store, thread), "refused, so the scribe is untouched"
+
+    # The hole that is still open, written down rather than left to be found.
+    unticked = commit(store, thread, "phc.op.capture-withdraw",
+                      {"capture_stop": False}, actor="user:mo")
+    assert unticked, "an explicit false is refused now: tighten this check"
+    assert scribe_offerable(store, thread), \
+        "a false withdrawal must at least not stop anything"
+
+    assert commit(store, thread, "phc.op.capture-withdraw", {"capture_stop": True},
+                  actor="user:mo")
+    assert not scribe_offerable(store, thread)
+    ok("a withdrawal that answers nothing is refused on every rendered path; "
+       "an explicit false is still allowed and still withdraws nothing")
 
 
 def check_the_demo_day_shows_both_answers():
@@ -195,6 +295,8 @@ def check_the_laboratory_is_not_given_a_consent_it_has_no_use_for():
     lab_states = set(vocab.for_bundle("lab").states)
     assert not [f for f in lab_states if f.startswith("capture.")], sorted(lab_states)
     assert not [i for i in lab.instruments.values() if i.kind == "scribe"]
+    assert "phc.op.capture-withdraw" not in lab.operations, \
+        "the laboratory loaded a withdrawal for a consent it never takes"
     for op in lab.operations.values():
         schema = validate.load(op["input"])
         asked = [q["link_id"] for q in validate.walk(schema["questions"])

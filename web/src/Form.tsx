@@ -16,6 +16,22 @@ export { validate, rangeBlocked, raisedFlags };
  *  right. contracts.Draft says the renderer must highlight it for re-reading. */
 const SURE = 0.9;
 
+/** Zero does not mean "nought per cent sure". It means the instrument that
+ *  produced this value reports no score at all, which is the scribe's case:
+ *  Eka returns no per field recognition confidence. The only confidence in its
+ *  response is a boolean about whether a diagnosis was matched to a code, and
+ *  audio_matrix is about the recording, not the words. Drawing "0%" claimed a
+ *  measurement that does not exist. The field stays marked unconfirmed either
+ *  way, because unconfirmed is the part that matters.
+ *
+ *  Nothing on the voice path lands here: packages/voice fails closed below its
+ *  own floor, so every value it hands over carries a real score above zero. */
+const unsureHint = (score: number) =>
+  score > 0
+    ? `Heard, not certain (${Math.round(score * 100)}%). Read it back before you commit.`
+    : "Filled by an instrument, not typed. Nothing scored this value, so read it " +
+      "back against what was said before you commit.";
+
 /** The one answer that is not a clinical value: the sentence someone typed to
  *  get past a range block. catalogue/validate.py knows it by this name too. */
 const OVERRIDE = "override_reason";
@@ -218,9 +234,7 @@ export function Form({
           <div className="f-hint">Range depends on {phc.range_from}. Not checked here or on the server.</div>
         )}
         {unsure && (
-          <div className="f-hint unsure">
-            Heard, not certain ({Math.round((confidence?.[q.link_id] ?? 0) * 100)}%). Read it back before you commit.
-          </div>
+          <div className="f-hint unsure">{unsureHint(confidence?.[q.link_id] ?? 0)}</div>
         )}
         {critical && !mine.length && (
           <span className="badge b-crit">Outside the safe band{phc.flags ? `, raises ${phc.flags}` : ""}</span>
