@@ -12,12 +12,15 @@ PHC_BUNDLE=lab PHC_DB=lab.sqlite3 PORT=8001 sh api/run.sh        # LAB   :8001
 ```
 
 Nothing here needs CARE, a network, or a database server. Python 3.9 and
-Node 22+ are the whole of it.
+Node 22+ are the whole of it. There is now a second adapter, `PHC_STORE=care`,
+and it does need all three; see "Switching adapters" below for what it can and
+cannot do.
 
 ## 0. Once
 
 ```sh
 python3 -m pip install --user fastapi uvicorn pyyaml     # the API and the linter
+python3 -m pip install --user ekacare                    # the ABDM connector, optional
 (cd web && npm install)                                   # the renderer
 (cd care_phc_mcp && go build -o care_phc_mcp .)           # the MCP server (optional)
 ```
@@ -107,6 +110,59 @@ Three things the switch does not carry, all of them real:
   written for a bundle. Questionnaires are the one exception: they are compiled
   in from `questionnaires/*.json` at build time, so a new form needs a restart,
   not a reload.
+
+### Switching adapters
+
+`PHC_STORE` names the system of record. It is read once, in `api/main.py`,
+and nothing downstream of it changes: the kernel only ever sees
+`kernel.contracts.Store`.
+
+```sh
+sh api/run.sh                       # PHC_STORE=local, the default
+PHC_STORE=care CARE_BASE_URL=https://your-care CARE_TOKEN=... sh api/run.sh
+```
+
+- **`local`** is `adapters/local`, the SQLite file. It needs nothing, it is
+  what every check in `scripts/check.sh` runs against, and it is the only
+  adapter that has been run end to end. Both bundles, both screens.
+- **`care`** is `adapters/care`, CARE's REST API over HTTP. It reads
+  `CARE_BASE_URL` and `CARE_TOKEN`, both required, plus `CARE_FACILITY`,
+  `CARE_GEO_ORGANIZATION`, `CARE_ABHA_CONFIG` and `CARE_AUTH_PREFIX`
+  (`Bearer`, or `Token` for CARE's other scheme) when the calls that need
+  them are made. **This has never served a request.** There is no CARE in
+  this repository and no credentials for one, so what is proven is the field
+  mapping against CARE's published schema and 24 checks against a fake
+  transport, not a working facility. Read `adapters/care/map.py` before
+  believing any of it: every one of its 88 fields carries a mark saying
+  whether it was seen in a live response, read in the schema, read in CARE's
+  source, or guessed.
+
+Four things `care` does not do, and refuses rather than guesses:
+
+- **`write("observation", ...)` raises.** CARE exposes no POST that creates
+  an observation, so the PHC vitals operation cannot run against CARE today.
+  That is the largest single gap.
+- **`open_thread` raises.** `EncounterCreateSpec` requires a patient, so CARE
+  cannot open a walk-in encounter before the person exists; `adapters/local`
+  can. That is a real ordering constraint on a bundle, not a missing feature.
+- **A dispense and a specimen are refused** for the same kind of reason:
+  CARE wants product and location ids a PHC payload does not carry, and a
+  specimen is created from the order it belongs to.
+- **Six of the Store methods are not CARE's at all.** The proposal queue, the
+  per-thread flags and this kernel's audit trail have no CARE equivalent, so
+  they are delegated to a sidecar `SqliteStore` on the same `PHC_DB` file. A
+  check asserts none of the six ever reaches the network.
+
+Getting it wrong ends in a sentence, not a traceback. `PHC_STORE=care` with
+nothing listening, with no `CARE_TOKEN`, or pointed at something that is not a
+CARE, prints what is wrong and how to go back to SQLite, and the kernel does
+not start:
+
+```
+Cannot use CARE at https://careapi.ohc.network.
+CARE is there and refused CARE_TOKEN: {'detail': 'Invalid Token, please relogin to continue'}
+Fix that, or run on the SQLite adapter instead: sh api/run.sh
+```
 
 ## 3. Start the renderer
 
@@ -225,7 +281,7 @@ open http://localhost:5173/#/threads/enc-002
 ## 5. The checks
 
 ```sh
-sh scripts/check.sh                 # everything, about 18 seconds, 248 ok lines
+sh scripts/check.sh                 # everything, about 20 seconds, 273 ok lines
 ```
 
 That runs the linters, every Python and Go unit check, the browser-side checks,
@@ -266,8 +322,35 @@ port.
   `python3 -c "import sqlite3,datetime;c=sqlite3.connect('phc.sqlite3');c.execute('insert into thread_flag values (?,?,?,?,?)',('f1','enc-002','capture.consented','you',datetime.datetime.now().isoformat()));c.commit()"`
 - **No authentication.** The role comes from `?role=` or `X-PHC-Role` and
   defaults to a union role holding every capability. This is a localhost demo.
-- **No CARE.** `adapters/local` is the only adapter. The column names in it are
-  taken from `care/emr/models` and are unverified against a running CARE.
+- **No CARE is running.** `adapters/local` is the only adapter that has
+  served a request. `adapters/care` exists and is selectable with
+  `PHC_STORE=care`, but nothing here has a CARE to point it at: three GETs
+  against the public `careapi.ohc.network` confirmed its pagination envelope,
+  its error shape and five field names, and everything past that is the
+  published schema. See "Switching adapters".
+
+- **ABDM is a connector, not a capability.** `care_phc/connectors/abdm/`
+  speaks to Eka's ABDM Connect gateway, on the official `ekacare` SDK for
+  auth, profile, ABHA card and QR and KYC, and on raw REST for the three
+  calls the SDK does not expose (PHR address check, Aadhaar enrolment init,
+  care context link). It is verified live against `https://api.eka.care`:
+  login succeeds, and the PHR check reaches Eka's own validator and comes
+  back with its errors. `python3 -m care_phc.connectors.abdm.check` is its
+  16 checks and needs no network. Three things to know:
+
+  - **Nothing in the kernel calls it.** `phc.op.abha-link` writes an ABHA
+    number to a patient row in the store. It does not reach ABDM, and no
+    route here does. The connector is wiring waiting for an operation.
+  - **Creating an ABHA is not finished.** The journey past the OTP raises
+    `NotImplementedError`, and `testuser99` on the sandbox still answers 500
+    `couldn't connect with ABDM servers`, which is the gateway's own words
+    and the blocker.
+  - **`.env`'s `EKA_BASE_URL` names `api.dev.eka.care`, where these
+    credentials are refused** with `pwd mismatch`. They work on
+    `https://api.eka.care`, which is the connector's default, so pass no base
+    URL rather than that one. The SDK is an extra install:
+    `python3 -m pip install --user ekacare`; `check.sh` skips the connector
+    with a warning when it is missing.
 - **`phc.op.household-visit` is in the PHC manifest and in no PHC step.** It
   stands at `community`, and the outpatient line has no such station, so
   `kernel/state.drawn_by` keeps it off every thread and `kernel/proposals`

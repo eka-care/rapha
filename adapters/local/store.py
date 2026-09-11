@@ -22,7 +22,9 @@ The guard, state derivation, or what an operation means. It stores rows.
 Honest limits
 -------------
 - Column names are taken from care/emr/models and are UNVERIFIED against a
-  running CARE, same caveat as care_phc/queries.py. Adapter 1 maps them.
+  running CARE. Adapter 1 (adapters/care/map.py) maps every one of them onto
+  a CARE field and records how that field was established, which is where to
+  look before believing any name in here.
 - write() takes one row, already shaped by the operation's declared mapping
   (kernel/mapping.py). This adapter no longer knows what a blood pressure is,
   which is the point: adapter 1 inherits the same mapping instead of deriving

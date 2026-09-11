@@ -58,8 +58,29 @@ ROLES = dict(vocab.BUNDLES)
 ROLES[DEMO_ROLE] = sorted(set().union(*vocab.BUNDLES.values()))
 
 
+# Which system of record. `local` is the SQLite file this repository ships
+# with and is the only one that has been run end to end; `care` is adapters/
+# care over CARE's REST API, which needs a CARE and credentials that are not
+# in here. The choice is configuration because the kernel only ever sees
+# kernel.contracts.Store, so nothing below this function changes with it.
+STORE = os.environ.get("PHC_STORE", "local")
+
+
 def make_store():
-    """A store, seeded on first use so the queue is never an empty screen."""
+    """A store, seeded on first use so the queue is never an empty screen.
+
+    A CARE that cannot be reached is a normal thing to get wrong here, so it
+    exits with a sentence instead of a connection traceback out of urllib.
+    """
+    if STORE == "care":
+        from adapters.care.store import CareUnreachable, open_care
+        try:
+            return open_care(db=DB)
+        except CareUnreachable as exc:
+            raise SystemExit("\n%s\n" % exc)
+    if STORE != "local":
+        raise SystemExit(
+            "\nPHC_STORE=%r is not an adapter. It is local or care.\n" % STORE)
     store = SqliteStore(DB)
     if not store.db.execute("SELECT 1 FROM encounter").fetchone():
         seed(store)

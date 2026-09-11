@@ -8,9 +8,13 @@ derive it and store nothing; a stored copy of a fact CARE owns will desync, and
 a desynced copy shows a pharmacist a Dispense button that should not exist.
 Only three flags are stored, because only three are things CARE cannot answer.
 
-derive() is deliberately pure: a Snapshot in, a set of flags out, no ORM. The
-querying lives in queries.py so this can be tested exhaustively without a
-running CARE.
+derive() is deliberately pure: a Snapshot in, a set of flags out, no ORM, so
+it can be tested exhaustively without a running CARE. The Django querying that
+used to build a Snapshot (queries.py) is deleted: every field name it guessed
+was wrong, and adapters/care/map.py now holds the CARE mapping with the mark
+saying how each name was established. kernel/state.py is what derives a
+thread's flags today; this file and its check are what that was proved
+against.
 """
 from __future__ import annotations
 
@@ -37,7 +41,8 @@ LINE = (
 
 @dataclass(frozen=True)
 class Snapshot:
-    """Facts CARE can answer about one encounter. Built by queries.py."""
+    """Facts CARE can answer about one encounter. Built by a caller; the
+    only one left is this module's own check."""
     patient_exists: bool = False
     abha_number: str | None = None
     vitals_observations: int = 0

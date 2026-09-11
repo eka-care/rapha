@@ -21,14 +21,22 @@ python3 -m bundles.lab.check      # a second bundle on the same kernel; SKIP_E2E
 
 echo "\n== the adapter and the service =="
 python3 -m adapters.local.tests.test_store
+python3 -m adapters.care.tests.test_store    # adapter 1, CARE REST, fake transport
+python3 -m adapters.care.tests.test_live     # READ ONLY against a public CARE; skipped when offline or SKIP_E2E
 python3 -m api.tests.test_api
 
 echo "\n== the agent, and the ABDM connector =="
 python3 -m agent.tests.test_planner
 python3 -m agent.turn          # one conversational turn, no kernel and no key
 python3 -m agent.tests.test_live      # binds a port; SKIP_E2E=1 skips that half
-python3 -m care_phc.tests.test_token
-python3 -m care_phc.tests.test_eka
+# The connector is the only thing here with a third party dependency, and it
+# is optional: nothing the kernel serves goes through ABDM yet. Skip rather
+# than fail on a machine that has not installed the SDK.
+if python3 -c 'import ekacare' 2>/dev/null; then
+  python3 -m care_phc.connectors.abdm.check
+else
+  echo "warn abdm connector skipped: python3 -m pip install --user ekacare"
+fi
 
 echo "\n== the MCP server =="
 (cd care_phc_mcp && go vet ./... && go test ./... && go build -o care_phc_mcp .)
