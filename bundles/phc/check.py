@@ -335,7 +335,7 @@ def check_the_consent_is_spoken_not_read():
     # Four things, and shortening further drops one: that it is a recording,
     # what for, that refusal is free, that it can be stopped.
     for must in ("record", "notes", "say no", "stop"):
-        assert must in SPOKEN.lower(), must
+        assert must in inst.says.lower(), must
 
     # `spoken` is the facility's off switch: true speaks the line, false
     # renders the same `says` sentence on screen instead (fallback: text).
