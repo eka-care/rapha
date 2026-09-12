@@ -120,8 +120,12 @@ export const api = {
    *  a person. Everything the person then types still goes through the
    *  guard. */
   openThread: (body: { token?: string } = {}) => post<ThreadView>("/threads/", body),
-  /** The shipped presets (bundle.yaml's `roles:`), read only. */
-  roles: () => req<{ presets: Record<string, string[]>; current: string }>("/roles/"),
+  /** The shipped presets (bundle.yaml's `roles:`), read only, plus whatever
+   *  a facility has already saved on top. Both come back so the editor can
+   *  seed from a deviation rather than showing the preset as if the save
+   *  never happened. */
+  roles: () =>
+    req<{ presets: Record<string, string[]>; overrides: Record<string, string[]>; current: string }>("/roles/"),
   /** A facility's own deviation from a preset. api/main.py stores it apart
    *  from the preset and requires facility.admin; a caller without it gets a
    *  403 back through the same ApiError every other write does. */

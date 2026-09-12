@@ -63,6 +63,15 @@ ROLES = dict(vocab.BUNDLES)
 # role, and facility.admin (needed to reach the endpoints below) sits in no
 # preset on purpose, so the union of presets alone would leave the demo
 # account unable to open its own role editor.
+#
+# demo is deliberately a superuser sandbox and not one more preset: it is the
+# account this kernel hands out with no login at all, so it is safe only
+# because there is no authentication yet. facility.admin sits in no preset on
+# purpose (it names no operation and neither _decide nor guard.evaluate ever
+# reads it, so on its own it unlocks no kernel write path, only /roles below),
+# but a capability added here in the future lands in demo's hands too without
+# anyone deciding that on purpose. The day a caller can be someone in
+# particular, this line is the one to narrow first.
 ROLES[DEMO_ROLE] = sorted(vocab.CAPABILITIES)
 
 # A facility's own combination, saved away from the shipped presets in
@@ -197,12 +206,16 @@ def facility(request: Request):
 
 @router.get("/roles")
 def roles_route(request: Request):
-    """The shipped presets, and who is asking.
+    """The shipped presets, a facility's own deviations, and who is asking.
 
     Presets are bundle.yaml's `roles:` (vocab.BUNDLES), read only here. A
     facility's own combination is saved separately, in OVERRIDES, which is
-    what CARE's sync_permissions_roles deliberately does not touch either."""
-    return {"presets": dict(vocab.BUNDLES), "current": caller(request)["role"]}
+    what CARE's sync_permissions_roles deliberately does not touch either.
+    Both come back: an editor that seeds only from `presets` shows a role
+    exactly as it shipped even after a facility has deliberately moved away
+    from it, and the next unrelated save silently restores what was removed."""
+    return {"presets": dict(vocab.BUNDLES), "overrides": dict(OVERRIDES),
+            "current": caller(request)["role"]}
 
 
 @router.put("/roles/{role}")

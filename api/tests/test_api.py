@@ -532,6 +532,11 @@ def test_roles_lists_presets_and_saves_a_deviation():
     # The grant took effect: the next request as that role carries it.
     assert "vitals.record" in client.get("/api/facility?role=frontdesk").json()["user"]["capabilities"]
 
+    # And a saved deviation comes back on the read, not just the preset: an
+    # editor that seeds from `presets` alone would show frontdesk exactly as
+    # it shipped, and a later unrelated save would silently undo this grant.
+    assert again["overrides"]["frontdesk"] == saved["capabilities"]
+
 
 def test_a_caller_without_facility_admin_cannot_edit_a_role():
     # frontdesk holds no facility.admin in any preset, so it is refused, not

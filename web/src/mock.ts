@@ -230,7 +230,7 @@ export const mockApi = {
   openThread: async () => {
     throw new DemoWrite();
   },
-  roles: () => wait({ presets: { demo: CAPS }, current: "demo" }),
+  roles: () => wait({ presets: { demo: CAPS }, overrides: {}, current: "demo" }),
   setRole: async () => {
     throw new DemoWrite();
   },

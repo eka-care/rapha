@@ -47,17 +47,26 @@ export function Roles({
   const editable = roleIds.filter((r) => r !== "demo");
   const [role, setRole] = useState(editable[0] ?? "");
   const [presets, setPresets] = useState<Record<string, string[]>>({});
+  // A facility's own save, kept apart from `presets` so "Reset to preset"
+  // still means the shipped list and not whatever was last saved. Without
+  // this the editor has only the preset to seed from, so reopening it after
+  // a deliberate removal shows the role as if nothing had changed, and the
+  // next unrelated Save silently re-grants what was taken away.
+  const [overrides, setOverrides] = useState<Record<string, string[]>>({});
   const [caps, setCaps] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    client.roles().then((got) => setPresets(got.presets)).catch(() => {});
+    client.roles().then((got) => {
+      setPresets(got.presets);
+      setOverrides(got.overrides);
+    }).catch(() => {});
   }, [client]);
 
   useEffect(() => {
-    setCaps(new Set(presets[role] ?? []));
-  }, [role, presets]);
+    setCaps(new Set(overrides[role] ?? presets[role] ?? []));
+  }, [role, presets, overrides]);
 
   const groups = groupsFor(cat);
 
@@ -75,6 +84,7 @@ export function Roles({
     try {
       const saved = await client.setRole(role, [...caps]);
       setCaps(new Set(saved.capabilities));
+      setOverrides((was) => ({ ...was, [role]: saved.capabilities }));
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not save");
     } finally {
