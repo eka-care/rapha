@@ -26,6 +26,7 @@ import pathlib
 
 from adapters.local.store import SqliteStore, seed
 from catalogue import validate, vocab
+from catalogue.build import parse
 from kernel import declarations, proposals, state, views
 
 BUNDLE = declarations.load("phc")
@@ -338,11 +339,17 @@ def check_the_consent_is_spoken_not_read():
 
     # `spoken` is the facility's off switch: true speaks the line, false
     # renders the same `says` sentence on screen instead (fallback: text).
-    # A defaulted dataclass field is exactly the shape of bug that deletes a
-    # feature silently: this asserts the atom actually declares the key
-    # rather than relying on the True default to hide its absence, and that
-    # the value survives compilation into catalogue.json rather than being
-    # dropped or reset on the way.
+    # c.Instrument defaults `spoken` to True, which means the compiled value
+    # alone cannot tell "declared true" from "not declared, defaulted true":
+    # this reads the atom's own frontmatter to prove the key is actually
+    # there, not just that the default happens to agree with it, and then
+    # separately proves the value survives compilation into catalogue.json
+    # rather than being dropped or reset on the way. Losing either check lets
+    # someone delete the off switch again while every other assertion here
+    # still passes on the default.
+    fm, _ = parse(pathlib.Path("bundles/phc/phc.inst.consent-speak.md"))
+    assert "spoken" in fm, "the atom does not declare `spoken`: the off switch is gone"
+    assert fm["spoken"] is True, fm["spoken"]
     assert inst.spoken is True, inst.spoken
     compiled = json.load(open("catalogue/catalogue.json"))
     assert compiled["instruments"]["phc.inst.consent-speak"]["spoken"] is True, \
