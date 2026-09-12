@@ -69,7 +69,9 @@ export function cue(a: {
   if (a.opener) return { kind: "open", op: a.opener, label: a.opener.title };
   const waiting = a.queue.filter((r) => r.station === a.station && r.thread !== a.closed);
   const first = waiting[0];
-  if (!first) return { kind: "empty", label: "Nobody waiting" };
+  if (!first) {
+    return { kind: "empty", label: a.station ? `Nobody waiting at ${a.station}` : "Nobody waiting" };
+  }
   const name = typeof first.subject.name === "string" && first.subject.name
     ? first.subject.name
     : String(first.subject.token ?? first.thread);

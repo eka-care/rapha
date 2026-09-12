@@ -337,15 +337,7 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
   stroke-linecap:round;stroke-linejoin:round}
 [data-theme="dark"] .hero-mark{opacity:.075}
 .hero-eye{font-size:10.5px;font-weight:700;color:var(--rose-ink);text-transform:uppercase;letter-spacing:.1em}
-.hero-h{font-size:27px;font-weight:800;letter-spacing:-.028em;margin-top:7px;line-height:1.15}
-.hero-h span{color:var(--ink-3);font-weight:600}
 .hero-sub{font-size:12.5px;color:var(--ink-3);margin-top:7px;line-height:1.55;max-width:560px}
-.hero-ask{display:flex;align-items:center;gap:11px;background:var(--surface);border:1.5px solid var(--border);
-  border-radius:var(--r-pill);padding:12px 18px;margin-top:20px;max-width:640px;cursor:text;
-  transition:.16s var(--ease);position:relative;z-index:1}
-.hero-ask:hover{border-color:var(--eka-blue);box-shadow:0 6px 20px rgba(33,95,255,.10)}
-.hero-ask input{flex:1;border:none;background:none;font:inherit;font-size:14px;color:var(--ink);outline:none}
-.hero-ask input::placeholder{color:var(--gray-400)}
 .chips{display:flex;gap:7px;margin-top:13px;flex-wrap:wrap;position:relative;z-index:1}
 .chip{border:1px solid var(--border);background:var(--surface);color:var(--ink-2);border-radius:var(--r-pill);
   padding:6px 13px;font:inherit;font-size:11.5px;font-weight:500;cursor:pointer;transition:.14s var(--ease)}
@@ -490,7 +482,6 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
   display:flex;align-items:center;gap:12px;margin-bottom:12px}
 .close-h{font-weight:600;flex:1}
 .close-e{color:var(--ink-2)}
-.close-u{background:none;border:0;color:var(--ink-2);cursor:pointer;font:inherit}
 
 @media(max-width:1100px){.chatgrid{grid-template-columns:1fr}.panel{display:none}.agrid{grid-template-columns:1fr}}
 @media(max-width:900px){.sb{display:none}.spot-body{flex-direction:column;height:auto}

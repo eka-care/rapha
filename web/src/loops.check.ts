@@ -74,6 +74,12 @@ ok(elsewhere.kind === "empty", "another station's queue is not this role's work"
 const quiet = cue({ station: "nurse", opener: null, queue: [], closed: "enc-1" });
 ok(quiet.kind === "empty", "an empty queue is an empty cue");
 ok(!/\d/.test(quiet.label), "the empty cue states no count it does not have");
+ok(quiet.label.includes("nurse"), "the empty cue names the station it is empty at, from data, not a bare literal");
+
+// A cue with no station (the whole visit is the subject, no current station)
+// still says something, rather than naming a station that is not there.
+const noStation = cue({ station: null, opener: null, queue: [], closed: "enc-1" });
+ok(noStation.kind === "empty" && noStation.label === "Nobody waiting", "no station, no station name invented");
 
 // -- how much AI a role touches is declared, never coded --------------------
 ok(opensOnArrival(register), "registration opens on arrival");

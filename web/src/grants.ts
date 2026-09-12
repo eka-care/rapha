@@ -1,8 +1,8 @@
 /** Whether a capability grant is inert, and why.
  *
  *  Pure functions over declarations, in their own file (not Roles.tsx)
- *  because a .check.ts may never import a .tsx: this is what roles.check.ts
- *  imports, and Roles.tsx re-exports `inert` for anything reading it there.
+ *  because a .check.ts may never import a .tsx: this is what grants.check.ts
+ *  imports.
  */
 import type { Catalogue } from "./types";
 
@@ -15,6 +15,9 @@ import type { Catalogue } from "./types";
  *  A switch that silently does nothing is worse than one that explains itself.
  */
 export function inert(cap: string, cat: Catalogue): boolean {
+  // ponytail: first workflow only, correct while a bundle declares one. A
+  // second workflow would mark every capability the first one draws as
+  // inert for the second; upgrade to check across all of cat.workflows.
   const wf = Object.values(cat.workflows ?? {})[0];
   const drawn = new Set((wf?.steps ?? []).flatMap((s) => s.operations));
   return !Object.values(cat.operations ?? {})

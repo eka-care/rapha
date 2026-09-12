@@ -267,6 +267,9 @@ function App() {
       cue: cue({
         station: thread.data?.station ?? null,
         opener: openerFor(cat.data, thread.data?.workflow, fac.data),
+        // ponytail: first queue only, correct while a bundle has one queue per
+        // station. A second queue at this station would leave the cue empty
+        // with a full line sitting behind it; upgrade to merge queues[*].result.rows.
         queue: (queues[0]?.result.rows ?? []) as QueueRow[],
         closed: route.id,
       }),

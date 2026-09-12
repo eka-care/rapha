@@ -13,8 +13,6 @@ import { inert, inertReason } from "./grants";
 import type { Catalogue, Operation } from "./types";
 import { human } from "./ui";
 
-export { inert } from "./grants";
-
 type Group = { title: string; rows: { cap: string; op?: Operation }[] };
 
 /** One row per capability the bundle declares, grouped by the operation it

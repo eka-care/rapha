@@ -352,3 +352,6 @@ Target: 178 visible words down to roughly 60 on the nurse's screen.
 - Browser speech accuracy for the spoken prompt is untested.
 - The CARE adapter has never run against an authenticated CARE.
 - `kernel/contracts.py` says the Store has nine methods; it declares ten.
+- The close card's quiet undo was never wired: `CloseCard` took an `onUndo`
+  prop nothing passed, and `.close-u` styled a button that never rendered.
+  Both were removed rather than built; undo after a close is still absent.

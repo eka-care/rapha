@@ -7,14 +7,13 @@
  */
 import type { Cue } from "./loops";
 
-export function CloseCard({ what, wentTo, cue, onCue, onUndo }: {
+export function CloseCard({ what, wentTo, cue, onCue }: {
   /** The operation's own title, from its declaration. */
   what: string;
   /** The station the thread is at now, or null once the line is complete. */
   wentTo: string | null;
   cue: Cue;
   onCue: () => void;
-  onUndo?: () => void;
 }) {
   return (
     <div className="close">
@@ -28,7 +27,6 @@ export function CloseCard({ what, wentTo, cue, onCue, onUndo }: {
           {cue.kind === "open" ? cue.label : `Next: ${cue.label}`}
         </button>
       )}
-      {onUndo && <button className="close-u" onClick={onUndo}>Undo</button>}
     </div>
   );
 }

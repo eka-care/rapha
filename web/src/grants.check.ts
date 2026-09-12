@@ -1,6 +1,6 @@
 /** inert() and its reason, as pure functions over declarations.
  *
- *  Run: node --experimental-strip-types src/roles.check.ts   (from web/)
+ *  Run: node --experimental-strip-types src/grants.check.ts   (from web/)
  *
  *  Two ways this rule degenerates and still "passes" a lazy check: calling
  *  every capability reachable (the disabled state never appears), or calling
