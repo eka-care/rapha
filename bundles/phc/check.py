@@ -336,13 +336,25 @@ def check_the_consent_is_spoken_not_read():
     for must in ("record", "notes", "say no", "stop"):
         assert must in SPOKEN.lower(), must
 
+    # `spoken` is the facility's off switch: true speaks the line, false
+    # renders the same `says` sentence on screen instead (fallback: text).
+    # A defaulted dataclass field is exactly the shape of bug that deletes a
+    # feature silently: this asserts the atom actually declares the key
+    # rather than relying on the True default to hide its absence, and that
+    # the value survives compilation into catalogue.json rather than being
+    # dropped or reset on the way.
+    assert inst.spoken is True, inst.spoken
+    compiled = json.load(open("catalogue/catalogue.json"))
+    assert compiled["instruments"]["phc.inst.consent-speak"]["spoken"] is True, \
+        "the off switch did not survive compilation into catalogue.json"
+
     schema = json.load(open("questionnaires/phc.schema.register-v1.json"))
     consent = [q for q in schema["questions"] if q["link_id"] == "capture_consent"][0]
     assert consent["text"] == "Record this visit?", consent["text"]
     assert "description" not in consent, "the 53 word read-out moved to the spoken line"
     ok("the registration form asks 'Record this visit?' with no read-out "
-       "paragraph, and the agent's own line carries all four things a "
-       "recording consent needs")
+       "paragraph, the agent's own line carries all four things a recording "
+       "consent needs, and its off switch declares and compiles")
 
 
 if __name__ == "__main__":

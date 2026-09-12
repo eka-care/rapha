@@ -224,6 +224,7 @@ class Instrument:
     commit: str = "tap"             # always "tap"
     fallback: str = "keypad"        # keypad | form | text
     says: Optional[str] = None      # spoken-prompt only: the exact line spoken
+    spoken: bool = True             # spoken-prompt only: a facility's off switch
     type: str = "instrument"
 
 

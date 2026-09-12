@@ -222,9 +222,14 @@ def _lint_instrument(fm, ops, fail):
     if fm["kind"] == "constrained-voice" and fm.get("grammar") not in c.VOICE_GRAMMARS:
         fail(f"constrained-voice needs a grammar from {c.VOICE_GRAMMARS}")
     if fm["kind"] == "spoken-prompt":
+        # `spoken` is the facility's off switch: true speaks the line, false
+        # renders it on screen instead. Either way `says` is what gets shown
+        # or said, so an empty one is refused regardless of which way the
+        # switch is set, not just when it happens to be off today.
         if not (fm.get("says") or "").strip():
             fail("a spoken-prompt with no `says` has nothing to fall back to "
-                 "when a facility turns the voice off")
+                 "when a facility turns the voice off, whether `spoken` is "
+                 "true or false")
 
     link_ids = set()
     for oid in fm["operations"] or []:

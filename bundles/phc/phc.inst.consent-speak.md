@@ -9,6 +9,7 @@ fields: [capture_consent, capture_declined]
 says: >-
   May we record this visit to write your notes?
   You can say no, or stop it any time.
+spoken: true
 commit: tap
 readback: required
 fallback: text
@@ -35,11 +36,12 @@ already a thread flag.
 
 ## The off switch
 
-Speaking the line is the default; a facility can turn its voice off, and when
-it does the same sentence renders on screen for a person to read instead, via
-`fallback: text`, and nothing else changes. The linter refuses a
-`spoken-prompt` with an empty `says`, because the off switch must always have
-something to fall back to.
+`spoken: true` is this atom's default; a facility setting overrides it. When
+it resolves false the same sentence renders on screen, via `fallback: text`,
+for a person to read instead, and nothing else changes: the clerk still taps
+what the patient answered. The linter refuses a `spoken-prompt` with an empty
+`says` whether `spoken` is true or false, because the off switch must always
+have something to fall back to.
 
 ## What this cannot do
 
