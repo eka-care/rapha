@@ -1,17 +1,17 @@
 /** The thread, as a conversation, worked out without a browser.
  *
  *  Everything on the patient screen that is a decision rather than a
- *  rectangle lives here: which messages a thread has and in what order, what
- *  the agent's last line says, and which pills the composer carries. It is
- *  pure, it takes the kernel's ThreadView and the compiled declarations, and
- *  messages.check.ts asserts it. Thread.tsx only draws what comes back.
+ *  rectangle lives here: which messages a thread has and in what order, and
+ *  what the agent's last line says. It is pure, it takes the kernel's
+ *  ThreadView and the compiled declarations, and messages.check.ts asserts
+ *  it. Thread.tsx only draws what comes back.
  *
  *  Two rules this file enforces and must keep enforcing:
  *
  *  - Nothing here can write. It imports no client and no fetch, and the
  *    check asserts the word "commit" and the word "confirm" appear nowhere in
- *    it. A composer that could commit would make the pills a machine surface.
- *  - No pill and no proposal is ever returned disabled. An action a person
+ *    it.
+ *  - No proposal is ever returned disabled. An action a person
  *    may not take is not in thread.actions, so it is not here either. The
  *    reason for an absence is said in words, by agentLine(), which is the
  *    replacement for the prototype's greyed-out buttons.
@@ -244,36 +244,9 @@ const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 export const clock = (at: string | undefined): string =>
   at && /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(at) ? at.slice(11, 16) : (at ?? "");
 
-// ------------------------------------------------------------- the composer
-
-export type Pill = {
-  op?: Operation;
-  view?: ViewDecl;
-  label: string;
-  /** ink filled. One at most, and never as a warning. */
-  primary?: boolean;
-  irreversible?: boolean;
-  kind: "action" | "scribe" | "summary" | "more";
-};
-
 /** The flag every scribe declaration gates on. It is a product rule and not a
  *  bundle's word: no capture happens anywhere without it. */
 export const CONSENT = "capture.consented";
-
-/** The composer's pill row: one pill per summary view this workflow declares.
- *
- *  This used to also carry a scribe shortcut, a capped action list and a
- *  "More" pill for the actions it could not fit. Those were the same
- *  operations the agent's own bubble already offers, so loops.ts (weigh())
- *  now draws the one primary action and its overflow there instead, and this
- *  function only has to say which summaries exist. Nothing is ever disabled.
- */
-export function composer(thread: ThreadView, cat: Catalogue): { pills: Pill[] } {
-  const pills: Pill[] = summariesFor(cat, thread.workflow).map((v) => ({
-    view: v, label: v.title ?? title(v.id), kind: "summary" as const,
-  }));
-  return { pills };
-}
 
 /** A summary view belongs to a thread, not to the nav. One that names a
  *  workflow belongs only to that workflow's threads. */

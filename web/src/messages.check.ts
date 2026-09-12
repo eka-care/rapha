@@ -8,9 +8,8 @@
  *  the last post, a proposal for an operation the visit has moved past) do not
  *  reliably exist in a seeded database.
  *
- *  Four of these assertions are safety properties, not conveniences:
+ *  Three of these assertions are safety properties, not conveniences:
  *
- *   - the composer never returns a disabled pill;
  *   - no module the thread screen composes from can commit or confirm;
  *   - a superseded proposal offers no Review;
  *   - a refused audit row never renders as a posted record.
@@ -20,7 +19,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  actorOf, agentLine, clock, composer, fmt, header, messages, queueViewFor, summariesFor,
+  actorOf, agentLine, clock, fmt, header, messages, queueViewFor, summariesFor,
   type Ctx,
 } from "./messages.ts";
 import { firstOperation, isAsk, rows } from "./search.ts";
@@ -163,26 +162,13 @@ assert.ok(
   "the reason for an absence is said in words",
 );
 
-// ---------------------------------------------------------------- composer
+// ------------------------------------------------------------- summary views
 
-// The scribe shortcut, the capped action list and the "More" pill used to be
-// tested here. loops.ts (loops.check.ts) now owns that behaviour: the agent's
-// bubble draws the one primary action and its overflow, so composer() has
-// only the summary pills left to be responsible for.
-const bar = composer(thread, cat);
-assert.ok(bar.pills.length > 0);
-for (const p of bar.pills) {
-  assert.ok(!("disabled" in p), "a pill is never disabled: an unavailable action is absent");
-}
-assert.ok(
-  bar.pills.every((p) => p.kind === "summary"),
-  "the composer offers summary views only; an operation is offered once, by the agent's own bubble",
-);
-assert.ok(
-  bar.pills.some((p) => p.kind === "summary"),
-  "every summary view this workflow declares is a pill on the thread",
-);
-
+// composer() and the Pill type it returned are gone: PillButton (the only
+// thing that ever rendered a Pill) was deleted with the bottom composer bar
+// in Thread.tsx, once the Records rail made it a duplicate of the rail's own
+// rows. summariesFor() is still real production code — Thread.tsx and
+// main.tsx use it to find the rail's summary view — so it keeps its check.
 assert.ok(summariesFor(cat, WF).length >= 1);
 
 // ------------------------------------------------------------------ header
@@ -328,5 +314,5 @@ for (const file of ["src/messages.ts", "src/search.ts", "src/ask.ts", "src/Threa
   assert.ok(!/\.commit\(|\.confirm\(/.test(body), `${file} must have no commit or confirm path`);
 }
 
-console.log("ok   thread messages, agent line, composer, header and palette rows");
+console.log("ok   thread messages, agent line, summary views, header and palette rows");
 console.log("ok   a structured answer's fields come from the operation's own mapping");

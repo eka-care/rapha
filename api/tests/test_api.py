@@ -183,6 +183,22 @@ def test_the_summary_view_is_the_thread_panel_declared():
     assert client.get("/api/views/phc.view.visit-summary").status_code == 400
 
 
+def test_a_section_s_declared_resource_reaches_the_serialised_response():
+    # The rail on the thread screen (web/src/loops.ts: records()) decides a
+    # section is a document, not kernel structure, by reading its `resource`
+    # off the JSON the API actually sends - not off the in-process ViewResult,
+    # and not off the frontend's own mock, which hardcodes it. If `resource`
+    # were ever dropped again on the way to JSON, every other check here would
+    # stay green while the rail silently emptied for every real user.
+    body = client.get("/api/views/phc.view.visit-summary?thread=enc-006").json()
+    prescription = [s for s in body["rows"] if s["title"] == "Prescription"][0]
+    assert prescription.get("resource") == "medication_request", \
+        "a section that reads a resource must carry that resource in the response"
+    visit = [s for s in body["rows"] if s["title"] == "Visit"][0]
+    assert visit.get("resource") is None, \
+        "a section that shows a kernel structure carries no resource"
+
+
 def test_the_mcp_facing_routes_did_not_move():
     assert client.get("/api/v1/phc/whoami/").status_code == 200
     assert "patient.find" in client.get("/api/v1/phc/whoami/").json()["capabilities"]

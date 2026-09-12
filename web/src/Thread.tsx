@@ -5,9 +5,9 @@
  *  offers or type a question. The forms are not on this screen: they open in a
  *  modal from it and post back into it.
  *
- *  Which messages there are, what the agent says and which pills the composer
- *  carries are all decided in messages.ts, which is pure and checked. This
- *  file draws them and nothing else. It names no station, no flag and no
+ *  Which messages there are and what the agent says are decided in
+ *  messages.ts, which is pure and checked. This file draws them and nothing
+ *  else. It names no station, no flag and no
  *  operation, and it cannot write: every write leaves through a callback to
  *  the shell, which opens the modal.
  *
