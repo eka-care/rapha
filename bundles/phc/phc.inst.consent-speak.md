@@ -1,0 +1,55 @@
+---
+id: phc.inst.consent-speak
+type: instrument
+kind: spoken-prompt
+title: Ask for consent aloud
+summary: The agent asks; the clerk taps what the patient answered.
+operations: [phc.op.patient-register]
+fields: [capture_consent, capture_declined]
+says: >-
+  May we record this visit to write your notes?
+  You can say no, or stop it any time.
+commit: tap
+readback: required
+fallback: text
+---
+
+## In plain words
+
+The clerk used to read fifty-three words off the screen to every patient, at a
+counter, with a queue behind them. Nobody reads fifty-three words the fortieth
+time, so the consent became a tick. The agent says the line instead, in the
+facility's language, and the clerk taps what the patient answered.
+
+Seventeen words carrying four things: that it is a recording, what it is for,
+that saying no is free, and that it can be stopped. Dropping any one of them
+makes it not a consent, which is why the linter checks the sentence rather
+than trusting a later edit.
+
+## Where this is asked
+
+At reception, on the registration form, not in the consulting room. The
+recording it authorises happens later at the doctor. That costs the doctor no
+consultation time, and by the time the scribe is available the answer is
+already a thread flag.
+
+## The off switch
+
+Speaking the line is the default; a facility can turn its voice off, and when
+it does the same sentence renders on screen for a person to read instead, via
+`fallback: text`, and nothing else changes. The linter refuses a
+`spoken-prompt` with an empty `says`, because the off switch must always have
+something to fall back to.
+
+## What this cannot do
+
+It cannot commit. It sets no flag. The clerk's tap is what raises
+`capture.agreed` or `capture.declined`, through the same form validation every
+other answer goes through. A prompt that recorded its own answer would be a
+consent nobody gave.
+
+## Withdrawal
+
+`phc.op.capture-withdraw` is the doctor's, asks one question, and is absent
+unless there is a consent to withdraw. A consent that cannot be withdrawn is
+not a consent.

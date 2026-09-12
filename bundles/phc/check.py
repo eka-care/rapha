@@ -21,6 +21,7 @@ recording meant writing a clinical note as well. It is its own operation.
 """
 from __future__ import annotations
 
+import json
 import pathlib
 
 from adapters.local.store import SqliteStore, seed
@@ -307,6 +308,41 @@ def check_the_laboratory_is_not_given_a_consent_it_has_no_use_for():
         assert "capture" not in path.read_text(), path
     ok("the laboratory has no capture flag, no scribe and no consent question: "
        "a bundle that does not listen is not asked to consent")
+
+
+def check_the_consent_is_spoken_not_read():
+    """The clerk used to read fifty-three words off the registration screen to
+    every patient, at a counter, with a queue behind them. Nobody reads
+    fifty-three words the fortieth time, so the consent became a tick. The
+    agent speaks the line now, and the clerk taps what the patient answered.
+
+    Instrument attributes, not dict keys: c.Instrument is a frozen dataclass
+    (kernel/contracts.py) and kernel/declarations.py's _plain() builds it from
+    the atom's frontmatter, so the compiled instrument is accessed the same
+    way SCRIBE is accessed above, by attribute.
+    """
+    # The agent's line is the consent itself. Dropping any one of the four
+    # things it carries, or paraphrasing it, is not a shorter consent, it is a
+    # different one, which is why this asserts the sentence and not a summary
+    # of it.
+    SPOKEN = ("May we record this visit to write your notes? "
+              "You can say no, or stop it any time.")
+
+    inst = BUNDLE.instruments["phc.inst.consent-speak"]
+    assert inst.kind == "spoken-prompt"
+    assert inst.says == SPOKEN, inst.says
+    # Four things, and shortening further drops one: that it is a recording,
+    # what for, that refusal is free, that it can be stopped.
+    for must in ("record", "notes", "say no", "stop"):
+        assert must in SPOKEN.lower(), must
+
+    schema = json.load(open("questionnaires/phc.schema.register-v1.json"))
+    consent = [q for q in schema["questions"] if q["link_id"] == "capture_consent"][0]
+    assert consent["text"] == "Record this visit?", consent["text"]
+    assert "description" not in consent, "the 53 word read-out moved to the spoken line"
+    ok("the registration form asks 'Record this visit?' with no read-out "
+       "paragraph, and the agent's own line carries all four things a "
+       "recording consent needs")
 
 
 if __name__ == "__main__":

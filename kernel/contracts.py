@@ -65,7 +65,7 @@ DECLARATION_TYPES = ("operation", "workflow", "view", "instrument", "metric")
 VIEW_KINDS = ("queue", "summary", "dashboard")
 VIEW_SCOPES = ("today", "open", "all")
 SUMMARY_SHOW = ("line", "actions", "proposals", "audit", "flags")
-INSTRUMENT_KINDS = ("form", "device", "constrained-voice", "scribe")
+INSTRUMENT_KINDS = ("form", "device", "constrained-voice", "scribe", "spoken-prompt")
 VOICE_GRAMMARS = ("number", "choice", "date", "free")
 METRIC_UNITS = ("count", "percent", "ratio")
 METRIC_WINDOWS = ("day", "week", "month", "all")
@@ -222,7 +222,8 @@ class Instrument:
     grammar: Optional[str] = None   # VOICE_GRAMMARS, constrained-voice only
     readback: str = "required"      # always "required"
     commit: str = "tap"             # always "tap"
-    fallback: str = "keypad"        # keypad | form
+    fallback: str = "keypad"        # keypad | form | text
+    says: Optional[str] = None      # spoken-prompt only: the exact line spoken
     type: str = "instrument"
 
 

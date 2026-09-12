@@ -116,6 +116,26 @@
     "worklist.read"
   ],
   "instruments": {
+    "phc.inst.consent-speak": {
+      "commit": "tap",
+      "fallback": "text",
+      "fields": [
+        "capture_consent",
+        "capture_declined"
+      ],
+      "grammar": null,
+      "id": "phc.inst.consent-speak",
+      "kind": "spoken-prompt",
+      "operations": [
+        "phc.op.patient-register"
+      ],
+      "readback": "required",
+      "says": "May we record this visit to write your notes? You can say no, or stop it any time.",
+      "summary": "The agent asks; the clerk taps what the patient answered.",
+      "title": "Ask for consent aloud",
+      "type": "instrument",
+      "types": []
+    },
     "phc.inst.consult-scribe": {
       "commit": "tap",
       "fallback": "form",
@@ -128,6 +148,7 @@
         "phc.op.rx-prescribe"
       ],
       "readback": "required",
+      "says": null,
       "summary": "Transcribes the consultation into a draft note and prescription.",
       "title": "Ambient scribe",
       "type": "instrument",
@@ -149,6 +170,7 @@
         "phc.op.vitals-record"
       ],
       "readback": "required",
+      "says": null,
       "summary": "A paired cuff or oximeter fills the field.",
       "title": "Read from a connected monitor",
       "type": "instrument",
@@ -172,6 +194,7 @@
         "phc.op.vitals-record"
       ],
       "readback": "required",
+      "says": null,
       "summary": "Say one number into one field.",
       "title": "Speak a reading",
       "type": "instrument",
@@ -186,7 +209,8 @@
     "instruments": [
       "phc.inst.vitals-voice",
       "phc.inst.vitals-device",
-      "phc.inst.consult-scribe"
+      "phc.inst.consult-scribe",
+      "phc.inst.consent-speak"
     ],
     "metrics": [
       "phc.metric.visits",
@@ -1046,7 +1070,7 @@
           "link_id": "capture_consent",
           "options": null,
           "required": false,
-          "text": "Recording consent",
+          "text": "Record this visit?",
           "type": "boolean"
         },
         {

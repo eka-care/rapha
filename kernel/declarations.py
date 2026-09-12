@@ -217,10 +217,14 @@ def _lint_instrument(fm, ops, fail):
         fail("readback must be 'required': a captured value is always shown back")
     if fm["commit"] != "tap":
         fail("commit must be 'tap': no instrument is a commit path")
-    if fm["fallback"] not in ("keypad", "form"):
-        fail("fallback must be 'keypad' or 'form'")
+    if fm["fallback"] not in ("keypad", "form", "text"):
+        fail("fallback must be 'keypad', 'form' or 'text'")
     if fm["kind"] == "constrained-voice" and fm.get("grammar") not in c.VOICE_GRAMMARS:
         fail(f"constrained-voice needs a grammar from {c.VOICE_GRAMMARS}")
+    if fm["kind"] == "spoken-prompt":
+        if not (fm.get("says") or "").strip():
+            fail("a spoken-prompt with no `says` has nothing to fall back to "
+                 "when a facility turns the voice off")
 
     link_ids = set()
     for oid in fm["operations"] or []:

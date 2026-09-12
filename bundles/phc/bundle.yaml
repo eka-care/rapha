@@ -31,6 +31,7 @@ instruments:
   - phc.inst.vitals-voice
   - phc.inst.vitals-device
   - phc.inst.consult-scribe
+  - phc.inst.consent-speak
 metrics:
   - phc.metric.visits
   - phc.metric.abha-coverage

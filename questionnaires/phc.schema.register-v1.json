@@ -81,7 +81,7 @@
     },
     {
       "link_id": "capture_consent",
-      "text": "Recording consent",
+      "text": "Record this visit?",
       "type": "boolean",
       "required": false,
       "styling_metadata": {
@@ -89,8 +89,7 @@
           "flags": "capture.agreed",
           "short": "Consent to record"
         }
-      },
-      "description": "We can record your conversation with the doctor so the notes write themselves. Only the staff treating you can hear it, and the sound is deleted once the doctor confirms the notes. It is for today only, you can stop at any time, and saying no changes nothing about your care."
+      }
     },
     {
       "link_id": "capture_declined",

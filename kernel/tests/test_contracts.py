@@ -90,7 +90,7 @@ def test_voice_and_scribe_instruments_read_back_and_commit_by_tap():
         inst = c.Instrument(**fm)
         assert inst.kind in c.INSTRUMENT_KINDS
         assert inst.readback == "required" and inst.commit == "tap", f"{iid} bypasses the tap"
-        assert inst.fallback in ("keypad", "form")
+        assert inst.fallback in ("keypad", "form", "text")
         for op in inst.operations:
             schema = validate.load(CAT["operations"][op]["input"])
             link_ids = {q["link_id"] for q in validate.walk(schema["questions"])}
