@@ -327,6 +327,25 @@ for (const line of lines) {
     `FAIL a refusal that offers nothing is a dead end: ${line}`);
 }
 
+// -- a posted card on your own station names who did it, not "System" -------
+// Thread.tsx is a .tsx file: this check runs under node's type stripping,
+// which does not compile JSX, so it reads the source as text rather than
+// importing it (the same technique the "no write from here" block above
+// already uses). "System" is still the right word for a refusal, where
+// nobody performed the refused thing; a posted card for a committed record
+// has to name who committed it, the same actor the folded summary shows for
+// another station's work.
+const threadSrc = read("web/src/Thread.tsx");
+assert.equal(
+  (threadSrc.match(/System · \{clock\(m\.at\)\}/g) ?? []).length, 1,
+  'exactly one "System" placeholder should remain (the refusal bubble); a posted card must not say it',
+);
+assert.ok(
+  /\{m\.actor\} · \{clock\(m\.at\)\}/.test(threadSrc),
+  "a posted card's meta line reads the audit record's own actor",
+);
+
 console.log("ok   thread messages, agent line, summary views, header and palette rows");
 console.log("ok   a structured answer's fields come from the operation's own mapping");
 console.log("ok   the agent narrates nothing already on screen");
+console.log("ok   a posted card names who did it, not System");

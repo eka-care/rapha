@@ -199,7 +199,7 @@ function Message({
       av="check"
       meta={
         <>
-          System · {clock(m.at)}
+          {m.actor} · {clock(m.at)}
           {m.tags.map((t: Tag, i: number) => (
             <Badge key={`${t.text}-${i}`} style={t.style}>{t.text}</Badge>
           ))}
