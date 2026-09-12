@@ -29,6 +29,8 @@ type Decl = {
   readback?: string;
   commit?: string;
   fallback?: string;
+  says?: string;
+  spoken?: boolean;
 };
 
 type Common = { id: string; title: string; summary: string; fallback: string };
@@ -41,7 +43,8 @@ export type Mount =
       labels: Record<string, string>;
     })
   | (Common & { kind: "scribe"; targets: Question[] })
-  | (Common & { kind: "device"; fields: string[] });
+  | (Common & { kind: "device"; fields: string[] })
+  | (Common & { kind: "spoken-prompt"; says: string; spoken: boolean; fields: string[] });
 
 export function mountsFor(
   instruments: Record<string, unknown> | undefined,
@@ -96,6 +99,13 @@ export function mountsFor(
       // as one honest line rather than left out, so the screen does not imply
       // the declaration is wrong.
       out.push({ ...common, kind: "device", fields: [...named] });
+    } else if (d.kind === "spoken-prompt") {
+      // A prompt with no sentence and no fields on this form is not a prompt
+      // this operation owns: skip it rather than draw an empty box.
+      if (!d.says) continue;
+      const fields = questions.filter((q) => named.has(q.link_id)).map((q) => q.link_id);
+      if (!fields.length) continue;
+      out.push({ ...common, kind: "spoken-prompt", says: d.says, spoken: !!d.spoken, fields });
     }
   }
   return out;

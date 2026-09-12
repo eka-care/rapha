@@ -31,6 +31,7 @@ import { Badge, Failed, human } from "./ui";
 import { Recorder } from "./scribe/Recorder";
 import { mountsFor } from "./voice/instruments";
 import { VoiceCapture } from "./voice/VoiceCapture";
+import { SpokenPrompt } from "./voice/SpokenPrompt";
 
 const IRREVERSIBLE = "irreversible";
 
@@ -253,8 +254,16 @@ export function OperationPanel({
           </div>
         )}
 
+        {/* The consent line. Rendered whenever the form below carries the
+            fields it names, whatever `spoken` resolves to: a failed or
+            absent utterance must never be the only place a patient was told
+            anything. See web/src/voice/SpokenPrompt.tsx. */}
+        {mounts.filter((m) => m.kind === "spoken-prompt").map((m) => (
+          <SpokenPrompt key={m.id} mount={m as Extract<typeof m, { kind: "spoken-prompt" }>} />
+        ))}
+
         <VoiceCapture
-          mounts={mounts.filter((m) => m.kind !== "scribe")}
+          mounts={mounts.filter((m) => m.kind !== "scribe" && m.kind !== "spoken-prompt")}
           operation={op.id}
           payload={payload}
           disabled={busy}

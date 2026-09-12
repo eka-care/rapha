@@ -143,4 +143,62 @@ assert.deepEqual(
 checks++;
 ok(!/useEffect|setTimeout|setInterval/.test(panel), "the panel has no timer and no effect that could fire a write");
 
+// -- the consent line reaches the screen, not just the atom ----------------
+// Every check above this one, and every check in bundles/phc/check.py, stops
+// at the compiled instrument: it asserts `inst.says` is the right sentence,
+// never that a person sees it. That is exactly how the sentence was deleted
+// from the form and declared moved to an atom nothing read. These checks
+// follow the declaration one hop further, into the renderer that draws it,
+// the same way the writes above were traced into send() rather than trusted
+// to be there.
+//
+// What this cannot cover: it cannot run the React tree, so it cannot prove a
+// real DOM node paints the words, that CSS does not hide them, or that
+// speechSynthesis is actually invoked in a browser. It is a source-text
+// assertion, chosen because a .check.ts run under plain node cannot import a
+// .tsx (JSX is not stripped by node --experimental-strip-types) the way
+// voice.check.ts already reads OperationPanel.tsx as text above. A browser
+// check (§ of the report) is what closes that last gap.
+const registerSchema = schema("phc.schema.register-v1");
+const register = op("phc.op.patient-register");
+const rm = mountsFor(instruments, register, registerSchema);
+const consentMount = mount("spoken-prompt", rm) as any;
+ok(consentMount, "registration mounts the declared spoken-prompt instrument");
+ok(
+  consentMount?.says === instruments["phc.inst.consent-speak"].says,
+  "the mount carries the atom's own sentence, not a paraphrase",
+);
+
+// A declaration with `spoken` turned off must still produce a mount with a
+// sentence: the on-screen path is not conditioned on the off switch.
+const unspoken = JSON.parse(JSON.stringify(instruments));
+unspoken["phc.inst.consent-speak"].spoken = false;
+const stillMounted = mount("spoken-prompt", mountsFor(unspoken, register, registerSchema)) as any;
+ok(stillMounted?.says, "spoken: false still mounts the sentence for on-screen rendering");
+
+// The panel must render every spoken-prompt mount unconditionally: the
+// selector feeding SpokenPrompt is not allowed to test `.spoken`, because
+// that would reintroduce exactly the hole this is fixing (speech resolves
+// true, fails silently, and the on-screen fallback never renders).
+const selector = panel.match(/mounts\.filter\(\(m\) => m\.kind === "spoken-prompt"\)[^)]*\)/);
+ok(selector, "OperationPanel selects spoken-prompt mounts to render");
+ok(
+  !!selector && !/\.spoken/.test(selector[0]),
+  `the spoken-prompt selector does not gate on .spoken: ${selector?.[0]}`,
+);
+ok(panel.includes("<SpokenPrompt"), "OperationPanel actually renders SpokenPrompt for those mounts");
+
+// And SpokenPrompt itself must not gate its on-screen text behind `spoken`:
+// only the speechSynthesis call may do that.
+const promptSrc = read("web/src/voice/SpokenPrompt.tsx");
+const jsxStart = promptSrc.indexOf("return (");
+ok(jsxStart > 0, "SpokenPrompt has a render");
+const jsx = promptSrc.slice(jsxStart);
+ok(jsx.includes("mount.says"), "the rendered JSX includes the sentence");
+ok(!/spoken/i.test(jsx), "the on-screen JSX does not condition on `spoken` at all");
+const effectStart = promptSrc.indexOf("useEffect(");
+const effect = promptSrc.slice(effectStart, jsxStart);
+ok(effect.includes("mount.spoken"), "only the speech effect reads `spoken`, to decide whether to also speak");
+ok(/try\s*{/.test(effect), "the speech attempt is guarded so a throw cannot reach the render");
+
 console.log(`ok   voice mount: ${checks} checks`);

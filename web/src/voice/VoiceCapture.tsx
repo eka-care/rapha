@@ -108,6 +108,8 @@ export function VoiceCapture({
           );
         }
 
+        if (m.kind !== "constrained-voice") return null;   // no other kind mounts here
+
         if (!supported) {
           return (
             <div className="v-row" key={m.id}>

@@ -3,6 +3,15 @@
    confirmed yet, which is exactly what it is. */
 
 .v-bar { display:grid; gap:8px; margin:10px 0 14px; }
+
+/* The consent sentence. Always visible where its instrument mounts, whether
+   or not the browser also speaks it. */
+.say-row { margin:0 0 4px; }
+.say-line {
+  font-size:13px; font-weight:600; color:var(--ink-1);
+  background:var(--gray-50); border:1px solid var(--border);
+  border-radius:var(--r-md); padding:9px 12px;
+}
 .v-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .v-row .f-hint { flex:1 1 220px; }
 .v-pick { max-width:220px; }
