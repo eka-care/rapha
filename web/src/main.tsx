@@ -130,16 +130,20 @@ function App() {
   useEffect(() => { setClosed(null); }, [route.id]);
 
   // The instrument is the screen, not a thing a button offers to fetch. Once
-  // per thread: reopening after a person closes it is a trap, not a default.
+  // per thread PER ROLE: thread.data refetches on role, and a role switch on
+  // the same thread can carry a different primary action, so the guard has
+  // to key on both. Reopening after a person closes it is a trap, not a
+  // default, but a role that has never seen this thread's panel is not that.
   const openedFor = useRef<string | null>(null);
   useEffect(() => {
     if (route.kind !== "thread" || !thread.data || modal || closed) return;
-    if (openedFor.current === route.id) return;
+    const key = `${role}:${route.id}`;
+    if (openedFor.current === key) return;
     const { primary } = weigh(thread.data.actions, thread.data.closes);
     if (!opensOnArrival(primary)) return;
-    openedFor.current = route.id;
+    openedFor.current = key;
     setModal({ op: primary!, thread: route.id });
-  }, [route.kind, route.id, thread.data, modal, closed]);
+  }, [route.kind, route.id, thread.data, modal, closed, role]);
 
   useEffect(() => {
     if (!thread.data) return;
