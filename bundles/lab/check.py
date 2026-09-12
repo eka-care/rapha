@@ -395,9 +395,20 @@ def check_release_is_irreversible_and_human():
 
 
 def check_views_and_metrics():
+    from datetime import datetime, timezone
+
     store = _released()
+
+    # Use dynamic timestamp for today to avoid hardcoded dates that become stale
+    # when the calendar rolls over. For day-windowed metrics, window.start is UTC
+    # midnight today; use noon UTC to ensure we're always within the window regardless
+    # of what hour the test runs.
+    now_utc = datetime.now(timezone.utc)
+    today_midnight = now_utc.replace(hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+    today_noon = now_utc.replace(hour=12, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+
     store._threads = [state.c.ThreadRef(id=T, workflow=WF.id, subject={"name": "Referred Person"},
-                                        opened_at="2026-09-11T00:00:00Z")]
+                                        opened_at=today_midnight)]
     q = views.resolve(BUNDLE, "lab.view.worklist", store)
     assert [g["key"] for g in q.groups] == \
         ["accession", "phlebotomy", "processing", "verification", "release", None]
@@ -415,7 +426,7 @@ def check_views_and_metrics():
     ok("the report view lists the values, the referrer and the release; no reference interval")
 
     for row in store.rows.get("service_request", []) + store.rows.get("questionnaire_response", []):
-        row["created_date"] = "2026-09-11T09:00:00Z"
+        row["created_date"] = today_noon
     d = views.resolve(BUNDLE, "lab.view.turnaround", store, at=None)
     got = {m.metric: m for m in d.rows}
     assert got["lab.metric.accessioned"].numerator == 1
