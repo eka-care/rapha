@@ -538,6 +538,29 @@ def test_roles_lists_presets_and_saves_a_deviation():
     assert again["overrides"]["frontdesk"] == saved["capabilities"]
 
 
+def test_removing_a_capability_from_a_preset_takes_and_stays_removed():
+    # The bug this guards against was a revocation, not a grant: an admin
+    # takes patient.register away from frontdesk, and it must actually be
+    # gone -- from the saved override, from the live capability set, and
+    # from what the next GET /roles reports -- while the preset keeps it, so
+    # "Reset to preset" still means something.
+    preset = client.get("/api/roles").json()["presets"]["frontdesk"]
+    assert "patient.register" in preset, "the case is worthless if it was never held"
+
+    narrowed = [c for c in preset if c != "patient.register"]
+    saved = client.put("/api/roles/frontdesk", json={"capabilities": narrowed}).json()
+    assert "patient.register" not in saved["capabilities"]
+
+    again = client.get("/api/roles").json()
+    assert "patient.register" not in again["overrides"]["frontdesk"]
+    assert "patient.register" in again["presets"]["frontdesk"]
+
+    # And the revocation actually took effect, not just got stored: the next
+    # request as that role carries the narrower set.
+    live = client.get("/api/facility?role=frontdesk").json()["user"]["capabilities"]
+    assert "patient.register" not in live
+
+
 def test_a_caller_without_facility_admin_cannot_edit_a_role():
     # frontdesk holds no facility.admin in any preset, so it is refused, not
     # silently ignored: the preset stays exactly as it was.
