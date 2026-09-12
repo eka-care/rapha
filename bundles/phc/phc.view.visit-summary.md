@@ -1,5 +1,5 @@
 ---
-id: phc.view.patient-summary
+id: phc.view.visit-summary
 type: view
 kind: summary
 title: Visit summary

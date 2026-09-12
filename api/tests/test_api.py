@@ -174,13 +174,13 @@ def test_the_dashboard_evaluates_its_metrics_locally():
 
 
 def test_the_summary_view_is_the_thread_panel_declared():
-    body = client.get("/api/views/phc.view.patient-summary?thread=enc-006").json()
+    body = client.get("/api/views/phc.view.visit-summary?thread=enc-006").json()
     titles = [s["title"] for s in body["rows"]]
     assert titles[0] == "Visit" and "Audit trail" in titles
     prescription = [s for s in body["rows"] if s["title"] == "Prescription"][0]
     assert len(prescription["rows"]) == 2
     assert set(prescription["rows"][0]) == {"medication", "dosage_instruction", "status"}
-    assert client.get("/api/views/phc.view.patient-summary").status_code == 400
+    assert client.get("/api/views/phc.view.visit-summary").status_code == 400
 
 
 def test_the_mcp_facing_routes_did_not_move():

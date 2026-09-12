@@ -209,7 +209,7 @@
     "version": "2026.09.10",
     "views": [
       "phc.view.station-queue",
-      "phc.view.patient-summary",
+      "phc.view.visit-summary",
       "phc.view.facility-dashboard"
     ],
     "workflows": [
@@ -1301,12 +1301,40 @@
       "window": "week",
       "workflow": null
     },
-    "phc.view.patient-summary": {
+    "phc.view.station-queue": {
+      "badges": {
+        "abha.pending": "warn",
+        "capture.declined": "mute",
+        "dispensed.partial": "mute",
+        "lab.critical": "crit",
+        "vitals.flagged": "crit"
+      },
+      "capability": "patient.find",
+      "columns": [
+        "name",
+        "age",
+        "sex",
+        "village",
+        "token"
+      ],
+      "group_by": "station",
+      "id": "phc.view.station-queue",
+      "kind": "queue",
+      "metrics": [],
+      "scope": "today",
+      "sections": [],
+      "summary": "Today, grouped by station.",
+      "title": "Patients by station",
+      "type": "view",
+      "window": "day",
+      "workflow": "phc.wf.outpatient"
+    },
+    "phc.view.visit-summary": {
       "badges": {},
       "capability": "patient.find",
       "columns": [],
       "group_by": null,
-      "id": "phc.view.patient-summary",
+      "id": "phc.view.visit-summary",
       "kind": "summary",
       "metrics": [],
       "scope": "today",
@@ -1409,34 +1437,6 @@
       ],
       "summary": "One visit on one page.",
       "title": "Visit summary",
-      "type": "view",
-      "window": "day",
-      "workflow": "phc.wf.outpatient"
-    },
-    "phc.view.station-queue": {
-      "badges": {
-        "abha.pending": "warn",
-        "capture.declined": "mute",
-        "dispensed.partial": "mute",
-        "lab.critical": "crit",
-        "vitals.flagged": "crit"
-      },
-      "capability": "patient.find",
-      "columns": [
-        "name",
-        "age",
-        "sex",
-        "village",
-        "token"
-      ],
-      "group_by": "station",
-      "id": "phc.view.station-queue",
-      "kind": "queue",
-      "metrics": [],
-      "scope": "today",
-      "sections": [],
-      "summary": "Today, grouped by station.",
-      "title": "Patients by station",
       "type": "view",
       "window": "day",
       "workflow": "phc.wf.outpatient"

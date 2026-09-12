@@ -25,22 +25,25 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Icon, iconFor } from "./icons";
-import { mine, weigh } from "./loops";
+import { mine, records, weigh } from "./loops";
 import {
-  agentLine, clock, composer, header, messages, queueViewFor,
-  type Ctx, type Kv, type Msg, type Pill, type Said, type Tag,
+  agentLine, clock, header, messages, queueViewFor, summariesFor,
+  type Ctx, type Kv, type Msg, type Said, type Tag,
 } from "./messages";
-import type { AuditRecord, Catalogue, Operation, Proposal, ThreadView, ViewDecl } from "./types";
+import type { Catalogue, Operation, Proposal, SectionResult, ThreadView, ViewDecl } from "./types";
 import { Badge, human } from "./ui";
 import { Line } from "./ViewRenderer";
 
 export function Thread({
-  thread, cat, ctx, said, asking, onSay, onAction, renderProposal, onReject, onSummary, onMore,
+  thread, cat, ctx, said, sections, asking, onSay, onAction, renderProposal, onReject, onSummary, onMore,
 }: {
   thread: ThreadView;
   cat: Catalogue;
   ctx: Ctx;
   said: Said[];
+  /** The summary view's own sections, for this thread. The rail's Records
+   *  panel is these, filtered to what read a resource and produced rows. */
+  sections: SectionResult[];
   /** An utterance is in flight. The input stays usable; only the send button
    *  says so, because a chat that freezes has lost the person's sentence. */
   asking?: boolean;
@@ -56,10 +59,10 @@ export function Thread({
   const head = header(thread, queue);
   const msgs = messages(thread, ctx, said);
   const line = agentLine(thread, ctx);
-  // The agent's bubble now carries the one primary action and its overflow;
-  // an operation pill down here would be the same operation offered twice.
-  // A summary is a view, not an operation, so it still belongs in the bar.
-  const summaries = composer(thread, cat).pills.filter((p) => p.kind === "summary");
+  // The one summary view this workflow declares. Its sections are also the
+  // rail's records: what the thread produced, not what it is allowed to do.
+  const summaryView = summariesFor(cat, thread.workflow)[0];
+  const rs = records(sections);
 
   return (
     <div className="chatgrid">
@@ -97,24 +100,11 @@ export function Thread({
         </Scroll>
 
         <div className="composer">
-          {summaries.length > 0 && (
-            <div className="cbar">
-              {summaries.map((p) => (
-                <PillButton
-                  key={`${p.kind}-${p.view?.id ?? p.label}`}
-                  p={p}
-                  onAction={onAction}
-                  onSummary={onSummary}
-                  onMore={onMore}
-                />
-              ))}
-            </div>
-          )}
           <Ask asking={asking} onSay={onSay} about={head.name} />
         </div>
       </div>
 
-      <Panel thread={thread} />
+      <Panel thread={thread} recs={rs} summaryView={summaryView} onSummary={onSummary} />
     </div>
   );
 }
@@ -334,32 +324,6 @@ function AgentBubble({
 const tagClass = (op: Operation) =>
   op.irreversibility === "irreversible" ? "irr" : op.instrument === "scribe" ? "scribe" : "form";
 
-// -------------------------------------------------------------- the composer
-
-function PillButton({
-  p, onAction, onSummary, onMore,
-}: {
-  p: Pill;
-  onAction: (op: Operation) => void;
-  onSummary: (v: ViewDecl) => void;
-  onMore: () => void;
-}) {
-  const go = () =>
-    p.kind === "more" ? onMore() : p.view ? onSummary(p.view) : p.op ? onAction(p.op) : undefined;
-  const icon =
-    p.kind === "scribe" ? "mic" : p.kind === "summary" ? "eye" : p.kind === "more" ? "list" : p.op ? iconFor(p.op) : "clip";
-  return (
-    <button
-      className={`cq${p.primary ? " rose" : ""}`}
-      onClick={go}
-      title={p.op ? `${p.op.summary}\n${p.op.instrument}` : undefined}
-    >
-      <Icon name={icon as never} size="sm" />
-      {p.label}
-    </button>
-  );
-}
-
 /** "Ask about this patient" is the prototype's copy and it is a PHC word. The
  *  thread's own headline is the generic form of the same sentence, and it is
  *  more specific besides. */
@@ -388,9 +352,17 @@ function Ask({ asking, onSay, about }: { asking?: boolean; onSay: (t: string) =>
 
 // -------------------------------------------------------------- the right rail
 
-function Panel({ thread }: { thread: ThreadView }) {
+function Panel({
+  thread, recs, summaryView, onSummary,
+}: {
+  thread: ThreadView;
+  /** The documents this thread produced, from the summary view's own
+   *  sections. See loops.ts:records(). */
+  recs: { title: string; count: number }[];
+  summaryView?: ViewDecl;
+  onSummary: (v: ViewDecl) => void;
+}) {
   const done = [...thread.line].reverse().find((s) => s.status === "done");
-  const crew = team(thread.audit ?? []);
 
   return (
     <div className="panel">
@@ -406,75 +378,22 @@ function Panel({ thread }: { thread: ThreadView }) {
       </div>
 
       <div className="card">
-        <div className="card-h">
-          <div>
-            <div className="eyebrow">This visit</div>
-            <div className="card-t" style={{ marginTop: 2 }}>Care unit</div>
-          </div>
-          <span className="badge b-mute ml-auto">{crew.length}</span>
-        </div>
-        <div className="team">
-          {crew.length ? (
-            crew.map(([actor, firstOp]) => (
-              <div className="tm" key={actor}>
-                <span className="p-av" style={{ width: 22, height: 22, fontSize: 9 }}>
-                  {actor.slice(0, 2).toUpperCase()}
-                </span>
-                {actor}
-                <span className="r">{human(firstOp)}</span>
-              </div>
-            ))
-          ) : (
-            <span className="f-hint">Nobody yet.</span>
-          )}
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card-h">
-          <Icon name="lock" size="sm" />
-          <div className="card-t">Capabilities held</div>
-        </div>
-        <div className="caps">
-          {thread.capabilities.map((c) => (
-            <span key={c} className={`cap${thread.held.includes(c) ? " on" : ""}`}>{c}</span>
-          ))}
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card-h">
-          <div className="card-t">Audit trail</div>
-          <span className="badge b-mute ml-auto">{thread.audit.length}</span>
-        </div>
-        <div className="audit">
-          {thread.audit.length ? (
-            [...thread.audit].reverse().map((a) => <Row key={a.id} a={a} />)
-          ) : (
-            <span className="f-hint">Nothing posted.</span>
-          )}
-        </div>
+        <div className="card-t">Records</div>
+        {recs.length === 0 ? (
+          <div className="close-e">Nothing yet</div>
+        ) : (
+          recs.map((r) => (
+            <button
+              key={r.title}
+              className="rec"
+              onClick={() => summaryView && onSummary(summaryView)}
+            >
+              <span>{r.title}</span>
+              {r.count > 1 && <span className="rec-n">{r.count}</span>}
+            </button>
+          ))
+        )}
       </div>
     </div>
   );
-}
-
-function Row({ a }: { a: AuditRecord }) {
-  const denied = a.outcome.startsWith("denied");
-  return (
-    <div className="au">
-      <span>{clock(a.at)}</span>
-      <b>{a.operation.replace(/^[a-z0-9]+\.op\./, "")}</b>
-      <span className="ml-auto">{a.actor ?? "unattributed"}</span>
-      <Badge style={denied ? "crit" : a.outcome === "proposed" ? "warn" : "ok"}>{a.outcome}</Badge>
-    </div>
-  );
-}
-
-/** Who touched this thread, in the order they first did. The audit trail is
- *  the only record of it. */
-function team(audit: AuditRecord[]): [string, string][] {
-  const seen = new Map<string, string>();
-  for (const a of audit) if (a.actor && !seen.has(a.actor)) seen.set(a.actor, a.operation);
-  return [...seen.entries()];
 }

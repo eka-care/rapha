@@ -20,7 +20,7 @@ import { questionnaire } from "./declarations";
 import { Home } from "./Home";
 import { Icon, IconSheet } from "./icons";
 import { cue, opensOnArrival, weigh, type Cue } from "./loops";
-import { clock, header, queueViewFor, type Ctx, type Said } from "./messages";
+import { clock, header, queueViewFor, summariesFor, type Ctx, type Said } from "./messages";
 import { mockApi } from "./mock";
 import { OperationPanel, proposalOperation } from "./OperationPanel";
 import { Palette } from "./Palette";
@@ -30,7 +30,8 @@ import {
 } from "./Shell";
 import { Thread } from "./Thread";
 import type {
-  Catalogue, Facility, MetricValue, Operation, Payload, Proposal, QueueRow, ThreadView, ViewDecl, ViewResult,
+  Catalogue, Facility, MetricValue, Operation, Payload, Proposal, QueueRow, SectionResult, ThreadView, ViewDecl,
+  ViewResult,
 } from "./types";
 import { Boundary, Failed, Loading, human, title } from "./ui";
 import { ViewRenderer } from "./ViewRenderer";
@@ -108,6 +109,15 @@ function App() {
   const thread = useAsync(
     () => (route.kind === "thread" ? client.thread(route.id) : Promise.resolve(null)),
     [route.kind, route.id, demo, role],
+  );
+
+  // The rail's Records panel is the summary view's own sections, read for
+  // this thread. There is one summary view per workflow (never picked by
+  // id: it is the ViewDecl the catalogue itself marks kind "summary").
+  const summaryView = cat.data && thread.data ? summariesFor(cat.data, thread.data.workflow)[0] : undefined;
+  const summary = useAsync(
+    () => (summaryView ? client.view(summaryView.id, route.id) : Promise.resolve(null)),
+    [summaryView?.id, route.id, demo, role],
   );
 
   const [recent, setRecent] = useState<Recent[]>(recents);
@@ -410,6 +420,7 @@ function App() {
                       cat={cat.data}
                       ctx={ctx}
                       said={said[thread.data.id] ?? []}
+                      sections={(summary.data?.rows as SectionResult[] | undefined) ?? []}
                       asking={asking}
                       onSay={(t) => say(route.id, t, route.id)}
                       onAction={(op) => setModal({ op, thread: route.id })}

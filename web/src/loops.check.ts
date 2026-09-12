@@ -8,8 +8,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { cue, mine, opensOnArrival, weigh } from "./loops.ts";
-import type { Operation, QueueRow } from "./types";
+import { cue, mine, opensOnArrival, records, weigh } from "./loops.ts";
+import type { Operation, QueueRow, SectionResult } from "./types";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const cat = JSON.parse(readFileSync(root + "catalogue/catalogue.json", "utf8"));
@@ -90,5 +90,19 @@ ok(mine(op("phc.op.vitals-record"), "nurse"), "the nurse's own work stays open")
 ok(!mine(register, "nurse"), "reception's finished form collapses for the nurse");
 ok(mine(register, "reception"), "and stays open for the clerk who filled it");
 ok(mine(register, null), "a complete line collapses nothing");
+
+// -- the rail is the declared summary, rendered as a list -------------------
+const secs: SectionResult[] = [
+  { title: "Visit", show: "line", rows: [] },
+  { title: "Vitals", resource: "observation", rows: [{}, {}] },
+  { title: "Notes", resource: "notes", rows: [{}] },
+  { title: "Prescription", resource: "medication_request", rows: [] },
+  { title: "Audit trail", show: "audit", rows: [{}] },
+];
+const r = records(secs);
+ok(r.length === 2, "only sections that read a resource and have rows are records");
+ok(r.every((x) => x.title !== "Audit trail"), "audit is events, not documents");
+ok(r.every((x) => x.title !== "Visit"), "the line is not a document");
+ok(r[0].title === "Vitals" && r[0].count === 2, "a record carries its count");
 
 console.log(`ok   ${checks} loop checks`);

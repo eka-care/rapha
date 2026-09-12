@@ -18,7 +18,7 @@ const CAPS = (compiled as { capabilities: string[] }).capabilities;
 
 const VIEWS = {
   "phc.view.station-queue": { id: "phc.view.station-queue", kind: "queue" as const, title: "Today's patients by station" },
-  "phc.view.patient-summary": { id: "phc.view.patient-summary", kind: "summary" as const, title: "Visit summary" },
+  "phc.view.visit-summary": { id: "phc.view.visit-summary", kind: "summary" as const, title: "Visit summary" },
   "phc.view.facility-dashboard": { id: "phc.view.facility-dashboard", kind: "dashboard" as const, title: "Facility today" },
 };
 
@@ -158,8 +158,8 @@ const summary = (threadId: string): ViewResult => {
   if (!r) throw new Error(`no demo thread ${threadId}`);
   const t = threadOf(r);
   return {
-    view: "phc.view.patient-summary",
-    title: VIEWS["phc.view.patient-summary"].title,
+    view: "phc.view.visit-summary",
+    title: VIEWS["phc.view.visit-summary"].title,
     kind: "summary",
     generated_at: new Date().toISOString(),
     rows: [

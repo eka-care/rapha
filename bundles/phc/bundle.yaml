@@ -25,7 +25,7 @@ workflows:
   - phc.wf.outpatient
 views:
   - phc.view.station-queue
-  - phc.view.patient-summary
+  - phc.view.visit-summary
   - phc.view.facility-dashboard
 instruments:
   - phc.inst.vitals-voice

@@ -4,7 +4,7 @@
  *  precondition is unmet or whose capability is not held is absent, never
  *  disabled. So everything here is a question of weight, not permission.
  */
-import type { Operation, QueueRow } from "./types";
+import type { Operation, QueueRow, SectionResult } from "./types";
 
 /** One filled button, everything else one level down.
  *
@@ -73,4 +73,22 @@ export function cue(a: {
     ? first.subject.name
     : String(first.subject.token ?? first.thread);
   return { kind: "next", thread: first.thread, label: name };
+}
+
+/** The documents a thread produced, from the summary view's own sections.
+ *
+ *  A section that reads a resource is a kind of document; a section that shows
+ *  a kernel structure (the line, the flags, the actions, the audit) is not.
+ *  These are also ABDM's units — Prescription, DiagnosticReport,
+ *  OPConsultation — so the rail and the ABHA share sheet list the same things.
+ *
+ *  Audit is deliberately excluded even though it has rows. The guard writes
+ *  audit before execute, so there are rows for denials and rejected proposals:
+ *  events that produced no document. Those belong in the visit collation. The
+ *  rail is what exists; the collation is what happened.
+ */
+export function records(sections: SectionResult[]): { title: string; count: number }[] {
+  return sections
+    .filter((s) => s.resource && s.rows.length > 0)
+    .map((s) => ({ title: s.title, count: s.rows.length }));
 }

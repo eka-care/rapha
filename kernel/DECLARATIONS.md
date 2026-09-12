@@ -352,7 +352,7 @@ Dashboard fields: `metrics` (ids), `window` (`day`, `week`, `month`, `all`;
 overrides each metric's default).
 
 Worked examples: `bundles/phc/phc.view.station-queue.md`,
-`phc.view.patient-summary.md`, `phc.view.facility-dashboard.md`.
+`phc.view.visit-summary.md`, `phc.view.facility-dashboard.md`.
 
 ## 4. Instrument
 

@@ -401,7 +401,7 @@ def test_a_queue_groups_in_line_order_with_a_trailing_finished_group():
 def test_a_summary_draws_what_the_sections_declare():
     s = consulted()
     s.add("service_request", code="CBC", status="active")
-    res = views.resolve(BUNDLE, "phc.view.patient-summary", s, thread=T,
+    res = views.resolve(BUNDLE, "phc.view.visit-summary", s, thread=T,
                         caps={"patient.find", "rx.prescribe"})
     titles = [block["title"] for block in res.rows]
     assert titles[:2] == ["Visit", "Flags"]
