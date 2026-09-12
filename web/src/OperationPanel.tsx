@@ -223,7 +223,17 @@ export function OperationPanel({
     : [];
 
   return (
-    <div className={inline ? "mod inline" : "mod"}>
+    <div
+      className={inline ? "mod inline" : "mod"}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") { e.preventDefault(); onCancel?.(); return; }
+        // Enter commits, except inside a textarea, where it is a newline. A
+        // consultation note committed because someone pressed return
+        // mid-sentence is worse than one extra tap.
+        const inText = (e.target as HTMLElement)?.tagName?.toLowerCase() === "textarea";
+        if (e.key === "Enter" && !inText && !busy) { e.preventDefault(); void send(); }
+      }}
+    >
       <div className="mod-bar" />
       <div className="mod-h" style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
         {/* Title only. The eyebrow said "New entry" on every panel there is,

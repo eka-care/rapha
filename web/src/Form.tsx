@@ -43,10 +43,14 @@ function outsideCritical(q: Question, v: unknown): boolean {
 }
 
 function Widget({
-  q, op, value, onChange, disabled, ids,
+  q, op, value, onChange, disabled, ids, autoFocus,
 }: {
   q: Question; op?: Operation; value: unknown; onChange: (v: unknown) => void;
   disabled?: boolean; ids: string;
+  /** Whether this is the first question this schema actually rendered, so it
+   *  takes focus without a click. Computed once per render by the caller,
+   *  which is the only place that knows what got skipped. */
+  autoFocus?: boolean;
 }) {
   const set = (v: unknown) => onChange(v);
   const str = value === undefined || value === null ? "" : String(value);
@@ -55,14 +59,15 @@ function Widget({
     case "boolean":
       return (
         <label className="f-check">
-          <input type="checkbox" checked={value === true} disabled={disabled}
+          <input type="checkbox" checked={value === true} disabled={disabled} autoFocus={autoFocus}
                  onChange={(e) => set(e.target.checked)} />
           <span>Yes</span>
         </label>
       );
     case "choice":
       return (
-        <select className="f-in" value={str} disabled={disabled} onChange={(e) => set(e.target.value || undefined)}>
+        <select className="f-in" value={str} disabled={disabled} autoFocus={autoFocus}
+                onChange={(e) => set(e.target.value || undefined)}>
           <option value="">Choose</option>
           {(q.answer_option ?? []).map((o) => (
             <option key={o.value} value={o.value}>{o.value}</option>
@@ -71,20 +76,21 @@ function Widget({
       );
     case "text":
       return <textarea className="f-in" id={`${ids}-${q.link_id}`} rows={4} value={str} disabled={disabled}
-                       onChange={(e) => set(e.target.value)} />;
+                       autoFocus={autoFocus} onChange={(e) => set(e.target.value)} />;
     case "integer":
     case "decimal":
       // The id is how an instrument that refused to guess hands the cursor
       // back to this field. inputMode makes it a keypad on a phone.
       return (
         <input className="f-in" id={`${ids}-${q.link_id}`} inputMode="decimal" value={str} disabled={disabled}
-               step={q.type === "integer" ? 1 : "any"} type="number"
+               step={q.type === "integer" ? 1 : "any"} type="number" autoFocus={autoFocus}
                onChange={(e) => set(e.target.value === "" ? undefined : e.target.value)} />
       );
     case "structured":
-      return <Structured q={q} op={op} value={value} onChange={set} disabled={disabled} />;
+      return <Structured q={q} op={op} value={value} onChange={set} disabled={disabled} autoFocus={autoFocus} />;
     default:
-      return <input className="f-in" value={str} disabled={disabled} onChange={(e) => set(e.target.value)} />;
+      return <input className="f-in" value={str} disabled={disabled} autoFocus={autoFocus}
+                    onChange={(e) => set(e.target.value)} />;
   }
 }
 
@@ -100,9 +106,10 @@ function Widget({
  *  row, which is what every one of them drew before.
  */
 function Structured({
-  q, op, value, onChange, disabled,
+  q, op, value, onChange, disabled, autoFocus,
 }: {
   q: Question; op?: Operation; value: unknown; onChange: (v: unknown) => void; disabled?: boolean;
+  autoFocus?: boolean;
 }) {
   const fields = itemFields(op, q.link_id);
   const listed = Array.isArray(value) ? value : value === undefined || value === "" ? [] : [value];
@@ -118,6 +125,7 @@ function Structured({
       <div className="f-rows">
         {rows.map((row, i) => (
           <input key={i} className="f-in" value={String(row.code ?? "")} disabled={disabled}
+                 autoFocus={autoFocus && i === 0}
                  placeholder={`${q.structured_type ?? "entry"} ${i + 1}`}
                  onChange={(e) => edit(i, "code", e.target.value)} />
         ))}
@@ -131,10 +139,11 @@ function Structured({
       {rows.map((row, i) => (
         <div className="f-item" key={i}>
           <span className="f-item-n">{i + 1}</span>
-          {fields.map((f: ItemField) => (
+          {fields.map((f: ItemField, j: number) => (
             <label className="f-sub" key={f.key}>
               <span>{f.label}</span>
               <input className="f-in" value={String(row[f.key] ?? "")} disabled={disabled}
+                     autoFocus={autoFocus && i === 0 && j === 0}
                      onChange={(e) => edit(i, f.key, e.target.value)} />
             </label>
           ))}
@@ -186,6 +195,11 @@ export function Form({
   };
   const blocked = rangeBlocked(schema, value);
   const flags = raisedFlags(schema, value);
+  // The clerk's cursor lands on the first question this render actually
+  // draws, not the first in the schema: a group, a display, or a switched-off
+  // question is not where a click would have gone either. Set once, by
+  // whichever question clears every skip check first.
+  let focused = false;
 
   const field = (q: Question) => {
     if (q.type === "group") {
@@ -213,6 +227,8 @@ export function Form({
     const from = sources?.[q.link_id];
     const unsure = from !== undefined || (confidence?.[q.link_id] !== undefined && confidence[q.link_id] < SURE);
     const critical = outsideCritical(q, value[q.link_id]);
+    const first = !focused;
+    focused = true;
     return (
       <div className={`f-field${mine.length ? " bad" : ""}${unsure ? " unsure" : ""}`} key={q.link_id}>
         <label className="f-lab">
@@ -221,7 +237,7 @@ export function Form({
           {phc.unit && <span className="f-unit">{phc.unit}</span>}
         </label>
         {q.description && <div className="f-hint">{q.description}</div>}
-        <Widget q={q} op={op} ids={ids} value={value[q.link_id]}
+        <Widget q={q} op={op} ids={ids} value={value[q.link_id]} autoFocus={first}
                 onChange={(v) => set(q.link_id, v)} disabled={disabled} />
         {phc.range && (
           <div className="f-hint">Usual range {phc.range.low} to {phc.range.high}{phc.unit ? ` ${phc.unit}` : ""}</div>

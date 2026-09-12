@@ -66,6 +66,9 @@ if [ -d web/node_modules ]; then
   # One primary action per station, everything else in overflow: pure rules
   # over declarations, checked without a browser.
   (cd web && node --experimental-strip-types src/loops.check.ts)
+  # Enter commits, Escape cancels, Tab never traps: the keyboard contract for
+  # a clerk who cannot reach for a mouse between patients.
+  (cd web && node --experimental-strip-types src/keys.check.ts)
   echo "ok   web renderer typechecks and builds"
 else
   echo "warn web: run (cd web && npm install) to check the renderer"

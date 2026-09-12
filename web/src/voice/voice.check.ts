@@ -129,12 +129,16 @@ for (const call of ["client.commit(", "client.confirm("]) {
   ok(panel.split(call).length === 2, `${call} appears exactly once in the panel`);
   ok(send.includes(call), `${call} is inside send(), which only a tap calls`);
 }
-ok(panel.includes("onClick={send}"), "send() is bound to a click and to nothing else");
+ok(panel.includes("onClick={send}"), "send() is bound to a click, still");
+// Enter also commits (Principle 9: the keyboard is the whole interface for a
+// clerk with a queue at the counter), so a bare tap is no longer the only
+// line that calls send(). What must still hold is that nothing else does:
+// no timer, no effect, no instrument callback reaches it directly.
 const named = panel.split("\n").filter((l) => /\bsend\b/.test(l) && !l.trim().startsWith("*"));
 assert.deepEqual(
   named.map((l) => l.trim()),
-  ["const send = async () => {", "onClick={send}"],
-  "FAIL send() is defined once and called from one onClick, and from nothing else",
+  ["const send = async () => {", 'if (e.key === "Enter" && !inText && !busy) { e.preventDefault(); void send(); }', "onClick={send}"],
+  "FAIL send() is defined once and called only from the click and the Enter key",
 );
 checks++;
 ok(!/useEffect|setTimeout|setInterval/.test(panel), "the panel has no timer and no effect that could fire a write");
