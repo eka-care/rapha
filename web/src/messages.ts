@@ -134,13 +134,12 @@ export const fmt = (v: unknown): string => {
   return String(v);
 };
 
-/** Tags on a posted card's meta line: who, how, and whether anything was
- *  raised. Every one of them is read off a declaration or off the record. */
+/** Tags on a posted card's meta line: whether it was rejected and whatever it
+ *  raised. Who posted it and which instrument they used are already named by
+ *  the actor line and the folded summary; a badge repeating either is
+ *  decoration on a card that already says it in words. */
 function tagsFor(ctx: Ctx, a: AuditRecord, raised: string[]): Tag[] {
-  const op = ctx.operations[a.operation];
-  const tags: Tag[] = [{ text: actorOf(a.actor), style: "mute" }];
-  if (op?.instrument) tags.push({ text: op.instrument, style: "mute" });
-  if (op?.irreversibility === "irreversible") tags.push({ text: "irreversible", style: "crit" });
+  const tags: Tag[] = [];
   if (a.outcome === "rejected") tags.push({ text: "rejected", style: "mute" });
   for (const flag of raised) tags.push({ text: human(flag), style: ctx.badges[flag] ?? "warn" });
   return tags;
@@ -304,7 +303,10 @@ export function header(thread: ThreadView, queue: ViewDecl | undefined): Header 
     ([k, v]) => IDENTITY.test(k) && v !== null && v !== undefined && v !== "",
   );
 
-  const badges: Tag[] = [{ text: thread.station ? human(thread.station) : "Complete", style: "blue" }];
+  // No station badge here: the topbar already carries station and last step,
+  // and a badge repeating it on the card is the duplicate this screen is
+  // rid of.
+  const badges: Tag[] = [];
   const token = columns.find((k) => /token/i.test(k) && k !== nameKey);
   if (token && has(token)) badges.push({ text: String(subject[token]), style: "mute" });
   for (const flag of thread.flags ?? []) {

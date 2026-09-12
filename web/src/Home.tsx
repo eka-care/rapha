@@ -12,7 +12,7 @@ import { human, title } from "./ui";
 import type { Recent } from "./Shell";
 
 export function Home({
-  cat, role, queues, dashboards, recent, onOpenThread, onGo, onSearch, onAsk,
+  cat, role, queues, dashboards, recent, onOpenThread, onGo,
 }: {
   cat: Catalogue;
   role: string;
@@ -21,20 +21,14 @@ export function Home({
   recent: Recent[];
   onOpenThread: (id: string) => void;
   onGo: (hash: string) => void;
-  onSearch: () => void;
-  onAsk: (q: string) => void;
 }) {
   const first = queues[0];
   const rows = (first?.result.rows ?? []) as QueueRow[];
   const groups = (first?.result.groups ?? []).filter((g) => g.key !== null);
-  const complete = (first?.result.groups ?? []).find((g) => g.key === null)?.count ?? 0;
-  const open = groups.reduce((n, g) => n + g.count, 0);
   const heaviest = groups.reduce((a, b) => (b.count > (a?.count ?? -1) ? b : a), groups[0]);
   const workflow = Object.values(cat.workflows ?? {}).find((w) => w.id === first?.decl.workflow)
     ?? Object.values(cat.workflows ?? {})[0];
 
-  const hour = new Date().getHours();
-  const greet = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const flagged = rows.filter((r) => Object.values(r.badges ?? {}).some((s) => s === "crit" || s === "warn"));
 
   return (
@@ -43,24 +37,6 @@ export function Home({
         <svg className="hero-mark" viewBox="0 0 24 24"><use href="#i-mark-lg" /></svg>
         <div className="hero-eye">
           {role === "demo" ? "Every capability" : human(role)} · {cat.manifest?.title ?? "Workspace"}
-        </div>
-        <div className="hero-h">
-          {greet}.<br />
-          <span>
-            {open + complete} on the {(workflow?.title ?? "line").toLowerCase()} today, {complete} complete.
-          </span>
-        </div>
-        <div className="hero-ask" onClick={onSearch}>
-          <Icon name="search" size="lg" />
-          <input placeholder="Search or ask" readOnly />
-          <span className="kbd">⌘K</span>
-        </div>
-        <div className="chips">
-          {[...queues, ...dashboards].map(({ decl }) => (
-            <button key={decl.id} className="chip" onClick={() => onAsk(`Show ${decl.title ?? title(decl.id)}`)}>
-              Show {decl.title ?? title(decl.id)}
-            </button>
-          ))}
         </div>
       </div>
 

@@ -70,7 +70,8 @@ export function Thread({
         <div className="pt-head">
           <div className="avatar">{head.initials}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="pt-name">{head.name}</div>
+            {/* Name and station are the topbar's heading; this card names only
+                what the topbar does not: age, sex, village. */}
             <div className="pt-meta">{head.meta.join(" · ")}</div>
             <div style={{ display: "flex", gap: 6, marginTop: 7, flexWrap: "wrap" }}>
               {head.identity && (
@@ -308,9 +309,6 @@ function AgentBubble({
             <span style={{ flex: 1, minWidth: 0 }}>
               <span className="p-l">{primary.title}</span>
             </span>
-            <span className={`p-tag ${tagClass(primary)}`}>
-              {primary.irreversibility === "irreversible" ? "irreversible" : primary.instrument}
-            </span>
           </button>
           {overflow.length > 0 && (
             <button className="cq" onClick={onMore}>{overflow.length} more</button>
@@ -320,9 +318,6 @@ function AgentBubble({
     </Bubble>
   );
 }
-
-const tagClass = (op: Operation) =>
-  op.irreversibility === "irreversible" ? "irr" : op.instrument === "scribe" ? "scribe" : "form";
 
 /** "Ask about this patient" is the prototype's copy and it is a PHC word. The
  *  thread's own headline is the generic form of the same sentence, and it is

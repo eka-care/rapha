@@ -342,7 +342,7 @@ function App() {
           <div className="ml-auto" />
           <div className="srcline">
             <span className={`dot ${demo ? "demo" : cat.error ? "down" : "up"}`} />
-            {demo ? "Demo data" : API_BASE}
+            {demo && "Demo data"}
           </div>
           <button className="pill" onClick={() => setDemo(!demo)}>
             {demo ? "Use the API" : "Use demo data"}
@@ -373,11 +373,6 @@ function App() {
                     recent={recent}
                     onOpenThread={openThread}
                     onGo={go}
-                    onSearch={() => setPalette(true)}
-                    onAsk={(q) => {
-                      go("#/ask");
-                      say("workspace", q);
-                    }}
                   />
                 </>
               )}

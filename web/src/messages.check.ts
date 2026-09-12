@@ -18,6 +18,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import * as Messages from "./messages.ts";
 import {
   actorOf, agentLine, clock, fmt, header, messages, queueViewFor, summariesFor,
   type Ctx,
@@ -314,5 +315,18 @@ for (const file of ["src/messages.ts", "src/search.ts", "src/ask.ts", "src/Threa
   assert.ok(!/\.commit\(|\.confirm\(/.test(body), `${file} must have no commit or confirm path`);
 }
 
+// -- the agent narrates nothing already on screen ---------------------------
+// Prose restating a card is the most common fluff, and it is written here, so
+// it is refusable here. The card carries the operation's own title; a sentence
+// that repeats it is a sentence with no reader.
+const lines = Object.values(Messages).filter((m) => typeof m === "string") as string[];
+for (const line of lines) {
+  assert.ok(!/was confirmed by .* at \d/.test(line),
+    `FAIL narration restates a posted card: ${line}`);
+  assert.ok(!/I have no way to do that/.test(line),
+    `FAIL a refusal that offers nothing is a dead end: ${line}`);
+}
+
 console.log("ok   thread messages, agent line, summary views, header and palette rows");
 console.log("ok   a structured answer's fields come from the operation's own mapping");
+console.log("ok   the agent narrates nothing already on screen");
