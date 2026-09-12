@@ -4,6 +4,7 @@
  *  precondition is unmet or whose capability is not held is absent, never
  *  disabled. So everything here is a question of weight, not permission.
  */
+import type { Recent } from "./Shell.tsx";
 import type { Operation, QueueRow, SectionResult } from "./types";
 
 /** One filled button, everything else one level down.
@@ -91,4 +92,12 @@ export function records(sections: SectionResult[]): { title: string; count: numb
   return sections
     .filter((s) => s.resource && s.rows.length > 0)
     .map((s) => ({ title: s.title, count: s.rows.length }));
+}
+
+/** Recents the kernel still serves. A reseed changes every thread id, and the
+ *  list survives it in localStorage, so the sidebar filled with dead tokens
+ *  that 404 on click. Filtering on read is cheaper than any bookkeeping. */
+export function keep(rs: Recent[], live: string[]): Recent[] {
+  const known = new Set(live);
+  return rs.filter((r) => known.has(r.id));
 }

@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { cue, mine, opensOnArrival, records, weigh } from "./loops.ts";
+import { cue, keep, mine, opensOnArrival, records, weigh } from "./loops.ts";
 import type { Operation, QueueRow, SectionResult } from "./types";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -104,5 +104,13 @@ ok(r.length === 2, "only sections that read a resource and have rows are records
 ok(r.every((x) => x.title !== "Audit trail"), "audit is events, not documents");
 ok(r.every((x) => x.title !== "Visit"), "the line is not a document");
 ok(r[0].title === "Vitals" && r[0].count === 2, "a record carries its count");
+
+// -- recents point at threads that still exist ------------------------------
+const rs = [{ id: "enc-1", name: "Kamala Devi" }, { id: "962", name: "962" }];
+ok(keep(rs, ["enc-1"]).length === 1, "a recent the kernel no longer serves is dropped");
+ok(keep(rs, ["enc-1"])[0].id === "enc-1", "and the live one is kept");
+ok(keep(rs, []).length === 0, "nothing live means no recents");
+// A reseed changes every id, which is how eight dead tokens came to be nav.
+ok(keep(rs, ["enc-9"]).length === 0, "a reseed clears them rather than leaving 404s");
 
 console.log(`ok   ${checks} loop checks`);

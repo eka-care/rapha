@@ -13,13 +13,13 @@
 import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ABHA_OP, ABHA_PENDING, mobileHint } from "./abha/sdk";
-import { API_BASE, DEMO_ROLE, api, currentRole, setRole, useAsync } from "./api";
+import { ApiError, API_BASE, DEMO_ROLE, api, currentRole, setRole, useAsync } from "./api";
 import { ask, NO_AGENT } from "./ask";
 import { CloseCard } from "./CloseCard";
 import { questionnaire } from "./declarations";
 import { Home } from "./Home";
 import { Icon, IconSheet } from "./icons";
-import { cue, opensOnArrival, weigh, type Cue } from "./loops";
+import { cue, keep, opensOnArrival, weigh, type Cue } from "./loops";
 import { clock, header, queueViewFor, summariesFor, type Ctx, type Said } from "./messages";
 import { mockApi } from "./mock";
 import { OperationPanel, proposalOperation } from "./OperationPanel";
@@ -38,15 +38,20 @@ import { ViewRenderer } from "./ViewRenderer";
 import "./theme.css";
 import "./renderer.css";
 
-type Route = { kind: "home" | "view" | "thread" | "ask"; id: string };
+type Route = { kind: "home" | "view" | "thread" | "ask" | "notfound"; id: string };
 
 function parse(hash: string): Route {
   const [head, id] = hash.replace(/^#\/?/, "").split("/");
   if (head === "threads" && id) return { kind: "thread", id };
   if (head === "views" && id) return { kind: "view", id };
   if (head === "ask") return { kind: "ask", id: "" };
-  if (head && head !== "home") return { kind: "view", id: head };
-  return { kind: "home", id: "" };
+  if (!head || head === "home") return { kind: "home", id: "" };
+  // A second segment under an unrecognised first one (`#/thread/enc-1`,
+  // singular, is the one that actually happened) is a malformed route, not a
+  // bare view id: guessing `head` as a view id here is how an empty thread id
+  // used to reach the API as `views/thread/`. Say so instead of guessing.
+  if (id) return { kind: "notfound", id: hash };
+  return { kind: "view", id: head };
 }
 
 function useRoute(): Route {
@@ -75,6 +80,16 @@ const loadSaid = (): Record<string, Said[]> => {
 };
 
 type Loaded = { decl: ViewDecl; result: ViewResult };
+
+/** Every thread id any loaded queue still lists. keep() filters recents
+ *  against this, not against a single queue, because a recent can belong to
+ *  any workflow this role's nav carries. */
+function liveThreadIds(loaded: Loaded[] | undefined): string[] {
+  return (loaded ?? [])
+    .filter((l) => l.decl.kind === "queue")
+    .flatMap((l) => (l.result.rows as QueueRow[] | undefined) ?? [])
+    .map((r) => r.thread);
+}
 
 function App() {
   const [demo, setDemo] = useState(false);
@@ -159,8 +174,17 @@ function App() {
     if (!thread.data) return;
     const q = queueViewFor(cat.data, thread.data.workflow);
     remember({ id: thread.data.id, name: header(thread.data, q).name });
-    setRecent(recents());
-  }, [thread.data, cat.data]);
+    setRecent(keep(recents(), liveThreadIds(loaded.data)));
+  }, [thread.data, cat.data, loaded.data]);
+
+  // A reseed changes every thread id, and the recents list survives it in
+  // localStorage: without this, the sidebar fills with tokens that 404 on
+  // click. This runs whenever the queue reloads, not only when a thread is
+  // opened, so a reseed clears them even if nobody happens to open a thread.
+  useEffect(() => {
+    if (!loaded.data) return;
+    setRecent(keep(recents(), liveThreadIds(loaded.data)));
+  }, [loaded.data]);
 
   // A role is one kernel's word. This browser remembers the last one chosen,
   // and pointing it at a different bundle (the laboratory on another port)
@@ -388,6 +412,17 @@ function App() {
                 />
               )}
 
+              {cat.data && route.kind === "notfound" && (
+                <Failed
+                  error={new ApiError(
+                    `Nothing at ${route.id}.`,
+                    "Check the address, or go back to Home.",
+                    404,
+                  )}
+                  onRetry={() => go("#/home")}
+                />
+              )}
+
               {cat.data && route.kind === "view" && (
                 <ViewScreen id={route.id} cat={cat.data} client={client} onOpenThread={openThread} />
               )}
@@ -553,6 +588,7 @@ function topbar(
 ): [string, string] {
   if (route.kind === "home") return ["Today", ""];
   if (route.kind === "ask") return ["Workspace chat", ""];
+  if (route.kind === "notfound") return ["Not found", ""];
   if (route.kind === "view") {
     const v = cat?.views?.[route.id];
     return [v?.title ?? title(route.id), ""];
