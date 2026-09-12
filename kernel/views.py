@@ -105,7 +105,7 @@ def _summary(bundle, view, store, thread, caps):
             rows = store.audit(thread)
         else:
             raise ValueError(f"unknown section show '{section.show}'")
-        out.append({"title": section.title, "rows": rows})
+        out.append({"title": section.title, "resource": section.resource, "rows": rows})
     return out
 
 

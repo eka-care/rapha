@@ -442,9 +442,11 @@ class ViewResult:
     """GET /api/v1/phc/views/{id}/            queue and dashboard
        GET /api/v1/phc/views/{id}/?thread=x   summary
 
-    `rows` is by kind: QueueRow for a queue, {title, rows} per Section for a
-    summary, MetricValue for a dashboard. `groups` is set only when the view
-    declares group_by: a list of {key, count} in line order."""
+    `rows` is by kind: QueueRow for a queue, {title, resource, rows} per
+    Section for a summary (`resource` is the section's declared resource, or
+    None for one that shows a kernel structure), MetricValue for a dashboard.
+    `groups` is set only when the view declares group_by: a list of
+    {key, count} in line order."""
     view: str
     kind: str
     rows: list
