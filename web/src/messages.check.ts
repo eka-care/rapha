@@ -18,7 +18,6 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import * as Messages from "./messages.ts";
 import {
   actorOf, agentLine, clock, fmt, header, messages, queueViewFor, summariesFor,
   type Ctx,
@@ -319,12 +318,29 @@ for (const file of ["src/messages.ts", "src/search.ts", "src/ask.ts", "src/Threa
 // Prose restating a card is the most common fluff, and it is written here, so
 // it is refusable here. The card carries the operation's own title; a sentence
 // that repeats it is a sentence with no reader.
-const lines = Object.values(Messages).filter((m) => typeof m === "string") as string[];
-for (const line of lines) {
-  assert.ok(!/was confirmed by .* at \d/.test(line),
-    `FAIL narration restates a posted card: ${line}`);
-  assert.ok(!/I have no way to do that/.test(line),
-    `FAIL a refusal that offers nothing is a dead end: ${line}`);
+//
+// messages.ts has exactly one string export (CONSENT, a flag name, not
+// narration), so `Object.values(Messages).filter(m => typeof m === "string")`
+// looped over that one value forever and could never fail: the narration this
+// is meant to forbid is built inside agentLine() as template literals in a
+// function body, which Object.values() never sees. Proven by appending
+// " I have no way to do that." to a sentence in messages.ts and watching this
+// check still print ok. Call agentLine() itself, over the fixtures already
+// built above, and assert on the sentences it actually produces.
+const agentSentences = [
+  line,
+  quiet,
+  agentLine({ ...thread, audit: [] }, ctx),                        // no audit at all
+  agentLine({ ...thread, audit: thread.audit.slice(0, 1) }, ctx),  // denied
+  agentLine({ ...thread, audit: thread.audit.slice(1, 2) }, ctx),  // allowed
+  agentLine({ ...thread, audit: thread.audit.slice(2, 3) }, ctx),  // proposed
+].flatMap((l) => l.sentences);
+assert.ok(agentSentences.length >= 6, "the narration check has real sentences to examine");
+for (const sentence of agentSentences) {
+  assert.ok(!/was confirmed by .* at \d/.test(sentence),
+    `FAIL narration restates a posted card: ${sentence}`);
+  assert.ok(!/I have no way to do that/.test(sentence),
+    `FAIL a refusal that offers nothing is a dead end: ${sentence}`);
 }
 
 // -- a posted card on your own station names who did it, not "System" -------
