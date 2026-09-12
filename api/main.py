@@ -58,7 +58,22 @@ DB = os.environ.get("PHC_DB", "phc.sqlite3")
 # browser can be.
 DEMO_ROLE = "demo"
 ROLES = dict(vocab.BUNDLES)
-ROLES[DEMO_ROLE] = sorted(set().union(*vocab.BUNDLES.values()))
+# Every declared capability, not just the ones a preset happens to carry:
+# "Every capability (demo)" is the label the sidebar already puts on this
+# role, and facility.admin (needed to reach the endpoints below) sits in no
+# preset on purpose, so the union of presets alone would leave the demo
+# account unable to open its own role editor.
+ROLES[DEMO_ROLE] = sorted(vocab.CAPABILITIES)
+
+# A facility's own combination, saved away from the shipped presets in
+# ROLES/BUNDLE.roles. Never mutate a preset: bundle.yaml ships as CARE
+# is_system=True roles and a facility's deviation is its own is_system=False
+# row, which sync_permissions_roles deliberately never touches.
+#
+# ponytail: in-process overrides, one facility per kernel. Persist to the
+# store (a CARE-backed role, or a row beside phc.sqlite3) when a second
+# facility shares this process.
+OVERRIDES: dict[str, list[str]] = {}
 
 
 # Which system of record. `local` is the SQLite file this repository ships
@@ -104,8 +119,9 @@ def caller(request: Request) -> dict:
             or request.query_params.get("role") or DEMO_ROLE)
     if role not in ROLES:
         raise HTTPException(400, "no such role %r" % role)
+    caps = OVERRIDES.get(role, ROLES[role])
     return {"id": request.headers.get("X-PHC-Actor") or "user:%s" % role,
-            "role": role, "capabilities": ROLES[role], "scopes": sorted(ROLES[role])}
+            "role": role, "capabilities": caps, "scopes": sorted(caps)}
 
 
 def operation_or_404(op_id: str) -> dict:
@@ -177,6 +193,31 @@ def facility(request: Request):
             "views": [{"id": v.id, "kind": v.kind, "title": v.title,
                        "capability": v.capability} for v in BUNDLE.views.values()],
             "roles": sorted(ROLES), "user": user}
+
+
+@router.get("/roles")
+def roles_route(request: Request):
+    """The shipped presets, and who is asking.
+
+    Presets are bundle.yaml's `roles:` (vocab.BUNDLES), read only here. A
+    facility's own combination is saved separately, in OVERRIDES, which is
+    what CARE's sync_permissions_roles deliberately does not touch either."""
+    return {"presets": dict(vocab.BUNDLES), "current": caller(request)["role"]}
+
+
+@router.put("/roles/{role}")
+def set_role(role: str, body: dict, request: Request):
+    user = caller(request)
+    if "facility.admin" not in user["capabilities"]:
+        raise HTTPException(403, "missing capability facility.admin")
+    if role not in ROLES:
+        raise HTTPException(404, "no such role %r" % role)
+    caps = sorted(set(body.get("capabilities") or []))
+    unknown = [c for c in caps if c not in vocab.CAPABILITIES]
+    if unknown:
+        raise HTTPException(400, "not capabilities of this bundle: %s" % unknown)
+    OVERRIDES[role] = caps          # facility role, never the preset
+    return {"role": role, "capabilities": caps}
 
 
 @router.get("/whoami")

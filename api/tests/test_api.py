@@ -19,6 +19,7 @@ client = TestClient(main.app)
 
 def reset():
     main.store = main.make_store()
+    main.OVERRIDES.clear()
 
 VITALS = {"systolic": 118, "diastolic": 76, "pulse": 80}
 
@@ -509,6 +510,41 @@ def test_a_session_id_nobody_started_is_a_404_that_says_so():
     reply = client.get("/api/scribe/sessions/scr-invented")
     assert reply.status_code == 404
     assert "Nothing was kept" in reply.json()["detail"]
+
+
+def test_roles_lists_presets_and_saves_a_deviation():
+    got = client.get("/api/roles").json()
+    # The nine in bundle.yaml are the presets, and they are the 70%.
+    assert "frontdesk" in got["presets"] and "nurse" in got["presets"]
+    assert "patient.register" in got["presets"]["frontdesk"]
+    assert "vitals.record" not in got["presets"]["frontdesk"]
+
+    # Enabling a function for a role is a capability grant and nothing else.
+    body = {"capabilities": got["presets"]["frontdesk"] + ["vitals.record"]}
+    saved = client.put("/api/roles/frontdesk", json=body).json()
+    assert "vitals.record" in saved["capabilities"]
+
+    # And the preset is untouched: a facility's own combination never edits
+    # the shipped role.
+    again = client.get("/api/roles").json()
+    assert "vitals.record" not in again["presets"]["frontdesk"]
+
+    # The grant took effect: the next request as that role carries it.
+    assert "vitals.record" in client.get("/api/facility?role=frontdesk").json()["user"]["capabilities"]
+
+
+def test_a_caller_without_facility_admin_cannot_edit_a_role():
+    # frontdesk holds no facility.admin in any preset, so it is refused, not
+    # silently ignored: the preset stays exactly as it was.
+    denied = client.put("/api/roles/frontdesk?role=frontdesk", json={"capabilities": ["patient.find"]})
+    assert denied.status_code == 403
+    assert "frontdesk" not in main.OVERRIDES
+
+
+def test_a_role_write_refuses_a_capability_the_bundle_does_not_declare():
+    denied = client.put("/api/roles/frontdesk", json={"capabilities": ["not.a.capability"]})
+    assert denied.status_code == 400
+    assert "frontdesk" not in main.OVERRIDES
 
 
 if __name__ == "__main__":
