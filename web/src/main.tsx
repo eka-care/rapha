@@ -24,6 +24,7 @@ import { clock, header, queueViewFor, summariesFor, type Ctx, type Said } from "
 import { mockApi } from "./mock";
 import { OperationPanel, proposalOperation } from "./OperationPanel";
 import { Palette } from "./Palette";
+import { Roles } from "./Roles";
 import { firstOperation } from "./search";
 import {
   navViews, Overlay, recents, remember, Sheet, Sidebar, toast, Toast, useTheme, type Recent,
@@ -145,6 +146,7 @@ function App() {
     seed?: Payload;
   } | null>(null);
   const [sheet, setSheet] = useState<{ view: ViewDecl; thread: string } | null>(null);
+  const [rolesOpen, setRolesOpen] = useState(false);
   const [said, setSaid] = useState<Record<string, Said[]>>(loadSaid);
   const [asking, setAsking] = useState(false);
   const [closed, setClosed] = useState<{ what: string; cue: Cue } | null>(null);
@@ -355,6 +357,7 @@ function App() {
           setRoleState(r);
           toast(`Role: ${r === "demo" ? "every capability (demo)" : human(r)}`);
         }}
+        onManageRoles={() => setRolesOpen(true)}
       />
 
       <div className="main">
@@ -541,6 +544,17 @@ function App() {
                 !modal.proposal && !!modal.op.emits?.includes(ABHA_PENDING),
               );
             }}
+          />
+        </Overlay>
+      )}
+
+      {rolesOpen && cat.data && fac.data && (
+        <Overlay onClose={() => setRolesOpen(false)}>
+          <Roles
+            cat={cat.data}
+            roleIds={fac.data.roles}
+            client={client}
+            onClose={() => setRolesOpen(false)}
           />
         </Overlay>
       )}

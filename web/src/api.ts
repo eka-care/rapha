@@ -120,6 +120,16 @@ export const api = {
    *  a person. Everything the person then types still goes through the
    *  guard. */
   openThread: (body: { token?: string } = {}) => post<ThreadView>("/threads/", body),
+  /** The shipped presets (bundle.yaml's `roles:`), read only. */
+  roles: () => req<{ presets: Record<string, string[]>; current: string }>("/roles/"),
+  /** A facility's own deviation from a preset. api/main.py stores it apart
+   *  from the preset and requires facility.admin; a caller without it gets a
+   *  403 back through the same ApiError every other write does. */
+  setRole: (role: string, capabilities: string[]) =>
+    req<{ role: string; capabilities: string[] }>(`/roles/${role}/`, {
+      method: "PUT",
+      body: JSON.stringify({ capabilities }),
+    }),
 };
 
 /** What a screen needs to talk to a kernel. The demo client in mock.ts

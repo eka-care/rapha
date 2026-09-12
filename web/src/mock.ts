@@ -230,6 +230,10 @@ export const mockApi = {
   openThread: async () => {
     throw new DemoWrite();
   },
+  roles: () => wait({ presets: { demo: CAPS }, current: "demo" }),
+  setRole: async () => {
+    throw new DemoWrite();
+  },
 };
 
 /** Writing is the one thing demo mode will not fake. A demo that says

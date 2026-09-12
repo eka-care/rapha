@@ -95,7 +95,7 @@ export function useTheme(): [string, () => void] {
 // ----------------------------------------------------------------- sidebar
 
 export function Sidebar({
-  cat, facility, queues, route, role, recent, onGo, onNewChat, onSearch, onRole,
+  cat, facility, queues, route, role, recent, onGo, onNewChat, onSearch, onRole, onManageRoles,
 }: {
   cat: Catalogue | undefined;
   facility: Facility | undefined;
@@ -109,6 +109,10 @@ export function Sidebar({
   onNewChat: () => void;
   onSearch: () => void;
   onRole: (role: string) => void;
+  /** Opens the role editor. Always offered here: whether this caller may
+   *  actually save is api/main.py's `facility.admin` check, not a thing this
+   *  menu decides by hiding the door. */
+  onManageRoles: () => void;
 }) {
   const [menu, setMenu] = useState(false);
   useEffect(() => {
@@ -206,6 +210,17 @@ export function Sidebar({
           ) : (
             <div style={{ padding: 9, fontSize: 11, color: "var(--ink-3)" }}>No roles.</div>
           )}
+          <button
+            className="mi"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenu(false);
+              onManageRoles();
+            }}
+          >
+            <Icon name="cog" size="sm" />
+            <span className="mi-l">Manage roles</span>
+          </button>
         </div>
         <button
           className="rolebtn"
