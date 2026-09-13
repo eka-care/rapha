@@ -129,9 +129,14 @@ tasks:
     where: {flag: lab.ordered, not: lab.resulted}
     operation: phc.op.lab-result-enter
   - title: Consent never asked
-    where: {flag: registered, not: capture.consented, not: capture.declined}
+    where: {flag: registered, not: [capture.consented, capture.declined]}
     operation: null
 ```
+
+`flag` and `not` each take a scalar or a list. The first draft of this spec
+wrote two `not:` keys in one mapping, which is not a list — YAML silently keeps
+the last one, so the task would have matched half what it claimed. Caught in
+implementation.
 
 Each row resolves to a count and a list of threads. `operation` is optional:
 a task with one is actionable from the row; a task without is a worklist.
