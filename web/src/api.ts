@@ -64,7 +64,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     // same from here, so say all four.
     throw new ApiError(
       `Cannot reach the kernel API at ${API_BASE}.`,
-      'Start it and reload, or tap "Use demo data".',
+      "Start it and reload.",
     );
   }
   if (res.status === 404) {

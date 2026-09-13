@@ -85,6 +85,10 @@ if [ -d web/node_modules ]; then
   # starts a drag or takes arrow keys, and the order that reads back is keyed
   # by declaration id, so a reseed does not lose it.
   (cd web && node --experimental-strip-types src/home.check.ts)
+  # The visual system: the accent token appears only in flag/critical/primary
+  # rules, a three-step radius/border/shadow scale, Khoj centred by the
+  # topbar's own grid, and no "Use demo data" control anywhere.
+  (cd web && node --experimental-strip-types src/design.check.ts)
   echo "ok   web renderer typechecks and builds"
 else
   echo "warn web: run (cd web && npm install) to check the renderer"

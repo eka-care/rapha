@@ -8,8 +8,8 @@ export function Loading({ what }: { what: string }) {
 /** Never a blank screen and never "something went wrong": what failed, and
  *  the one thing to do about it. */
 export function Failed({
-  error, onRetry, onDemo, what = "Not loaded",
-}: { error: ApiError; onRetry?: () => void; onDemo?: () => void; what?: string }) {
+  error, onRetry, what = "Not loaded",
+}: { error: ApiError; onRetry?: () => void; what?: string }) {
   return (
     <div className="card state bad">
       <div className="eyebrow">{what}</div>
@@ -17,7 +17,6 @@ export function Failed({
       <p className="state-p">{error.next}</p>
       <div className="state-actions">
         {onRetry && <button className="cq" onClick={onRetry}>Try again</button>}
-        {onDemo && <button className="cq rose" onClick={onDemo}>Use demo data</button>}
       </div>
     </div>
   );

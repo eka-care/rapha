@@ -20,7 +20,7 @@
 .f-field { display:grid; gap:5px; }
 .f-field.bad .f-in { border-color:var(--destructive); background:var(--destructive-bg); }
 .f-field.unsure .f-in { border-color:var(--warning); background:var(--warning-bg); }
-.f-field.override { border-left:3px solid var(--pink-accent); background:var(--rose-tint);
+.f-field.override { border-left:3px solid var(--accent-border); background:var(--accent-bg);
   padding:10px 12px; border-radius:var(--r-sm); }
 .f-lab { font-size:11.5px; font-weight:700; display:flex; align-items:center; gap:7px; }
 .f-req { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-3); }
@@ -95,7 +95,7 @@
 .tasklist { display:flex; flex-direction:column; gap:10px; }
 .task-row { display:flex; align-items:center; gap:10px; padding:13px 14px; }
 .task-t { flex:1; min-width:0; font-size:12.5px; font-weight:600; }
-.task-n { font-size:20px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.task-n { font-size:26px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
 
 /* ---- a view embedded in a Home card is not a card of its own: stacking a
    card inside a card is the identical-chrome problem the visual system

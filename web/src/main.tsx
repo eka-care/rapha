@@ -22,7 +22,6 @@ import { Icon, IconSheet } from "./icons";
 import { Khoj } from "./Khoj";
 import { cue, keep, offered, opensOnArrival, weigh, type Cue } from "./loops";
 import { clock, header, queueViewFor, summariesFor, type Ctx, type Said } from "./messages";
-import { mockApi } from "./mock";
 import { OperationPanel, proposalOperation } from "./OperationPanel";
 import { Roles } from "./Roles";
 import { firstOperation } from "./search";
@@ -93,14 +92,13 @@ function liveThreadIds(loaded: Loaded[] | undefined): string[] {
 }
 
 function App() {
-  const [demo, setDemo] = useState(false);
-  const client = demo ? mockApi : api;
+  const client = api;
   const [role, setRoleState] = useState(currentRole());
   const [theme, toggleTheme] = useTheme();
   const route = useRoute();
 
-  const cat = useAsync<Catalogue>(() => client.catalogue(), [demo, role]);
-  const fac = useAsync(() => client.facility(), [demo, role]);
+  const cat = useAsync<Catalogue>(() => client.catalogue(), [role]);
+  const fac = useAsync(() => client.facility(), [role]);
 
   // One read per view the caller may open, shared by the nav counts, Home and
   // Khoj. navViews has already dropped the ones whose capability this
@@ -117,7 +115,7 @@ function App() {
           ),
         ),
       ).then((all) => all.filter((x): x is Loaded => x !== null)),
-    [nav, demo, role],
+    [nav, role],
   );
   const queues = (loaded.data ?? []).filter((x) => x.decl.kind === "queue");
   const dashboards = (loaded.data ?? []).filter((x) => x.decl.kind === "dashboard");
@@ -125,7 +123,7 @@ function App() {
 
   const thread = useAsync(
     () => (route.kind === "thread" ? client.thread(route.id) : Promise.resolve(null)),
-    [route.kind, route.id, demo, role],
+    [route.kind, route.id, role],
   );
 
   // The rail's Records panel is the summary view's own sections, read for
@@ -134,7 +132,7 @@ function App() {
   const summaryView = cat.data && thread.data ? summariesFor(cat.data, thread.data.workflow)[0] : undefined;
   const summary = useAsync(
     () => (summaryView ? client.view(summaryView.id, route.id) : Promise.resolve(null)),
-    [summaryView?.id, route.id, demo, role],
+    [summaryView?.id, route.id, role],
   );
 
   const [recent, setRecent] = useState<Recent[]>(recents);
@@ -397,32 +395,32 @@ function App() {
 
       <div className="main">
         <div className="topbar">
-          <div>
+          <div className="tb-info">
             <div className="tb-title">{heading[0]}</div>
             <div className="tb-sub">{heading[1]}</div>
           </div>
-          <div className="ml-auto" />
-          <div className="srcline">
-            <span className={`dot ${demo ? "demo" : cat.error ? "down" : "up"}`} />
-            {demo && "Demo data"}
-          </div>
-          <button className="pill" onClick={() => setDemo(!demo)}>
-            {demo ? "Use the API" : "Use demo data"}
-          </button>
-          <button className="pill" onClick={() => setKhoj(true)}>
+          {/* Khoj takes the centre of the header bar: the middle column of a
+              three-column grid, not a side-aligned button pushed inward by a
+              margin. The two side columns are equal (`1fr` each), so this
+              stays centred on the bar itself, not on whatever the title or
+              the theme toggle happen to measure. */}
+          <button className="khoj-trigger" onClick={() => setKhoj(true)} aria-label="Search or ask Khoj">
             <Icon name="search" size="sm" />Search or ask<span className="kbd">⌘K</span>
           </button>
-          <button className="icon-btn" onClick={toggleTheme} title="Light or dark">
-            <Icon name={theme === "light" ? "moon" : "sun"} />
-          </button>
+          <div className="tb-actions">
+            <span className={`dot ${cat.error ? "down" : "up"}`} title={cat.error ? "Kernel unreachable" : "Kernel reachable"} />
+            <button className="icon-btn" onClick={toggleTheme} title="Light or dark">
+              <Icon name={theme === "light" ? "moon" : "sun"} />
+            </button>
+          </div>
         </div>
 
         <div className={`view${route.kind === "thread" || route.kind === "ask" ? "" : " scroll"}`}>
           <div className="wrap">
-            <Boundary key={`${route.kind}-${route.id}-${demo}-${role}`}>
+            <Boundary key={`${route.kind}-${route.id}-${role}`}>
               {cat.loading && <Loading what="the catalogue" />}
               {cat.error && (
-                <Failed error={cat.error} onRetry={cat.reload} onDemo={demo ? undefined : () => setDemo(true)} />
+                <Failed error={cat.error} onRetry={cat.reload} />
               )}
               {cat.data && route.kind === "home" && (
                 <>
