@@ -12,7 +12,7 @@
 import type { Operation, ViewDecl } from "./types";
 
 export type IconName =
-  "mark" | "mark-lg" | "search" | "home" | "moon" | "sun" | "vitals" | "mic" | "flask" | "box" | "clip" | "eye" | "plus" | "folder" | "chat" | "spark" | "check" | "alert" | "lock" | "send" | "user" | "users" | "list" | "cog" | "refer" | "chev" | "id" | "doc";
+  "mark" | "mark-lg" | "search" | "home" | "moon" | "sun" | "vitals" | "mic" | "flask" | "box" | "clip" | "eye" | "plus" | "folder" | "chat" | "spark" | "check" | "alert" | "lock" | "send" | "user" | "users" | "list" | "cog" | "refer" | "chev" | "id" | "doc" | "grip";
 
 export function Icon({ name, size }: { name: IconName; size?: "sm" | "lg" }) {
   return (
@@ -49,6 +49,7 @@ const SHEET = `
     #i-mark path, #i-mark circle, #i-mark-lg path, #i-mark-lg circle {
       fill: none; stroke: currentColor; vector-effect: non-scaling-stroke;
     }
+    #i-grip circle { fill: currentColor; stroke: none; }
   </style>
   <symbol id="i-mark" viewBox="0 0 24 24"><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(0 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(45 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(90 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(135 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(180 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(225 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(270 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(315 12 12)"/><circle cx="12" cy="12" r="1.7"/>  <circle cx="12" cy="12" r="6.2" opacity=".35"/>  <circle cx="3.1" cy="3.1" r=".7"/><circle cx="20.9" cy="3.1" r=".7"/>  <circle cx="3.1" cy="20.9" r=".7"/><circle cx="20.9" cy="20.9" r=".7"/></symbol>
   <symbol id="i-mark-lg" viewBox="0 0 24 24"><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(0 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(45 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(90 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(135 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(180 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(225 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(270 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(315 12 12)"/><circle cx="12" cy="12" r="1.7"/>  <circle cx="12" cy="12" r="6.2" opacity=".3"/><circle cx="12" cy="12" r="9.4" opacity=".16"/></symbol>
@@ -78,4 +79,5 @@ const SHEET = `
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
   <symbol id="i-id" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><circle cx="8.5" cy="11" r="2.2"/><path d="M5.2 16.2c.8-1.4 2-2 3.3-2s2.5.6 3.3 2M15 10h4M15 14h3"/></symbol>
   <symbol id="i-doc" viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.4"/><path d="M5 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M12 15.5v3M10.5 17h3"/></symbol>
+  <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.3"/><circle cx="15" cy="6" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="18" r="1.3"/></symbol>
 `;

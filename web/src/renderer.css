@@ -91,6 +91,23 @@
 .m-sub.dim { color:var(--gray-400); margin-top:2px; }
 .cap.risk { background:var(--destructive-bg); color:var(--destructive); border-color:var(--destructive-border); }
 
+/* ---- tasklist: kind: tasklist's rows, a title and a count, no prose ---- */
+.tasklist { display:flex; flex-direction:column; gap:10px; }
+.task-row { display:flex; align-items:center; gap:10px; padding:13px 14px; }
+.task-t { flex:1; min-width:0; font-size:12.5px; font-weight:600; }
+.task-n { font-size:20px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+
+/* ---- a view embedded in a Home card is not a card of its own: stacking a
+   card inside a card is the identical-chrome problem the visual system
+   exists to fix. Flattened to a rule-separated list instead. ---- */
+.home-card .mgrid { grid-template-columns:1fr; gap:0; }
+.home-card .metric, .home-card .task-row {
+  background:transparent; border:none; box-shadow:none; border-radius:0;
+  padding:10px 0; border-top:1px solid var(--border);
+}
+.home-card .metric:first-child, .home-card .task-row:first-child { border-top:none; padding-top:0; }
+.home-card .tasklist { gap:0; }
+
 .tblwrap { overflow-x:auto; }
 .tbl { border-collapse:collapse; width:100%; font-size:11.5px; }
 .tbl th { text-align:left; font-size:9.5px; text-transform:uppercase; letter-spacing:.07em;

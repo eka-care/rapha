@@ -81,6 +81,10 @@ if [ -d web/node_modules ]; then
   # kind: tasklist's renderer: dispatch reaches it, a row is a title and a
   # count, and the Open button is genuinely gated behind `operation`.
   (cd web && node --experimental-strip-types src/tasklist.check.ts)
+  # Home: three bands in order, a card's own handle (not the card body)
+  # starts a drag or takes arrow keys, and the order that reads back is keyed
+  # by declaration id, so a reseed does not lose it.
+  (cd web && node --experimental-strip-types src/home.check.ts)
   echo "ok   web renderer typechecks and builds"
 else
   echo "warn web: run (cd web && npm install) to check the renderer"

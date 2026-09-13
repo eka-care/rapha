@@ -338,30 +338,34 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .cq.rose:hover{transform:translateY(-1px);color:var(--surface);background:var(--gray-800)}
 .crow{display:flex;gap:8px;align-items:center}
 /* ---------- home ---------- */
-.home{display:flex;flex-direction:column;gap:16px;padding-bottom:20px}
-.hero{position:relative;overflow:hidden;border-radius:var(--r-xl);border:1px solid var(--border);
-  background:linear-gradient(122deg,var(--surface) 0%,var(--gray-50) 58%,var(--rose-tint) 128%);
-  padding:26px 26px 22px;box-shadow:var(--sh-card)}
-.hero::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--grad-rose-line)}
-.hero-mark{position:absolute;top:-62px;right:-52px;width:290px;height:290px;color:var(--ink);
-  opacity:.052;pointer-events:none;stroke-width:.35;fill:none;stroke:currentColor;
-  stroke-linecap:round;stroke-linejoin:round}
-[data-theme="dark"] .hero-mark{opacity:.075}
-.hero-eye{font-size:10.5px;font-weight:700;color:var(--rose-ink);text-transform:uppercase;letter-spacing:.1em}
-.hero-sub{font-size:12.5px;color:var(--ink-3);margin-top:7px;line-height:1.55;max-width:560px}
-.chips{display:flex;gap:7px;margin-top:13px;flex-wrap:wrap;position:relative;z-index:1}
-.chip{border:1px solid var(--border);background:var(--surface);color:var(--ink-2);border-radius:var(--r-pill);
-  padding:6px 13px;font:inherit;font-size:11.5px;font-weight:500;cursor:pointer;transition:.14s var(--ease)}
-.chip:hover{border-color:var(--eka-blue);color:var(--eka-blue);background:var(--eka-blue-bg)}
+.home{display:flex;flex-direction:column;gap:20px;padding-bottom:20px}
 
-.brief{display:flex;gap:12px;padding:15px 16px}
-.brief-av{width:30px;height:30px;border-radius:var(--r-sm);background:var(--eka-blue-bg);color:var(--eka-blue);
-  display:grid;place-items:center;flex-shrink:0}
-.brief-t{font-size:13px;line-height:1.65;color:var(--ink-2)}
-.brief-t b{color:var(--ink);font-weight:600}
-.brief-t em{font-style:normal;color:var(--eka-blue);font-weight:600;cursor:pointer;
-  border-bottom:1px dashed var(--eka-blue-100)}
-.brief-t em:hover{border-bottom-style:solid}
+/* the greeting: one line, the largest text on the page, nothing beneath it */
+.greet{font-size:22px;font-weight:700;letter-spacing:-.015em;display:flex;align-items:baseline;gap:9px}
+.greet-sep{color:var(--gray-400);font-weight:400}
+.greet-org{color:var(--ink-3);font-weight:500;font-size:15px}
+
+/* the live line is the page's subject: no card, no border, no shadow. it sits
+   flat on the canvas because it does not need a box to be the most important
+   thing here. */
+.flat{background:transparent;border:none;box-shadow:none;border-radius:0}
+.live{padding:2px 0 6px}
+.live-h{display:flex;align-items:baseline;gap:9px;margin-bottom:4px}
+
+.home-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;align-items:start}
+
+/* every secondary card carries an explicit handle: not tap-and-hold on the
+   card body (fails on touch, and on a screen already full of taps), and not
+   drag-only either, a focused handle takes arrow keys. */
+.drag-handle{width:26px;height:26px;flex-shrink:0;border:none;background:none;border-radius:var(--r-sm);
+  color:var(--gray-400);cursor:grab;display:grid;place-items:center;transition:.14s var(--ease)}
+.drag-handle:hover{background:var(--gray-100);color:var(--ink-2)}
+.drag-handle:active{cursor:grabbing}
+.drag-handle:focus-visible{outline:2px solid var(--ink);outline-offset:1px;color:var(--ink-2)}
+
+/* the tertiary tier: a rule, not a surface. Recent is on this page but it is
+   not what the page is for, so it gets the lightest treatment of the three. */
+.rule{border-top:1px solid var(--border);padding-top:10px}
 
 .flow{display:flex;gap:0;padding:16px 14px;overflow-x:auto}
 .fl-col{min-width:132px;flex:1;position:relative;padding:0 7px}

@@ -121,6 +121,7 @@ function App() {
   );
   const queues = (loaded.data ?? []).filter((x) => x.decl.kind === "queue");
   const dashboards = (loaded.data ?? []).filter((x) => x.decl.kind === "dashboard");
+  const tasklists = (loaded.data ?? []).filter((x) => x.decl.kind === "tasklist");
 
   const thread = useAsync(
     () => (route.kind === "thread" ? client.thread(route.id) : Promise.resolve(null)),
@@ -431,9 +432,11 @@ function App() {
                     role={role}
                     queues={queues}
                     dashboards={dashboards}
+                    tasklists={tasklists}
                     recent={recent}
                     onOpenThread={openThread}
                     onGo={go}
+                    titles={titlesOf(cat.data)}
                   />
                 </>
               )}
@@ -823,7 +826,7 @@ function Counts({ l, cat }: { l: Loaded; cat: Catalogue }) {
 
 /** Every declaration the catalogue carries, by id, so a result that names a
  *  metric or a view by id can be labelled with the words its author wrote. */
-function titlesOf(cat: Catalogue): Record<string, string> {
+export function titlesOf(cat: Catalogue): Record<string, string> {
   const out: Record<string, string> = {};
   for (const group of [cat.views, cat.metrics, cat.operations, cat.workflows]) {
     for (const [id, d] of Object.entries(group ?? {})) {
