@@ -8,8 +8,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { cue, keep, mine, offered, opensOnArrival, records, weigh } from "./loops.ts";
-import type { Operation, QueueRow, SectionResult } from "./types";
+import {
+  cue, filterOptions, filterRows, keep, mine, offered, opensOnArrival, records, sortOptions, sortRows, weigh,
+} from "./loops.ts";
+import type { Operation, QueueRow, SectionResult, ViewDecl } from "./types";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const cat = JSON.parse(readFileSync(root + "catalogue/catalogue.json", "utf8"));
@@ -135,5 +137,74 @@ ok(keep(rs, ["enc-1"])[0].id === "enc-1", "and the live one is kept");
 ok(keep(rs, []).length === 0, "nothing live means no recents");
 // A reseed changes every id, which is how eight dead tokens came to be nav.
 ok(keep(rs, ["enc-9"]).length === 0, "a reseed clears them rather than leaving 404s");
+
+// -- Recents: sort and filter, and the controls that offer them ------------
+//
+// Built for the health centre's own queue view here, but nothing below is
+// keyed to a PHC word: swap the decl passed in and the controls swap with it,
+// which is the property the last two checks in this section prove.
+const qrow = (thread: string, name: string, station: string, flags: string[], at: string): QueueRow => ({
+  thread, subject: { name }, station, flags, badges: {}, opened_at: at,
+});
+const three: QueueRow[] = [
+  qrow("t1", "Charlie", "B", [], "2020-01-01T00:00:00Z"),
+  qrow("t2", "Alice", "A", ["crit"], "2020-01-03T00:00:00Z"),
+  qrow("t3", "Bob", "C", [], "2020-01-02T00:00:00Z"),
+];
+const decl: Pick<ViewDecl, "columns" | "badges"> = { columns: ["name"], badges: { crit: "crit" } };
+const ids = (rows: QueueRow[]) => rows.map((r) => r.thread);
+
+// A sort that ignores its key returns the same order for two different keys.
+// These two keys are chosen so the correct answer differs between them:
+// alphabetical by name (Alice, Bob, Charlie) is not alphabetical by station
+// (A, B, C maps to Alice, Charlie, Bob).
+ok(
+  JSON.stringify(ids(sortRows(three, "name", decl))) !== JSON.stringify(ids(sortRows(three, "station", decl))),
+  "sorting by name and by station give different orders on data where they must",
+);
+assert.deepEqual(ids(sortRows(three, "name", decl)), ["t2", "t3", "t1"], "FAIL sort by name is alphabetical on the declared column");
+checks++;
+assert.deepEqual(ids(sortRows(three, "station", decl)), ["t2", "t1", "t3"], "FAIL sort by station is alphabetical on station");
+checks++;
+assert.deepEqual(ids(sortRows(three, "recent", decl)), ["t2", "t3", "t1"], "FAIL sort by recent is newest opened_at first");
+checks++;
+// A sort that just hands back its input, unchanged, passes none of the three
+// above by luck alone: the input order (t1, t2, t3) matches none of them.
+ok(ids(three)[0] === "t1" && ids(three)[1] === "t2", "the fixture's own order is not already any of the three sorts");
+ok(!Object.is(sortRows(three, "name", decl), three), "sortRows hands back a copy, not the input array");
+assert.deepEqual(ids(three), ["t1", "t2", "t3"], "FAIL sortRows must not mutate its input");
+checks++;
+
+// A filter that ignores its predicate returns every row regardless.
+assert.deepEqual(ids(filterRows(three, { flag: "crit" })), ["t2"], "FAIL filtering by flag keeps only the row carrying it");
+checks++;
+assert.deepEqual(ids(filterRows(three, { station: "B" })), ["t1"], "FAIL filtering by station keeps only that station's row");
+checks++;
+// A filter that returns nothing regardless of input would also pass a check
+// that only asserts "the result is smaller"; asserting the exact surviving
+// set, on both a matching and a no-op filter, catches that shortcut too.
+assert.deepEqual(ids(filterRows(three, null)), ["t1", "t2", "t3"], "FAIL no filter keeps every row, not none");
+checks++;
+ok(filterRows(three, { flag: "crit" }).length > 0, "a real filter keeps at least the matching row, not an empty result");
+
+// -- the control set changes when the declaration does ----------------------
+// Same technique as web/src/voice/voice.check.ts: mutate the declaration in
+// memory and assert the offered controls move with it. A hard-coded "name,
+// station" or "crit, warn" would pass everything above and fail only here.
+const withColumn = sortOptions(decl);
+ok(withColumn.some((o) => o.key === "name"), "a declared first column earns a name sort");
+const noColumn = sortOptions({ columns: [], badges: {} });
+ok(!noColumn.some((o) => o.key === "name"), "no declared column, no name sort offered");
+
+const oneBadge = filterOptions(decl, three);
+assert.deepEqual(oneBadge.flags, ["crit"], "FAIL the flag filter lists exactly the declared badges");
+checks++;
+const twoBadges = filterOptions({ columns: ["name"], badges: { crit: "crit", warn: "warn" } }, three);
+assert.deepEqual(twoBadges.flags, ["crit", "warn"], "FAIL a bundle declaring a second badge gets a second flag filter, with no change here");
+checks++;
+ok(
+  JSON.stringify(oneBadge.flags) !== JSON.stringify(twoBadges.flags),
+  "the filter control set actually moved when the declaration did, not just its size",
+);
 
 console.log(`ok   ${checks} loop checks`);

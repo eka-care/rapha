@@ -380,11 +380,12 @@ function App() {
       <Sidebar
         cat={cat.data}
         facility={fac.data}
-        queues={queues.map((q) => q.result)}
+        queues={queues}
         route={route}
         role={role}
         recent={recent}
         onGo={go}
+        onAddRecent={() => setKhoj(true)}
         onRole={(r) => {
           setRole(r);
           setRoleState(r);

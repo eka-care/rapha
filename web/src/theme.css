@@ -94,9 +94,16 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
   display:flex;flex-direction:column;flex-shrink:0;
   transition:background .25s var(--ease),width .16s var(--ease)}
 .sb.collapsed{width:60px}
-.sb.collapsed .nv,.sb.collapsed .rolebtn{justify-content:center;padding:8px}
+.sb.collapsed .nv,.sb.collapsed .sb-add,.sb.collapsed .rolebtn{justify-content:center;padding:8px}
 .sb-top{padding:14px 14px 8px;display:flex;align-items:center;gap:9px}
 .sb.collapsed .sb-top{padding:14px 9px 8px}
+.sb-sec-row{display:flex;align-items:center;gap:6px;padding:14px 10px 6px}
+.sb.collapsed .sb-sec-row{justify-content:center;padding:14px 9px 6px}
+.sb-add{width:26px;height:26px;margin-left:auto}
+.sb.collapsed .sb-add{margin-left:0}
+.sb-filters{display:flex;gap:6px;padding:0 10px 8px}
+.sb-filters select{flex:1;min-width:0;border:1px solid var(--border);background:var(--surface);
+  color:var(--ink-2);border-radius:var(--r-sm);padding:4px 6px;font:inherit;font-size:11px}
 .brand-mark{width:30px;height:30px;border-radius:9px;background:var(--surface);
   border:1px solid var(--border);display:grid;place-items:center;color:var(--ink);
   box-shadow:var(--sh-card)}

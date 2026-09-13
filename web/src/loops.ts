@@ -5,7 +5,7 @@
  *  disabled. So everything here is a question of weight, not permission.
  */
 import type { Recent } from "./Shell.tsx";
-import type { Operation, QueueRow, SectionResult } from "./types";
+import type { Operation, QueueRow, SectionResult, ViewDecl } from "./types";
 
 /** One filled button, everything else one level down.
  *
@@ -114,4 +114,63 @@ export function records(sections: SectionResult[]): { title: string; count: numb
 export function keep(rs: Recent[], live: string[]): Recent[] {
   const known = new Set(live);
   return rs.filter((r) => known.has(r.id));
+}
+
+// -------------------------------------------------------------- sort/filter
+//
+// Recents' sort and filter controls, and the two pure functions behind them.
+// Both are worked out from the queue view's own declaration (`columns` for
+// the name to sort by, `badges` for the flags to filter by) so that pointing
+// this at a different bundle changes the controls with no edit here. Nothing
+// below names a station, a flag id, or a bundle.
+
+export type SortKey = "recent" | "name" | "station";
+
+/** The sort menu this bundle's queue declaration earns. "Recent" and
+ *  "Station" need no declaration (every QueueRow carries `opened_at` and
+ *  `station`); "Name" is offered only when the view declared a first column,
+ *  labelled with that column's own word. */
+export function sortOptions(decl: Pick<ViewDecl, "columns"> | undefined): { key: SortKey; label: string }[] {
+  const opts: { key: SortKey; label: string }[] = [{ key: "recent", label: "Recent" }];
+  if (decl?.columns?.length) opts.push({ key: "name", label: decl.columns[0] });
+  opts.push({ key: "station", label: "Station" });
+  return opts;
+}
+
+/** Sorts a copy of `rows`; never mutates and never hands back `rows` itself,
+ *  so a caller that needs the new order cannot be fooled by object identity.
+ *  "Name" reads the declared first column, because that is the only field
+ *  this code is told is a name. */
+export function sortRows(rows: QueueRow[], key: SortKey, decl: Pick<ViewDecl, "columns"> | undefined): QueueRow[] {
+  const nameCol = decl?.columns?.[0];
+  const get = (r: QueueRow): string => {
+    if (key === "station") return r.station ?? "";
+    if (key === "name") return String(r.subject?.[nameCol ?? ""] ?? "");
+    return r.opened_at ?? "";
+  };
+  const sorted = [...rows].sort((a, b) => get(a).localeCompare(get(b)));
+  return key === "recent" ? sorted.reverse() : sorted;
+}
+
+export type Filter = { flag: string } | { station: string } | null;
+
+/** The filter chips this bundle's queue declaration earns: one per declared
+ *  badge (a flag worth calling out), and one per station actually present in
+ *  today's rows. A bundle that declares no badges offers no flag filter. */
+export function filterOptions(
+  decl: Pick<ViewDecl, "badges"> | undefined,
+  rows: QueueRow[],
+): { flags: string[]; stations: string[] } {
+  return {
+    flags: Object.keys(decl?.badges ?? {}),
+    stations: [...new Set(rows.map((r) => r.station).filter((s): s is string => !!s))],
+  };
+}
+
+/** Filters a copy of `rows` by the chosen flag or station; `null` means no
+ *  filter and hands every row back, never a subset picked at random. */
+export function filterRows(rows: QueueRow[], filter: Filter): QueueRow[] {
+  if (!filter) return rows;
+  if ("flag" in filter) return rows.filter((r) => r.flags.includes(filter.flag));
+  return rows.filter((r) => r.station === filter.station);
 }

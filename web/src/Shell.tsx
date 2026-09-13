@@ -12,7 +12,8 @@
 import { useEffect, useState } from "react";
 import { API_BASE } from "./api";
 import { Icon, iconForView } from "./icons";
-import type { Catalogue, Facility, ViewDecl, ViewResult } from "./types";
+import { filterOptions, filterRows, sortOptions, sortRows, type Filter, type SortKey } from "./loops";
+import type { Catalogue, Facility, QueueRow, ViewDecl, ViewResult } from "./types";
 import { human, title } from "./ui";
 
 // ------------------------------------------------------------------ recents
@@ -119,17 +120,21 @@ function useCollapsed(): [boolean, () => void] {
 // ----------------------------------------------------------------- sidebar
 
 export function Sidebar({
-  cat, facility, queues, route, role, recent, onGo, onRole, onManageRoles,
+  cat, facility, queues, route, role, recent, onGo, onAddRecent, onRole, onManageRoles,
 }: {
   cat: Catalogue | undefined;
   facility: Facility | undefined;
-  /** The queue views' results, for the counts. One read each, the same read
-   *  Home and the palette use. */
-  queues: ViewResult[];
+  /** The queue views' own decl and result, for the counts and for the
+   *  Recents sort/filter controls. One read each, the same read Home and
+   *  Khoj use. */
+  queues: { decl: ViewDecl; result: ViewResult }[];
   route: { kind: string; id: string };
   role: string;
   recent: Recent[];
   onGo: (hash: string) => void;
+  /** The `+` beside Recents: opens patient search first, exactly the way
+   *  Khoj does, so create-on-miss is never reimplemented here. */
+  onAddRecent: () => void;
   onRole: (role: string) => void;
   /** Opens the role editor. Always offered here: whether this caller may
    *  actually save is api/main.py's `facility.admin` check, not a thing this
@@ -138,6 +143,8 @@ export function Sidebar({
 }) {
   const [menu, setMenu] = useState(false);
   const [collapsed, toggleCollapsed] = useCollapsed();
+  const [sort, setSort] = useState<SortKey>("recent");
+  const [filter, setFilter] = useState<Filter>(null);
   useEffect(() => {
     const shut = () => setMenu(false);
     addEventListener("click", shut);
@@ -152,6 +159,22 @@ export function Sidebar({
   // claiming none.
   const held = (r: string): string | number =>
     cat?.bundles?.[r]?.length ?? (r === facility?.user?.role ? facility.user.capabilities.length : "?");
+
+  // The first declared queue is this bundle's answer to "what does a Recent
+  // look like": its columns name what "sort by name" reads, its badges name
+  // what "filter by flag" offers. A bundle with no queue view gets no sort or
+  // filter at all, which is the honest state, not an empty-looking control.
+  const primary = queues.find((q) => q.decl.kind === "queue")?.decl;
+  const allRows = queues.flatMap((q) => (q.result.rows ?? []) as QueueRow[]);
+  const byThread = new Map(allRows.map((r) => [r.thread, r]));
+  // A recent not on any queue read (yesterday's, or one this role no longer
+  // sees) still gets a row, so it can still be sorted and shown, just with
+  // nothing to filter it by.
+  const recentRow = (t: Recent): QueueRow =>
+    byThread.get(t.id) ?? { thread: t.id, subject: { [primary?.columns?.[0] ?? "name"]: t.name }, station: null, flags: [], badges: {}, opened_at: "" };
+  const sorted = sortRows(recent.map(recentRow), sort, primary);
+  const { flags, stations } = filterOptions(primary, allRows);
+  const filtered = filterRows(sorted, filter).map((r) => recent.find((t) => t.id === r.thread)!);
 
   const label = (name: string) => (collapsed ? undefined : name);
 
@@ -182,7 +205,7 @@ export function Sidebar({
           <Icon name="home" size="sm" />{label("Home")}
         </button>
         {nav.map((v) => {
-          const result = queues.find((q) => q.view === v.id);
+          const result = queues.find((q) => q.decl.id === v.id)?.result;
           const count = result?.groups?.reduce((n, g) => n + (g.key === null ? 0 : g.count), 0);
           const name = v.title ?? title(v.id);
           return (
@@ -200,10 +223,45 @@ export function Sidebar({
         })}
       </div>
 
-      {!collapsed && <div className="sb-sec">Recents</div>}
+      <div className="sb-sec-row">
+        {!collapsed && <span className="sb-sec">Recents</span>}
+        <button
+          className="icon-btn sb-add"
+          aria-label="Add a patient"
+          title="Add a patient"
+          onClick={onAddRecent}
+        >
+          <Icon name="plus" size="sm" />
+        </button>
+      </div>
+
+      {!collapsed && recent.length > 1 && (flags.length > 0 || stations.length > 0) && (
+        <div className="sb-filters">
+          <select aria-label="Sort recents" value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
+            {sortOptions(primary).map((o) => (
+              <option key={o.key} value={o.key}>{human(o.label)}</option>
+            ))}
+          </select>
+          <select
+            aria-label="Filter recents"
+            value={filter ? ("flag" in filter ? `flag:${filter.flag}` : `station:${filter.station}`) : ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) return setFilter(null);
+              const [kind, id] = v.split(":");
+              setFilter(kind === "flag" ? { flag: id } : { station: id });
+            }}
+          >
+            <option value="">All</option>
+            {flags.map((f) => <option key={`flag:${f}`} value={`flag:${f}`}>{human(f)}</option>)}
+            {stations.map((s) => <option key={`station:${s}`} value={`station:${s}`}>{title(s)}</option>)}
+          </select>
+        </div>
+      )}
+
       <div className="sb-list">
-        {!collapsed && recent.length ? (
-          recent.map((t) => (
+        {!collapsed && filtered.length ? (
+          filtered.map((t) => (
             <button
               key={t.id}
               className={`th${route.kind === "thread" && route.id === t.id ? " on" : ""}`}
@@ -216,7 +274,7 @@ export function Sidebar({
         ) : (
           !collapsed && (
             <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--gray-400)" }}>
-              No threads yet.
+              {recent.length ? "No match." : "No threads yet."}
             </div>
           )
         )}
