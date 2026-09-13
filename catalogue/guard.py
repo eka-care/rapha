@@ -78,11 +78,31 @@ def describe_precondition(pre, unevaluable=False):
     return f"Already {words}." if negated else f"Requires {words}."
 
 
+def precondition_kind(pre, unevaluable=False):
+    """A machine-stable label for a precondition denial, alongside the human
+    sentence describe_precondition() writes. One of "flag_negated",
+    "flag_required", "actor_negated", "actor_required", "unevaluable" — never
+    a specific flag or operation name, so a caller (agent/turn.py) can react
+    to the shape of the denial without parsing prose a copy pass is free to
+    reword. Derived from the same parse_precondition() the sentence is, so
+    the two cannot drift apart."""
+    if unevaluable:
+        return "unevaluable"
+    kind, _, negated = parse_precondition(pre)
+    return f"{kind}_{'negated' if negated else 'required'}"
+
+
 @dataclass
 class Decision:
     allowed: bool
     reason: str
     audit: dict = field(default_factory=dict)
+    # Machine-stable classification of a denial, set only for a precondition
+    # denial (see precondition_kind()). Empty for every other kind of denial
+    # and for an allow, so a caller that only cares about preconditions can
+    # test truthiness. Added, not inserted, so positional Decision(False,
+    # "...", {...}) call sites elsewhere are unaffected.
+    kind: str = ""
 
     def __bool__(self):
         return self.allowed
@@ -150,9 +170,9 @@ def evaluate(op, *, caps, state, payload, surface, confirmed=False,
         "payload": payload, "outcome": None,
     }
 
-    def deny(reason):
+    def deny(reason, kind=""):
         audit["outcome"] = f"denied: {reason}"
-        return Decision(False, reason, audit)
+        return Decision(False, reason, audit, kind=kind)
 
     # 1. schema. Fail closed: no validator is a denial, never a pass.
     if validate is None:
@@ -171,7 +191,8 @@ def evaluate(op, *, caps, state, payload, surface, confirmed=False,
     # 3. preconditions over thread state, and over who has already acted here.
     met, missing, unevaluable = _preconditions_met(op, state, actor, performers, unknown_actor=True)
     if not met:
-        return deny(describe_precondition(missing, unevaluable))
+        return deny(describe_precondition(missing, unevaluable),
+                    kind=precondition_kind(missing, unevaluable))
 
     # 4. irreversibility. v0.1 SS5 and addendum SSB.2: the confirm for an
     #    irreversible operation is explicit and un-prefilled, and an agent can

@@ -394,14 +394,14 @@ def say(request: Request, body: dict = Body(default={})):
     actor = "agent:%s" % user["id"]
 
     def propose_one(op_id, payload):
-        """(proposal_id | None, the guard's reason, flags raised)."""
+        """(proposal_id | None, the guard's reason, flags raised, precondition kind)."""
         if op_id not in BUNDLE.operations:
-            return None, "unknown operation %r" % op_id, []
+            return None, "unknown operation %r" % op_id, [], ""
         decision, proposal = proposals.propose(
             store, BUNDLE, op_id, thread=thread, payload=payload,
             caps=set(user["capabilities"]), scopes=set(user["scopes"]), actor=actor)
         return ((proposal.id if proposal else None), decision.reason,
-                proposal.flags_raised if proposal else [])
+                proposal.flags_raised if proposal else [], decision.kind)
 
     answer = turn.take(
         str(body.get("utterance") or ""),

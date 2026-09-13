@@ -29,37 +29,43 @@ from agent import planner
 UNSURE = ("I do not know which operation that is, and I will not guess: a "
           "wrong proposal in front of a busy clinician is worse than none.")
 
-# What to do next, per kind of refusal. The guard's own reason is passed
-# through unedited and is the first half of the sentence; this is only the
-# second half. Keyed by the shape of the sentence catalogue/guard.py writes,
-# never by a particular flag or operation name, so a bundle this file has
-# never heard of still gets a sensible next step.
+# What to do next, for a precondition denial. Keyed by catalogue.guard's own
+# machine-stable classification (precondition_kind()), never by the clerk
+# sentence describe_precondition() writes: those sentences are exactly what
+# Task 7's copy pass is about to reword, and a string match on them would
+# degrade silently to NEXT_OTHERWISE the moment the wording changed.
+PRECONDITION_NEXT = {
+    # A separation of duties rule is about WHO, not about the visit, so it
+    # gets its own half sentence.
+    "actor_negated":
+        "Somebody else has to do this one. Whoever did the step it names cannot "
+        "also do this, whatever capabilities they hold.",
+    "actor_required":
+        "Only the person who did the step it names may do this one.",
+    "unevaluable":
+        "Nobody said who is acting here, and the kernel will not guess on a "
+        "rule about who did what.",
+    # Both polarities of a plain flag precondition ("Already registered." and
+    # "Requires rx confirmed.") get the same half sentence: it must be true of
+    # either, so it claims no order of its own.
+    "flag_negated":
+        "The state of this visit does not satisfy that. "
+        "The kernel decides what is open here, not me.",
+    "flag_required":
+        "The state of this visit does not satisfy that. "
+        "The kernel decides what is open here, not me.",
+}
+
+# Everything else the guard can deny on: no precondition_kind travels with
+# these (only a precondition denial gets one), so they are still keyed by the
+# shape of the guard's own reason string. None of these are the clerk-facing
+# precondition sentences a copy pass is about to touch.
 NEXT = (
     ("payload invalid", "Open the form on screen and fill in the rest. I only "
                         "fill what the words actually said."),
     ("missing capability", "This account does not hold that capability. "
                            "Someone who does has to do it."),
     ("outside scope", "That is outside this account's scope of practice."),
-    # A separation of duties rule is about WHO, not about the visit, so it
-    # gets its own half sentence. It has to come first: "Already performed"
-    # and "Must be the person who performed" would otherwise also match the
-    # generic "Already"/"Requires" checks below.
-    ("Already performed",
-     "Somebody else has to do this one. Whoever did the step it names cannot "
-     "also do this, whatever capabilities they hold."),
-    ("Must be the person who performed",
-     "Only the person who did the step it names may do this one."),
-    ("Needs to know who is acting",
-     "Nobody said who is acting here, and the kernel will not guess on a "
-     "rule about who did what."),
-    # Both polarities of a plain flag precondition: "Already registered."
-    # (unmet because it is present) and "Requires rx confirmed." (unmet
-    # because it is absent). This half must be true of either, so it claims
-    # no order of its own.
-    ("Already", "The state of this visit does not satisfy that. "
-               "The kernel decides what is open here, not me."),
-    ("Requires", "The state of this visit does not satisfy that. "
-                "The kernel decides what is open here, not me."),
     ("irreversible", "Irreversible work is done on screen with an explicit tap. "
                      "I cannot propose it, and that is deliberate."),
     ("not a step of", "This line has no station that draws it, so it cannot "
@@ -68,7 +74,9 @@ NEXT = (
 NEXT_OTHERWISE = "Open it on screen if it should still happen."
 
 
-def next_step(reason: str) -> str:
+def next_step(reason: str, kind: str = "") -> str:
+    if kind in PRECONDITION_NEXT:
+        return PRECONDITION_NEXT[kind]
     for prefix, advice in NEXT:
         if prefix in reason:
             return advice
@@ -90,7 +98,7 @@ def heard_with(confidence, payload) -> dict:
 
 
 def card(op, proposed, decision_reason, proposal_id, flags_raised, *,
-         actions, station, confidence) -> dict:
+         actions, station, confidence, decision_kind="") -> dict:
     """Everything the thread needs to draw one proposal, and nothing it has to
     compute. `order` is the kernel's ordering explained, never an opinion."""
     allowed = proposal_id is not None
@@ -114,7 +122,7 @@ def card(op, proposed, decision_reason, proposal_id, flags_raised, *,
             # The guard's words, unedited. Paraphrasing a refusal is how an
             # agent starts inventing policy.
             "reason": decision_reason,
-            "next": "" if allowed else next_step(decision_reason),
+            "next": "" if allowed else next_step(decision_reason, decision_kind),
         },
         "flags_raised": flags_raised,
         "station": next((a["station"] for a in actions if a["id"] == op["id"]), None),
@@ -156,10 +164,15 @@ def take(utterance: str, *, catalogue: dict, view: dict, propose,
          confidence=None, which: str = None) -> dict:
     """Plan, order by the kernel, propose each, and report every verdict.
 
-    propose: callable(operation_id, payload) -> (proposal_id|None, reason, flags)
-             The only thing here that touches a store, injected so this runs
-             without one. There is no second callable and there must not be:
-             a confirm argument would be a hole a sentence could reach.
+    propose: callable(operation_id, payload) -> (proposal_id|None, reason, flags, kind)
+             kind is catalogue.guard's machine-stable precondition_kind(), or
+             "" for a denial that is not a precondition (or for an allow) --
+             next_step() dispatches on it before it ever looks at the reason
+             string, so a copy pass over the guard's sentences cannot silently
+             change the advice. The only thing here that touches a store,
+             injected so this runs without one. There is no second callable
+             and there must not be: a confirm argument would be a hole a
+             sentence could reach.
 
     Every operation the planner named is sent, including one the kernel does
     not currently offer, because the refusal is the guard's to state and an
@@ -189,9 +202,10 @@ def take(utterance: str, *, catalogue: dict, view: dict, propose,
         # dataclasses.replace, so a new field on Proposed cannot be silently
         # dropped here by a constructor that was not updated with it.
         p = dataclasses.replace(p, payload=planner.typed(op, p.payload))
-        proposal_id, reason, flags = propose(p.operation, p.payload)
+        proposal_id, reason, flags, kind = propose(p.operation, p.payload)
         cards.append(card(op, p, reason, proposal_id, flags, actions=actions,
-                          station=view.get("station"), confidence=confidence))
+                          station=view.get("station"), confidence=confidence,
+                          decision_kind=kind))
     return {"said": say(cards, actions), "backend": which,
             "understood": bool(cards), "proposals": cards}
 
@@ -236,8 +250,8 @@ def demo():
     def propose(operation, payload):
         sent.append((operation, dict(payload)))
         if operation == "x.op.vitals":
-            return "prop-1", "proposed", ["vitals.flagged"]
-        return None, "Requires rx prescribed.", []
+            return "prop-1", "proposed", ["vitals.flagged"], ""
+        return None, "Requires rx prescribed.", [], "flag_required"
 
     turn = take("vitals 140 over 90 and pulse 72", catalogue=cat, view=view,
                 propose=propose, confidence={"systolic": 0.8, "invented": 0.9},
@@ -262,12 +276,22 @@ def demo():
     assert refused["proposal_id"] is None
     assert refused["verdict"]["reason"] == "Requires rx prescribed."
     assert "does not satisfy that" in refused["verdict"]["next"]
-    # A separation of duties refusal reads differently and must not share
-    # that sentence: it is about who is asking, not about the visit.
+    # The advice is keyed on the guard's machine-stable kind, not on the
+    # sentence: rewording the sentence must not change it (Task 7 reworks
+    # exactly these clerk-facing sentences), and a different kind must give
+    # different advice even carrying the very same words.
+    assert next_step("Patient is already registered.", "flag_negated") == \
+        next_step("Already registered.", "flag_negated"), \
+        "the sentence changed; the advice for the same kind must not"
+    assert next_step("Already registered.", "flag_negated") != \
+        next_step("Already registered.", "actor_negated"), \
+        "two different kinds must not collapse to the same advice just because a sentence was reused"
+    # A separation of duties refusal must not share the plain-flag advice: it
+    # is about who is asking, not about the visit.
     assert "Somebody else has to do this one" in next_step(
-        "Already performed lab op result enter.")
+        "Already performed lab op result enter.", "actor_negated")
     assert "does not satisfy that" not in next_step(
-        "Already performed lab op result enter.")
+        "Already performed lab op result enter.", "actor_negated")
     assert refused["offered_here"] is False
     assert "does not offer this" in refused["order"]
 

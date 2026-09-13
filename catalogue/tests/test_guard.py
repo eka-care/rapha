@@ -162,6 +162,30 @@ def test_describe_precondition_is_derived_from_the_flag_never_a_lookup_table():
     assert guard.describe_precondition("not something.brand-new") == "Already something brand new."
 
 
+def test_precondition_kind_is_stable_regardless_of_the_sentence():
+    """precondition_kind() is what a caller (agent/turn.py) should dispatch
+    on, never the sentence describe_precondition() writes: the sentence is
+    the thing a copy pass is free to reword."""
+    assert guard.precondition_kind("not registered") == "flag_negated"
+    assert guard.precondition_kind("rx.confirmed") == "flag_required"
+    assert guard.precondition_kind("not actor of lab.op.result-enter") == "actor_negated"
+    assert guard.precondition_kind("actor of lab.op.result-enter") == "actor_required"
+    assert guard.precondition_kind("lab.op.result-enter", unevaluable=True) == "unevaluable"
+
+    # And evaluate() actually carries it on the Decision, for a precondition
+    # denial only -- an allow, and a denial of some other kind, carry none.
+    op = OPS["phc.op.patient-register"]
+    d = guard.evaluate(op, caps={"patient.register"}, state={"registered"},
+                       payload={}, surface=guard.RENDERED, validate=ok)
+    assert d.kind == "flag_negated", d.kind
+    d = guard.evaluate(op, caps=set(), state=set(), payload={},
+                       surface=guard.RENDERED, validate=ok)
+    assert not d and d.kind == "", "missing capability is not a precondition"
+    d = guard.evaluate(op, caps={"patient.register"}, state=set(),
+                       payload={}, surface=guard.RENDERED, validate=ok)
+    assert d and d.kind == "", "an allow carries no precondition kind"
+
+
 def test_every_write_operation_is_a_proposal_on_mcp():
     for oid, op in OPS.items():
         if op["kind"] == "write":
