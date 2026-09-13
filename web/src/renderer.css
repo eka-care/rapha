@@ -10,7 +10,7 @@
 
 /* ---- the three states every screen owes ---- */
 .state { padding:22px; font-size:12.5px; color:var(--ink-2); line-height:1.6; }
-.state.bad { border-color:var(--destructive-border); background:var(--destructive-bg); }
+.state.bad { border-color:var(--accent-border); background:var(--accent-bg); }
 .state-t { font-size:13.5px; font-weight:700; color:var(--ink); margin:4px 0 6px; }
 .state-p { margin:0 0 12px; color:var(--ink-2); max-width:62ch; }
 .state-actions { display:flex; gap:8px; }
@@ -18,7 +18,7 @@
 /* ---- forms ---- */
 .f-form { display:grid; gap:14px; }
 .f-field { display:grid; gap:5px; }
-.f-field.bad .f-in { border-color:var(--destructive); background:var(--destructive-bg); }
+.f-field.bad .f-in { border-color:var(--accent); background:var(--accent-bg); }
 .f-field.unsure .f-in { border-color:var(--warning); background:var(--warning-bg); }
 .f-field.override { border-left:3px solid var(--accent-border); background:var(--accent-bg);
   padding:10px 12px; border-radius:var(--r-sm); }
@@ -44,8 +44,8 @@
 .f-check input { width:16px; height:16px; accent-color:var(--ink); }
 .f-hint { font-size:10.5px; color:var(--ink-3); line-height:1.5; }
 .f-hint.unsure { color:var(--warning); font-weight:600; }
-.f-bad { font-size:11px; color:var(--destructive); font-weight:600; }
-.f-bad.block { background:var(--destructive-bg); border:1px solid var(--destructive-border);
+.f-bad { font-size:11px; color:var(--accent); font-weight:600; }
+.f-bad.block { background:var(--accent-bg); border:1px solid var(--accent-border);
   border-radius:var(--r-sm); padding:9px 11px; font-weight:500; line-height:1.5; }
 .f-flags { font-size:11px; color:var(--warning); background:var(--warning-bg);
   border:1px solid var(--warning-border); border-radius:var(--r-sm); padding:9px 11px; line-height:1.5; }
@@ -59,7 +59,7 @@
 .transcript { margin-top:7px; font-style:italic; color:var(--ink-3); }
 .diff { font-size:11.5px; background:var(--gray-50); border:1px solid var(--border);
   border-radius:var(--r-sm); padding:10px 12px; display:grid; gap:4px; }
-.confirmbox { border:1.5px solid var(--destructive-border); background:var(--destructive-bg);
+.confirmbox { border:1.5px solid var(--accent-border); background:var(--accent-bg);
   border-radius:var(--r-md); padding:12px 14px; }
 /* The same commit surface, inside the conversation instead of over it. A
    proposal is reviewed where it was made; nothing about the review changes. */
@@ -89,7 +89,7 @@
 .m-val { font-size:30px; font-weight:700; letter-spacing:-.03em; margin:6px 0 3px; }
 .m-sub { font-size:10.5px; color:var(--ink-3); }
 .m-sub.dim { color:var(--gray-400); margin-top:2px; }
-.cap.risk { background:var(--destructive-bg); color:var(--destructive); border-color:var(--destructive-border); }
+.cap.risk { background:var(--accent-bg); color:var(--accent); border-color:var(--accent-border); }
 
 /* ---- tasklist: kind: tasklist's rows, a title and a count, no prose ---- */
 .tasklist { display:flex; flex-direction:column; gap:10px; }

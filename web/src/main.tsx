@@ -427,7 +427,6 @@ function App() {
                   {loaded.loading && <Loading what="today" />}
                   <Home
                     cat={cat.data}
-                    role={role}
                     queues={queues}
                     dashboards={dashboards}
                     tasklists={tasklists}

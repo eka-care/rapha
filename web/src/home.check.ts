@@ -48,6 +48,10 @@ const handleFn = src.slice(src.indexOf("const Handle ="), src.indexOf("const Han
 ok(/draggable/.test(handleFn), "the handle itself is the draggable element");
 ok(/onDragStart/.test(handleFn), "the handle starts the drag, not some ancestor");
 ok(/dataTransfer\.setData/.test(handleFn), "the handle carries its own id on the drag");
+// The handle is a bare icon with no visible text, so its aria-label is the
+// only thing that tells a screen reader what it does or which card it
+// belongs to; losing it is silent to anyone who is not using one.
+ok(/aria-label=\{`Reorder \$\{label\}`\}/.test(handleFn), "the handle has a per-card accessible name");
 
 // -- keyboard reorder: a focused handle takes arrow keys, not just a mouse --
 ok(/ArrowUp/.test(handleFn) && /ArrowDown/.test(handleFn), "the handle's keydown branches on ArrowUp and ArrowDown");
@@ -63,7 +67,19 @@ const cardFn = src.slice(src.indexOf("function Card("), src.indexOf("function Ca
 ok(/onDragOver/.test(cardFn) && /onDrop/.test(cardFn), "the whole card is a drop zone, not a sliver at the handle");
 
 // -- order is per viewer (localStorage), keyed so a reseed does not lose it -
-ok(/localStorage\.(get|set)Item\(ORDER_KEY/.test(src), "order reads and writes the same localStorage key");
+//
+// `loadOrder()` reading `localStorage.getItem` is necessary but nowhere near
+// sufficient: a check that only looked for "getItem or setItem, anywhere in
+// the file" was satisfied by the read half alone, so a mutation that gutted
+// `persist` down to `setOrder(next)` (dropping the write, the one line that
+// actually makes an order survive a reload) still passed. Anchored on the
+// `persist` function's own body instead, so the write half is what's tested.
+ok(/localStorage\.getItem\(ORDER_KEY/.test(src), "order is read from the localStorage key");
+const persistFn = src.slice(src.indexOf("const persist = "), src.indexOf("const persist = ") + 300);
+ok(persistFn.length > 20, "the persist function exists to anchor this check on");
+ok(/localStorage\.setItem\(ORDER_KEY,\s*JSON\.stringify\(next\)\)/.test(persistFn),
+  "persist() actually writes the new order to localStorage, not just to React state");
+ok(/setOrder\(next\)/.test(persistFn), "persist() also updates the state that renders, so the reorder is visible immediately");
 ok(/ORDER_KEY\s*=\s*"phc\.home\.order\." \+ API_BASE/.test(src),
   "the key is scoped per kernel, the same reason Recents is (two kernels, two facilities)");
 // The pool is built from decl.id (and the literal "recent"), never from a

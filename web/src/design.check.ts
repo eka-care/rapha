@@ -31,40 +31,91 @@ const renderer = read("web/src/renderer.css");
 //
 // Every rule block that USES the token (`var(--accent...)`) rather than just
 // declaring it (`--accent:` inside :root or [data-theme="dark"]) must belong
-// to one of those three categories. The category names below are the actual
-// selectors this codebase uses for a flag, a critical, or a primary action;
-// a new one is added here deliberately, not inferred, so this stays a review
-// gate rather than a rubber stamp.
-const ACCENT_ALLOW = [
-  /^\.b-warn/, /^\.b-crit/,             // a flag, a critical value
-  /^\.fl-p\.alert/,                      // the live line's own critical row
-  /^\.at-ic\.red/, /^\.at-ic\.amb/,      // the attention list's own flag/critical icon
-  /^\.dot\.down/,                        // kernel unreachable: a critical system state
-  /^\.nudge/,                            // a clinical flag rendered as a sentence
-  /^\.f-field\.override/,                // an ABHA-locked field under override: a flag
-  /^\.prop\.primary/, /^\.btn-b/, /^\.cq\.rose/, // the primary action, everywhere it appears
-];
+// to one of these exact, individual selectors. This is an exact-match Set,
+// not a prefix test: a first cut of this check used `/^\.b-warn/.test(...)`,
+// which matches the *start* of a selector list, so a rule edited to
+// `.b-warn,.nv.on{...}` still passed (".nv.on" rides in on the same block as
+// the one legitimate selector). Splitting every rule's selector list on its
+// commas and checking each piece against this Set exactly closes that: the
+// appended selector is its own entry, and ".nv.on" is not in the Set.
+//
+// There used to be a second colour token (--destructive) that was
+// byte-identical to --accent in both themes; a rule could "avoid" this guard
+// simply by spelling the token differently while painting the exact same
+// pixel. That token is gone (merged into --accent, see the token block
+// above), so there is now only one spelling to police.
+const ACCENT_ALLOW = new Set([
+  ".b-warn", ".b-crit",                        // a flag, a critical value
+  ".fl-p.alert", ".fl-p.alert .fl-av",         // the live line's own critical row
+  ".at-ic.red", ".at-ic.amb",                  // the attention list's own flag/critical icon
+  ".dot.down",                                  // kernel unreachable: a critical system state
+  ".nudge",                                     // a clinical flag rendered as a sentence
+  ".f-field.override",                          // an ABHA-locked field under override: a flag
+  ".prop.primary", ".prop.primary .p-s", ".prop.primary .p-tag",
+  ".btn-b",
+  ".cq.rose",                                   // the primary action, everywhere it appears
+  // (the :hover variants of these three lighten via filter:brightness, not
+  // via --accent, so they carry no usage of the token to allow-list)
+  // Consolidated former --destructive users: every one is an error, an
+  // irreversible-action warning, or a critical value already, which is why
+  // they were folded into the same token rather than given their own entry.
+  ".state.bad", ".f-field.bad .f-in", ".f-bad", ".f-bad.block",
+  ".confirmbox", ".cap.risk", ".kv.crit b", ".p-tag.irr", ".crit-box",
+]);
 
-function accentUsageBlocks(rawCss: string): { selector: string; body: string }[] {
+function accentUsageSelectors(rawCss: string): string[] {
   const css = rawCss.replace(/\/\*[\s\S]*?\*\//g, "");
   // Strip the two blocks that DECLARE the token; only usage sites remain.
   const withoutDecls = css
     .replace(/:root\{[\s\S]*?\n\}/, "")
     .replace(/\[data-theme="dark"\]\{[\s\S]*?\n\}/, "");
-  const blocks: { selector: string; body: string }[] = [];
+  const selectors: string[] = [];
   const re = /([^{}]+)\{([^{}]*)\}/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(withoutDecls))) {
-    if (m[2].includes("--accent")) blocks.push({ selector: m[1].trim(), body: m[2] });
+    if (!m[2].includes("--accent")) continue;
+    for (const part of m[1].split(",")) {
+      selectors.push(part.trim().replace(/\s+/g, " "));
+    }
   }
-  return blocks;
+  return selectors;
 }
 
-const usages = [...accentUsageBlocks(theme), ...accentUsageBlocks(renderer)];
+// The specific bypass this guarded against once: --destructive was declared
+// as the exact same hex value as --accent in both themes, so a rule could
+// paint the identical pixel while spelling a different token name and slip
+// past a check that only watches for `var(--accent...)`. That token is gone
+// now, but nothing stops a *new* one from reintroducing the same trick, so
+// this checks the general case: no other colour token in either theme block
+// may share --accent's exact hex value.
+function hexTokens(block: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const m of block.matchAll(/--([\w-]+):\s*(#[0-9A-Fa-f]{3,8})\b/g)) out.set(m[1], m[2].toUpperCase());
+  return out;
+}
+for (const [label, blockRe] of [
+  ["light", /:root\{([\s\S]*?)\n\}/],
+  ["dark", /\[data-theme="dark"\]\{([\s\S]*?)\n\}/],
+] as const) {
+  const block = blockRe.exec(theme)![1];
+  const hexes = hexTokens(block);
+  const accentHex = hexes.get("accent");
+  ok(!!accentHex, `--accent has a hex value in the ${label} theme block, for this check to compare against`);
+  for (const [name, hex] of hexes) {
+    if (name === "accent" || name === "accent-bg" || name === "accent-border") continue;
+    ok(hex !== accentHex, `--${name} (${label}) is not a byte-identical duplicate of --accent (${accentHex})`);
+  }
+}
+
+const usages = [...accentUsageSelectors(theme), ...accentUsageSelectors(renderer)];
 ok(usages.length >= 8, "the accent token is actually used somewhere (the check is not vacuous)");
-for (const { selector } of usages) {
-  const allowed = ACCENT_ALLOW.some((re) => re.test(selector));
-  ok(allowed, `"${selector}" uses --accent but is not a declared flag/critical/primary selector`);
+for (const selector of usages) {
+  ok(ACCENT_ALLOW.has(selector), `"${selector}" uses --accent but is not an exact allow-listed flag/critical/primary selector`);
+}
+// The allow-list itself must not silently grow stale: every entry should be
+// exercised by something in the stylesheet, or it is dead permission.
+for (const allowed of ACCENT_ALLOW) {
+  ok(usages.includes(allowed), `"${allowed}" is allow-listed but nothing in the stylesheet actually uses it`);
 }
 
 // -- three-step scale: radius, border and shadow are named tiers, not one
@@ -81,15 +132,26 @@ ok(/--tier-flat-border/.test(theme) && /--tier-surface-border/.test(theme) && /-
 // written the same collapsed way.
 const flat = theme.replace(/\s+/g, "");
 
-// The default card is drawn from the surface tier, not a value of its own.
+// Each tier class must draw from its OWN named tokens, not a hardcoded
+// value that happens to match today. An earlier version of this check
+// asserted the literal collapsed CSS text (e.g. "border:none" for .flat),
+// which meant the day .flat and .rule were wired up to actually use the
+// --tier-flat-*/--tier-rule-* tokens declared for exactly this purpose, the
+// check itself had to be rewritten anyway — it had locked in the very
+// copy-paste the token scale exists to replace, rather than checking that a
+// scale was in use at all.
 ok(/\.card\{background:var\(--surface\);border:var\(--tier-surface-border\);border-radius:var\(--tier-surface-radius\)/
-  .test(flat), ".card is drawn from the surface tier's tokens");
-
-// -- not every card is a card: the live line is flat, Recent is a rule -----
-ok(/\.flat\{background:transparent;border:none;box-shadow:none;border-radius:0\}/.test(flat),
-  "the flat tier has no box at all: no border, no shadow, no radius");
-ok(/\.rule\{border-top:1pxsolidvar\(--border\);padding-top:10px\}/.test(flat),
-  "the rule tier is a divider, not a surface");
+  .test(flat), ".card is drawn from the surface tier's tokens, not a value of its own");
+ok(/\.flat\{background:transparent;border:var\(--tier-flat-border\);box-shadow:var\(--tier-flat-shadow\);border-radius:var\(--tier-flat-radius\)\}/
+  .test(flat), "the flat tier draws from its own tier tokens, not a hardcoded none/0");
+ok(/\.rule\{border-top:var\(--tier-rule-border\);box-shadow:var\(--tier-rule-shadow\);border-radius:var\(--tier-rule-radius\)/
+  .test(flat), "the rule tier draws from its own tier tokens too");
+// And the three tiers must actually differ from each other - a "scale" where
+// every step names the same value is the single-value problem wearing three
+// names.
+ok(/--tier-flat-radius:0px/.test(theme) && /--tier-surface-radius:var\(--r-lg\)/.test(theme)
+  && /--tier-rule-radius:0px/.test(theme), "the radius tier values are the ones the tokens actually declare");
+ok(!/--tier-flat-shadow:var\(--sh-card\)/.test(theme), "flat's shadow is not quietly the same as surface's");
 
 // -- numbers are the largest thing after the greeting -----------------------
 const numAfter = (label: string, re: RegExp): number => {
@@ -121,16 +183,23 @@ ok(/khoj-trigger/.test(topbarJsx), "the topbar actually renders the centred Khoj
 // -- "Use demo data" is gone, root and branch -------------------------------
 // Checked against the working tree, not the git index: a deletion not yet
 // staged still appears in `git ls-files`, but the file itself is gone.
+//
+// One assertion over the concatenation of every tracked renderer file, not
+// one assertion per file: repeating the same string-absence check file by
+// file inflates the count (it grows by two every time anyone adds an
+// unrelated file) without adding rigour — a file that never mentioned demo
+// data was never going to fail on its own. Concatenating first means a hit
+// anywhere still fails the build, and says which file in its own message.
 ok(!existsSync(root + "web/src/mock.ts"), "web/src/mock.ts no longer exists");
 const tracked = execFileSync("git", ["ls-files", "web/src"], { cwd: root, encoding: "utf8" })
   .split("\n")
   .filter((f) => /\.(tsx?|css)$/.test(f) && !f.endsWith(".check.ts") && existsSync(root + f));
 ok(tracked.length > 5, "the check actually found renderer files to read");
-for (const f of tracked) {
-  const src = read(f);
-  ok(!/Use demo data/.test(src), `${f} contains no "Use demo data" string`);
-  ok(!/\bmockApi\b/.test(src), `${f} does not reference mockApi`);
-}
+const bodies = tracked.map((f) => ({ f, src: read(f) }));
+const demoHit = bodies.find(({ src }) => /Use demo data/.test(src));
+ok(!demoHit, demoHit ? `${demoHit.f} still contains "Use demo data"` : "");
+const mockHit = bodies.find(({ src }) => /\bmockApi\b/.test(src));
+ok(!mockHit, mockHit ? `${mockHit.f} still references mockApi` : "");
 
 // -- dark mode is deliberate: every light-mode token this file defines has a
 // dark-mode override, not a silent fall-through to the light value ---------

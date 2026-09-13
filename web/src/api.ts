@@ -136,8 +136,7 @@ export const api = {
     }),
 };
 
-/** What a screen needs to talk to a kernel. The demo client in mock.ts
- *  satisfies the same shape, so a screen never learns which one it has. */
+/** What a screen needs to talk to a kernel. */
 export type Client = typeof api;
 
 /** Load once, reload on demand, and never leave the caller without one of the

@@ -33,14 +33,16 @@
   --sh-rose:0 6px 18px rgba(34,30,25,.22);
   --success:#5B6B4E; --success-bg:#F1F2EC; --success-border:#DCE0D2;
   --warning:#8A6524; --warning-bg:#FAF3E4; --warning-border:#EBDCBC;
-  --destructive:#AE3A2C; --destructive-bg:#FBEEEB; --destructive-border:#F0D3CC;
   --teal-500:#5F6B62; --teal-bg:#EFF2F0; --teal-border:#DBE1DC;
   --violet-500:#6B6257; --violet-bg:#F3F0EA; --violet-border:#E3DCD0;
   --amber-500:#8A6524; --amber-bg:#FAF3E4;
   /* The one accent, and it only ever means "needs you": a flag, a critical
-     value, the primary action. It shares the destructive hue because a flag
-     IS a small emergency; nothing decorative may reach for this token, and
-     design.check.ts asserts that mechanically. */
+     value, the primary action. There used to be a second token
+     (--destructive) carrying the identical colour under a different name,
+     which let a rule "avoid" the accent guard just by spelling it
+     differently; that token is gone, this is the only warm/red hue the
+     stylesheet defines, and design.check.ts checks selectors exactly (not
+     by prefix) so a comma-appended selector cannot ride in free either. */
   --accent:#AE3A2C; --accent-bg:#FBEEEB; --accent-border:#F0D3CC; --accent-ink:#FFFFFF;
   --gray-50:#F7F3ED; --gray-100:#F1ECE4; --gray-200:#E5DED3; --gray-300:#D2C9BB;
   --gray-400:#A79B8A; --gray-500:#7C7263; --gray-600:#5C5449; --gray-700:#423C34;
@@ -70,7 +72,6 @@
   --success:#9DB388; --success-bg:#1B2117; --success-border:#31402A;
   --warning:#D9A94F; --warning-bg:#2A2114; --warning-border:#54432420;
   --warning-border:#4E3E22;
-  --destructive:#E08272; --destructive-bg:#2C1A16; --destructive-border:#553029;
   --teal-500:#9AAA9E; --teal-bg:#1A201C; --teal-border:#2F3A33;
   --violet-500:#B0A492; --violet-bg:#221E19; --violet-border:#3C352C;
   --amber-500:#D9A94F; --amber-bg:#2A2114;
@@ -210,8 +211,12 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;
   padding:3px 8px;border-radius:var(--r-pill);border:1px solid transparent}
 /* A flag and a critical value are both "needs you": the one accent, and nowhere else. */
+/* One hue, two ranks: a flag is tinted (the accent as text on a light wash
+   of itself), a critical is filled (the accent as a solid ground). Same
+   colour, so the "one accent" rule still holds; different weight, so a flag
+   and a critical do not read as the same thing. */
 .b-warn{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-border)}
-.b-crit{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-border)}
+.b-crit{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .b-ok{background:var(--gray-100);color:var(--ink-3);border-color:var(--border)}
 .b-mute{background:var(--gray-100);color:var(--ink-3);border-color:var(--border)}
 .b-vio{background:var(--gray-100);color:var(--ink-3);border-color:var(--border)}
@@ -256,7 +261,7 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .kvbox{margin-top:9px;border:1px solid var(--border);border-radius:var(--r-md);padding:8px 10px;background:var(--surface)}
 .kv{display:flex;justify-content:space-between;gap:12px;font-size:11.5px;padding:3px 0;color:var(--ink-3)}
 .kv b{color:var(--eka-blue);font-weight:700}
-.kv.crit b{color:var(--destructive)}
+.kv.crit b{color:var(--accent)}
 .quote{border-left:2px solid var(--violet-border);padding-left:10px;font-style:italic;
   color:var(--ink-3);font-size:12px;line-height:1.55;margin-top:7px}
 .props{margin-top:11px;display:flex;flex-direction:column;gap:6px}
@@ -264,7 +269,7 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .prop{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
   border:1px solid var(--border);background:var(--surface);border-radius:var(--r-md);
   padding:9px 11px;cursor:pointer;font:inherit;color:var(--ink);transition:.15s var(--ease)}
-.prop:hover:not(:disabled){border-color:var(--eka-blue);background:var(--eka-blue-bg);transform:translateX(2px)}
+.prop:hover:not(:disabled){border-color:var(--gray-400);background:var(--gray-100);transform:translateX(2px)}
 .prop:disabled{opacity:.45;cursor:not-allowed}
 /* the one accent, spent here on the primary action: this is the thing the
    principle means by "needs you". */
@@ -277,9 +282,11 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .p-tag{margin-left:auto;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
   padding:3px 6px;border-radius:4px;background:var(--gray-100);color:var(--ink-3);
   border:1px solid var(--border);white-space:nowrap}
-.p-tag.scribe{background:var(--violet-bg);color:var(--violet-500);border-color:var(--violet-border)}
-.p-tag.form{background:var(--teal-bg);color:var(--teal-500);border-color:var(--teal-border)}
-.p-tag.irr{background:var(--destructive-bg);color:var(--destructive);border-color:var(--destructive-border)}
+/* An instrument tag names how a value was captured, not that anything is
+   wrong with it: neutral, like the tag pill it decorates. */
+.p-tag.scribe{background:var(--gray-100);color:var(--ink-3);border-color:var(--border)}
+.p-tag.form{background:var(--gray-100);color:var(--ink-3);border-color:var(--border)}
+.p-tag.irr{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-border)}
 .p-tag.hand{background:var(--eka-blue-bg);color:var(--eka-blue-700);border-color:var(--eka-blue-100)}
 .empty{margin:auto;text-align:center;color:var(--ink-3);font-size:12.5px;line-height:1.6;max-width:340px}
 .composer{border-top:1px solid var(--border);padding:11px 14px;display:flex;gap:8px;align-items:center;flex-shrink:0}
@@ -363,7 +370,7 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .cq{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface);
   color:var(--ink-2);border-radius:var(--r-pill);padding:6px 12px;font:inherit;font-size:11.5px;
   font-weight:600;cursor:pointer;white-space:nowrap;transition:.14s var(--ease)}
-.cq:hover:not(:disabled){border-color:var(--eka-blue);color:var(--eka-blue);background:var(--eka-blue-bg)}
+.cq:hover:not(:disabled){border-color:var(--gray-400);color:var(--ink);background:var(--gray-100)}
 .cq:disabled{opacity:.4;cursor:not-allowed}
 .cq.rose{border-color:transparent;background:var(--accent);color:var(--accent-ink);box-shadow:var(--tier-surface-shadow)}
 .cq.rose:hover{transform:translateY(-1px);filter:brightness(.94)}
@@ -375,31 +382,55 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 /* The greeting is the single largest thing on the page; a metric's own
    number (.m-val, .task-n) is the next largest, ahead of every card title
    and every line of body text. */
-.greet{font-size:32px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:baseline;gap:9px}
+/* A block of ordinary inline text, not a flex row: at a narrow width this
+   wraps the way a sentence wraps (facility name first, "·" and the date
+   trailing onto the next line together), instead of stranding the
+   separator alone on its own flex-gapped line the way `display:flex` did. */
+.greet{font-size:32px;font-weight:700;letter-spacing:-.02em;line-height:1.25}
 .greet-sep{color:var(--gray-400);font-weight:400}
-.greet-org{color:var(--ink-3);font-weight:500;font-size:15px}
 
 /* the live line is the page's subject: no card, no border, no shadow. it sits
    flat on the canvas because it does not need a box to be the most important
    thing here. */
-.flat{background:transparent;border:none;box-shadow:none;border-radius:0}
+.flat{background:transparent;border:var(--tier-flat-border);box-shadow:var(--tier-flat-shadow);border-radius:var(--tier-flat-radius)}
 .live{padding:2px 0 6px}
 .live-h{display:flex;align-items:baseline;gap:9px;margin-bottom:4px}
 
-.home-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;align-items:start}
+/* flex-wrap, not a fixed-column grid: a grid whose column count does not
+   divide the card count evenly leaves an empty cell with no content in it
+   and nothing choosing where it falls (measured: a 335x365px hole, about
+   22% of the band, with exactly three cards in two columns). A wrapped flex
+   row never has a phantom cell to leave empty — an odd card out just ends
+   its row a little early, the way wrapped text does, which reads as content
+   running out, not as a shape cut from the layout. */
+.home-cards{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.home-cards>*{flex:1 1 320px;min-width:280px}
 
 /* every secondary card carries an explicit handle: not tap-and-hold on the
    card body (fails on touch, and on a screen already full of taps), and not
    drag-only either, a focused handle takes arrow keys. */
-.drag-handle{width:26px;height:26px;flex-shrink:0;border:none;background:none;border-radius:var(--r-sm);
+/* 44x44, the touch-target minimum, on a 20px icon: negative margin gives the
+   handle a hit area bigger than its visible box without pushing the card
+   header any taller than it already was. HTML5 drag-and-drop still does not
+   fire on touch at all (no browser implements it there), so this is a real
+   but partial fix - it gets the handle to a size a thumb can actually hit
+   the keyboard-reorder path with, not a working touch-drag path, which does
+   not exist here; see the report. */
+.drag-handle{width:44px;height:44px;margin:-9px;flex-shrink:0;border:none;background:none;border-radius:var(--r-sm);
   color:var(--gray-400);cursor:grab;display:grid;place-items:center;transition:.14s var(--ease)}
 .drag-handle:hover{background:var(--gray-100);color:var(--ink-2)}
 .drag-handle:active{cursor:grabbing}
 .drag-handle:focus-visible{outline:2px solid var(--ink);outline-offset:1px;color:var(--ink-2)}
+/* The dragged card itself, and whatever it is currently over: without this
+   nothing on screen shows where a card will land until the drop actually
+   happens. */
+.card.dragging,.rule.dragging{opacity:.5}
+.card.drag-over,.rule.drag-over{border-color:var(--ink);background:var(--gray-50)}
+[data-theme="dark"] .card.drag-over,[data-theme="dark"] .rule.drag-over{background:var(--gray-100)}
 
 /* the tertiary tier: a rule, not a surface. Recent is on this page but it is
    not what the page is for, so it gets the lightest treatment of the three. */
-.rule{border-top:1px solid var(--border);padding-top:10px}
+.rule{border-top:var(--tier-rule-border);box-shadow:var(--tier-rule-shadow);border-radius:var(--tier-rule-radius);padding-top:10px}
 
 .flow{display:flex;gap:0;padding:16px 14px;overflow-x:auto}
 .fl-col{min-width:132px;flex:1;position:relative;padding:0 7px}
@@ -411,19 +442,19 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
   background:linear-gradient(90deg,transparent,var(--ink),transparent);
   background-size:60% 100%;background-repeat:no-repeat;animation:flow 2.4s linear infinite}
 @keyframes flow{from{background-position:-60% 0}to{background-position:160% 0}}
-.fl-col.jam .fl-rail{background:var(--warning-border)}
-.fl-col.jam .fl-rail i{background:linear-gradient(90deg,transparent,var(--warning),transparent);
+.fl-col.jam .fl-rail{background:var(--gray-300)}
+.fl-col.jam .fl-rail i{background:linear-gradient(90deg,transparent,var(--ink-3),transparent);
   background-size:60% 100%;background-repeat:no-repeat}
 .fl-p{display:flex;align-items:center;gap:7px;padding:7px 8px;border:1px solid var(--border);
   background:var(--surface);border-radius:var(--r-sm);margin-bottom:5px;cursor:pointer;
   font-size:11px;transition:.14s var(--ease)}
-.fl-p:hover{border-color:var(--eka-blue);background:var(--eka-blue-bg);transform:translateX(2px)}
+.fl-p:hover{border-color:var(--gray-400);background:var(--gray-100);transform:translateX(2px)}
 .fl-av{width:20px;height:20px;border-radius:4px;background:var(--gray-100);color:var(--ink-2);
   display:grid;place-items:center;font-size:8.5px;font-weight:700;flex-shrink:0}
 .fl-p.alert{border-color:var(--accent-border);background:var(--accent-bg)}
 .fl-p.alert .fl-av{background:var(--accent);color:var(--accent-ink)}
 .fl-e{font-size:10.5px;color:var(--gray-400);padding:6px 2px}
-.fl-jam{font-size:9.5px;font-weight:700;color:var(--warning);margin-top:7px;
+.fl-jam{font-size:9.5px;font-weight:700;color:var(--ink-3);margin-top:7px;
   display:flex;align-items:center;gap:4px}
 
 .hgrid{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;align-items:start}
@@ -434,7 +465,7 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .at:hover{background:var(--gray-50)}
 .at-ic{width:28px;height:28px;border-radius:var(--r-sm);display:grid;place-items:center;flex-shrink:0;
   background:var(--gray-100);color:var(--ink-3)}
-.at-ic.red{background:var(--accent-bg);color:var(--accent)}
+.at-ic.red{background:var(--accent);color:var(--accent-ink)}
 .at-ic.amb{background:var(--accent-bg);color:var(--accent)}
 .at-ic.blue{background:var(--eka-blue-bg);color:var(--eka-blue)}
 .at-t{font-size:12.5px;font-weight:600}
@@ -450,7 +481,13 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .leg{display:flex;gap:14px;margin-top:7px;font-size:10.5px;color:var(--ink-3)}
 .leg span{display:flex;align-items:center;gap:5px}
 .dt{width:7px;height:7px;border-radius:50%}
-.cont{display:flex;gap:9px;overflow-x:auto;padding:13px 15px}
+/* Wraps rather than scrolling horizontally: on the Home card specifically
+   (a narrower flex-basis than this row used to assume) a scrolling `.cont`
+   clipped the second Recent tile with no visible scrollbar and no other
+   affordance telling anyone more was there (measured: scrollWidth 379 vs
+   clientWidth 335). Wrapping means everything that's in `recent` is always
+   on screen. */
+.cont{display:flex;flex-wrap:wrap;gap:9px;padding:13px 15px}
 .cn{min-width:170px;border:1px solid var(--border);border-radius:var(--r-md);padding:10px 11px;
   cursor:pointer;transition:.14s var(--ease);background:var(--surface)}
 .cn:hover{border-color:var(--eka-blue);transform:translateY(-1px);box-shadow:var(--sh-hover)}
@@ -515,7 +552,7 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .warn-box,.crit-box{border-radius:var(--r-md);padding:10px 12px;font-size:11.5px;
   line-height:1.5;margin-bottom:13px;display:flex;gap:8px;align-items:flex-start}
 .warn-box{border:1px solid var(--warning-border);background:var(--warning-bg);color:var(--warning);font-weight:500}
-.crit-box{border:1px solid var(--destructive-border);background:var(--destructive-bg);color:var(--destructive)}
+.crit-box{border:1px solid var(--accent-border);background:var(--accent-bg);color:var(--accent)}
 .chk{display:flex;gap:9px;align-items:flex-start;font-size:11.5px;color:var(--ink-2);
   padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-md);cursor:pointer;line-height:1.45}
 .chk input{margin-top:2px;accent-color:var(--eka-blue);width:15px;height:15px;flex-shrink:0}
