@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { cue, keep, mine, opensOnArrival, records, weigh } from "./loops.ts";
+import { cue, keep, mine, offered, opensOnArrival, records, weigh } from "./loops.ts";
 import type { Operation, QueueRow, SectionResult } from "./types";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -51,6 +51,23 @@ const row = (thread: string, name: string, station: string): QueueRow => ({
   thread, subject: { name }, station, flags: [], badges: {}, opened_at: "",
 });
 const register = op("phc.op.patient-register");
+
+// -- a surface may only open what the kernel is still offering -------------
+// The bug this closes: a surface opened `phc.op.patient-register` by id, on
+// a thread whose own `actions` had already, correctly, stopped offering it —
+// six denials in 28 seconds on an already-registered patient. `offered()` is
+// the one gate every call site that opens an operation on an existing thread
+// must pass through: it hands back the kernel's own object from `actions`,
+// or nothing, so there is no way to construct an operation the current list
+// does not contain. Would this still pass if the function ignored `actions`
+// and just returned the operation by id regardless? No: the second and
+// fourth checks below fail immediately if it does.
+ok(offered(register.id, [register]) === register, "an operation present in actions is handed back");
+ok(offered(register.id, [op("phc.op.vitals-record")]) === undefined,
+   "an operation absent from actions is refused, not returned by id");
+ok(offered(op("phc.op.vitals-record").id, doctor) === undefined,
+   "absence holds for an id from a different bundle's operation too");
+ok(offered("phc.op.patient-register", []) === undefined, "an empty actions list offers nothing");
 
 // A role that can start a new subject loops on new subjects.
 const opened = cue({ station: "reception", opener: register, queue: [], closed: "enc-1" });

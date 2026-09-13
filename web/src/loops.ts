@@ -14,6 +14,18 @@ import type { Operation, QueueRow, SectionResult } from "./types";
  *  when it is not on offer (its precondition is unmet, or the line is
  *  complete) the step's own ordering has put the next thing first.
  */
+/** Whether a thread's own current actions are still offering an operation, by
+ *  id. Six denials landed on an already-registered patient because a surface
+ *  opened `phc.op.patient-register` by id instead of by membership in
+ *  `thread.actions` — the guard's own predicate, already applied. Every
+ *  screen that opens an operation on a thread already in progress must go
+ *  through this: it hands back the kernel's own Operation object from
+ *  `actions`, or undefined, so there is no way to hold onto an operation the
+ *  current list does not contain. */
+export function offered(id: string, actions: Operation[]): Operation | undefined {
+  return actions.find((a) => a.id === id);
+}
+
 export function weigh(
   actions: Operation[],
   closes: string | null,

@@ -19,7 +19,7 @@ import { CloseCard } from "./CloseCard";
 import { questionnaire } from "./declarations";
 import { Home } from "./Home";
 import { Icon, IconSheet } from "./icons";
-import { cue, keep, opensOnArrival, weigh, type Cue } from "./loops";
+import { cue, keep, offered, opensOnArrival, weigh, type Cue } from "./loops";
 import { clock, header, queueViewFor, summariesFor, type Ctx, type Said } from "./messages";
 import { mockApi } from "./mock";
 import { OperationPanel, proposalOperation } from "./OperationPanel";
@@ -256,6 +256,38 @@ function App() {
     go(`#/threads/${id}`);
   };
 
+  /** Open an operation on a thread already in progress, never by id alone.
+   *
+   *  Six denials landed on an already-registered patient because a surface
+   *  opened `phc.op.patient-register` by id, and `thread.actions` had
+   *  already, correctly, stopped offering it. A copy of `actions` held from
+   *  an earlier moment (a palette preview, a summary sheet opened minutes
+   *  ago) can be just as stale as a hard-coded id, so this reads the thread
+   *  fresh and checks with `offered()` — the guard's own membership test —
+   *  right before opening. Not present: this says what the kernel said (its
+   *  nudge), never nothing, because a button that does nothing is how the
+   *  six denials went unnoticed.
+   *
+   *  Not for register(): that path opens a brand-new thread and its
+   *  workflow's first operation, which has no `actions` yet to check against
+   *  and is the bundle's own definition of what registers somebody. */
+  const openIfOffered = async (
+    threadId: string, op: Operation,
+    extra?: { proposal?: Proposal; mobile?: string; seed?: Payload },
+  ) => {
+    try {
+      const panel = await client.thread(threadId);
+      const op2 = offered(op.id, panel.actions);
+      if (op2) {
+        setModal({ op: op2, thread: threadId, ...extra });
+      } else {
+        toast(panel.nudge || `${op.title} is no longer being offered on this thread.`);
+      }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not open that action");
+    }
+  };
+
   /** Read `closes` before reloading, because the reload is what changes it. */
   const finish = (op: Operation) => {
     const wasClosing = thread.data?.closes === op.id;
@@ -309,7 +341,7 @@ function App() {
     if (alreadyAsked && !carried) return;
     try {
       const panel = await client.thread(id);
-      const op = panel.actions.find((a) => a.id === ABHA_OP);
+      const op = offered(ABHA_OP, panel.actions);
       // `seed` rather than a second journey: the identifier is already known,
       // and the consent and the method on that form are still a person's to
       // answer, behind its own un-prefilled confirm.
@@ -459,7 +491,7 @@ function App() {
                       sections={(summary.data?.rows as SectionResult[] | undefined) ?? []}
                       asking={asking}
                       onSay={(t) => say(route.id, t, route.id)}
-                      onAction={(op) => setModal({ op, thread: route.id })}
+                      onAction={(op) => void openIfOffered(route.id, op)}
                       renderProposal={(p) => (
                         <OperationPanel
                           inline
@@ -517,7 +549,7 @@ function App() {
             onAction={(t: string, op: Operation) => {
               setPalette(false);
               go(`#/threads/${t}`);
-              setModal({ op, thread: t });
+              void openIfOffered(t, op);
             }}
           />
         </Overlay>
@@ -571,7 +603,7 @@ function App() {
           onClose={() => setSheet(null)}
           onAction={(op) => {
             setSheet(null);
-            setModal({ op, thread: sheet.thread });
+            void openIfOffered(sheet.thread, op);
           }}
           onReview={(p) => {
             setSheet(null);

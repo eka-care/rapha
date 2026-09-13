@@ -151,7 +151,7 @@ def test_a_walk_in_can_be_registered_and_the_line_moves():
     twice = client.post("/api/operations/phc.op.patient-register/commit",
                         json={"thread": "enc-001", "payload": payload})
     assert twice.status_code == 422
-    assert "precondition" in twice.json()["detail"]
+    assert twice.json()["detail"] == "Already registered."
 
 
 def test_a_capability_the_role_lacks_hides_the_action_and_refuses_the_write():
@@ -303,7 +303,7 @@ def test_a_refusal_carries_the_guard_own_reason_and_a_next_step():
                              "utterance": "vitals 120 over 80 and pulse 70"}).json()
     card = body["proposals"][0]
     assert card["proposal_id"] is None
-    assert card["verdict"]["reason"] == "precondition not met: not vitals.recorded"
+    assert card["verdict"]["reason"] == "Already vitals recorded."
     assert card["verdict"]["next"] and "kernel decides" in card["verdict"]["next"]
     assert card["verdict"]["reason"] in body["said"]
     # a denial is audited even though nothing was written.

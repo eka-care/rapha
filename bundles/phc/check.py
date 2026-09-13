@@ -226,7 +226,7 @@ def check_the_withdrawal_action_is_invisible_with_nothing_to_withdraw():
     # Absent means absent, on the tap as well as on the screen.
     again = commit(store, thread, "phc.op.capture-withdraw", {"capture_stop": True},
                    actor="user:mo")
-    assert not again and "capture.consented" in again.reason, again.reason
+    assert not again and again.reason == "Requires capture consented.", again.reason
     ok("the withdrawal is absent when consent was never given, when it was "
        "declined and once it has already been withdrawn, on both the screen "
        "and the tap")

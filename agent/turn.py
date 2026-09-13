@@ -31,7 +31,9 @@ UNSURE = ("I do not know which operation that is, and I will not guess: a "
 
 # What to do next, per kind of refusal. The guard's own reason is passed
 # through unedited and is the first half of the sentence; this is only the
-# second half. Keyed by the prefix catalogue/guard.py writes.
+# second half. Keyed by the shape of the sentence catalogue/guard.py writes,
+# never by a particular flag or operation name, so a bundle this file has
+# never heard of still gets a sensible next step.
 NEXT = (
     ("payload invalid", "Open the form on screen and fill in the rest. I only "
                         "fill what the words actually said."),
@@ -39,18 +41,25 @@ NEXT = (
                            "Someone who does has to do it."),
     ("outside scope", "That is outside this account's scope of practice."),
     # A separation of duties rule is about WHO, not about the visit, so it
-    # gets its own half sentence. It has to come first: both reasons begin
-    # "precondition not met".
-    ("precondition not met: not actor of",
+    # gets its own half sentence. It has to come first: "Already performed"
+    # and "Must be the person who performed" would otherwise also match the
+    # generic "Already"/"Requires" checks below.
+    ("Already performed",
      "Somebody else has to do this one. Whoever did the step it names cannot "
      "also do this, whatever capabilities they hold."),
-    ("precondition not met: actor of",
+    ("Must be the person who performed",
      "Only the person who did the step it names may do this one."),
-    # Both polarities: "consult.documented" is not done yet, "not
-    # vitals.recorded" is already done. The guard's reason names which; this
-    # half must be true of either, so it claims no order of its own.
-    ("precondition not met", "The state of this visit does not satisfy that. "
-                             "The kernel decides what is open here, not me."),
+    ("Needs to know who is acting",
+     "Nobody said who is acting here, and the kernel will not guess on a "
+     "rule about who did what."),
+    # Both polarities of a plain flag precondition: "Already registered."
+    # (unmet because it is present) and "Requires rx confirmed." (unmet
+    # because it is absent). This half must be true of either, so it claims
+    # no order of its own.
+    ("Already", "The state of this visit does not satisfy that. "
+               "The kernel decides what is open here, not me."),
+    ("Requires", "The state of this visit does not satisfy that. "
+                "The kernel decides what is open here, not me."),
     ("irreversible", "Irreversible work is done on screen with an explicit tap. "
                      "I cannot propose it, and that is deliberate."),
     ("not a step of", "This line has no station that draws it, so it cannot "
@@ -228,7 +237,7 @@ def demo():
         sent.append((operation, dict(payload)))
         if operation == "x.op.vitals":
             return "prop-1", "proposed", ["vitals.flagged"]
-        return None, "precondition not met: rx.prescribed", []
+        return None, "Requires rx prescribed.", []
 
     turn = take("vitals 140 over 90 and pulse 72", catalogue=cat, view=view,
                 propose=propose, confidence={"systolic": 0.8, "invented": 0.9},
@@ -251,14 +260,14 @@ def demo():
     refused = take("dispense the medicines", catalogue=cat, view=view,
                    propose=propose, which="router")["proposals"][0]
     assert refused["proposal_id"] is None
-    assert refused["verdict"]["reason"] == "precondition not met: rx.prescribed"
+    assert refused["verdict"]["reason"] == "Requires rx prescribed."
     assert "does not satisfy that" in refused["verdict"]["next"]
-    # A separation of duties refusal shares that prefix and must not share
+    # A separation of duties refusal reads differently and must not share
     # that sentence: it is about who is asking, not about the visit.
     assert "Somebody else has to do this one" in next_step(
-        "precondition not met: not actor of lab.op.result-enter")
+        "Already performed lab op result enter.")
     assert "does not satisfy that" not in next_step(
-        "precondition not met: not actor of lab.op.result-enter")
+        "Already performed lab op result enter.")
     assert refused["offered_here"] is False
     assert "does not offer this" in refused["order"]
 

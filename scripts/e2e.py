@@ -524,7 +524,7 @@ def main():
         denied = call(base, "/operations/phc.op.pharmacy-dispense/commit/",
                       {"thread": "enc-002",
                        "payload": {"dispenses": ["Amlodipine 5mg x 10"]}}, expect=422)
-        assert "precondition not met: rx.confirmed" in denied["detail"], denied
+        assert "Requires rx confirmed." in denied["detail"], denied
         ok("a precondition that is not met refuses the write: %s" % denied["detail"])
 
         thread = register(base, "Range Test", "T-90")

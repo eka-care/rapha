@@ -330,7 +330,7 @@ def check_the_same_person_cannot_verify_their_own_result():
 
     d = commit(store, "lab.op.result-verify", VERIFY, SENIOR, actor=A_SENIOR)
     assert not d, "the same person verified their own result"
-    assert "not actor of lab.op.result-enter" in d.reason, d.reason
+    assert d.reason == "Already performed lab op result enter.", d.reason
     assert "diagnostic_report" in store.rows and \
         all(r["status"] != "verified" for r in store.rows["diagnostic_report"]), \
         "nothing was written by the refused verification"
@@ -385,7 +385,7 @@ def check_release_is_irreversible_and_human():
     assert [s.status for s in state.line(WF, known)] == ["done"] * 5
     d = commit(store, "lab.op.report-release", RELEASE, PATHOLOGIST, actor=A_PATH,
                confirmed=True)
-    assert not d and "precondition not met: not report.released" in d.reason
+    assert not d and d.reason == "Already report released.", d.reason
     ok("with the tap it releases, the line completes, and a second release is refused")
 
     outcomes = [r.outcome for r in store.audit(T)]
@@ -516,10 +516,10 @@ def e2e():
                {"thread": t2, "payload": RESULT})
         denied = h.call(base, "/operations/lab.op.result-verify/commit/?role=senior_technologist",
                         {"thread": t2, "payload": VERIFY}, expect=422)
-        assert "not actor of lab.op.result-enter" in denied["detail"], denied
+        assert "Already performed lab op result enter." in denied["detail"], denied
         denied = h.call(base, "/operations/lab.op.result-verify/propose/?role=senior_technologist",
                         {"thread": t2, "payload": VERIFY}, expect=422)
-        assert "not actor of lab.op.result-enter" in denied["detail"], denied
+        assert "Already performed lab op result enter." in denied["detail"], denied
         assert h.rows(db, "SELECT status FROM diagnostic_report WHERE encounter=? "
                           "AND status='verified'", (t2,)) == []
         h.call(base, "/operations/lab.op.result-verify/commit/?role=pathologist",

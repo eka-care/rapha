@@ -241,7 +241,7 @@ def live(base):
     assert view["flags"] == [] and view["station"] == "reception", view["flags"]
     out = cli.respond(kernel, catalogue, view, "record her bp 140 over 90 and pulse 72",
                       which="router")
-    assert "precondition not met: registered" in out, out
+    assert "Requires registered." in out, out
     assert "refused" in out
     ok("an unmet precondition comes back as the guard's own words")
 
@@ -250,7 +250,7 @@ def live(base):
         kernel.propose("phc.op.vitals-record", "enc-001",
                        {"systolic": 140, "diastolic": 90, "pulse": 72})
     except client.Refused as no:
-        assert no.reason == "precondition not met: registered", no.reason
+        assert no.reason == "Requires registered.", no.reason
         assert no.status == 422
     else:
         raise AssertionError("the kernel allowed vitals on an unregistered thread")

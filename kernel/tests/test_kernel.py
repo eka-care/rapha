@@ -309,7 +309,7 @@ def test_a_proposal_is_judged_again_at_confirm_and_not_when_it_was_made():
     # Someone else prescribes first. The precondition 'not rx.confirmed' has gone.
     s.add("medication_request", status="active")
     d2, prop2 = proposals.confirm(s, BUNDLE, prop, caps={"rx.prescribe"}, actor="mo")
-    assert not d2 and "precondition not met" in d2.reason
+    assert not d2 and d2.reason == "Already rx confirmed.", d2.reason
     assert prop2.status == "pending" and len(s.rows["medication_request"]) == 1
 
 
