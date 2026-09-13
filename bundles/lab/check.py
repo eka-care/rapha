@@ -612,7 +612,13 @@ def mcp_tools(base):
         proc.wait(timeout=10)
     tools = [t["name"] for t in reply["result"]["tools"]]
     assert "propose_result_verify" in tools and "propose_report_release" in tools, tools
-    assert all(t.startswith("propose_") for t in tools), tools
+    # Khoj is the ask-and-search tool and is not an operation, so it is not
+    # named propose_*. Everything else on this surface must be: the rule this
+    # asserts is that no MCP tool can commit, and khoj's own description says
+    # it never does. scripts/e2e.py:144 carves it out the same way.
+    assert "khoj" in tools, tools
+    ops_only = [t for t in tools if t != "khoj"]
+    assert ops_only and all(t.startswith("propose_") for t in ops_only), tools
     ok("the unmodified Go MCP server offers the lab operations, every one a proposal, "
        "including release, which the kernel then refuses on surface")
 
