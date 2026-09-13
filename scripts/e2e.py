@@ -448,7 +448,7 @@ def lab_separation():
                                 "?role=senior_technologist" % surface,
                           {"thread": t, "payload": VERIFY,
                            "confirmed": True}, expect=422)
-            assert "not actor of lab.op.result-enter" in denied["detail"], denied
+            assert "Already performed lab op result enter." in denied["detail"], denied
         assert rows(db, "SELECT 1 FROM diagnostic_report WHERE encounter=? "
                         "AND status='verified'", (t,)) == []
         ok("and refuses it on both surfaces even with the tap, writing nothing")
@@ -464,7 +464,7 @@ def lab_separation():
         verify = [c for c in answer["proposals"]
                   if c["operation"] == "lab.op.result-verify"]
         assert verify and not verify[0]["proposal_id"], answer
-        assert "not actor of lab.op.result-enter" in verify[0]["verdict"]["reason"]
+        assert "Already performed lab op result enter." in verify[0]["verdict"]["reason"]
         assert not call(base, "/threads/%s/?role=senior_technologist" % t)["proposals"]
         ok("an utterance does not launder it either: the agent acting for that "
            "account is refused the same way")

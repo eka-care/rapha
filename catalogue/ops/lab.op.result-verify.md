@@ -74,6 +74,6 @@ out before: it did not exist.
   cannot re-enter, because `result.entered` is already true. There is no
   amend loop in this bundle; see bundles/LAB-LOG.md.
 - **The same person entered and verified.** Refused, on both surfaces, with
-  the reason `precondition not met: not actor of lab.op.result-enter`. On the
+  the reason `Already performed lab op result enter.` On the
   rendered panel it is refused on the tap rather than hidden, because
   api/main.py does not yet tell the kernel who is looking.

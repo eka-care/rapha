@@ -72,7 +72,7 @@ const thread: ThreadView = {
   ],
   audit: [
     { id: "a1", thread: "enc-t", operation: "phc.op.lab-order", actor: "user:mo", surface: "mcp",
-      payload: {}, outcome: "denied: precondition not met: consult.documented",
+      payload: {}, outcome: "denied: Requires consult documented.",
       at: "2026-09-10T18:40:00Z", proposal: null },
     { id: "a2", thread: "enc-t", operation: VITALS, actor: "user:nurse", surface: "rendered",
       payload: { systolic: 190, diastolic: 125, pulse: 72, override_reason: "cuff reads high, repeated" },
