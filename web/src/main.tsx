@@ -385,8 +385,6 @@ function App() {
         role={role}
         recent={recent}
         onGo={go}
-        onNewChat={() => go("#/ask")}
-        onSearch={() => setKhoj(true)}
         onRole={(r) => {
           setRole(r);
           setRoleState(r);

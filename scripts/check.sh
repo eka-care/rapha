@@ -69,6 +69,9 @@ if [ -d web/node_modules ]; then
   # One primary action per station, everything else in overflow: pure rules
   # over declarations, checked without a browser.
   (cd web && node --experimental-strip-types src/loops.check.ts)
+  # Home first and default, the sidebar built from declarations, and "Lines"
+  # is the atom's own word, never typed into a renderer.
+  (cd web && node --experimental-strip-types src/shell.check.ts)
   # Enter commits, Escape cancels, Tab never traps: the keyboard contract for
   # a clerk who cannot reach for a mouse between patients.
   (cd web && node --experimental-strip-types src/keys.check.ts)

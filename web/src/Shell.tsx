@@ -92,10 +92,34 @@ export function useTheme(): [string, () => void] {
   return [theme, () => setTheme(theme === "light" ? "dark" : "light")];
 }
 
+// ---------------------------------------------------------------- collapse
+
+const COLLAPSED = "phc.sidebar.collapsed";
+
+/** Per viewer, per browser, same treatment as the theme: remembered in
+ *  localStorage, and nothing else needs to know about it. */
+function useCollapsed(): [boolean, () => void] {
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(COLLAPSED) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLLAPSED, collapsed ? "1" : "0");
+    } catch {
+      /* this session still remembers it */
+    }
+  }, [collapsed]);
+  return [collapsed, () => setCollapsed((c) => !c)];
+}
+
 // ----------------------------------------------------------------- sidebar
 
 export function Sidebar({
-  cat, facility, queues, route, role, recent, onGo, onNewChat, onSearch, onRole, onManageRoles,
+  cat, facility, queues, route, role, recent, onGo, onRole, onManageRoles,
 }: {
   cat: Catalogue | undefined;
   facility: Facility | undefined;
@@ -106,8 +130,6 @@ export function Sidebar({
   role: string;
   recent: Recent[];
   onGo: (hash: string) => void;
-  onNewChat: () => void;
-  onSearch: () => void;
   onRole: (role: string) => void;
   /** Opens the role editor. Always offered here: whether this caller may
    *  actually save is api/main.py's `facility.admin` check, not a thing this
@@ -115,6 +137,7 @@ export function Sidebar({
   onManageRoles: () => void;
 }) {
   const [menu, setMenu] = useState(false);
+  const [collapsed, toggleCollapsed] = useCollapsed();
   useEffect(() => {
     const shut = () => setMenu(false);
     addEventListener("click", shut);
@@ -130,53 +153,56 @@ export function Sidebar({
   const held = (r: string): string | number =>
     cat?.bundles?.[r]?.length ?? (r === facility?.user?.role ? facility.user.capabilities.length : "?");
 
+  const label = (name: string) => (collapsed ? undefined : name);
+
   return (
-    <aside className="sb">
+    <aside className={`sb${collapsed ? " collapsed" : ""}`}>
       <div className="sb-top">
         <div className="brand-mark"><Icon name="mark" size="lg" /></div>
-        <div>
-          <div className="brand-n">{cat?.manifest?.title ?? "Workspace"}</div>
-          <div className="brand-s">
-            {cat?.manifest ? `${cat.manifest.id} · ${cat.manifest.version}` : "no manifest"}
+        {!collapsed && (
+          <div>
+            <div className="brand-n">{cat?.manifest?.title ?? "Workspace"}</div>
+            <div className="brand-s">
+              {cat?.manifest ? `${cat.manifest.id} · ${cat.manifest.version}` : "no manifest"}
+            </div>
           </div>
-        </div>
-      </div>
-
-      <div className="sb-pad">
-        <button className="sb-btn" onClick={onNewChat}>
-          <Icon name="plus" size="sm" />New chat
-        </button>
-      </div>
-      <div className="sb-pad" style={{ paddingTop: 0 }}>
-        <button className="sb-btn ghost" onClick={onSearch}>
-          <Icon name="search" size="sm" />Search<span className="kbd ml-auto">⌘K</span>
+        )}
+        <button
+          className="icon-btn ml-auto"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!collapsed}
+          onClick={toggleCollapsed}
+        >
+          <Icon name="chev" size="sm" />
         </button>
       </div>
 
       <div className="sb-nav">
-        <button className={`nv${route.kind === "home" ? " on" : ""}`} onClick={() => onGo("#/home")}>
-          <Icon name="spark" size="sm" />Home
+        <button className={`nv${route.kind === "home" ? " on" : ""}`} onClick={() => onGo("#/home")} aria-label="Home">
+          <Icon name="home" size="sm" />{label("Home")}
         </button>
         {nav.map((v) => {
           const result = queues.find((q) => q.view === v.id);
           const count = result?.groups?.reduce((n, g) => n + (g.key === null ? 0 : g.count), 0);
+          const name = v.title ?? title(v.id);
           return (
             <button
               key={v.id}
               className={`nv${route.kind === "view" && route.id === v.id ? " on" : ""}`}
               onClick={() => onGo(`#/views/${v.id}`)}
+              aria-label={name}
             >
               <Icon name={iconForView(v)} size="sm" />
-              {v.title ?? title(v.id)}
-              {count !== undefined && <span className="ct">{count}</span>}
+              {label(name)}
+              {!collapsed && count !== undefined && <span className="ct">{count}</span>}
             </button>
           );
         })}
       </div>
 
-      <div className="sb-sec">Recents</div>
+      {!collapsed && <div className="sb-sec">Recents</div>}
       <div className="sb-list">
-        {recent.length ? (
+        {!collapsed && recent.length ? (
           recent.map((t) => (
             <button
               key={t.id}
@@ -188,9 +214,11 @@ export function Sidebar({
             </button>
           ))
         ) : (
-          <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--gray-400)" }}>
-            No threads yet.
-          </div>
+          !collapsed && (
+            <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--gray-400)" }}>
+              No threads yet.
+            </div>
+          )
         )}
       </div>
 
@@ -224,17 +252,20 @@ export function Sidebar({
         </div>
         <button
           className="rolebtn"
+          aria-label={`Role: ${role === "demo" ? "every capability (demo)" : human(role)}`}
           onClick={(e) => {
             e.stopPropagation();
             setMenu(!menu);
           }}
         >
           <span className="rb-av">{role.slice(0, 1).toUpperCase()}</span>
-          <span style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
-            <span className="rb-n">{role === "demo" ? "Every capability (demo)" : human(role)}</span>
-            <div className="rb-s">{held(role)} capabilities</div>
-          </span>
-          <Icon name="chev" size="sm" />
+          {!collapsed && (
+            <span style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+              <span className="rb-n">{role === "demo" ? "Every capability (demo)" : human(role)}</span>
+              <div className="rb-s">{held(role)} capabilities</div>
+            </span>
+          )}
+          {!collapsed && <Icon name="chev" size="sm" />}
         </button>
       </div>
     </aside>

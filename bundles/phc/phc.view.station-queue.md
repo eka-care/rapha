@@ -2,7 +2,7 @@
 id: phc.view.station-queue
 type: view
 kind: queue
-title: Patients by station
+title: Lines
 summary: Today, grouped by station.
 capability: patient.find
 workflow: phc.wf.outpatient

@@ -1357,7 +1357,7 @@
       "scope": "today",
       "sections": [],
       "summary": "Today, grouped by station.",
-      "title": "Patients by station",
+      "title": "Lines",
       "type": "view",
       "window": "day",
       "workflow": "phc.wf.outpatient"
