@@ -31,23 +31,26 @@ def ok(what):
     print("ok   %s" % what)
 
 
+SELF = "scripts/check_khoj.py"
+
+
 def tracked_source_files():
     out = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True,
                          text=True, check=True)
     for rel in out.stdout.splitlines():
-        if rel.endswith(".md"):
-            continue  # docs and history, not live code
+        if rel.endswith(".md") or rel == SELF:
+            continue  # docs and history, not live code; and this file has to
+                       # name both words in order to check for them
         yield rel
 
 
 # Files allowed to still make a live call to the deprecated path: its own
 # alias route, api/main.py's `say()`, which delegates to `khoj()` and has no
-# logic of its own; the test that proves that alias still answers; and this
-# file. Everywhere else, a comment is allowed to talk about /agent/say (that
-# is history, same as a .md file), but code is not: see the comment-strip
-# below, the same technique web/src/messages.check.ts uses for the same
-# reason.
-ALLOWED_SAY_CODE = {"api/main.py", "api/tests/test_api.py", "scripts/check_khoj.py"}
+# logic of its own, and the test that proves that alias still answers.
+# Everywhere else, a comment is allowed to talk about /agent/say (that is
+# history, same as a .md file), but code is not: see the comment-strip below,
+# the same technique web/src/messages.check.ts uses for the same reason.
+ALLOWED_SAY_CODE = {"api/main.py", "api/tests/test_api.py"}
 
 
 def code_only(text: str) -> str:
