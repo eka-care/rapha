@@ -84,6 +84,37 @@ def _queue(bundle, view, store, at):
     return rows, groups
 
 
+def _as_list(v):
+    if v is None:
+        return []
+    return v if isinstance(v, list) else [v]
+
+
+def _tasklist(bundle, view, store, at):
+    """A row per declared task: a count and the matching threads. Cross
+    thread by construction, unlike a queue or a summary: each task walks
+    every thread this workflow has today and tests a predicate over its
+    flags, not the flags of one thread the caller already opened.
+
+    Reads only flags, via kernel.state.flags, exactly what a queue row reads
+    for its badges. No Store method exists here that every adapter does not
+    already serve.
+    """
+    wf = bundle.workflows[view.workflow]
+    known_by_thread = {ref.id: flags(store, ref.id, wf)
+                       for ref in store.threads(workflow=view.workflow, scope=view.scope)}
+    rows = []
+    for task in view.tasks:
+        want = _as_list(task.where.get("flag"))
+        avoid = _as_list(task.where.get("not"))
+        matches = sorted(tid for tid, known in known_by_thread.items()
+                         if all(f in known for f in want)
+                         and not any(f in known for f in avoid))
+        rows.append(c.TaskRow(title=task.title, count=len(matches),
+                              threads=matches, operation=task.operation))
+    return rows
+
+
 def _summary(bundle, view, store, thread, caps):
     wf = bundle.workflows[view.workflow]
     known = flags(store, thread, wf)
@@ -126,6 +157,8 @@ def resolve(bundle, view_id, store, *, thread=None, caps=frozenset(), at=None):
         rows = [metric(store, bundle.metrics[mid], window=view.window, at=at)
                 for mid in view.metrics]
         groups = []
+    elif view.kind == "tasklist":
+        rows, groups = _tasklist(bundle, view, store, at), []
     else:
         raise ValueError(f"unknown view kind '{view.kind}'")
 

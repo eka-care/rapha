@@ -27,6 +27,7 @@ views:
   - phc.view.station-queue
   - phc.view.visit-summary
   - phc.view.facility-dashboard
+  - phc.view.today-tasks
 instruments:
   - phc.inst.vitals-voice
   - phc.inst.vitals-device

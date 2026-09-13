@@ -88,7 +88,7 @@ export type MappingRecord = {
 };
 
 export type ViewDecl = {
-  id: string; kind: "queue" | "summary" | "dashboard"; title: string; summary?: string;
+  id: string; kind: "queue" | "summary" | "dashboard" | "tasklist"; title: string; summary?: string;
   /** A queue view says which subject fields matter and how a flag is styled.
    *  The thread header and the palette read both, so that neither has to
    *  guess at a subject's shape. `/facility` sends a short form of a view
@@ -173,8 +173,14 @@ export type SectionResult = {
   title: string; show?: string; resource?: string; rows: unknown[];
 };
 
+/** A tasklist row: a title and a count, no prose. `operation` present makes
+ *  the row actionable; absent, it is a worklist to open, not tap. */
+export type TaskRow = {
+  title: string; count: number; threads: string[]; operation?: string | null;
+};
+
 export type ViewResult = {
-  view: string; kind: "queue" | "summary" | "dashboard";
+  view: string; kind: "queue" | "summary" | "dashboard" | "tasklist";
   rows: unknown[]; generated_at: string; groups?: { key: string | null; count: number }[];
   /** Not on contracts.ViewResult. Nav needs a human title; if the API omits it
    *  we fall back to the view id. */

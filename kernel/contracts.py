@@ -62,7 +62,7 @@ from catalogue.guard import MCP, RENDERED, Decision  # noqa: F401  re-exported
 # --------------------------------------------------------------------------
 
 DECLARATION_TYPES = ("operation", "workflow", "view", "instrument", "metric")
-VIEW_KINDS = ("queue", "summary", "dashboard")
+VIEW_KINDS = ("queue", "summary", "dashboard", "tasklist")
 VIEW_SCOPES = ("today", "open", "all")
 SUMMARY_SHOW = ("line", "actions", "proposals", "audit", "flags")
 INSTRUMENT_KINDS = ("form", "device", "constrained-voice", "scribe", "spoken-prompt")
@@ -179,16 +179,28 @@ class Section:
 
 
 @dataclass(frozen=True)
+class Task:
+    """One row of a tasklist view: a predicate over a workflow's threads and
+    an optional verb. `where` is {"flag": str | [str], "not": str | [str]}:
+    every named flag must be held, every "not" flag must be absent.
+    `operation` is optional: with one the row is actionable from itself;
+    without one it is a worklist, a count and a list with nothing to tap."""
+    title: str
+    where: dict
+    operation: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class View:
-    """catalogue.json["views"][id]. One dataclass for three kinds, because
-    the renderer keys on `kind` and the unused fields stay empty. Three
-    classes would need three renderer entry points and three API shapes."""
+    """catalogue.json["views"][id]. One dataclass for four kinds, because
+    the renderer keys on `kind` and the unused fields stay empty. Four
+    classes would need four renderer entry points and four API shapes."""
     id: str
     kind: str                       # VIEW_KINDS
     title: str
     summary: str
     capability: str                 # who may open it
-    workflow: Optional[str] = None  # queue and summary: which thread kind
+    workflow: Optional[str] = None  # queue, summary and tasklist: which thread kind
     # queue
     scope: str = "today"            # VIEW_SCOPES
     group_by: Optional[str] = None  # "station" or a flag; None is one list
@@ -199,6 +211,8 @@ class View:
     # dashboard
     metrics: list = field(default_factory=list)   # metric ids
     window: str = "day"             # METRIC_WINDOWS
+    # tasklist
+    tasks: list = field(default_factory=list)     # of Task
     type: str = "view"
 
 
@@ -449,6 +463,17 @@ class QueueRow:
 
 
 @dataclass(frozen=True)
+class TaskRow:
+    """One resolved row of a tasklist: a title, a count, the matching
+    threads, and the verb if the declaration named one. Copy rule: a title
+    and a count, no prose, so this carries nothing else to render."""
+    title: str
+    count: int
+    threads: list                   # thread ids
+    operation: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class MetricValue:
     metric: str
     value: float
@@ -466,9 +491,9 @@ class ViewResult:
 
     `rows` is by kind: QueueRow for a queue, {title, resource, rows} per
     Section for a summary (`resource` is the section's declared resource, or
-    None for one that shows a kernel structure), MetricValue for a dashboard.
-    `groups` is set only when the view declares group_by: a list of
-    {key, count} in line order."""
+    None for one that shows a kernel structure), MetricValue for a dashboard,
+    TaskRow for a tasklist. `groups` is set only when the view declares
+    group_by: a list of {key, count} in line order."""
     view: str
     kind: str
     rows: list

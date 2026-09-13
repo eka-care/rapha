@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import dataclasses
 import inspect
+import json
 
 from care_phc.thread import Snapshot, derive
 from care_phc.thread import station as coded_station
@@ -432,6 +433,79 @@ def test_a_dashboard_evaluates_every_metric_locally():
     assert by_id["phc.metric.visits"].value == 2
     assert by_id["phc.metric.vitals-flagged-rate"].value == 50.0
     assert all(m.window == "week" for m in res.rows), "the view's window did not win"
+
+
+def test_a_tasklist_resolves_a_count_and_the_matching_threads_per_task():
+    """Cross thread by construction: three threads share the workflow, one
+    task's `where` picks out one of them, the other picks out all three, and
+    the resolver must not confuse the two. A resolver that ignored `where`
+    and returned every thread would pass a check that only asserts *some*
+    rows come back; this asserts the exact set and the exact count."""
+    s = Fake(threads=_refs("enc-1", "enc-2", "enc-3"))
+    for t in ("enc-1", "enc-2", "enc-3"):
+        s.add("patient", thread=t)
+    s.add("service_request", thread="enc-2")
+    s.add("service_request", thread="enc-3")
+    s.add("diagnostic_report", thread="enc-3")
+
+    res = views.resolve(BUNDLE, "phc.view.today-tasks", s)
+    by_title = {r.title: r for r in res.rows}
+
+    waiting = by_title["Waiting on a lab result"]
+    assert (waiting.count, waiting.threads) == (1, ["enc-2"]), waiting
+    assert waiting.operation == "phc.op.lab-result-enter"
+
+    unasked = by_title["Consent never asked"]
+    assert (unasked.count, sorted(unasked.threads)) == (3, ["enc-1", "enc-2", "enc-3"])
+    assert unasked.operation is None, "a task with no declared operation is a worklist"
+
+
+def test_a_tasklist_with_nothing_matching_is_a_real_zero_not_an_empty_result():
+    """The other half of the mutation: a resolver that always returned no
+    threads would still pass a check that only asserts *a* zero count
+    somewhere. This pins a task that must be non-zero alongside one that
+    must be exactly zero, on the same call."""
+    s = Fake(threads=_refs("enc-1"))
+    s.add("patient", thread="enc-1")
+    s.add("service_request", thread="enc-1")
+    s.add("diagnostic_report", thread="enc-1")   # lab.resulted: the task must be 0
+    res = views.resolve(BUNDLE, "phc.view.today-tasks", s)
+    by_title = {r.title: r for r in res.rows}
+    assert by_title["Waiting on a lab result"].count == 0
+    assert by_title["Consent never asked"].count == 1, "the other task on the same call is not zero"
+
+
+def test_the_laboratory_gets_the_tasklist_kind_free_and_names_no_phc_word():
+    """Declared, not coded: the same kernel resolver runs a bundle that
+    shares no vocabulary with the PHC. Nothing on the laboratory's tasklist
+    may name a PHC word, which is the point of a bundle-closed vocabulary."""
+    lab = declarations.load("lab")
+    view = lab.views["lab.view.today-tasks"]
+    blob = json.dumps(dataclasses.asdict(view)).lower()
+    for word in ("phc", "patient", "vitals", "consult", "rx.", "pharmacy",
+                "dispense", "abha", "capture."):
+        assert word not in blob, f"'{word}' leaked into the laboratory's tasklist"
+
+    s = Fake(threads=[c.ThreadRef(id="spec-1", workflow=lab.workflow().id,
+                                  opened_at="2026-09-10T09:00:00Z", subject={})])
+    s.add("specimen", thread="spec-1")
+    res = views.resolve(lab, "lab.view.today-tasks", s)
+    by_title = {r.title: r for r in res.rows}
+    assert by_title["Collected, no result yet"].count == 1
+    assert by_title["Entered, not yet verified"].count == 0
+
+
+def test_lint_refuses_a_tasklist_naming_an_unknown_flag():
+    bad = _lint_with("phc.view.today-tasks",
+                     tasks=[{"title": "x", "where": {"flag": "lab.orderd"}}])
+    assert any("unknown state" in b for b in bad), bad
+
+
+def test_lint_refuses_a_tasklist_naming_an_unknown_operation():
+    bad = _lint_with("phc.view.today-tasks",
+                     tasks=[{"title": "x", "where": {"flag": "lab.ordered"},
+                            "operation": "phc.op.nope"}])
+    assert any("does not exist" in b for b in bad), bad
 
 
 def test_a_window_excludes_what_is_older_than_it():

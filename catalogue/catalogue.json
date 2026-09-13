@@ -243,7 +243,8 @@
     "views": [
       "phc.view.station-queue",
       "phc.view.visit-summary",
-      "phc.view.facility-dashboard"
+      "phc.view.facility-dashboard",
+      "phc.view.today-tasks"
     ],
     "workflows": [
       "phc.wf.outpatient"
@@ -1329,6 +1330,7 @@
       "scope": "today",
       "sections": [],
       "summary": "Visits, ABHA coverage and flagged vitals.",
+      "tasks": [],
       "title": "Facility today",
       "type": "view",
       "window": "week",
@@ -1357,7 +1359,45 @@
       "scope": "today",
       "sections": [],
       "summary": "Today, grouped by station.",
+      "tasks": [],
       "title": "Lines",
+      "type": "view",
+      "window": "day",
+      "workflow": "phc.wf.outpatient"
+    },
+    "phc.view.today-tasks": {
+      "badges": {},
+      "capability": "patient.find",
+      "columns": [],
+      "group_by": null,
+      "id": "phc.view.today-tasks",
+      "kind": "tasklist",
+      "metrics": [],
+      "scope": "today",
+      "sections": [],
+      "summary": "What is waiting across today's visits, not what is waiting on one.",
+      "tasks": [
+        {
+          "operation": "phc.op.lab-result-enter",
+          "title": "Waiting on a lab result",
+          "where": {
+            "flag": "lab.ordered",
+            "not": "lab.resulted"
+          }
+        },
+        {
+          "operation": null,
+          "title": "Consent never asked",
+          "where": {
+            "flag": "registered",
+            "not": [
+              "capture.consented",
+              "capture.declined"
+            ]
+          }
+        }
+      ],
+      "title": "Needs you",
       "type": "view",
       "window": "day",
       "workflow": "phc.wf.outpatient"
@@ -1469,6 +1509,7 @@
         }
       ],
       "summary": "One visit on one page.",
+      "tasks": [],
       "title": "Visit summary",
       "type": "view",
       "window": "day",

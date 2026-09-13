@@ -59,6 +59,7 @@ views:
   - lab.view.worklist
   - lab.view.report
   - lab.view.turnaround
+  - lab.view.today-tasks
 instruments:
   - lab.inst.analyser
 metrics:

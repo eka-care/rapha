@@ -5,7 +5,7 @@
  *  samples by bench are the same code; the difference is the declaration.
  */
 import { useState } from "react";
-import type { AuditRecord, MetricValue, Operation, Proposal, QueueRow, SectionResult, StepStatus, ViewResult } from "./types";
+import type { AuditRecord, MetricValue, Operation, Proposal, QueueRow, SectionResult, StepStatus, TaskRow, ViewResult } from "./types";
 import { Badge, Empty, human, title } from "./ui";
 
 export function ViewRenderer({
@@ -24,7 +24,33 @@ export function ViewRenderer({
   if (result.kind === "summary") {
     return <Sections sections={result.rows as SectionResult[]} onAction={onAction} onReview={onReview} />;
   }
+  if (result.kind === "tasklist") {
+    return <TaskList rows={result.rows as TaskRow[]} onOpenThread={onOpenThread} />;
+  }
   return <Empty>No renderer for a <b>{result.kind}</b> view.</Empty>;
+}
+
+// -------------------------------------------------------------- tasklist ----
+
+/** A row is a title and a count, per the declaration's own copy rule: nothing
+ *  here invents prose. `operation` present makes the row actionable, which
+ *  here means opening the first matching thread, where that operation is
+ *  drawn like any other; absent, it is a worklist with nowhere to tap. */
+function TaskList({ rows, onOpenThread }: { rows: TaskRow[]; onOpenThread?: (t: string) => void }) {
+  if (!rows.length) return <Empty>Nothing declared for this list.</Empty>;
+  return (
+    <div className="tasklist">
+      {rows.map((r) => (
+        <div className="card task-row" key={r.title}>
+          <div className="task-t">{r.title}</div>
+          <div className="task-n">{r.count}</div>
+          {r.operation && r.count > 0 && (
+            <button className="cq" onClick={() => onOpenThread?.(r.threads[0])}>Open</button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------- queue ----

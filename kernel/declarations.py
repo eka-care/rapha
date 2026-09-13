@@ -170,7 +170,13 @@ def _lint_workflow(fm, ops, fail, voc):
     return stored
 
 
-def _lint_view(fm, refs, fail, voc):
+def _as_list(v):
+    if v is None:
+        return []
+    return v if isinstance(v, list) else [v]
+
+
+def _lint_view(fm, refs, fail, voc, ops):
     if fm["kind"] not in c.VIEW_KINDS:
         fail(f"kind must be one of {c.VIEW_KINDS}")
     if fm["capability"] not in voc.capabilities:
@@ -196,6 +202,24 @@ def _lint_view(fm, refs, fail, voc):
             fail(f"badge names unknown state '{flag}'")
         if style not in BADGE_STYLES:
             fail(f"badge style '{style}' must be one of {BADGE_STYLES}")
+
+    if fm["kind"] == "tasklist":
+        for task in fm.get("tasks") or []:
+            title = task.get("title", "?")
+            if "title" not in task or "where" not in task:
+                fail(f"task '{title}' needs 'title' and 'where'")
+                continue
+            where = task["where"]
+            if not isinstance(where, dict) or "flag" not in where:
+                fail(f"task '{title}': where needs a 'flag'")
+            else:
+                for key in ("flag", "not"):
+                    for flag in _as_list(where.get(key)):
+                        if flag not in voc.states:
+                            fail(f"task '{title}': where names unknown state '{flag}'")
+            op = task.get("operation")
+            if op is not None and op not in ops:
+                fail(f"task '{title}': operation '{op}' does not exist")
 
     for section in fm.get("sections") or []:
         title = section.get("title", "?")
@@ -405,7 +429,7 @@ def lint(manifest, decls, ops, seed=()):
         if kind == "workflow":
             stored_by_workflow[did] = _lint_workflow(fm, ops, fail, voc)
         elif kind == "view":
-            _lint_view(fm, refs, fail, voc)
+            _lint_view(fm, refs, fail, voc, ops)
         elif kind == "instrument":
             _lint_instrument(fm, ops, fail)
         elif kind == "metric":
@@ -430,9 +454,10 @@ def _workflow(fm, stored):
 
 def _view(fm):
     known = {f.name for f in dataclasses.fields(c.View)}
-    kwargs = {k: v for k, v in fm.items() if k in known and k != "sections"}
+    kwargs = {k: v for k, v in fm.items() if k in known and k not in ("sections", "tasks")}
     kwargs["summary"] = fm["summary"].strip()
     kwargs["sections"] = [c.Section(**s) for s in fm.get("sections") or []]
+    kwargs["tasks"] = [c.Task(**t) for t in fm.get("tasks") or []]
     return c.View(**kwargs)
 
 
