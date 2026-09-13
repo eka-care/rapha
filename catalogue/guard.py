@@ -7,6 +7,7 @@ this module is deliberately small: it is only the part CARE does not do.
 Steps 5 to 7 of the write path (audit persist, CARE write, state emit) belong to
 the caller. evaluate() decides, and hands back the audit record to write.
 """
+import re
 from dataclasses import dataclass, field
 
 # Surfaces an operation can be invoked from. There is no third.
@@ -53,6 +54,30 @@ def parse_precondition(pre):
     return "flag", term, negated
 
 
+def _words(name):
+    """A flag or operation id, as words. `rx.confirmed` -> "rx confirmed",
+    `lab.op.result-enter` -> "lab op result enter". No lookup table: this is
+    the catalogue's own punctuation, split apart, so any bundle's flags read
+    the same way PHC's do."""
+    return re.sub(r"[._-]+", " ", name).strip()
+
+
+def describe_precondition(pre, unevaluable=False):
+    """A sentence a clerk reads correctly, never the literal precondition
+    string. `not registered` unmet means the flag IS present, which is
+    "Already registered.", not something that sounds like its opposite. A
+    required flag that is absent reads what it requires. `unevaluable` is the
+    separation-of-duties case where nobody said who is acting, so it is
+    neither confirmed nor denied by the flag or the actor; it says that."""
+    kind, name, negated = parse_precondition(pre)
+    words = _words(name)
+    if unevaluable:
+        return f"Needs to know who is acting, to check whether they performed {words}."
+    if kind == "actor":
+        return f"Already performed {words}." if negated else f"Must be the person who performed {words}."
+    return f"Already {words}." if negated else f"Requires {words}."
+
+
 @dataclass
 class Decision:
     allowed: bool
@@ -81,13 +106,13 @@ def _preconditions_met(op, state, actor=None, performers=None, unknown_actor=Fal
             # Not evaluable: either nobody said who is acting, or nobody read
             # the thread's audit to find out who acted before.
             if unknown_actor:
-                return False, "%s (the caller did not say who is acting here)" % pre
+                return False, pre, True
             continue
         else:
             held = person(actor) in {person(a) for a in (performers.get(name) or ())}
         if held == negated:
-            return False, pre
-    return True, None
+            return False, pre, False
+    return True, None, False
 
 
 def visible(op, caps, state, actor=None, performers=None):
@@ -104,7 +129,7 @@ def visible(op, caps, state, actor=None, performers=None):
     """
     if op["capability"] not in caps:
         return False
-    met, _ = _preconditions_met(op, state, actor, performers)
+    met, _, _ = _preconditions_met(op, state, actor, performers)
     return met
 
 
@@ -144,9 +169,9 @@ def evaluate(op, *, caps, state, payload, surface, confirmed=False,
         return deny(f"outside scope of practice: {qualifier}")
 
     # 3. preconditions over thread state, and over who has already acted here.
-    met, missing = _preconditions_met(op, state, actor, performers, unknown_actor=True)
+    met, missing, unevaluable = _preconditions_met(op, state, actor, performers, unknown_actor=True)
     if not met:
-        return deny(f"precondition not met: {missing}")
+        return deny(describe_precondition(missing, unevaluable))
 
     # 4. irreversibility. v0.1 SS5 and addendum SSB.2: the confirm for an
     #    irreversible operation is explicit and un-prefilled, and an agent can

@@ -33,7 +33,7 @@ def test_precondition_denied_even_when_capability_held():
     op = OPS["phc.op.pharmacy-dispense"]
     d = guard.evaluate(op, caps={"pharmacy.dispense"}, state={"registered"},
                        payload={"q": 1}, surface=guard.RENDERED, validate=ok)
-    assert not d and "precondition not met: rx.confirmed" in d.reason
+    assert not d and d.reason == "Requires rx confirmed.", d.reason
 
 
 def test_agent_can_never_commit_an_irreversible_write():
@@ -94,10 +94,72 @@ def test_an_agent_inherits_the_exclusions_of_the_person_it_acts_for():
         assert not guard.visible(op, caps, state, who, performed), who
         d = guard.evaluate(op, caps=caps, state=state, payload={}, validate=ok,
                            surface=guard.MCP, actor=who, performers=performed)
-        assert not d and "not actor of lab.op.result-enter" in d.reason, who
+        assert not d and d.reason == "Already performed lab op result enter.", who
 
     for who in ("user:pathologist", "agent:user:pathologist"):
         assert guard.visible(op, caps, state, who, performed), who
+
+
+def test_registered_patient_denied_registration_reads_as_already_done():
+    """The bug the product owner saw: `not registered` unmet means the flag
+    IS present, so the message must say the patient already is one, not
+    something a clerk reads as the opposite."""
+    op = OPS["phc.op.patient-register"]
+    d = guard.evaluate(op, caps={"patient.register"}, state={"registered"},
+                       payload={}, surface=guard.RENDERED, validate=ok)
+    assert not d
+    assert d.reason == "Already registered.", d.reason
+
+
+def test_no_denial_message_echoes_the_raw_precondition_in_either_bundle():
+    """Would this still pass if the renderer ignored the precondition and
+    printed the literal? No: every denial below is checked against the exact
+    literal(s) that produced it, for both PHC and the laboratory, so a
+    regression back to f"precondition not met: {pre}" fails here immediately."""
+    cases = [
+        # (op id, caps, state, actor, performers) -> raw precondition literals
+        # that must never appear verbatim in the denial.
+        ("phc.op.patient-register", {"patient.register"}, {"registered"}, None, None,
+         ["not registered"]),
+        ("phc.op.pharmacy-dispense", {"pharmacy.dispense"}, {"registered"}, None, None,
+         ["rx.confirmed"]),
+        ("lab.op.referral-accession", {"referral.accession"}, {"order.accessioned"}, None, None,
+         ["not order.accessioned"]),
+        ("lab.op.specimen-collect", {"specimen.collect"}, set(), None, None,
+         ["order.accessioned"]),
+    ]
+    for oid, caps, state, actor, performers, literals in cases:
+        d = guard.evaluate(OPS[oid], caps=caps, state=state, payload={},
+                           surface=guard.RENDERED, validate=ok, actor=actor, performers=performers)
+        assert not d, oid
+        for literal in literals:
+            assert literal not in d.reason, (oid, literal, d.reason)
+
+    # The separation-of-duties case: `actor of` also gets a sentence, and the
+    # unevaluable case (no actor supplied at all) never leaks the raw pre either.
+    op = OPS["lab.op.result-verify"]
+    state = {"result.entered", "specimen.collected", "order.accessioned"}
+    d = guard.evaluate(op, caps={"result.verify"}, state=state, payload={},
+                       surface=guard.RENDERED, validate=ok)  # no actor, no performers
+    assert not d
+    assert "actor of" not in d.reason and "lab.op.result-enter" not in d.reason, d.reason
+
+
+def test_describe_precondition_is_derived_from_the_flag_never_a_lookup_table():
+    """The three kinds, and that a made-up flag this table has never seen
+    still reads as a sentence, which is the proof there is no lookup table of
+    PHC strings hiding behind the renderer."""
+    assert guard.describe_precondition("not registered") == "Already registered."
+    assert guard.describe_precondition("rx.confirmed") == "Requires rx confirmed."
+    assert guard.describe_precondition("not actor of lab.op.result-enter") == \
+        "Already performed lab op result enter."
+    assert guard.describe_precondition("actor of lab.op.result-enter") == \
+        "Must be the person who performed lab op result enter."
+    assert guard.describe_precondition("lab.op.result-enter", unevaluable=True) == \
+        "Needs to know who is acting, to check whether they performed lab op result enter."
+    # A flag this codebase has never named, proving there is no table of
+    # known PHC strings behind the sentence.
+    assert guard.describe_precondition("not something.brand-new") == "Already something brand new."
 
 
 def test_every_write_operation_is_a_proposal_on_mcp():
