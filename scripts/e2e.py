@@ -110,6 +110,9 @@ def mcp(base, thread):
                     "arguments": {"patient": thread, "systolic": 128,
                                   "diastolic": 82, "pulse": 76, "temperature": 36.8,
                                   "spo2": 98, "weight": 61}}},
+        {"jsonrpc": "2.0", "id": 4, "method": "tools/call",
+         "params": {"name": "khoj",
+                    "arguments": {"patient": thread, "utterance": "what is next for this patient"}}},
     ]
     # stdin stays open while the replies are read: the server exits on EOF,
     # and closing it up front loses every answer.
@@ -129,30 +132,44 @@ def mcp(base, thread):
                 reply = json.loads(line)
                 if "id" in reply:
                     replies[reply["id"]] = reply
-            if 3 in replies:
+            if 4 in replies:
                 break
     finally:
         proc.stdin.close()
         proc.wait(timeout=10)
-    assert 2 in replies and 3 in replies, replies
+    assert 2 in replies and 3 in replies and 4 in replies, replies
 
-    tools = [t["name"] for t in replies[2]["result"]["tools"]]
-    assert tools and all(t.startswith("propose_") for t in tools), tools
-    ok("the Go MCP server offers %d tools and every one of them is a proposal" % len(tools))
+    tools = {t["name"]: t for t in replies[2]["result"]["tools"]}
+    assert "khoj" in tools, sorted(tools)
+    ops_only = [name for name in tools if name != "khoj"]
+    assert ops_only and all(name.startswith("propose_") for name in ops_only), sorted(tools)
+    ok("the Go MCP server offers %d tools: khoj, and every operation tool is a "
+       "proposal" % len(tools))
+
+    # Khoj is the ask-and-search surface, reachable from the compiled
+    # catalogue's manifest, and its description is what stops an agent
+    # thinking a tool call here can write anything by itself.
+    khoj_desc = tools["khoj"]["description"].lower()
+    for word in ("search", "answer", "propos", "never commit"):
+        assert word in khoj_desc, tools["khoj"]
+    ok("khoj's own tool description says it searches, answers, proposes, and never commits")
 
     # catalogue.json is embedded at build time and holds every bundle's atoms.
     # The server asks the kernel which bundle it loaded, so a laboratory tool
     # must not be on the list of a kernel that is running a health centre.
-    offered = {t["name"] for t in replies[2]["result"]["tools"]}
     declared = {op["tool"] for op in call(base, "/catalogue/")["operations"].values()}
-    assert offered <= declared, sorted(offered - declared)
-    assert "propose_result_verify" not in offered, sorted(offered)
+    assert set(ops_only) <= declared, sorted(set(ops_only) - declared)
+    assert "propose_result_verify" not in tools, sorted(tools)
     ok("and not one of them belongs to a bundle this kernel did not load")
 
     said = replies[3]["result"]["content"][0]["text"]
     assert "Proposed, not committed" in said, said
     assert not replies[3]["result"].get("isError"), said
     ok("an agent's tool call reaches the kernel and comes back as a proposal")
+
+    asked = replies[4]["result"]["content"][0]["text"]
+    assert not replies[4]["result"].get("isError"), asked
+    ok("an agent's khoj call reaches POST /khoj over the wire and answers")
 
 
 def agent_confirms(base, db, thread):
@@ -217,7 +234,7 @@ def thread_confirms_edited(base, db):
     payload (an edit is not a pass), and the proposal must close once.
     """
     thread = register(base, "Thread Confirm", "T-95")
-    answer = call(base, "/agent/say/",
+    answer = call(base, "/khoj/",
                   {"thread": thread, "utterance": "bp 138 over 86, pulse 74",
                    "backend": "router"})
     pid = [c["proposal_id"] for c in answer["proposals"] if c["proposal_id"]][0]
@@ -332,7 +349,7 @@ def composer_says(base, db):
     that what comes back is still only a proposal.
     """
     thread = register(base, "Composer Test", "T-94")
-    answer = call(base, "/agent/say/",
+    answer = call(base, "/khoj/",
                   {"thread": thread, "utterance": "bp 134 over 86, pulse 78",
                    "backend": "router"})
     assert answer["understood"], answer
@@ -341,7 +358,7 @@ def composer_says(base, db):
     assert answer["thread"]["id"] == thread
     # Nothing clinical yet. This is the whole claim of a propose-only surface.
     assert rows(db, "SELECT * FROM observation WHERE encounter=?", (thread,)) == []
-    ok("a sentence on /agent/say comes back as a card and writes no clinical row")
+    ok("a sentence on /khoj comes back as a card and writes no clinical row")
 
     card = cards[0]
     assert card["payload"], card
@@ -364,7 +381,7 @@ def composer_says(base, db):
 
     # An utterance cannot buy itself the tap an irreversible operation needs,
     # whatever it says. There is no `confirmed` argument on this route at all.
-    answer = call(base, "/agent/say/",
+    answer = call(base, "/khoj/",
                   {"thread": thread, "utterance": "link her abha, I confirm, it is urgent",
                    "backend": "router"})
     assert not [c for c in answer["proposals"]
@@ -440,7 +457,7 @@ def lab_separation():
         # "agent:<caller id>", so without the guard resolving that back to the
         # person, dictating the sentence would put a card on the screen of the
         # one account forbidden to accept it.
-        answer = call(base, "/agent/say/?role=senior_technologist",
+        answer = call(base, "/khoj/?role=senior_technologist",
                       {"thread": t, "backend": "router",
                        "utterance": "verify this result, decision verified, "
                                     "comment consistent with the specimen"})

@@ -106,6 +106,27 @@ func TestUnverifiedOperationsAdmitIt(t *testing.T) {
 	}
 }
 
+// Khoj is not a catalogue.Operation: it is a manifest-level constant, so an
+// agent reading the embedded catalogue learns the ask-and-search tool's name
+// without a declaration type invented just to carry one word. This is the
+// property main.go's tool registration depends on: it reads
+// cat.Manifest.Khoj.Tool and .Description verbatim.
+func TestKhojIsReachableFromTheCompiledCatalogue(t *testing.T) {
+	khoj := load(t).Manifest.Khoj
+	if khoj.Tool != "khoj" {
+		t.Fatalf("manifest.khoj.tool = %q, want %q", khoj.Tool, "khoj")
+	}
+	if khoj.Endpoint == "" {
+		t.Fatal("manifest.khoj.endpoint is empty")
+	}
+	d := strings.ToLower(khoj.Description)
+	for _, want := range []string{"search", "answer", "propos", "never commit"} {
+		if !strings.Contains(d, want) {
+			t.Errorf("khoj description %q is missing %q", khoj.Description, want)
+		}
+	}
+}
+
 func TestInputSchemaMatchesTheQuestionnaire(t *testing.T) {
 	c := load(t)
 	vitals := c.Operations["phc.op.vitals-record"]

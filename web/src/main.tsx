@@ -19,11 +19,11 @@ import { CloseCard } from "./CloseCard";
 import { questionnaire } from "./declarations";
 import { Home } from "./Home";
 import { Icon, IconSheet } from "./icons";
+import { Khoj } from "./Khoj";
 import { cue, keep, offered, opensOnArrival, weigh, type Cue } from "./loops";
 import { clock, header, queueViewFor, summariesFor, type Ctx, type Said } from "./messages";
 import { mockApi } from "./mock";
 import { OperationPanel, proposalOperation } from "./OperationPanel";
-import { Palette } from "./Palette";
 import { Roles } from "./Roles";
 import { firstOperation } from "./search";
 import {
@@ -103,7 +103,7 @@ function App() {
   const fac = useAsync(() => client.facility(), [demo, role]);
 
   // One read per view the caller may open, shared by the nav counts, Home and
-  // the palette. navViews has already dropped the ones whose capability this
+  // Khoj. navViews has already dropped the ones whose capability this
   // role does not hold, so this normally asks for nothing it cannot have; a
   // 403 that gets through anyway is an answer, not a crash, and drops out.
   const nav = useMemo(() => navViews(cat.data, fac.data?.user?.capabilities), [cat.data, fac.data]);
@@ -137,10 +137,10 @@ function App() {
   );
 
   const [recent, setRecent] = useState<Recent[]>(recents);
-  const [palette, setPalette] = useState(false);
+  const [khoj, setKhoj] = useState(false);
   const [modal, setModal] = useState<{
     op: Operation; thread: string; proposal?: Proposal;
-    /** A mobile number the clerk typed in the palette, for the journey. */
+    /** A mobile number the clerk typed in Khoj, for the journey. */
     mobile?: string;
     /** Answers already obtained by a journey on the previous panel. */
     seed?: Payload;
@@ -206,7 +206,7 @@ function App() {
     const key = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setPalette(true);
+        setKhoj(true);
       }
     };
     addEventListener("keydown", key);
@@ -252,7 +252,7 @@ function App() {
   );
 
   const openThread = (id: string) => {
-    setPalette(false);
+    setKhoj(false);
     go(`#/threads/${id}`);
   };
 
@@ -261,7 +261,7 @@ function App() {
    *  Six denials landed on an already-registered patient because a surface
    *  opened `phc.op.patient-register` by id, and `thread.actions` had
    *  already, correctly, stopped offering it. A copy of `actions` held from
-   *  an earlier moment (a palette preview, a summary sheet opened minutes
+   *  an earlier moment (a Khoj preview, a summary sheet opened minutes
    *  ago) can be just as stale as a hard-coded id, so this reads the thread
    *  fresh and checks with `offered()` — the guard's own membership test —
    *  right before opening. Not present: this says what the kernel said (its
@@ -358,7 +358,7 @@ function App() {
     if (!cat.data) return;
     try {
       const opened = await client.openThread({});
-      setPalette(false);
+      setKhoj(false);
       go(`#/threads/${opened.id}`);
       const id = firstOperation(cat.data, opened.workflow);
       const op = id ? cat.data.operations?.[id] : undefined;
@@ -386,7 +386,7 @@ function App() {
         recent={recent}
         onGo={go}
         onNewChat={() => go("#/ask")}
-        onSearch={() => setPalette(true)}
+        onSearch={() => setKhoj(true)}
         onRole={(r) => {
           setRole(r);
           setRoleState(r);
@@ -409,7 +409,7 @@ function App() {
           <button className="pill" onClick={() => setDemo(!demo)}>
             {demo ? "Use the API" : "Use demo data"}
           </button>
-          <button className="pill" onClick={() => setPalette(true)}>
+          <button className="pill" onClick={() => setKhoj(true)}>
             <Icon name="search" size="sm" />Search or ask<span className="kbd">⌘K</span>
           </button>
           <button className="icon-btn" onClick={toggleTheme} title="Light or dark">
@@ -517,7 +517,7 @@ function App() {
                         }
                       }}
                       onSummary={(v) => setSheet({ view: v, thread: route.id })}
-                      onMore={() => setPalette(true)}
+                      onMore={() => setKhoj(true)}
                     />
                   )}
                 </>
@@ -527,27 +527,27 @@ function App() {
         </div>
       </div>
 
-      {palette && cat.data && (
-        <Overlay onClose={() => setPalette(false)}>
-          <Palette
+      {khoj && cat.data && (
+        <Overlay onClose={() => setKhoj(false)}>
+          <Khoj
             cat={cat.data}
             client={client}
             queues={queues}
             nav={nav}
-            onClose={() => setPalette(false)}
+            onClose={() => setKhoj(false)}
             onOpenThread={openThread}
             onGo={(h: string) => {
-              setPalette(false);
+              setKhoj(false);
               go(h);
             }}
             onAsk={(q: string) => {
-              setPalette(false);
+              setKhoj(false);
               go("#/ask");
               say("workspace", q);
             }}
             onRegister={(typed: string) => void register(typed)}
             onAction={(t: string, op: Operation) => {
-              setPalette(false);
+              setKhoj(false);
               go(`#/threads/${t}`);
               void openIfOffered(t, op);
             }}

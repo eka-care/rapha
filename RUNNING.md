@@ -233,17 +233,19 @@ The ask box on screen, which needs nothing extra started: the composer at the
 foot of every thread posts to the kernel's own route.
 
 ```sh
-curl -s localhost:8000/api/v1/phc/agent/say \
+curl -s localhost:8000/api/v1/phc/khoj \
   -H 'Content-Type: application/json' \
   -d '{"thread": "enc-002", "utterance": "bp 138 over 86, pulse 74"}' \
   | python3 -m json.tool | head -30
 ```
 
-That route is `api/main.say()`. It calls `agent/turn.py`, which plans with
+That route is `api/main.khoj()`. It calls `agent/turn.py`, which plans with
 `agent/planner.py` and then calls `kernel.proposals.propose` on the machine
 surface. It takes no `confirmed` argument and has no branch that reaches
 `confirm` or `commit`, so the worst a sentence can do is put a card in front
-of a person. The reply carries the full thread panel after the turn, and per
+of a person. `POST /agent/say` is the same route under its old name, kept as
+a deprecated alias for one release for the Go MCP binary and any agent
+already bound to it. The reply carries the full thread panel after the turn, and per
 proposal the guard's own verdict, the payload it filled, and one plain
 sentence saying what to do next. `web/src/ask.ts` posts to exactly this. There
 is no second process and no `VITE_AGENT_BASE`.
@@ -288,7 +290,7 @@ That runs the linters, every Python and Go unit check, the browser-side checks,
 `bundles/lab/check.py` (a second bundle on the same kernel, with its own socket
 half), and `scripts/e2e.py`, which starts its own uvicorn on a free port, walks
 a patient through the line over HTTP, reads the SQLite file to prove the row
-landed, drives the Go MCP binary at it, posts a sentence to `/agent/say` and
+landed, drives the Go MCP binary at it, posts a sentence to `/khoj` and
 confirms what comes back, confirms one of those cards with an EDITED payload
 and proves the edited value is what lands rather than the proposed one, then
 starts a second kernel as the laboratory and proves that the account which

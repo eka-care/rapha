@@ -243,6 +243,25 @@ class Metric:
     type: str = "metric"
 
 
+# Khoj is the one ask-and-search surface, the same word in the renderer, the
+# API route, an MCP tool, and here. It is not a sixth declaration type: it
+# does not vary per bundle and nothing about it is linted, so it is a
+# constant on the manifest every bundle already carries, not an atom of its
+# own. care_phc_mcp/catalogue.go reads manifest.khoj.tool for the tool name it
+# registers, and manifest.khoj.description word for word as that tool's
+# description, so this is the one place an agent reading the compiled
+# catalogue learns the word without being told.
+KHOJ = {
+    "tool": "khoj",
+    "endpoint": "/api/v1/phc/khoj",
+    "description": (
+        "Searches, answers, and proposes. It never commits: every write it "
+        "returns is a proposal for a clinician to review and confirm on "
+        "screen, exactly like every other write tool here."
+    ),
+}
+
+
 @dataclass(frozen=True)
 class Manifest:
     """catalogue.json["manifest"]: which declarations this build loaded, from
@@ -257,6 +276,7 @@ class Manifest:
     views: list
     instruments: list
     metrics: list
+    khoj: dict = field(default_factory=lambda: dict(KHOJ))
 
 
 # --------------------------------------------------------------------------

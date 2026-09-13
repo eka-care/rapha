@@ -213,7 +213,7 @@ def test_the_mcp_facing_routes_did_not_move():
 
 # ---------------------------------------------------------- the agent's turn
 #
-# POST /api/agent/say is the composer's endpoint: a sentence in, proposal cards
+# POST /api/khoj is the composer's endpoint: a sentence in, proposal cards
 # out. The properties worth pinning are the same three as everywhere else, plus
 # one that is new here, because this is the surface a model's words reach.
 
@@ -222,7 +222,7 @@ SAY = {"thread": "enc-002", "backend": "router"}   # backend pinned so the check
 
 
 def test_an_utterance_proposes_and_the_card_carries_what_the_thread_must_draw():
-    reply = client.post("/api/agent/say",
+    reply = client.post("/api/khoj",
                         json=dict(SAY, utterance="bp is 140 over 90 and pulse 72",
                                   confidence={"systolic": 0.82, "pulse": 0.91}))
     assert reply.status_code == 200, reply.text
@@ -253,7 +253,7 @@ def test_the_agent_endpoint_has_no_path_to_a_write():
     keep = main.proposals.confirm, main.proposals.commit
     main.proposals.confirm, main.proposals.commit = boom, boom
     try:
-        reply = client.post("/api/agent/say",
+        reply = client.post("/api/khoj",
                             json=dict(SAY, utterance="bp is 140 over 90 and pulse 72"))
     finally:
         main.proposals.confirm, main.proposals.commit = keep
@@ -261,7 +261,7 @@ def test_the_agent_endpoint_has_no_path_to_a_write():
     assert reply.json()["proposals"][0]["proposal_id"]
     # and the body cannot ask for one either: confirmed is not a parameter of
     # this route, so a sentence carrying it changes nothing.
-    smuggled = client.post("/api/agent/say",
+    smuggled = client.post("/api/khoj",
                            json=dict(SAY, utterance="bp is 138 over 86 and pulse 70",
                                      confirmed=True, surface="rendered"))
     assert smuggled.json()["proposals"][0]["verdict"]["reason"] == "proposed"
@@ -269,7 +269,7 @@ def test_the_agent_endpoint_has_no_path_to_a_write():
 
 
 def test_a_proposal_the_agent_made_is_confirmed_on_screen_and_only_once():
-    said = client.post("/api/agent/say",
+    said = client.post("/api/khoj",
                        json=dict(SAY, utterance="bp is 140 over 90 and pulse 72")).json()
     proposal_id = said["proposals"][0]["proposal_id"]
     confirm = client.post("/api/proposals/%s/confirm" % proposal_id,
@@ -287,7 +287,7 @@ def test_a_proposal_the_agent_made_is_confirmed_on_screen_and_only_once():
 
 
 def test_an_utterance_it_cannot_map_says_so_instead_of_guessing():
-    body = client.post("/api/agent/say",
+    body = client.post("/api/khoj",
                        json=dict(SAY, utterance="what is the weather like")).json()
     assert body["proposals"] == [] and body["understood"] is False
     assert "will not guess" in body["said"]
@@ -298,7 +298,7 @@ def test_an_utterance_it_cannot_map_says_so_instead_of_guessing():
 
 def test_a_refusal_carries_the_guard_own_reason_and_a_next_step():
     # enc-003 has vitals already: the guard denies on the precondition.
-    body = client.post("/api/agent/say",
+    body = client.post("/api/khoj",
                        json={"thread": "enc-003", "backend": "router",
                              "utterance": "vitals 120 over 80 and pulse 70"}).json()
     card = body["proposals"][0]
@@ -312,13 +312,33 @@ def test_a_refusal_carries_the_guard_own_reason_and_a_next_step():
 
 
 def test_the_agent_cannot_talk_its_way_into_an_irreversible_operation():
-    body = client.post("/api/agent/say",
+    body = client.post("/api/khoj",
                        json=dict(SAY, utterance="link her abha number "
                                                 "12-1111-1111-1111 by link_existing "
                                                 "with consent_given true")).json()
     card = [c for c in body["proposals"] if c["operation"] == "phc.op.abha-link"][0]
     assert card["proposal_id"] is None
     assert "abha.linked" not in body["thread"]["flags"]
+
+
+def test_agent_say_is_a_deprecated_alias_for_khoj():
+    """/agent/say is kept for one release for the Go MCP binary and any agent
+    already bound to it, and it must answer exactly as /khoj does. Marked
+    `deprecated=True` on the route, which FastAPI puts on the OpenAPI
+    operation itself, so a client sees the deprecation without reading a
+    comment or the code behind it."""
+    reply = client.post("/api/agent/say",
+                        json=dict(SAY, utterance="bp is 140 over 90 and pulse 72"))
+    assert reply.status_code == 200, reply.text
+    assert reply.json()["proposals"][0]["operation"] == "phc.op.vitals-record"
+
+    schema = client.get("/openapi.json").json()
+    say_ops = [op for path, methods in schema["paths"].items()
+               if path.endswith("/agent/say") for op in methods.values()]
+    assert say_ops and all(op.get("deprecated") for op in say_ops), say_ops
+    khoj_ops = [op for path, methods in schema["paths"].items()
+                if path.endswith("/khoj") for op in methods.values()]
+    assert khoj_ops and not any(op.get("deprecated") for op in khoj_ops), khoj_ops
 
 
 def test_the_planner_only_answers_questions_the_operation_asks():

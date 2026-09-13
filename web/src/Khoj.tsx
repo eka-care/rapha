@@ -1,4 +1,4 @@
-/** The command palette. Find first, create only on miss.
+/** Khoj. The ask-and-search surface. Find first, create only on miss.
  *
  *  Rows in three groups, arrow keys, a preview beside them, and one button at
  *  the bottom of an empty result that says what creating costs before it
@@ -6,7 +6,7 @@
  *
  *  The preview's quick actions are one `GET /threads/{id}`, debounced. What
  *  comes back is already filtered by the role's capabilities and the guard's
- *  preconditions, so the palette draws what it was given and disables nothing.
+ *  preconditions, so Khoj draws what it was given and disables nothing.
  *  The prototype greyed out the actions the role lacked; that is the one thing
  *  in it this file deliberately does not copy.
  */
@@ -17,7 +17,7 @@ import { createLabel, rows, type Row } from "./search";
 import type { Catalogue, Operation, ThreadView, ViewDecl, ViewResult } from "./types";
 import { Badge, human } from "./ui";
 
-export function Palette({
+export function Khoj({
   cat, client, queues, nav, onClose, onOpenThread, onGo, onAsk, onRegister, onAction,
 }: {
   cat: Catalogue;
@@ -134,7 +134,7 @@ export function Palette({
 }
 
 /** One thread read per highlighted row, debounced, cached for the life of
- *  this palette. Without it the quick actions would be a guess, and a guess
+ *  this Khoj. Without it the quick actions would be a guess, and a guess
  *  about what a person may do is exactly what the guard exists to stop. */
 function Preview({
   r, client, onOpenThread, onAction,

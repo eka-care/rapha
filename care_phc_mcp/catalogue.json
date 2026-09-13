@@ -216,6 +216,11 @@
       "phc.inst.consult-scribe",
       "phc.inst.consent-speak"
     ],
+    "khoj": {
+      "description": "Searches, answers, and proposes. It never commits: every write it returns is a proposal for a clinician to review and confirm on screen, exactly like every other write tool here.",
+      "endpoint": "/api/v1/phc/khoj",
+      "tool": "khoj"
+    },
     "metrics": [
       "phc.metric.visits",
       "phc.metric.abha-coverage",

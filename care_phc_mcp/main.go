@@ -153,6 +153,31 @@ func handler(c *Client, op Operation) mcp.ToolHandler {
 	}
 }
 
+// khojHandler forwards an agent's search or question straight to the kernel's
+// own Khoj route, whatever shape the caller sent: `utterance`, and `patient`
+// if the question is about one thread. api/main.py's thread_of() already
+// treats `patient` as an alias for `thread`, which is why nothing here needs
+// to translate the argument names first.
+//
+// There is no write branch: khoj.Endpoint is the propose-only route, so this
+// can only ever return what that route returns, and that route has no path
+// to confirm or commit.
+func khojHandler(c *Client, khoj Khoj) mcp.ToolHandler {
+	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args map[string]any
+		if len(req.Params.Arguments) > 0 {
+			if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+				return fail("arguments are not valid JSON: %v", err), nil
+			}
+		}
+		body, err := c.do(ctx, http.MethodPost, khoj.Endpoint, args)
+		if err != nil {
+			return fail("%v", err), nil
+		}
+		return text(strings.TrimSpace(string(body))), nil
+	}
+}
+
 func main() {
 	base := os.Getenv("CARE_BASE_URL")
 	token := os.Getenv("CARE_SERVICE_TOKEN")
@@ -203,7 +228,23 @@ func main() {
 			InputSchema: json.RawMessage(schema),
 		}, handler(client, op))
 	}
-	log.Printf("care-phc: %d of %d operations available to this account",
+
+	// Khoj is not one operation gated by one capability; every account that
+	// can reach this server may search and ask, and the guard still runs
+	// underneath whatever it proposes. Its name and description come from
+	// the compiled catalogue's own manifest, not from a string typed here.
+	if cat.Manifest.Khoj.Tool != "" {
+		server.AddTool(&mcp.Tool{
+			Name:        cat.Manifest.Khoj.Tool,
+			Title:       "Khoj",
+			Description: cat.Manifest.Khoj.Description,
+			InputSchema: json.RawMessage(`{"type":"object","properties":{` +
+				`"utterance":{"type":"string","description":"What to search for, or ask."},` +
+				`"patient":{"type":"string","description":"The patient thread this question is about, if any."}` +
+				`},"required":["utterance"]}`),
+		}, khojHandler(client, cat.Manifest.Khoj))
+	}
+	log.Printf("care-phc: %d of %d operations available to this account, plus khoj",
 		len(ops), len(cat.Operations))
 
 	if err := server.Run(ctx, &mcp.StdioTransport{}); err != nil {

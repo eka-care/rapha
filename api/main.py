@@ -369,9 +369,9 @@ def confirm(proposal_id: str, request: Request, body: dict = Body(default={})):
     return {"proposal": asdict(decided), "thread": panel(proposal.thread, user)}
 
 
-@router.post("/agent/say")
-def say(request: Request, body: dict = Body(default={})):
-    """A sentence in, proposals out. Body: thread, utterance, confidence, backend.
+@router.post("/khoj")
+def khoj(request: Request, body: dict = Body(default={})):
+    """Khoj: a sentence in, proposals out. Body: thread, utterance, confidence, backend.
 
     This is the composer's endpoint, and it is a propose-only surface. It calls
     agent.turn, which calls the planner in agent/ and then this module's own
@@ -411,6 +411,20 @@ def say(request: Request, body: dict = Body(default={})):
     # The thread as it stands after the turn, so the renderer draws the new
     # pending cards without a second read. Still pending: see every verdict.
     return dict(answer, thread=panel(thread, user))
+
+
+@router.post("/agent/say", deprecated=True)
+def say(request: Request, body: dict = Body(default={})):
+    """Deprecated alias for POST /khoj, same body and same answer.
+
+    Kept for one release: the Go MCP binary and any agent already bound to
+    the old path may still call it. `deprecated=True` puts the flag on the
+    OpenAPI operation itself, so a client sees it without reading a comment.
+    Do not add anything here beyond this delegation; the one propose path is
+    `khoj()` above, and this route has no logic of its own to drift out of
+    step with it.
+    """
+    return khoj(request, body)
 
 
 @router.post("/proposals/{proposal_id}/reject")

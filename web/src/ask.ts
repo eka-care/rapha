@@ -1,10 +1,14 @@
-/** The ask box. A sentence in, proposals out, and nothing else.
+/** The ask box, Khoj. A sentence in, proposals out, and nothing else.
  *
- *  It posts to the kernel's own `POST /api/v1/phc/agent/say`, which calls
+ *  It posts to the kernel's own `POST /api/v1/phc/khoj`, which calls
  *  agent.turn -> agent.planner -> kernel.proposals.propose on guard.MCP. That
  *  route takes no `confirmed` argument and there is no branch on it that
  *  reaches confirm or commit, so the worst a sentence can do is put a card in
  *  front of a person. The tap on that card is still what writes.
+ *
+ *  `/agent/say` is the same route under its old name, kept for one release as
+ *  a deprecated alias for the Go MCP binary and any already-bound agent. This
+ *  box never calls it.
  *
  *  There is no second process and no VITE_AGENT_BASE. The agent lives on the
  *  kernel because the propose path already does; a second port would be a
@@ -15,7 +19,7 @@
  */
 import { API_BASE, currentRole } from "./api";
 
-const SAY = "/api/v1/phc/agent/say";
+const KHOJ = "/api/v1/phc/khoj";
 
 /** What the kernel sends back per proposal. Only the fields this box reads. */
 type Card = { proposal_id: string | null; title?: string; verdict?: { reason?: string } };
@@ -31,7 +35,7 @@ export async function ask(body: { utterance: string; thread?: string; role: stri
     return { said: "Open a thread first.", proposed: 0 };
   }
   try {
-    const res = await fetch(`${API_BASE}${SAY}`, {
+    const res = await fetch(`${API_BASE}${KHOJ}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-PHC-Role": body.role || currentRole() },
       body: JSON.stringify({ thread: body.thread, utterance: body.utterance }),

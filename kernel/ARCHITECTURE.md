@@ -112,7 +112,7 @@ patched one:
   question only the audit can answer.
 - **`api/` and `agent/` exist.** `api/main.py` is the HTTP server the table
   gives to the kernel agent, and it carries one route the diagram does not:
-  `POST /agent/say`, a sentence in and proposals out. It reaches a write only
+  `POST /khoj` (`/agent/say` is the deprecated alias), a sentence in and proposals out. It reaches a write only
   through `kernel.proposals.propose` on `guard.MCP`, which takes no `confirmed`
   argument, so it is a machine surface like any other. `web/` replaced
   `care_phc_fe/` as the renderer; the older one still builds and is still

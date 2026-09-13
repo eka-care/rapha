@@ -46,11 +46,29 @@ type Operation struct {
 	Fields          []Field  `json:"fields"`
 }
 
+// Khoj is the ask-and-search surface's own name, reachable from the compiled
+// catalogue's manifest so this server learns the word without being told it
+// separately. Tool is the MCP tool name ("khoj"), Endpoint the kernel route
+// it calls, and Description exactly what the tool tells an agent: it
+// searches, answers, and proposes, and it never commits.
+type Khoj struct {
+	Tool        string `json:"tool"`
+	Endpoint    string `json:"endpoint"`
+	Description string `json:"description"`
+}
+
+type Manifest struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	Khoj  Khoj   `json:"khoj"`
+}
+
 type Catalogue struct {
 	Capabilities []string             `json:"capabilities"`
 	Bundles      map[string][]string  `json:"bundles"`
 	States       []string             `json:"states"`
 	Operations   map[string]Operation `json:"operations"`
+	Manifest     Manifest             `json:"manifest"`
 }
 
 func Load() (*Catalogue, error) {
