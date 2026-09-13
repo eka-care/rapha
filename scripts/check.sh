@@ -78,6 +78,9 @@ if [ -d web/node_modules ]; then
   # A capability a workflow draws is grantable; one it does not is inert, and
   # says so from the operation's own station and the workflow's own title.
   (cd web && node --experimental-strip-types src/grants.check.ts)
+  # kind: tasklist's renderer: dispatch reaches it, a row is a title and a
+  # count, and the Open button is genuinely gated behind `operation`.
+  (cd web && node --experimental-strip-types src/tasklist.check.ts)
   echo "ok   web renderer typechecks and builds"
 else
   echo "warn web: run (cd web && npm install) to check the renderer"

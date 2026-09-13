@@ -32,9 +32,16 @@ class Fake:
     for. Nothing here enforces a rule; the kernel is what is under test.
     """
 
-    def __init__(self, stored=(), threads=()):
+    def __init__(self, stored=(), threads=(), stored_by_thread=None):
         self.rows, self.props, self.log = {}, {}, []
         self.stored, self._threads = set(stored), list(threads)
+        # Every existing caller shares one global `stored` set, which is fine
+        # while every test works one thread at a time (T = "enc-1"). A
+        # tasklist walks many threads at once and needs some of them to hold
+        # a stored flag (capture.declined) that others do not, so this is an
+        # additive per-thread override: unset for a thread, `stored_flags`
+        # falls back to the global set exactly as before.
+        self._stored_by_thread = {t: set(f) for t, f in (stored_by_thread or {}).items()}
 
     # test helpers
     def add(self, resource, n=1, thread=T, **fields):
@@ -75,6 +82,8 @@ class Fake:
         return list(self._threads)
 
     def stored_flags(self, thread):
+        if thread in self._stored_by_thread:
+            return frozenset(self._stored_by_thread[thread])
         return frozenset(self.stored)
 
     def write(self, resource, record, *, thread):
@@ -473,6 +482,56 @@ def test_a_tasklist_with_nothing_matching_is_a_real_zero_not_an_empty_result():
     by_title = {r.title: r for r in res.rows}
     assert by_title["Waiting on a lab result"].count == 0
     assert by_title["Consent never asked"].count == 1, "the other task on the same call is not zero"
+
+
+def test_a_tasklist_not_clause_excludes_a_thread_that_has_declined():
+    """'Consent never asked' names `not capture.declined` for a reason: a
+    visit that said no is not a visit nobody asked. Without this test a
+    resolver checking only the first member of `not` (here capture.consented)
+    would let a declined thread straight back onto the row, which is the
+    silent-half-match failure the spec calls out by name."""
+    s = Fake(threads=_refs("enc-1", "enc-3"),
+            stored_by_thread={"enc-3": {"capture.declined"}})
+    s.add("patient", thread="enc-1")
+    s.add("patient", thread="enc-3")
+    res = views.resolve(BUNDLE, "phc.view.today-tasks", s)
+    row = next(r for r in res.rows if r.title == "Consent never asked")
+    assert row.threads == ["enc-1"], \
+        "a thread that declined must be excluded, not counted as unasked"
+
+
+def test_a_tasklist_not_clause_excludes_a_thread_that_has_consented():
+    """The other half of the same `not` list: capture.consented is composed
+    (all_of agreed, not declined, not withdrawn), so this also proves the
+    tasklist reads a derived flag correctly and not only a stored one."""
+    s = Fake(threads=_refs("enc-1", "enc-2"),
+            stored_by_thread={"enc-2": {"capture.agreed"}})
+    s.add("patient", thread="enc-1")
+    s.add("patient", thread="enc-2")
+    res = views.resolve(BUNDLE, "phc.view.today-tasks", s)
+    row = next(r for r in res.rows if r.title == "Consent never asked")
+    assert row.threads == ["enc-1"], \
+        "a thread that already consented must be excluded, not counted as unasked"
+
+
+def test_a_tasklist_requires_every_member_of_a_multi_flag_where():
+    """The declared bundle's own tasks each name one `flag`, so this proves
+    the `all(want)` side directly: a task naming two flags must require both,
+    not just the first, the same property the two `not` tests above prove for
+    exclusion."""
+    s = Fake(threads=_refs("enc-1", "enc-2"))
+    s.add("patient", thread="enc-1")                              # registered only
+    s.add("patient", thread="enc-2")
+    s.add("observation", thread="enc-2", category="vital-signs")  # + vitals.recorded
+    task = c.Task(title="Registered and vitalled",
+                 where={"flag": ["registered", "vitals.recorded"]})
+    view = c.View(id="phc.view._fixture-multi-flag", kind="tasklist", title="", summary="",
+                 capability="patient.find", workflow=WF.id, tasks=[task])
+    bundle = dataclasses.replace(BUNDLE, views={view.id: view})
+    res = views.resolve(bundle, view.id, s)
+    row, = res.rows
+    assert row.threads == ["enc-2"], \
+        "a multi-member `flag` list must require every member, not just the first"
 
 
 def test_the_laboratory_gets_the_tasklist_kind_free_and_names_no_phc_word():
