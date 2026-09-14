@@ -79,13 +79,27 @@ ok(/plate-handle/.test(plateFn), "the handle carries its own class for the zero-
 
 // -- keyboard reorder: ArrowUp/ArrowDown/Home/End/Escape, all routed through
 // the same reorder() this file's pointer path also calls -------------------
-const keyFn = src.slice(src.indexOf("function onKeyDown("), src.indexOf("function onKeyDown(") + 900);
+// Comment-stripped: a mutation's own explanatory comment can otherwise
+// mention "reorder(" in prose and satisfy a regex looking for the real call.
+const keyFn = stripped.slice(stripped.indexOf("function onKeyDown("), stripped.indexOf("function onKeyDown(") + 900);
 ok(/ArrowUp/.test(keyFn) && /ArrowDown/.test(keyFn), "the keyboard branch handles ArrowUp and ArrowDown");
 ok(/"Home"/.test(keyFn) && /"End"/.test(keyFn), "the keyboard branch handles Home and End");
 ok(/"Escape"/.test(keyFn) && /focusOrigin/.test(keyFn), "Escape restores the index recorded on focus");
 ok(/preventDefault\(\)/.test(keyFn), "the handler prevents the browser's own scroll-on-arrow-key");
-ok((keyFn.match(/reorder\(/g) ?? []).length >= 4,
-  "every keyboard branch calls reorder(), the same function the pointer-drop path calls");
+// Anchored per branch, not just "reorder( appears >=N times somewhere in the
+// function": a mutation that gave ArrowDown its own inline splice (the exact
+// two-semantics-in-one-component bug) still left enough OTHER branches
+// calling reorder() to clear a bare count threshold, so it passed a looser
+// version of this check. Requiring each key's own branch to reach reorder(
+// before the next branch starts is what actually closes that hole.
+for (const key of ["ArrowUp", "ArrowDown", "Home", "End"]) {
+  const at = keyFn.indexOf(`"${key}"`);
+  ok(at >= 0, `the keyboard branch has a case for ${key}`);
+  const branch = keyFn.slice(at, at + 160);
+  const nextCase = branch.slice(1).search(/else if \(e\.key ===/);
+  const scoped = nextCase === -1 ? branch : branch.slice(0, nextCase + 1);
+  ok(/\breorder\(/.test(scoped), `${key} calls reorder(), not a private splice of its own`);
+}
 
 // -- ONE move function, shared: today's build has a single splice-out/
 // splice-in move(), called from exactly one place (reorder()), which is
