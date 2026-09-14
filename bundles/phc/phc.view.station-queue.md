@@ -8,6 +8,10 @@ capability: patient.find
 workflow: phc.wf.outpatient
 scope: today
 group_by: station
+# A facility-tunable default, not a value the spec measured or derived: 30
+# minutes before a row starts inking amber is defensible for a PHC OPD wait,
+# but it is a placeholder for whoever actually owns this facility's target,
+# not a number to read back as researched.
 target_minutes: 30
 columns: [name, age, sex, village, token]
 badges:
