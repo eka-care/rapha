@@ -100,6 +100,11 @@ export type ViewDecl = {
   scope?: string;
   capability?: string;
   metrics?: string[];
+  /** The colour law's declared wait limits, in minutes. Both optional; a
+   *  bundle that declares neither renders pure monochrome. See
+   *  QueueRow.entered_at. */
+  target_minutes?: number | null;
+  escalate_minutes?: number | null;
 };
 
 export type Catalogue = {
@@ -159,6 +164,9 @@ export type ThreadView = {
 export type QueueRow = {
   thread: string; subject: Record<string, unknown>; station: string | null;
   flags: string[]; badges: Record<string, string>; opened_at: string;
+  /** When this row entered its current station, if the store tracks it.
+   *  elapsed = now - (entered_at ?? opened_at). Not populated today. */
+  entered_at?: string | null;
 };
 
 export type MetricValue = {

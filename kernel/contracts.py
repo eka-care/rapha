@@ -213,6 +213,11 @@ class View:
     window: str = "day"             # METRIC_WINDOWS
     # tasklist
     tasks: list = field(default_factory=list)     # of Task
+    # colour law (Vernier): a queue's declared wait limits, in minutes. Both
+    # optional; a bundle that declares neither renders pure monochrome. See
+    # QueueRow.entered_at and the renderer's colourRule.
+    target_minutes: Optional[int] = None
+    escalate_minutes: Optional[int] = None        # defaults to 2x target when unset
     type: str = "view"
 
 
@@ -460,6 +465,10 @@ class QueueRow:
     flags: list
     badges: dict                    # flag -> style, only the flags present
     opened_at: str
+    # colour law (Vernier): when this row entered its current station, if the
+    # store tracks it. elapsed = now - (entered_at ?? opened_at). Optional and
+    # unpopulated today; adding a value here is a later group's work.
+    entered_at: Optional[str] = None
 
 
 @dataclass(frozen=True)

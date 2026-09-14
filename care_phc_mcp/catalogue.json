@@ -1319,6 +1319,7 @@
       "badges": {},
       "capability": "reporting.view",
       "columns": [],
+      "escalate_minutes": null,
       "group_by": null,
       "id": "phc.view.facility-dashboard",
       "kind": "dashboard",
@@ -1330,6 +1331,7 @@
       "scope": "today",
       "sections": [],
       "summary": "Visits, ABHA coverage and flagged vitals.",
+      "target_minutes": null,
       "tasks": [],
       "title": "Facility today",
       "type": "view",
@@ -1352,6 +1354,7 @@
         "village",
         "token"
       ],
+      "escalate_minutes": null,
       "group_by": "station",
       "id": "phc.view.station-queue",
       "kind": "queue",
@@ -1359,6 +1362,7 @@
       "scope": "today",
       "sections": [],
       "summary": "Today, grouped by station.",
+      "target_minutes": 30,
       "tasks": [],
       "title": "Lines",
       "type": "view",
@@ -1369,6 +1373,7 @@
       "badges": {},
       "capability": "patient.find",
       "columns": [],
+      "escalate_minutes": null,
       "group_by": null,
       "id": "phc.view.today-tasks",
       "kind": "tasklist",
@@ -1376,6 +1381,7 @@
       "scope": "today",
       "sections": [],
       "summary": "What is waiting across today's visits, not what is waiting on one.",
+      "target_minutes": null,
       "tasks": [
         {
           "operation": "phc.op.lab-result-enter",
@@ -1406,6 +1412,7 @@
       "badges": {},
       "capability": "patient.find",
       "columns": [],
+      "escalate_minutes": null,
       "group_by": null,
       "id": "phc.view.visit-summary",
       "kind": "summary",
@@ -1509,6 +1516,7 @@
         }
       ],
       "summary": "One visit on one page.",
+      "target_minutes": null,
       "tasks": [],
       "title": "Visit summary",
       "type": "view",

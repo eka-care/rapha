@@ -8,6 +8,7 @@ capability: patient.find
 workflow: phc.wf.outpatient
 scope: today
 group_by: station
+target_minutes: 30
 columns: [name, age, sex, village, token]
 badges:
   abha.pending: warn
