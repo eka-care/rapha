@@ -433,7 +433,7 @@ export function Sidebar({
 
           {canPrimary && (
             <button className="rail-primary" onClick={onAddRecent} {...rove("primary", "none")}>
-              <span>{primaryOpDecl!.short} {subjectNoun}</span>
+              <span>{primaryOpDecl!.short} {subjectNoun}</span>{" "}
               <span className="rail-primary-key">Alt N</span>
             </button>
           )}
@@ -447,7 +447,7 @@ export function Sidebar({
               aria-current={route.kind === "home" ? "page" : undefined}
               {...rove("nav:home", "list", "home")}
             >
-              {altHeld && <span className="rail-altkey">1</span>}
+              {altHeld && <span className="rail-altkey" aria-hidden="true">1</span>}
               <span>Home</span>
             </button>
             {nav.map((v, i) => {
@@ -466,7 +466,7 @@ export function Sidebar({
                   aria-current={active ? "page" : undefined}
                   {...rove(`nav:${v.id}`, "list", name)}
                 >
-                  {altHeld && digit <= 9 && <span className="rail-altkey">{digit}</span>}
+                  {altHeld && digit <= 9 && <span className="rail-altkey" aria-hidden="true">{digit}</span>}
                   <span>{name}</span>
                   {count !== undefined && <span className="ct" {...toneAttrs(tone)}>{count}</span>}
                 </button>
@@ -597,7 +597,7 @@ export function Sidebar({
               }}
               {...rove("role", "none")}
             >
-              <span className="rail-role-av">{role.slice(0, 1).toUpperCase()}</span>
+              <span className="rail-role-av" aria-hidden="true">{role.slice(0, 1).toUpperCase()}</span>
               <span className="rail-role-name">{role === "demo" ? "Every capability (demo)" : human(role)}</span>
             </button>
           </div>
