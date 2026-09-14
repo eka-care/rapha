@@ -109,8 +109,12 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
    its own trailing edge as the last cell of a grid row that already ends at
    the spine (x=256) -- never via margin-inline-start:auto, which does not
    appear anywhere in this file. */
+/* box-shadow, not border-right: a border consumes 1px of the box-sizing:
+   border-box width, which would put the rail-body's own right inner edge at
+   255 instead of 256 (264 - 1(border) - 8(inset) = 255). An inset shadow
+   paints the same 1px rule with no layout box at all. */
 .sb{position:fixed;top:0;left:0;bottom:0;width:var(--rail-w);background:var(--rail);
-  border-right:1px solid var(--rule);z-index:10;display:flex;flex-direction:column;
+  box-shadow:inset -1px 0 0 var(--rule);z-index:10;display:flex;flex-direction:column;
   transition:none}
 .rail-spacer{width:var(--rail-w);flex-shrink:0}
 .rail-body{padding-inline:var(--inset-rail);padding-top:8px;padding-bottom:12px;
