@@ -660,7 +660,7 @@ function ViewScreen({
     <>
       {loading && <Loading what={title(id)} />}
       {error && <Failed error={error} onRetry={reload} />}
-      {data && <ViewRenderer result={data} titles={titlesOf(cat)} onOpenThread={onOpenThread} />}
+      {data && <ViewRenderer result={data} decl={cat.views?.[id]} titles={titlesOf(cat)} onOpenThread={onOpenThread} />}
     </>
   );
 }

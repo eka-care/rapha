@@ -15,15 +15,7 @@ import type { Operation } from "./types";
 
 export type IconName =
   "mark" | "mark-lg" | "search" | "home" | "moon" | "sun" | "vitals" | "mic" | "box" | "clip" | "eye" | "plus" | "folder" | "chat" | "spark" | "check" | "alert" | "lock" | "send" | "user" | "users" | "list" | "cog" | "refer" | "chev" | "id" | "doc" |
-  // ponytail: #i-grip (and the "grip" name) stays alongside the new "handle"
-  // glyph rather than being deleted as the spec's own step 5 literally says.
-  // Home.tsx (web/src/Home.tsx:360) still renders <Icon name="grip" .../> for
-  // today's drag handle and is group C's file (spec step 9), not this one's;
-  // deleting grip out from under it would fail `npm run check` for a renderer
-  // this group does not own. Whoever lands step 9 should switch that call to
-  // "handle" and delete "grip" and #i-grip in the same commit -- the glyph
-  // this replaces it with is already here, unused, ready for that edit.
-  "grip" | "handle";
+  "handle";
 
 export function Icon({ name, size }: { name: IconName; size?: "sm" | "lg" }) {
   return (
@@ -56,7 +48,6 @@ const SHEET = `
     #i-mark path, #i-mark circle, #i-mark-lg path, #i-mark-lg circle {
       fill: none; stroke: currentColor; vector-effect: non-scaling-stroke;
     }
-    #i-grip circle { fill: currentColor; stroke: none; }
   </style>
   <symbol id="i-mark" viewBox="0 0 24 24"><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(0 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(45 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(90 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(135 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(180 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(225 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(270 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(315 12 12)"/><circle cx="12" cy="12" r="1.7"/>  <circle cx="12" cy="12" r="6.2" opacity=".35"/>  <circle cx="3.1" cy="3.1" r=".7"/><circle cx="20.9" cy="3.1" r=".7"/>  <circle cx="3.1" cy="20.9" r=".7"/><circle cx="20.9" cy="20.9" r=".7"/></symbol>
   <symbol id="i-mark-lg" viewBox="0 0 24 24"><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(0 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(45 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(90 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(135 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(180 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(225 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(270 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(315 12 12)"/><circle cx="12" cy="12" r="1.7"/>  <circle cx="12" cy="12" r="6.2" opacity=".3"/><circle cx="12" cy="12" r="9.4" opacity=".16"/></symbol>
@@ -85,9 +76,7 @@ const SHEET = `
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
   <symbol id="i-id" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><circle cx="8.5" cy="11" r="2.2"/><path d="M5.2 16.2c.8-1.4 2-2 3.3-2s2.5.6 3.3 2M15 10h4M15 14h3"/></symbol>
   <symbol id="i-doc" viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.4"/><path d="M5 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M12 15.5v3M10.5 17h3"/></symbol>
-  <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.3"/><circle cx="15" cy="6" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="18" r="1.3"/></symbol>
-  <!-- The card-reorder handle's real glyph (spec: "two 12px horizontal rules
-       4px apart -- the plate's own seam repeated, not a stock six-dot grip").
-       Unused until whoever lands Home.tsx's rewrite switches to it. -->
+  <!-- The card-reorder handle's glyph (spec: "two 12px horizontal rules 4px
+       apart -- the plate's own seam repeated, not a stock six-dot grip"). -->
   <symbol id="i-handle" viewBox="0 0 24 24"><path d="M4 9h16M4 15h16"/></symbol>
 `;

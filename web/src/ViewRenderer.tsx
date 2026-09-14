@@ -3,13 +3,22 @@
  *
  *  It contains no screen. A queue of patients by station and a queue of
  *  samples by bench are the same code; the difference is the declaration.
+ *
+ *  Memoised (Vernier step 10): Home's pointer-driven reorder changes its own
+ *  `order` state on every plate boundary crossed, which re-renders Home and
+ *  every <Card>/<ViewRenderer> underneath it. Without memo, that re-runs
+ *  QueueView/Dashboard/TaskList's own row-building work every time a card
+ *  merely changes position, for a re-render whose props (`result`, `titles`,
+ *  `onOpenThread`) never actually changed. `React.memo` makes a pointer
+ *  crossing cost nothing here; the crossing is still visible via the
+ *  imperative FLIP transform Home applies directly to the DOM.
  */
-import { useState } from "react";
-import type { AuditRecord, MetricValue, Operation, Proposal, QueueRow, SectionResult, StepStatus, TaskRow, ViewResult } from "./types";
+import { memo, useState } from "react";
+import type { AuditRecord, MetricValue, Operation, Proposal, QueueRow, SectionResult, StepStatus, TaskRow, ViewDecl, ViewResult } from "./types";
 import { Badge, Empty, human, title } from "./ui";
 
-export function ViewRenderer({
-  result, titles, onOpenThread, onAction, onReview,
+function ViewRendererImpl({
+  result, titles, onOpenThread, onAction, onReview, decl, maxRows,
 }: {
   result: ViewResult;
   /** Declaration id to human title, for anything the result names by id but
@@ -18,16 +27,128 @@ export function ViewRenderer({
   onOpenThread?: (thread: string) => void;
   onAction?: (op: Operation) => void;
   onReview?: (p: Proposal) => void;
+  /** The colour law's declared thresholds live on the view's own decl, not
+   *  on the result. Optional: a caller with only a result (no decl at hand)
+   *  still renders, just without a wait rule -- the same fallback the law
+   *  itself specifies for a bundle that declares no target. */
+  decl?: Pick<ViewDecl, "target_minutes" | "escalate_minutes">;
+  /** Home's plate body caps at six rows, then a 32px "+N more" row that
+   *  expands in place; a dedicated full-page view (reached from the rail,
+   *  not embedded in a plate) shows everything. Only Dashboard and TaskList
+   *  read this: a plate never embeds a queue. */
+  maxRows?: number;
 }) {
-  if (result.kind === "queue") return <QueueView result={result} onOpenThread={onOpenThread} />;
-  if (result.kind === "dashboard") return <Dashboard rows={result.rows as MetricValue[]} titles={titles} />;
+  if (result.kind === "queue") return <QueueView result={result} decl={decl} onOpenThread={onOpenThread} />;
+  if (result.kind === "dashboard") return <Dashboard rows={result.rows as MetricValue[]} titles={titles} maxRows={maxRows} />;
   if (result.kind === "summary") {
     return <Sections sections={result.rows as SectionResult[]} onAction={onAction} onReview={onReview} />;
   }
   if (result.kind === "tasklist") {
-    return <TaskList rows={result.rows as TaskRow[]} onOpenThread={onOpenThread} />;
+    return <TaskList rows={result.rows as TaskRow[]} onOpenThread={onOpenThread} maxRows={maxRows} />;
   }
   return <Empty>No renderer for a <b>{result.kind}</b> view.</Empty>;
+}
+
+export const ViewRenderer = memo(ViewRendererImpl);
+
+// ---------------------------------------------------------- the colour law --
+//
+// The one place in the renderer that turns a declared threshold plus a row's
+// own timestamp into the wait rule's fill and [data-over]/[data-act]. Mirrors
+// Shell.tsx's rowTone exactly (elapsed = now - (entered_at ?? opened_at); over
+// at target; act at escalate, default 2x target) -- that file carries its own
+// copy for the rail's nav counts and collapsed badge (sites 4 and 5 of the
+// colour law), which are different DOM nodes than any row this file draws and
+// cannot share a React tree with them; Home.tsx imports these instead of
+// reimplementing them a third time, so there is exactly one implementation of
+// "what tone is this row" for every row a subject actually appears in.
+export type Tone = "over" | "act" | null;
+
+function elapsedMinutes(row: { entered_at?: string | null; opened_at?: string }): number | null {
+  const at = row.entered_at ?? row.opened_at;
+  if (!at) return null;
+  const ms = Date.now() - new Date(at).getTime();
+  return Number.isFinite(ms) ? ms / 60000 : null;
+}
+
+export function toneOf(
+  decl: Pick<ViewDecl, "target_minutes" | "escalate_minutes"> | undefined,
+  row: { entered_at?: string | null; opened_at?: string },
+): Tone {
+  if (decl?.target_minutes == null) return null;
+  const minutes = elapsedMinutes(row);
+  if (minutes == null) return null;
+  const escalate = decl.escalate_minutes ?? decl.target_minutes * 2;
+  if (minutes >= escalate) return "act";
+  if (minutes >= decl.target_minutes) return "over";
+  return null;
+}
+
+/** The wait rule's own style+attributes for one row, given the tone it has
+ *  already been assigned (which may have been demoted by an act budget --
+ *  see QueueView below -- so this never recomputes tone itself). --t is the
+ *  elapsed/target fraction, clamped to 1: once a row is over, its bar is
+ *  already full width and only its colour still moves. */
+function waitAttrs(
+  decl: Pick<ViewDecl, "target_minutes" | "escalate_minutes"> | undefined,
+  row: { entered_at?: string | null; opened_at?: string },
+  tone: Tone,
+): React.HTMLAttributes<HTMLElement> & { "data-over"?: string; "data-act"?: string } {
+  if (decl?.target_minutes == null) return {};
+  const minutes = elapsedMinutes(row);
+  if (minutes == null) return {};
+  const t = Math.min(1, minutes / decl.target_minutes);
+  const attrs: React.HTMLAttributes<HTMLElement> & { "data-over"?: string; "data-act"?: string } =
+    { style: { "--t": t } as React.CSSProperties };
+  if (tone === "over" || tone === "act") attrs["data-over"] = "";
+  if (tone === "act") attrs["data-act"] = "";
+  return attrs;
+}
+
+/** The age cell's own word, so colour is never the only channel: "18m over"
+ *  for amber, "41m · act now" for red, a plain "6m" otherwise. Null when
+ *  the row carries no timestamp at all (nothing to read back). */
+function ageLabel(row: { entered_at?: string | null; opened_at?: string }, tone: Tone): string | null {
+  const minutes = elapsedMinutes(row);
+  if (minutes == null) return null;
+  const m = Math.max(0, Math.round(minutes));
+  if (tone === "act") return `${m}m · act now`;
+  if (tone === "over") return `${m}m over`;
+  return `${m}m`;
+}
+
+/** The declared short identifier for a subject row. There is no separate
+ *  "short id column" field on ViewDecl (an additive contract change nobody
+ *  has needed yet), so this is the same /token/i heuristic Shell.tsx's own
+ *  shortId carries for the rail -- kept in step here rather than imported so
+ *  neither file reaches into the other's internals, the same call that
+ *  file's own comment documents. Home.tsx imports THIS copy for its own
+ *  subject rows (the Recent plate), so within the renderer itself there is
+ *  exactly one implementation, not a third fork of it. */
+export function shortId(subject: Record<string, unknown>): string {
+  const hit = Object.entries(subject).find(([k, v]) => /token/i.test(k) && v !== null && v !== undefined && v !== "");
+  return hit ? String(hit[1]) : "";
+}
+
+// ------------------------------------------------------- plate row cap ----
+
+/** Home layout, band 3: "six rows maximum, then a 32px '+14 more' row that
+ *  expands in place." One hook for both row-producing kinds so the cap and
+ *  its expand button exist in exactly one place. `maxRows` unset (a
+ *  full-page view, not a plate) shows everything. */
+function useRowCap(total: number, maxRows?: number) {
+  const [expanded, setExpanded] = useState(false);
+  const capped = maxRows != null && !expanded && total > maxRows;
+  const limit = capped ? maxRows : total;
+  const hidden = capped ? total - maxRows! : 0;
+  return { limit, hidden, expand: () => setExpanded(true) };
+}
+
+function MoreRow({ hidden, onExpand }: { hidden: number; onExpand: () => void }) {
+  if (hidden <= 0) return null;
+  return (
+    <button type="button" className="plate-more" onClick={onExpand}>+{hidden} more</button>
+  );
 }
 
 // -------------------------------------------------------------- tasklist ----
@@ -35,13 +156,18 @@ export function ViewRenderer({
 /** A row is a title and a count, per the declaration's own copy rule: nothing
  *  here invents prose. `operation` present makes the row actionable, which
  *  here means opening the first matching thread, where that operation is
- *  drawn like any other; absent, it is a worklist with nowhere to tap. */
-function TaskList({ rows, onOpenThread }: { rows: TaskRow[]; onOpenThread?: (t: string) => void }) {
+ *  drawn like any other; absent, it is a worklist with nowhere to tap.
+ *
+ *  No token stub here: a TaskRow is a count across many threads, not one
+ *  subject, and no entered_at either, so it carries no wait rule -- both
+ *  would be invented information the kernel never sent. */
+function TaskList({ rows, onOpenThread, maxRows }: { rows: TaskRow[]; onOpenThread?: (t: string) => void; maxRows?: number }) {
   if (!rows.length) return <Empty>Nothing declared for this list.</Empty>;
+  const { limit, hidden, expand } = useRowCap(rows.length, maxRows);
   return (
     <div className="tasklist">
-      {rows.map((r) => (
-        <div className="card task-row" key={r.title}>
+      {rows.slice(0, limit).map((r) => (
+        <div className="plate-row task-row" key={r.title}>
           <div className="task-t">{r.title}</div>
           <div className="task-n">{r.count}</div>
           {r.operation && r.count > 0 && (
@@ -49,13 +175,51 @@ function TaskList({ rows, onOpenThread }: { rows: TaskRow[]; onOpenThread?: (t: 
           )}
         </div>
       ))}
+      <MoreRow hidden={hidden} onExpand={expand} />
     </div>
   );
 }
 
 // ---------------------------------------------------------------- queue ----
 
-function QueueView({ result, onOpenThread }: { result: ViewResult; onOpenThread?: (t: string) => void }) {
+/** Grafts item 3's fix, rendered: over-threshold rows sort to the top of an
+ *  unambiguous vertical list (the 2x2/auto-fill grid this replaced is exactly
+ *  what would have made that position ambiguous). Stable beyond tone: two
+ *  rows of the same tone keep their original order. */
+function sortByTone(rows: QueueRow[], decl?: Pick<ViewDecl, "target_minutes" | "escalate_minutes">): { row: QueueRow; tone: Tone }[] {
+  const rank = (t: Tone) => (t === "act" ? 0 : t === "over" ? 1 : 2);
+  return rows
+    .map((row, i) => ({ row, i, tone: toneOf(decl, row), minutes: elapsedMinutes(row) ?? -1 }))
+    // Within the same tone, the longest-waiting row sorts first -- the one
+    // act slot the budget below allows is the most overdue row, not merely
+    // whichever the API happened to list first; two rows of equal wait keep
+    // their original order (stable).
+    .sort((a, b) => rank(a.tone) - rank(b.tone) || b.minutes - a.minutes || a.i - b.i)
+    .map(({ row, tone }) => ({ row, tone }));
+}
+
+/** The act budget: one act element per plate, full stop. The rest are still
+ *  exactly as over-threshold (still sorted up, still carry [data-over] and
+ *  their own true "Nm over" reading), they are simply not the second red
+ *  element on the same screen -- the header's own "+N act now" is where they
+ *  are counted, never a hidden row. Returns the demoted tone per row and the
+ *  true act total for that header line. */
+function budgetAct(decorated: { row: QueueRow; tone: Tone }[]): { row: QueueRow; tone: Tone; shown: Tone }[] {
+  let used = 0;
+  return decorated.map(({ row, tone }) => {
+    if (tone !== "act") return { row, tone, shown: tone };
+    used += 1;
+    return { row, tone, shown: used === 1 ? "act" : "over" };
+  });
+}
+
+function QueueView({
+  result, decl, onOpenThread,
+}: {
+  result: ViewResult;
+  decl?: Pick<ViewDecl, "target_minutes" | "escalate_minutes">;
+  onOpenThread?: (t: string) => void;
+}) {
   const rows = result.rows as QueueRow[];
   const groups = result.groups ?? [];
   const [tab, setTab] = useState("all");
@@ -88,6 +252,9 @@ function QueueView({ result, onOpenThread }: { result: ViewResult; onOpenThread?
   ];
   const list = tab === "all" ? rows : tab === "_loose" ? loose : rows.filter((r) => holds(r, tab));
 
+  const budgeted = budgetAct(sortByTone(list, decl));
+  const actTotal = budgeted.filter((b) => b.tone === "act").length;
+
   return (
     <>
       {tabs.length > 1 && (
@@ -100,9 +267,12 @@ function QueueView({ result, onOpenThread }: { result: ViewResult; onOpenThread?
           ))}
         </div>
       )}
-      {list.length ? (
-        <div className="qgrid">
-          {list.map((r) => <Card key={r.thread} row={r} onOpen={onOpenThread} />)}
+      {actTotal > 1 && (
+        <div className="qact" data-act>+{actTotal - 1} act now</div>
+      )}
+      {budgeted.length ? (
+        <div className="plate standalone qlist">
+          {budgeted.map(({ row, shown }) => <Card key={row.thread} row={row} decl={decl} tone={shown} onOpen={onOpenThread} />)}
         </div>
       ) : (
         <Empty>Nobody here.</Empty>
@@ -111,37 +281,42 @@ function QueueView({ result, onOpenThread }: { result: ViewResult; onOpenThread?
   );
 }
 
-/** The columns are whatever the view declared, so the card cannot hard-code
- *  them: the first stringy column is the headline, the rest are the line
- *  under it. */
-function Card({ row, onOpen }: { row: QueueRow; onOpen?: (t: string) => void }) {
+/** One subject row: the token stub, the name, the rest of the declared
+ *  columns, the age cell (colour law's word channel) and the wait rule
+ *  (colour law's length channel), in that order. The columns are whatever
+ *  the view declared, so the row cannot hard-code them: the first stringy
+ *  column is the headline, the rest sit beside it. */
+function Card({
+  row, decl, tone, onOpen,
+}: {
+  row: QueueRow;
+  decl?: Pick<ViewDecl, "target_minutes" | "escalate_minutes">;
+  tone: Tone;
+  onOpen?: (t: string) => void;
+}) {
   const cols = Object.entries(row.subject).filter(([, v]) => v !== null && v !== undefined && v !== "");
   const headIdx = Math.max(0, cols.findIndex(([k, v]) => k === "name" || typeof v === "string"));
   const head = cols[headIdx] ? String(cols[headIdx][1]) : row.thread;
-  // A token is the kernel's own word for a thread (api ThreadRef carries one),
-  // not a bundle's, and the design gives it the corner rather than the line.
-  const token = cols.find(([k], i) => i !== headIdx && /token/i.test(k));
+  const tok = shortId(row.subject);
   const rest = cols
-    .filter(([k], i) => i !== headIdx && k !== token?.[0])
+    .filter(([k], i) => i !== headIdx && !/token/i.test(k))
     .map(([, v]) => String(v));
-  const initials = head.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  const age = ageLabel(row, tone);
 
   return (
-    <button className="card qc" onClick={() => onOpen?.(row.thread)}>
-      <div className="qc-top">
-        <div className="avatar" style={{ width: 34, height: 34, fontSize: 11.5 }}>{initials}</div>
-        <div style={{ minWidth: 0 }}>
-          <div className="qc-n">{head}</div>
-          <div className="qc-m">{rest.join(" · ")}</div>
-        </div>
-        {token && <span className="qc-tok">{String(token[1])}</span>}
-      </div>
-      <div className="qc-chips">
+    <button className="plate-row qrow" onClick={() => onOpen?.(row.thread)} {...waitAttrs(decl, row, tone)}>
+      <span className="stub">{tok}</span>
+      <span className="qrow-name">
+        {head}
+        {rest.length > 0 && <span className="qrow-rest"> · {rest.join(" · ")}</span>}
+      </span>
+      {age && <span className="qrow-age">{age}</span>}
+      <span className="qrow-chips">
         <Badge style="blue">{row.station ? human(row.station) : "Complete"}</Badge>
         {Object.entries(row.badges ?? {}).map(([flag, style]) => (
           <Badge key={flag} style={style}>{human(flag)}</Badge>
         ))}
-      </div>
+      </span>
     </button>
   );
 }
@@ -161,7 +336,7 @@ export function Sections({
         <div className="card" key={s.title}>
           <div className="card-h">
             <div className="card-t">{s.title}</div>
-            <span className="badge b-mute ml-auto">{s.rows?.length ?? 0}</span>
+            <span className="badge b-mute">{s.rows?.length ?? 0}</span>
           </div>
           <div className="secbody">
             <SectionRows section={s} onAction={onAction} onReview={onReview} />
@@ -232,7 +407,7 @@ export function Line({ line }: { line: StepStatus[] }) {
         <div key={s.station} className={`st ${s.status === "done" ? "done" : s.status === "now" ? "now" : s.status === "skipped" ? "skip" : ""}`}>
           <span className="n">{s.status === "done" ? "✓" : i + 1}</span>
           {human(s.label || s.station)}
-          {s.status === "skipped" && <span className="ml-auto" style={{ fontSize: 9.5 }}>not this visit</span>}
+          {s.status === "skipped" && <span className="st-skip">not this visit</span>}
         </div>
       ))}
     </div>
@@ -248,7 +423,7 @@ export function ProposalRow({ p, onReview }: { p: Proposal; onReview?: (p: Propo
         <Badge style="warn">awaiting a person</Badge>
       </div>
       <div className="op-m">{p.proposed_by ?? "unattributed"} · {p.surface} · {n} value{n === 1 ? "" : "s"}</div>
-      {onReview && <button className="cq rose" style={{ marginTop: 8 }} onClick={() => onReview(p)}>Review</button>}
+      {onReview && <button className="cq" style={{ marginTop: 8 }} onClick={() => onReview(p)}>Review</button>}
     </div>
   );
 }
@@ -259,7 +434,7 @@ export function AuditRow({ a }: { a: AuditRecord }) {
     <div className="au">
       <span>{a.at?.slice(11, 16) || a.at}</span>
       <b>{a.operation.replace(/^[a-z0-9]+\.op\./, "")}</b>
-      <span className="ml-auto">{a.actor ?? "unattributed"}</span>
+      <span className="au-actor">{a.actor ?? "unattributed"}</span>
       <Badge style={denied ? "crit" : a.outcome === "proposed" ? "warn" : "ok"}>{a.outcome}</Badge>
     </div>
   );
@@ -299,27 +474,27 @@ export const fmt = (v: unknown): string =>
 
 // ------------------------------------------------------------ dashboard ----
 
-function Dashboard({ rows, titles }: { rows: MetricValue[]; titles?: Record<string, string> }) {
+function Dashboard({ rows, titles, maxRows }: { rows: MetricValue[]; titles?: Record<string, string>; maxRows?: number }) {
   if (!rows.length) return <Empty>This dashboard declares no metrics.</Empty>;
+  const { limit, hidden, expand } = useRowCap(rows.length, maxRows);
   return (
-    <>
-      <div className="mgrid">
-        {rows.map((m) => (
-          // The exact window start is an ISO timestamp. It is the tile's
-          // tooltip, not a second line under a line that already says "in the
-          // week": nobody reads a machine timestamp off a dashboard.
-          <div className="card metric" key={m.metric} title={`since ${m.window_start}`}>
-            <div className="eyebrow">{m.title ?? titles?.[m.metric] ?? human(m.metric)}</div>
-            <div className="m-val">{metricValue(m)}</div>
-            <div className="m-sub">
-              {m.denominator === null || m.denominator === undefined
-                ? `${m.numerator} in the ${m.window}`
-                : `${m.numerator} of ${m.denominator} in the ${m.window}`}
-            </div>
-          </div>
-        ))}
-      </div>
-    </>
+    <div className="mgrid">
+      {rows.slice(0, limit).map((m) => (
+        // The exact window start is an ISO timestamp. It is the row's title
+        // attribute, not a second line under a line that already says "in the
+        // week": nobody reads a machine timestamp off a dashboard.
+        <div className="plate-row metric" key={m.metric} title={`since ${m.window_start}`}>
+          <span className="m-lab">{m.title ?? titles?.[m.metric] ?? human(m.metric)}</span>
+          <span className="m-val">{metricValue(m)}</span>
+          <span className="m-sub">
+            {m.denominator === null || m.denominator === undefined
+              ? `${m.numerator} in the ${m.window}`
+              : `${m.numerator} of ${m.denominator} in the ${m.window}`}
+          </span>
+        </div>
+      ))}
+      <MoreRow hidden={hidden} onExpand={expand} />
+    </div>
   );
 }
 
