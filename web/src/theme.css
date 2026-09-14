@@ -389,6 +389,11 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
    box, sitting on its own 1px --rule baseline. */
 .scale{height:60px;background:transparent;border-bottom:1px solid var(--rule);
   display:flex;align-items:flex-end}
+/* Type scale's largest size, 32/36 mono, reserved for the live scale's
+   counts and nothing else anywhere -- there is no display face in this
+   product, the largest thing on any screen is a number. */
+.scale-count{font:500 32px/36px "Atkinson Hyperlegible Mono",ui-monospace,monospace;
+  letter-spacing:-.015em;font-variant-numeric:tabular-nums;color:var(--ink)}
 
 /* flex-wrap, not a fixed-column grid: a grid whose column count does not
    divide the card count evenly leaves an empty cell with no content in it

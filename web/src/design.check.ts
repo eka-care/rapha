@@ -1,17 +1,24 @@
-/** Task 7's visual system: one accent that only ever means "needs you", a
- *  three-step radius/border/shadow scale instead of one value everywhere,
- *  Khoj centred in the header by layout rather than by a margin, and the
- *  "Use demo data" control gone for good.
+/** The colour law's enforcement mechanism, and what survives of task 7's
+ *  visual-system checks now that the accent/tier system it checked is gone.
  *
  *  Run: node --experimental-strip-types src/design.check.ts   (from web/)
  *
  *  Same technique as shell.check.ts and tasklist.check.ts: read the CSS and
  *  the renderer sources back as text and assert against them, because a
- *  `.check.ts` may never import a `.tsx` or load a browser. What this catches
- *  that eyeballing a screenshot would not: a future rule quietly reaching for
- *  `--accent` to make something look nice (a hover state, a chip, a label)
- *  rather than to mean "needs you", which is exactly the drift that put five
- *  unrelated colours on the old Home page in the first place.
+ *  `.check.ts` may never import a `.tsx` or load a browser.
+ *
+ *  CLAUSE TWO OF THE COLOUR LAW, MADE MECHANICAL: no CSS rule may use
+ *  var(--over) or var(--act) unless EVERY selector in its list contains
+ *  [data-over] or [data-act]. Those attributes are set in exactly one place
+ *  in the renderer (ViewRenderer.tsx, a later group), from a declared
+ *  threshold; deleting the declared field makes the attribute never set and
+ *  the colour must vanish everywhere. This replaces task 7's ACCENT_ALLOW
+ *  machinery, which matched a selector against the START of a comma list
+ *  (`/^\.b-warn/`) rather than every entry in it -- a rule quietly edited to
+ *  `.b-warn,.nv.on{...}` rode the allow-listed selector's permission in on
+ *  the same block. Checking every comma-separated selector individually is
+ *  what closes that hole; it is also why this check needs no allow-list at
+ *  all: a selector either carries the gating attribute or it does not.
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -27,144 +34,36 @@ const ok = (cond: unknown, what: string) => { checks++; assert.ok(cond, `FAIL ${
 const theme = read("web/src/theme.css");
 const renderer = read("web/src/renderer.css");
 
-// -- one accent, scoped to flag / critical / primary, nowhere else ---------
+// -- the colour gate: every --over/--act usage, gated on every selector ----
 //
-// Every rule block that USES the token (`var(--accent...)`) rather than just
-// declaring it (`--accent:` inside :root or [data-theme="dark"]) must belong
-// to one of these exact, individual selectors. This is an exact-match Set,
-// not a prefix test: a first cut of this check used `/^\.b-warn/.test(...)`,
-// which matches the *start* of a selector list, so a rule edited to
-// `.b-warn,.nv.on{...}` still passed (".nv.on" rides in on the same block as
-// the one legitimate selector). Splitting every rule's selector list on its
-// commas and checking each piece against this Set exactly closes that: the
-// appended selector is its own entry, and ".nv.on" is not in the Set.
-//
-// There used to be a second colour token (--destructive) that was
-// byte-identical to --accent in both themes; a rule could "avoid" this guard
-// simply by spelling the token differently while painting the exact same
-// pixel. That token is gone (merged into --accent, see the token block
-// above), so there is now only one spelling to police.
-const ACCENT_ALLOW = new Set([
-  ".b-warn", ".b-crit",                        // a flag, a critical value
-  ".fl-p.alert", ".fl-p.alert .fl-av",         // the live line's own critical row
-  ".at-ic.red", ".at-ic.amb",                  // the attention list's own flag/critical icon
-  ".dot.down",                                  // kernel unreachable: a critical system state
-  ".nudge",                                     // a clinical flag rendered as a sentence
-  ".f-field.override",                          // an ABHA-locked field under override: a flag
-  ".prop.primary", ".prop.primary .p-s", ".prop.primary .p-tag",
-  ".btn-b",
-  ".cq.rose",                                   // the primary action, everywhere it appears
-  // (the :hover variants of these three lighten via filter:brightness, not
-  // via --accent, so they carry no usage of the token to allow-list)
-  // Consolidated former --destructive users: every one is an error, an
-  // irreversible-action warning, or a critical value already, which is why
-  // they were folded into the same token rather than given their own entry.
-  ".state.bad", ".f-field.bad .f-in", ".f-bad", ".f-bad.block",
-  ".confirmbox", ".cap.risk", ".kv.crit b", ".p-tag.irr", ".crit-box",
-]);
-
-function accentUsageSelectors(rawCss: string): string[] {
+// A "usage" is a declaration block whose body mentions var(--over) or
+// var(--act). `\b` after the token name is what stops a future --overflow or
+// --active token from being mistaken for a hit; there is no such token today,
+// but the boundary costs nothing and removes the question later.
+function colourUsages(rawCss: string): { selector: string; body: string }[] {
   const css = rawCss.replace(/\/\*[\s\S]*?\*\//g, "");
-  // Strip the two blocks that DECLARE the token; only usage sites remain.
   const withoutDecls = css
     .replace(/:root\{[\s\S]*?\n\}/, "")
     .replace(/\[data-theme="dark"\]\{[\s\S]*?\n\}/, "");
-  const selectors: string[] = [];
+  const usages: { selector: string; body: string }[] = [];
   const re = /([^{}]+)\{([^{}]*)\}/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(withoutDecls))) {
-    if (!m[2].includes("--accent")) continue;
-    for (const part of m[1].split(",")) {
-      selectors.push(part.trim().replace(/\s+/g, " "));
-    }
+    if (!/--over\b/.test(m[2]) && !/--act\b/.test(m[2])) continue;
+    usages.push({ selector: m[1].trim().replace(/\s+/g, " "), body: m[2] });
   }
-  return selectors;
+  return usages;
 }
 
-// The specific bypass this guarded against once: --destructive was declared
-// as the exact same hex value as --accent in both themes, so a rule could
-// paint the identical pixel while spelling a different token name and slip
-// past a check that only watches for `var(--accent...)`. That token is gone
-// now, but nothing stops a *new* one from reintroducing the same trick, so
-// this checks the general case: no other colour token in either theme block
-// may share --accent's exact hex value.
-function hexTokens(block: string): Map<string, string> {
-  const out = new Map<string, string>();
-  for (const m of block.matchAll(/--([\w-]+):\s*(#[0-9A-Fa-f]{3,8})\b/g)) out.set(m[1], m[2].toUpperCase());
-  return out;
+const gated = [...colourUsages(theme), ...colourUsages(renderer)];
+ok(gated.length >= 1, "the colour gate is actually exercised somewhere (the check is not vacuous)");
+for (const { selector, body } of gated) {
+  const parts = selector.split(",").map((s) => s.trim());
+  const allGated = parts.every((p) => p.includes("[data-over]") || p.includes("[data-act]"));
+  ok(allGated,
+    `"${selector}" uses --over/--act ("${body.trim()}") but not every selector in its ` +
+    `comma list carries [data-over] or [data-act] -- one bare selector is enough to leak colour`);
 }
-for (const [label, blockRe] of [
-  ["light", /:root\{([\s\S]*?)\n\}/],
-  ["dark", /\[data-theme="dark"\]\{([\s\S]*?)\n\}/],
-] as const) {
-  const block = blockRe.exec(theme)![1];
-  const hexes = hexTokens(block);
-  const accentHex = hexes.get("accent");
-  ok(!!accentHex, `--accent has a hex value in the ${label} theme block, for this check to compare against`);
-  for (const [name, hex] of hexes) {
-    if (name === "accent" || name === "accent-bg" || name === "accent-border") continue;
-    ok(hex !== accentHex, `--${name} (${label}) is not a byte-identical duplicate of --accent (${accentHex})`);
-  }
-}
-
-const usages = [...accentUsageSelectors(theme), ...accentUsageSelectors(renderer)];
-ok(usages.length >= 8, "the accent token is actually used somewhere (the check is not vacuous)");
-for (const selector of usages) {
-  ok(ACCENT_ALLOW.has(selector), `"${selector}" uses --accent but is not an exact allow-listed flag/critical/primary selector`);
-}
-// The allow-list itself must not silently grow stale: every entry should be
-// exercised by something in the stylesheet, or it is dead permission.
-for (const allowed of ACCENT_ALLOW) {
-  ok(usages.includes(allowed), `"${allowed}" is allow-listed but nothing in the stylesheet actually uses it`);
-}
-
-// -- three-step scale: radius, border and shadow are named tiers, not one
-// hardcoded value copy-pasted onto every box -------------------------------
-ok(/--tier-flat-radius/.test(theme) && /--tier-surface-radius/.test(theme) && /--tier-rule-radius/.test(theme),
-  "three named radius tiers exist (flat, surface, rule)");
-ok(/--tier-flat-shadow/.test(theme) && /--tier-surface-shadow/.test(theme) && /--tier-rule-shadow/.test(theme),
-  "three named shadow tiers exist");
-ok(/--tier-flat-border/.test(theme) && /--tier-surface-border/.test(theme) && /--tier-rule-border/.test(theme),
-  "three named border tiers exist");
-// Every rule below is matched against the CSS with ALL whitespace removed
-// (including the spaces inside a value, e.g. "1px solid var(--border)"
-// becomes "1pxsolidvar(--border)"), so the expected strings here must be
-// written the same collapsed way.
-const flat = theme.replace(/\s+/g, "");
-
-// Each tier class must draw from its OWN named tokens, not a hardcoded
-// value that happens to match today. An earlier version of this check
-// asserted the literal collapsed CSS text (e.g. "border:none" for .flat),
-// which meant the day .flat and .rule were wired up to actually use the
-// --tier-flat-*/--tier-rule-* tokens declared for exactly this purpose, the
-// check itself had to be rewritten anyway — it had locked in the very
-// copy-paste the token scale exists to replace, rather than checking that a
-// scale was in use at all.
-ok(/\.card\{background:var\(--surface\);border:var\(--tier-surface-border\);border-radius:var\(--tier-surface-radius\)/
-  .test(flat), ".card is drawn from the surface tier's tokens, not a value of its own");
-ok(/\.flat\{background:transparent;border:var\(--tier-flat-border\);box-shadow:var\(--tier-flat-shadow\);border-radius:var\(--tier-flat-radius\)\}/
-  .test(flat), "the flat tier draws from its own tier tokens, not a hardcoded none/0");
-ok(/\.rule\{border-top:var\(--tier-rule-border\);box-shadow:var\(--tier-rule-shadow\);border-radius:var\(--tier-rule-radius\)/
-  .test(flat), "the rule tier draws from its own tier tokens too");
-// And the three tiers must actually differ from each other - a "scale" where
-// every step names the same value is the single-value problem wearing three
-// names.
-ok(/--tier-flat-radius:0px/.test(theme) && /--tier-surface-radius:var\(--r-lg\)/.test(theme)
-  && /--tier-rule-radius:0px/.test(theme), "the radius tier values are the ones the tokens actually declare");
-ok(!/--tier-flat-shadow:var\(--sh-card\)/.test(theme), "flat's shadow is not quietly the same as surface's");
-
-// -- numbers are the largest thing after the greeting -----------------------
-const numAfter = (label: string, re: RegExp): number => {
-  const m = re.exec(theme) ?? re.exec(renderer);
-  assert.ok(m, `could not find a font-size rule for ${label}`);
-  return parseFloat(m![1]);
-};
-const greetSize = numAfter("the greeting", /\.greet\{font-size:(\d+(?:\.\d+)?)px/);
-const metricSize = numAfter("a metric's number", /\.m-val\s*\{\s*font-size:(\d+(?:\.\d+)?)px/);
-const taskSize = numAfter("a task's count", /\.task-n\s*\{\s*font-size:(\d+(?:\.\d+)?)px/);
-const cardTitleSize = numAfter("a card title", /\.card-t\{font-size:(\d+(?:\.\d+)?)px/);
-ok(greetSize > metricSize && greetSize > taskSize, "the greeting is larger than any number on the page");
-ok(metricSize > cardTitleSize && taskSize > cardTitleSize, "a number is larger than a card title");
 
 // -- Khoj takes the centre of the header bar, by layout, not by a margin ---
 const topbarRule = /\.topbar\{[^}]*\}/.exec(theme)?.[0] ?? "";
@@ -179,6 +78,42 @@ const main = read("web/src/main.tsx");
 const topbarJsx = main.slice(main.indexOf('<div className="topbar">'), main.indexOf('<div className="topbar">') + 1200);
 ok(!/ml-auto/.test(topbarJsx), "no ml-auto spacer sits in the topbar faking a centred layout");
 ok(/khoj-trigger/.test(topbarJsx), "the topbar actually renders the centred Khoj trigger");
+
+// -- there is no display face: the largest number on the page is a mono
+// numeral rule, not a headline ----------------------------------------------
+//
+// task 7's version of this compared .greet against a metric's own number;
+// .greet is gone (Vernier's rule is "no display face at all", not "a smaller
+// one"), so this compares every font-size rule in the stylesheet against
+// itself and asserts the winner is a tabular mono numeral, not prose.
+function fontSizeRules(rawCss: string): { size: number; rule: string }[] {
+  const css = rawCss.replace(/\/\*[\s\S]*?\*\//g, "");
+  const out: { size: number; rule: string }[] = [];
+  const re = /([^{}]+)\{([^{}]*)\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(css))) {
+    const sizeMatch = /font-size:\s*(\d+(?:\.\d+)?)px/.exec(m[2]) ??
+      /font:[^;]*?(?:^|\s)(\d+(?:\.\d+)?)px\//.exec(m[2]);
+    if (!sizeMatch) continue;
+    out.push({ size: parseFloat(sizeMatch[1]), rule: `${m[1].trim()}{${m[2].trim()}}` });
+  }
+  return out;
+}
+const sized = [...fontSizeRules(theme), ...fontSizeRules(renderer)];
+ok(sized.length > 10, "found enough font-size rules for the check to mean something");
+const maxSize = Math.max(...sized.map((r) => r.size));
+const atMax = sized.filter((r) => r.size === maxSize);
+for (const { rule } of atMax) {
+  ok(/mono/i.test(rule), `the largest font-size in the stylesheet (${maxSize}px, "${rule}") is not a mono numeral rule`);
+}
+ok(!/\.greet\s*\{/.test(theme) && !/\.greet\s*\{/.test(renderer), "no .greet rule exists: a greeting is not the largest thing on the page any more");
+// No uppercase above 11px: checked per rule block that declares both
+// properties itself, the same text-only reach every other check here has.
+for (const { rule } of sized) {
+  if (!/text-transform:\s*uppercase/.test(rule)) continue;
+  const size = parseFloat(/font-size:\s*(\d+(?:\.\d+)?)px/.exec(rule)![1]);
+  ok(size <= 11, `"${rule}" sets text-transform:uppercase above the 11px floor`);
+}
 
 // -- "Use demo data" is gone, root and branch -------------------------------
 // Checked against the working tree, not the git index: a deletion not yet
@@ -207,9 +142,14 @@ const rootBlock = /:root\{([\s\S]*?)\n\}/.exec(theme)![1];
 const darkBlock = /\[data-theme="dark"\]\{([\s\S]*?)\n\}/.exec(theme)![1];
 const lightTokens = [...rootBlock.matchAll(/--([\w-]+):/g)].map((m) => m[1]);
 const darkTokens = new Set([...darkBlock.matchAll(/--([\w-]+):/g)].map((m) => m[1]));
-// Tokens that are legitimately theme-invariant (the ease curve, the radius
-// scale, spacing) are not colour and are excluded by name.
-const INVARIANT = /^(ease|r-|sh-rose|tier-)/;
+// Tokens that are legitimately theme-invariant (the ease curve, the spacing
+// scale, the inset/rail/stub geometry, the motion durations) are not colour
+// and are excluded by name; Vernier's spec says as much in so many words:
+// "every geometry and motion token is theme-invariant and is not
+// redeclared". --sh-overlay/--sh-pop are colour (they carry alpha against a
+// ground that flips), so they are deliberately NOT in this list and DO have
+// to be redeclared below, which they are.
+const INVARIANT = /^(ease|s\d+|inset-|rail-w|stub-w|dur-)/;
 const colourTokens = lightTokens.filter((t) => !INVARIANT.test(t));
 ok(colourTokens.length > 15, "found enough colour tokens for the check to mean something");
 for (const t of colourTokens) {
