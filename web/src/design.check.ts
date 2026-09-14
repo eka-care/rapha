@@ -65,6 +65,33 @@ for (const { selector, body } of gated) {
     `comma list carries [data-over] or [data-act] -- one bare selector is enough to leak colour`);
 }
 
+// -- CLAUSE ONE OF THE COLOUR LAW: "you are here" is not coloured -----------
+//
+// Carried over from group A (which rewrote this file before the sidebar
+// block existed to check against): a nav row is never coloured for BEING
+// Home or any other fixed view -- it is always that view, and a noun does
+// not change shift to shift. The row that is currently SELECTED may be
+// coloured, because selection moves. The old
+// `.nv.on{background:var(--eka-blue-bg);color:var(--eka-blue)}` rule is the
+// thing this replaces: a plain background/color fill on the bare selector is
+// exactly "coloured for being here", so it must be gone, and whatever
+// replaced it must carry the selected state some other way (a wash plus a
+// bar, per the spec), not a --hand background fill. Checked against the
+// comment-stripped stylesheet, the same way colourUsages() above does it, so
+// a docstring that quotes the deleted rule for context (this file's own
+// theme.css comment does exactly that) cannot trip either direction of this
+// check.
+const themeNoComments = theme.replace(/\/\*[\s\S]*?\*\//g, "");
+const navOnRule = /(?:^|[};])\s*\.nv\.on\s*\{([^}]*)\}/.exec(themeNoComments)?.[1] ?? "";
+ok(navOnRule.length > 0, "a .nv.on rule exists for the selected nav row");
+ok(!/\.nv\.on\s*\{\s*background:\s*var\(--eka-blue-bg\)/.test(themeNoComments),
+  "the old .nv.on{background:var(--eka-blue-bg)} rule (coloured for being current, not for being selected) is gone");
+ok(!/background(?:-color)?:\s*var\(--hand\)/.test(navOnRule),
+  "'you are here' is not coloured: .nv.on must not fill itself with --hand as a background");
+ok(/box-shadow:[^;]*var\(--hand\)/.test(navOnRule),
+  ".nv.on carries the selected row's --hand bar as a box-shadow (no layout box, no background fill)");
+ok(/font-weight:\s*600/.test(navOnRule), ".nv.on carries the selected row's weight 600");
+
 // -- Khoj takes the centre of the header bar, by layout, not by a margin ---
 const topbarRule = /\.topbar\{[^}]*\}/.exec(theme)?.[0] ?? "";
 ok(/grid-template-columns:\s*1fr auto 1fr/.test(topbarRule),

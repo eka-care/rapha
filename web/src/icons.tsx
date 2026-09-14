@@ -5,14 +5,25 @@
  *  so drawing one would put the PHC in the renderer. A station is drawn with
  *  its own first letter instead.
  *
- *  Which icon an action gets is decided by its declared instrument, and which
- *  icon a nav entry gets by its declared view kind. Nothing here is keyed to
- *  an id.
+ *  Which icon an action gets is decided by its declared instrument. Nothing
+ *  here is keyed to a view: iconForView is gone (Vernier's sidebar spec,
+ *  "zero glyphs in navigation" -- two of its four nav icons resolved to the
+ *  same #i-list glyph and a 13px label is a faster, unambiguous discriminator
+ *  anyway), and #i-flask went with it, unused everywhere else.
  */
-import type { Operation, ViewDecl } from "./types";
+import type { Operation } from "./types";
 
 export type IconName =
-  "mark" | "mark-lg" | "search" | "home" | "moon" | "sun" | "vitals" | "mic" | "flask" | "box" | "clip" | "eye" | "plus" | "folder" | "chat" | "spark" | "check" | "alert" | "lock" | "send" | "user" | "users" | "list" | "cog" | "refer" | "chev" | "id" | "doc" | "grip";
+  "mark" | "mark-lg" | "search" | "home" | "moon" | "sun" | "vitals" | "mic" | "box" | "clip" | "eye" | "plus" | "folder" | "chat" | "spark" | "check" | "alert" | "lock" | "send" | "user" | "users" | "list" | "cog" | "refer" | "chev" | "id" | "doc" |
+  // ponytail: #i-grip (and the "grip" name) stays alongside the new "handle"
+  // glyph rather than being deleted as the spec's own step 5 literally says.
+  // Home.tsx (web/src/Home.tsx:360) still renders <Icon name="grip" .../> for
+  // today's drag handle and is group C's file (spec step 9), not this one's;
+  // deleting grip out from under it would fail `npm run check` for a renderer
+  // this group does not own. Whoever lands step 9 should switch that call to
+  // "handle" and delete "grip" and #i-grip in the same commit -- the glyph
+  // this replaces it with is already here, unused, ready for that edit.
+  "grip" | "handle";
 
 export function Icon({ name, size }: { name: IconName; size?: "sm" | "lg" }) {
   return (
@@ -40,10 +51,6 @@ export function iconFor(op: Operation): IconName {
   return "clip";
 }
 
-export function iconForView(v: ViewDecl): IconName {
-  return v.kind === "dashboard" ? "vitals" : v.kind === "summary" ? "eye" : "list";
-}
-
 const SHEET = `
   <style>
     #i-mark path, #i-mark circle, #i-mark-lg path, #i-mark-lg circle {
@@ -59,7 +66,6 @@ const SHEET = `
   <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
   <symbol id="i-vitals" viewBox="0 0 24 24"><path d="M2.5 12h4l2-5 3.5 10 2.5-7 1.5 2h5.5"/></symbol>
   <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M9 21.5h6"/></symbol>
-  <symbol id="i-flask" viewBox="0 0 24 24"><path d="M10 3v6l-5 9a1.8 1.8 0 0 0 1.6 2.7h10.8A1.8 1.8 0 0 0 19 18l-5-9V3"/><path d="M9 3h6"/></symbol>
   <symbol id="i-box" viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></symbol>
   <symbol id="i-clip" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5a3 3 0 0 1 6 0"/><path d="M9 11h6M9 15h4"/></symbol>
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></symbol>
@@ -80,4 +86,8 @@ const SHEET = `
   <symbol id="i-id" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><circle cx="8.5" cy="11" r="2.2"/><path d="M5.2 16.2c.8-1.4 2-2 3.3-2s2.5.6 3.3 2M15 10h4M15 14h3"/></symbol>
   <symbol id="i-doc" viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.4"/><path d="M5 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M12 15.5v3M10.5 17h3"/></symbol>
   <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.3"/><circle cx="15" cy="6" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="18" r="1.3"/></symbol>
+  <!-- The card-reorder handle's real glyph (spec: "two 12px horizontal rules
+       4px apart -- the plate's own seam repeated, not a stock six-dot grip").
+       Unused until whoever lands Home.tsx's rewrite switches to it. -->
+  <symbol id="i-handle" viewBox="0 0 24 24"><path d="M4 9h16M4 15h16"/></symbol>
 `;

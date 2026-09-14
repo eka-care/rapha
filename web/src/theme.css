@@ -92,78 +92,154 @@ body { background:var(--bench); color:var(--ink); -webkit-font-smoothing:antiali
 svg.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6;
   stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
-/* One page spine: the rail's own track is --rail-w, painted over an in-flow
-   spacer once the sidebar rewrite (step 4/6) adds one. Until then .sb sits
-   in this track at its own (unrewritten) width. */
+/* One page spine: the rail's own track is --rail-w. The painted rail (.sb) is
+   position:fixed and never occupies this track itself; when expanded, the
+   in-flow .rail-spacer does, so .main never reflows while .sb repaints its own
+   contents (a scrolling list, a hover state). Collapsing removes both the
+   spacer and .sb from the DOM, and [data-sidebar="collapsed"] on <html>
+   (set next to data-theme, by the same useEffect pattern) drops the rail
+   track from the grid template entirely, so .main claims the full viewport in
+   one step -- never an intermediate width, because nothing here transitions
+   `width`. */
 .app{display:grid;grid-template-columns:var(--rail-w) 1fr;height:100vh;width:100vw;overflow:hidden}
-/* ---------- sidebar (Claude-style) ---------- */
-.sb{width:248px;background:var(--sb);border-right:1px solid var(--border);
-  display:flex;flex-direction:column;flex-shrink:0;
-  transition:background .25s var(--ease),width .16s var(--ease)}
-.sb.collapsed{width:60px}
-.sb.collapsed .nv,.sb.collapsed .sb-add,.sb.collapsed .rolebtn{justify-content:center;padding:8px}
-.sb-top{padding:14px 14px 8px;display:flex;align-items:center;gap:9px}
-.sb.collapsed .sb-top{padding:14px 9px 8px}
-.sb-sec-row{display:flex;align-items:center;gap:6px;padding:14px 10px 6px}
-.sb.collapsed .sb-sec-row{justify-content:center;padding:14px 9px 6px}
-.sb-add{width:26px;height:26px;margin-left:auto}
-.sb.collapsed .sb-add{margin-left:0}
-.sb-filters{display:flex;gap:6px;padding:0 10px 8px}
-.sb-filters select{flex:1;min-width:0;border:1px solid var(--border);background:var(--surface);
-  color:var(--ink-2);border-radius:var(--r-sm);padding:4px 6px;font:inherit;font-size:11px}
-.brand-mark{width:30px;height:30px;border-radius:9px;background:var(--surface);
-  border:1px solid var(--border);display:grid;place-items:center;color:var(--ink);
-  box-shadow:var(--sh-card)}
-.brand-mark svg{stroke-width:1.1}
-.brand-n{font-size:13px;font-weight:700;letter-spacing:-.01em}
-.brand-s{font-size:9.5px;color:var(--ink-3);margin-top:1px}
-.sb-pad{padding:6px 10px}
-.sb-btn{display:flex;align-items:center;gap:9px;width:100%;border:1px solid var(--border);
-  background:var(--surface);color:var(--ink);border-radius:var(--r-md);padding:9px 11px;
-  font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:.14s var(--ease)}
-.sb-btn:hover{background:var(--gray-100);border-color:var(--gray-300)}
-.sb-btn.ghost{border-color:transparent;background:none;color:var(--ink-3);font-weight:500}
-.sb-btn.ghost:hover{background:var(--gray-100);color:var(--ink-2)}
-.sb-nav{padding:6px 10px 4px;display:flex;flex-direction:column;gap:2px}
-.nv{display:flex;align-items:center;gap:10px;width:100%;border:none;background:none;
-  color:var(--ink-2);border-radius:var(--r-md);padding:8px 11px;font:inherit;font-size:12.5px;
-  font-weight:500;cursor:pointer;transition:.14s var(--ease);text-align:left}
-.nv:hover{background:var(--gray-100)}
-.nv.on{background:var(--eka-blue-bg);color:var(--eka-blue);font-weight:600}
-.nv .ct{margin-left:auto;font-size:10px;font-weight:700;background:var(--gray-200);
-  color:var(--ink-3);border-radius:var(--r-pill);padding:1px 7px}
-.nv.on .ct{background:var(--ink);color:var(--surface)}
-.sb-sec{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;
-  color:var(--gray-400);padding:14px 14px 6px}
-.sb-list{flex:1;overflow-y:auto;padding:0 10px 10px;display:flex;flex-direction:column;gap:1px}
-.th{display:flex;align-items:center;gap:9px;border:none;background:none;color:var(--ink-2);
-  border-radius:var(--r-md);padding:7px 10px;font:inherit;font-size:12px;cursor:pointer;
-  transition:.14s var(--ease);text-align:left;width:100%}
-.th:hover{background:var(--gray-100)}
-.th.on{background:var(--gray-100);color:var(--ink);font-weight:600}
-.th-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.th-t{font-size:9.5px;color:var(--gray-400);flex-shrink:0}
-.sb-foot{border-top:1px solid var(--border);padding:9px 10px;position:relative}
-.rolebtn{display:flex;align-items:center;gap:9px;width:100%;border:1px solid var(--border);
-  background:var(--surface);border-radius:var(--r-md);padding:8px 10px;cursor:pointer;
-  font:inherit;color:var(--ink);transition:.14s var(--ease)}
-.rolebtn:hover{background:var(--gray-100)}
-.rb-av{width:26px;height:26px;border-radius:var(--r-sm);background:var(--eka-blue-bg);
-  color:var(--eka-blue);display:grid;place-items:center;flex-shrink:0}
-.rb-n{font-size:12px;font-weight:600;line-height:1.2}
-.rb-s{font-size:9.5px;color:var(--ink-3);margin-top:1px}
-.menu{position:absolute;bottom:calc(100% + 6px);left:10px;width:252px;background:var(--surface);
-  border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-pop);
-  padding:5px;z-index:40;display:none;animation:pop .14s var(--ease)}
-.menu.show{display:block}
-.mi{display:flex;align-items:center;gap:9px;width:100%;border:none;background:none;
-  color:var(--ink-2);border-radius:var(--r-sm);padding:8px 9px;font:inherit;font-size:12px;
-  cursor:pointer;text-align:left;transition:.12s var(--ease)}
-.mi:hover{background:var(--gray-100)}
-.mi.on{background:var(--eka-blue-bg);color:var(--eka-blue);font-weight:600}
-.mi-l{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
-.mi-c{flex-shrink:0;font-size:9.5px;color:var(--gray-400);font-family:ui-monospace,monospace;
-  background:none;border:none;padding:0}
+[data-sidebar="collapsed"] .app{grid-template-columns:1fr}
+/* ---------- sidebar ---------- */
+/* RULE B: --inset-rail is the rail's ONLY horizontal padding, carried by
+   .rail-body alone. Every descendant below sets padding-inline:0 and reaches
+   its own trailing edge as the last cell of a grid row that already ends at
+   the spine (x=256) -- never via margin-inline-start:auto, which does not
+   appear anywhere in this file. */
+.sb{position:fixed;top:0;left:0;bottom:0;width:var(--rail-w);background:var(--rail);
+  border-right:1px solid var(--rule);z-index:10;display:flex;flex-direction:column;
+  transition:none}
+.rail-spacer{width:var(--rail-w);flex-shrink:0}
+.rail-body{padding-inline:var(--inset-rail);padding-top:8px;padding-bottom:12px;
+  display:flex;flex-direction:column;flex:1;min-height:0}
+
+.rail-chrome{height:32px;flex-shrink:0;display:grid;grid-template-columns:auto 1fr auto;
+  align-items:center;column-gap:8px}
+.rail-mark{width:20px;height:20px;border-radius:4px;background:var(--ink);color:var(--dial);
+  display:grid;place-items:center;flex-shrink:0;font:500 11px/16px "Atkinson Hyperlegible Mono",ui-monospace,monospace}
+.rail-title{font:500 13px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;color:var(--ink);
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* The collapse toggle: a bare 32x32 grid cell in both states, never an
+   .icon-btn (that class still carries tokens this stylesheet no longer
+   declares). Zero <svg> anywhere in the rail -- the chevron is CSS, drawn
+   from a border and a bar, both legal at 2px. */
+.rail-toggle{position:relative;width:32px;height:32px;border:none;background:none;
+  border-radius:4px;color:var(--ink-2);display:grid;place-items:center;cursor:pointer;
+  flex-shrink:0}
+.rail-toggle:hover{background:var(--rail-hover);color:var(--ink)}
+.rail-toggle-floating{position:fixed;top:8px;left:8px;z-index:50;background:var(--dial);
+  border:1px solid var(--rule)}
+.rail-toggle-glyph{width:16px;height:12px;box-sizing:border-box;border:2px solid currentColor;
+  border-radius:2px;position:relative}
+.rail-toggle-glyph::after{content:"";position:absolute;top:-2px;bottom:-2px;left:4px;
+  width:2px;background:currentColor}
+.rail-badge{position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:8px;
+  background:var(--ink);color:var(--dial);display:grid;place-items:center;
+  font:500 11px/16px "Atkinson Hyperlegible Mono",ui-monospace,monospace;
+  font-variant-numeric:tabular-nums}
+.rail-badge[data-over]{background:var(--over)}
+.rail-badge[data-act]{background:var(--act)}
+/* The tooltip is the only place either shortcut is discoverable: 400ms in,
+   0ms out, 80ms fade -- the delay lives on whichever rule the transition is
+   entering, which is the standard way to give hover-in and hover-out
+   different timing from one `opacity` transition. */
+.rail-tip{position:absolute;top:calc(100% + 13px);left:0;opacity:0;pointer-events:none;
+  background:var(--ink);color:var(--dial);font:400 13px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;
+  padding:4px 8px;border-radius:4px;white-space:nowrap;z-index:60;transition:opacity 80ms linear 0ms}
+.rail-toggle:hover .rail-tip,.rail-toggle:focus-visible .rail-tip{opacity:1;transition-delay:400ms}
+
+/* The primary action: the highest-value 248x40 in the product. Filled --hand,
+   flush to the row's own edges like everything else -- there is no fourth
+   inset token to shrink it by. */
+.rail-primary{margin-top:20px;height:40px;flex-shrink:0;display:grid;grid-template-columns:1fr auto;
+  align-items:center;width:100%;border:none;border-radius:4px;background:var(--hand);
+  color:var(--hand-ink);padding-inline:0;cursor:pointer;
+  font:500 13px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif}
+.rail-primary-key{font:500 13px/20px "Atkinson Hyperlegible Mono",ui-monospace,monospace;opacity:.72}
+
+.rail-rule{height:1px;background:var(--rule);flex-shrink:0;margin-top:20px}
+
+/* Pinned nav: no icons, ever -- iconForView is gone (icons.tsx), and a 13px
+   label is the whole discriminator. Pitch 34 on a 32px row is a 2px
+   transparent border, the one place 2px may appear outside the wait rule. */
+.rail-nav{margin-top:8px;flex-shrink:0;display:flex;flex-direction:column}
+.nv{display:grid;grid-template-columns:1fr auto;align-items:center;height:32px;
+  border:none;border-bottom:2px solid transparent;background:none;padding-inline:0;
+  color:var(--ink-2);font:500 13px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;
+  cursor:pointer;text-align:left;position:relative;transition:none}
+.nv:hover{background:var(--rail-hover)}
+/* Clause one, made structural: "you are here" is never a hue, because a nav
+   row's identity does not change shift to shift. Selection does move, so the
+   --dial wash + weight 600 + --hand bar are legal -- box-shadow, not
+   background-on-a-bare-selector, so the colour gate (design.check.ts) never
+   has to gate this rule on [data-over]/[data-act]; it carries no --over/--act
+   at all. The old .nv.on{background:var(--eka-blue-bg)} rule is gone. */
+.nv.on{background:var(--dial);color:var(--ink);font-weight:600;box-shadow:inset 2px 0 0 var(--hand)}
+.ct{font:500 13px/20px "Atkinson Hyperlegible Mono",ui-monospace,monospace;
+  font-variant-numeric:tabular-nums;color:var(--ink-2);justify-self:end}
+.nv.on .ct{color:var(--ink)}
+/* The only colour the rail can ever show, and only from a declared threshold
+   (ViewRenderer sets no attribute here -- Shell.tsx computes its own, from
+   the same target/escalate/entered_at fields, because the count pill is a
+   different DOM node from any plate row). */
+.nv .ct[data-over]{color:var(--over)}
+.nv .ct[data-act]{color:var(--act)}
+
+.rail-section{margin-top:20px;height:24px;flex-shrink:0;display:grid;
+  grid-template-columns:1fr auto auto;align-items:center;column-gap:4px}
+.rail-section-t{font:400 13px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;color:var(--ink-2)}
+.rail-aff{width:28px;height:28px;border:none;background:none;border-radius:4px;
+  color:var(--ink-2);display:grid;place-items:center;cursor:pointer;
+  font:500 15px/1 "Atkinson Hyperlegible Next",system-ui,sans-serif}
+.rail-aff:hover{background:var(--rail-hover);color:var(--ink)}
+
+.rail-list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column}
+.rail-row{display:grid;grid-template-columns:var(--stub-w) 1fr auto;align-items:center;
+  column-gap:8px;height:40px;flex-shrink:0;width:100%;border:none;background:none;
+  padding-inline:0;cursor:pointer;text-align:left;color:var(--ink)}
+.rail-row:hover{background:var(--rail-hover)}
+/* AT DEPTH: a patient row open as the current thread takes the wash; it does
+   not also take the --hand bar, which is what a nav row's own selection
+   means. */
+.rail-row.on{background:var(--dial)}
+.rail-stub{width:var(--stub-w);height:100%;display:flex;align-items:center;justify-content:flex-end;
+  font:500 13px/20px "Atkinson Hyperlegible Mono",ui-monospace,monospace;
+  font-variant-numeric:tabular-nums;color:var(--ink);border-right:1px dashed var(--rule)}
+.rail-name{font:400 15px/24px "Atkinson Hyperlegible Next",system-ui,sans-serif;letter-spacing:-.005em;
+  color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rail-id{font:500 13px/20px "Atkinson Hyperlegible Mono",ui-monospace,monospace;color:var(--ink-2);
+  font-variant-numeric:tabular-nums;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.rail-empty{padding-block:8px;font:400 13px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;
+  color:var(--ink-3)}
+
+.rail-footer{flex-shrink:0;position:relative}
+.rail-role{height:40px;width:100%;display:grid;grid-template-columns:auto 1fr;align-items:center;
+  column-gap:8px;border:none;background:none;padding-inline:0;cursor:pointer;color:var(--ink)}
+.rail-role:hover{background:var(--rail-hover)}
+.rail-role-av{width:24px;height:24px;border-radius:4px;background:var(--dial);color:var(--ink);
+  display:grid;place-items:center;flex-shrink:0;font:500 13px/20px "Atkinson Hyperlegible Mono",ui-monospace,monospace}
+.rail-role-name{font:500 13px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;text-align:left;
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* One popover shape for both the role switcher and the filter/group menu.
+   248px so it fits inside its own 264px rail -- the measured 252px menu
+   overflowing a 248px aside by 14px cannot recur when the menu's own width is
+   the row width, not a value picked separately. */
+.rail-menu{position:absolute;bottom:calc(100% + 8px);left:0;width:248px;background:var(--dial);
+  border:1px solid var(--rule);border-radius:4px;box-shadow:var(--sh-pop);padding:4px;z-index:40}
+.rail-menu-t{font:400 13px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;color:var(--ink-2);
+  padding-block:4px}
+.mi{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:8px;width:100%;
+  border:none;background:none;color:var(--ink-2);border-radius:4px;height:32px;padding-inline:4px;
+  font:500 13px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;cursor:pointer;text-align:left}
+.mi:hover{background:var(--rail-hover)}
+.mi.on{background:var(--dial);color:var(--ink);font-weight:600;box-shadow:inset 2px 0 0 var(--hand)}
+.mi-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mi-c{font:500 13px/20px "Atkinson Hyperlegible Mono",ui-monospace,monospace;color:var(--ink-3)}
 
 /* ---------- main ---------- */
 .main{flex:1;display:flex;flex-direction:column;min-width:0}
