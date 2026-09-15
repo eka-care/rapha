@@ -122,6 +122,28 @@ ok(/requestAnimationFrame/.test(src), "Play is scheduled on the next frame, not 
 ok(/prefers-reduced-motion/.test(src), "a reduced-motion path exists");
 ok(!/\btransform:\s*(scale|rotate)/.test(stripped), "no scale or rotation anywhere -- an instrument module slides, it does not tilt");
 
+// -- the release does not teleport: "Last" is read AFTER the drag/preview
+// transform is cleared, not before -----------------------------------------
+//
+// reorder() captures "First" while the dragged plate's own translate and
+// every crossed sibling's preview translate are still applied. If the
+// settle effect below then reads "Last" via getBoundingClientRect() BEFORE
+// clearing those same inline transforms, both rects are stale in the same
+// way and the two stale offsets cancel: dy collapses to a pure layout delta
+// with the actual visual offset thrown away, which is what made a released
+// plate jump instantly into its new slot and animate back OUT of it rather
+// than sliding smoothly INTO it. Anchored on the effect's own slice (not a
+// file-wide regex) so a `getBoundingClientRect()` call anywhere else in the
+// file cannot satisfy this by accident.
+const flipEffectStart = src.indexOf("useLayoutEffect(() => {");
+const flipEffectEnd = src.indexOf("}, [order]);", flipEffectStart);
+ok(flipEffectStart > 0 && flipEffectEnd > flipEffectStart, "the settle's useLayoutEffect body is found so its ordering can be checked");
+const flipEffectBody = src.slice(flipEffectStart, flipEffectEnd);
+const iClearTransform = flipEffectBody.indexOf('el.style.transform = "";');
+const iLastRead = flipEffectBody.indexOf("const after = el.getBoundingClientRect();");
+ok(iClearTransform >= 0 && iLastRead >= 0 && iClearTransform < iLastRead,
+  "the drag/preview transform (el.style.transform = \"\") is cleared BEFORE \"Last\" is read via getBoundingClientRect() -- reading it first is the exact release-teleport bug");
+
 // -- one aria-live region announces a crossing; the current build has none,
 // so a screen-reader user cannot tell whether a key did anything -----------
 ok(/aria-live="polite"/.test(src), "an aria-live=\"polite\" region exists");
