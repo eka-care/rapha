@@ -286,17 +286,83 @@ for (const { f, src } of tsxSources) {
   ok(!/marginInlineStart:\s*["']auto["']/.test(src), `${f}: marginInlineStart:"auto" -- RULE B bans this outright`);
 }
 
-// -- the .ml-auto utility: deleted from theme.css AND from every call site --
-// Checked as a whole class TOKEN (inside className="..."), not a bare
-// substring: "ml-auto" cannot collide with English prose the way a shorter
-// name might, but the same token-extraction machinery is reused below for
-// names that can (.at, .dt, .tl), so it is written once and shared.
+// -- shared class-token extraction, from a real parse of the attribute value,
+// not a `[^}]*` scan that stops at the first `}` a template's own ${...}
+// contains (that bug would truncate `${STYLE[style] ?? "b-mute"}` before its
+// closing brace and silently drop the fallback). Used below both by the
+// .ml-auto check and by the class census. --------------------------------
+//
+// A className built from a template literal is walked, not grepped: its
+// static text is a token run same as a plain string; each ${...} is resolved
+// as far as it honestly can be --
+//   - a ternary/nullish branch that is itself a string literal (the common
+//     case throughout this renderer: `active ? " on" : ""`),
+//   - a nested template literal (recursed, so `${size ? `${size}` : ""}`
+//     walks into the inner `${size}` the same way as the outer one), and
+//   - what is left after both of those is a bare identifier the census
+//     cannot evaluate by itself. If it is one, this asks what TYPE it was
+//     declared with in the SAME file: a parameter typed as a union of string
+//     literals (icons.tsx's `size?: "sm" | "lg"`) names every value it can
+//     ever hold. That is a rule about the language the class was built with,
+//     not a memory of which class icons.tsx happens to interpolate today --
+//     the honest alternative to hard-coding "sm"/"lg" into a list.
+function splitTemplate(content: string): { statics: string[]; subs: string[] } {
+  const statics: string[] = [];
+  const subs: string[] = [];
+  let i = 0, last = 0;
+  while (i < content.length) {
+    if (content[i] === "$" && content[i + 1] === "{") {
+      statics.push(content.slice(last, i));
+      let depth = 1, j = i + 2;
+      while (j < content.length && depth > 0) {
+        if (content[j] === "{") depth++;
+        else if (content[j] === "}") depth--;
+        j++;
+      }
+      subs.push(content.slice(i + 2, j - 1));
+      i = j; last = j;
+    } else i++;
+  }
+  statics.push(content.slice(last));
+  return { statics, subs };
+}
+function unionLiteralsFor(fileSrc: string, ident: string): string[] {
+  const m = new RegExp(`\\b${ident}\\??:\\s*((?:"[^"]*"|'[^']*')(?:\\s*\\|\\s*(?:"[^"]*"|'[^']*'))*)`).exec(fileSrc);
+  return m ? [...m[1].matchAll(/"([^"]*)"|'([^']*)'/g)].map((mm) => mm[1] ?? mm[2] ?? "") : [];
+}
+function literalsFromTemplate(content: string, fileSrc: string): string[] {
+  const { statics, subs } = splitTemplate(content);
+  const out: string[] = [...statics];
+  for (const sub of subs) {
+    for (const m of sub.matchAll(/[?:]\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g)) out.push(m[1].slice(1, -1));
+    for (const m of sub.matchAll(/`([^`]*)`/g)) out.push(...literalsFromTemplate(m[1], fileSrc));
+    const bare = sub.trim();
+    if (/^[A-Za-z_$][\w$]*$/.test(bare)) out.push(...unionLiteralsFor(fileSrc, bare));
+  }
+  return out;
+}
+// className="literal" is a complete, static class list. className={EXPR} is
+// found with a balanced-brace walk (the bug above, avoided); EXPR is then
+// either one whole template literal (walked per literalsFromTemplate) or a
+// bare ternary between complete strings (`inline ? "mod inline" : "mod"`,
+// OperationPanel.tsx and abha/Journey.tsx's only shape), where every quoted
+// branch is simply a full className value.
 function classTokens(src: string): Set<string> {
   const tokens = new Set<string>();
-  for (const m of src.matchAll(/className=\{[^}]*\}|className="[^"]*"/g)) {
-    for (const sm of m[0].matchAll(/"([^"]*)"|`([^`]*)`/g)) {
-      const literal = (sm[1] ?? sm[2] ?? "").replace(/\$\{[^}]*\}/g, " ");
-      for (const tok of literal.split(/\s+/)) if (tok) tokens.add(tok);
+  const add = (text: string) => { for (const tok of text.split(/\s+/)) if (tok) tokens.add(tok); };
+  for (const m of src.matchAll(/className="([^"]*)"/g)) add(m[1]);
+  for (const m of src.matchAll(/className=\{/g)) {
+    let depth = 1, j = m.index! + m[0].length;
+    while (j < src.length && depth > 0) {
+      if (src[j] === "{") depth++;
+      else if (src[j] === "}") depth--;
+      j++;
+    }
+    const expr = src.slice(m.index! + m[0].length, j - 1);
+    if (expr.startsWith("`") && expr.endsWith("`")) {
+      for (const lit of literalsFromTemplate(expr.slice(1, -1), src)) add(lit);
+    } else {
+      for (const t of expr.matchAll(/"([^"]*)"|'([^']*)'/g)) add(t[1] ?? t[2] ?? "");
     }
   }
   return tokens;
@@ -305,17 +371,71 @@ const tsxClassTokens = tsxSources.map(({ f, src }) => ({ f, tokens: classTokens(
 ok(!/\.ml-auto\s*\{/.test(themeCss), "the .ml-auto utility class has no definition left in theme.css");
 for (const { f, tokens } of tsxClassTokens) ok(!tokens.has("ml-auto"), `${f} still uses className="...ml-auto..."`);
 
-// -- assertion 12: NO DEAD CSS ------------------------------------------
-// Checked as class tokens (a `.` in CSS text, a whole className token in
-// .tsx), not bare substrings: several of these names (.at, .dt, .tl, .leg)
-// collide with ordinary English words and property access (`m.at`, "at
-// once", "the legend") that a plain grep would trip over. Scanned across the
-// WHOLE repo's .css and .tsx, no scope exclusion: this is a binary,
-// unambiguous check (a class exists or it does not), unlike the spacing
-// scale, so there is no legacy-debt argument for narrowing it.
-const DEAD_CLASSES = [".hgrid", ".att", ".at", ".at-t", ".at-s", ".at-ic", ".at-go", ".pulse",
-  ".pu-r", ".pu-v", ".split", ".leg", ".dt", ".sb-pad", ".sb-btn", ".th-t", ".tl", ".sh-s",
-  ".greet", ".flow", ".fl-col"];
+// -- assertion 12: THE CLASS CENSUS --------------------------------------
+// Replaces DEAD_CLASSES, a literal array of 21 remembered names: it caught
+// exactly what someone remembered to list, and every class deleted after it
+// was last edited was invisible to it -- which is how this branch shipped
+// two redesigns that deleted real chrome while the gate stayed green. A
+// census asks a RULE instead of consulting a memory: every className token a
+// .tsx/.ts (a .check.ts excepted, see below) grants has a rule in some .css
+// under web/src, and every class a selector in some .css names is granted by
+// something in web/src. Both directions, no exclusion list, because a class
+// exists or it does not -- unlike the spacing scale there is no legacy-debt
+// argument for narrowing this one.
+//
+// SOURCE SCOPE: every .tsx/.ts under web/src except a .check.ts. A .check.ts
+// is read here as TEXT (this file reads OperationPanel.tsx as a string
+// elsewhere in the repo the same way), so a class name appearing only inside
+// one -- a selector under test, not a class this renderer ever grants an
+// element -- must not count as a call site. voice.check.ts's own `.sm`/`.on`
+// -style assertions-by-name would otherwise launder a real orphan through
+// the test that is supposed to catch it.
+function allSource(dir: string): string[] {
+  const out: string[] = [];
+  for (const e of readdirSync(root + dir, { withFileTypes: true })) {
+    if (e.isDirectory()) out.push(...allSource(`${dir}/${e.name}`));
+    else if (/\.tsx?$/.test(e.name) && !e.name.endsWith(".check.ts")) out.push(`${dir}/${e.name}`);
+  }
+  return out;
+}
+const censusSources = allSource("web/src").map((f) => ({ f, tokens: classTokens(read(f)) }));
+ok(censusSources.length >= 15, `the census actually found source files to scan (${censusSources.length})`);
+const usedNames = new Map<string, string[]>(); // class -> files that grant it
+for (const { f, tokens } of censusSources) for (const t of tokens) usedNames.set(t, [...(usedNames.get(t) ?? []), f]);
+
+// CSS SCOPE: every .css under web/src, no exclusion (unlike cssScope above).
+// A selector list is walked with real brace-matching, not the flat
+// `([^{}]+)\{([^{}]*)\}` scan `declarations()` uses above -- that one mis-
+// parses `@media(...){ :root{...} }`, fine for a props-only scan but wrong
+// for reading the SELECTOR of a nested rule. @-rules (`@media`, `@keyframes`)
+// are recursed into rather than read as selectors; their own preludes name
+// no class. Each comma-branch of a selector list is one independent "rule
+// occurrence" (renderer.css's `.plate .mgrid,\n.plate .tasklist { ... }` is
+// two, not one), because each names a different, independently reachable
+// class chain.
+function ruleSelectors(css: string): string[] {
+  const noComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const out: string[] = [];
+  (function walk(s: string) {
+    let depth = 0, start = 0;
+    for (let j = 0; j < s.length; j++) {
+      if (s[j] !== "{" || depth !== 0) { if (s[j] === "{") depth++; else if (s[j] === "}") depth--; continue; }
+      const prelude = s.slice(start, j).trim();
+      let d = 1, k = j + 1;
+      while (k < s.length && d > 0) {
+        if (s[k] === "{") d++;
+        else if (s[k] === "}") d--;
+        k++;
+      }
+      const inner = s.slice(j + 1, k - 1);
+      if (prelude.startsWith("@")) walk(inner);
+      else if (prelude) out.push(prelude);
+      start = k; j = k - 1;
+    }
+  })(noComments);
+  return out;
+}
+const classesIn = (selector: string) => [...selector.matchAll(/\.([A-Za-z_-][\w-]*)/g)].map((m) => m[1]);
 function findCssFiles(dir: string): string[] {
   const out: string[] = [];
   for (const e of readdirSync(root + dir, { withFileTypes: true })) {
@@ -324,16 +444,36 @@ function findCssFiles(dir: string): string[] {
   }
   return out;
 }
-const allCss = findCssFiles("web/src").map((f) => read(f)).join("\n");
-ok(allCss.length > 1000, "the dead-CSS scan actually found stylesheet text to check");
-for (const cls of DEAD_CLASSES) {
-  const name = cls.slice(1);
-  const cssHit = new RegExp(`\\.${name.replace(/[-]/g, "\\-")}(?![\\w-])`).test(allCss);
-  ok(!cssHit, `"${cls}" still has a rule in some .css file`);
-  const tsxHit = tsxClassTokens.some(({ tokens }) => tokens.has(name));
-  ok(!tsxHit, `"${cls}" is still used as a className token in some .tsx file`);
+type Rule = { file: string; selector: string; classes: string[] };
+const rules: Rule[] = [];
+for (const f of findCssFiles("web/src")) {
+  for (const prelude of ruleSelectors(read(f))) {
+    for (const sel of prelude.split(",").map((s) => s.trim()).filter(Boolean)) {
+      const classes = classesIn(sel);
+      if (classes.length) rules.push({ file: f, selector: sel, classes });
+    }
+  }
 }
-ok(!/max-width:\s*1000px/.test(allCss), "the @media(max-width:1000px) rule that guarded .hgrid is gone too");
+ok(rules.length > 100, `the census actually found CSS class rules to check (${rules.length})`);
+const declaredNames = new Set<string>();
+for (const r of rules) for (const c of r.classes) declaredNames.add(c);
+
+// DIRECTION 1: every used class has a rule somewhere. THIRD-PARTY EXCEPTION,
+// named rather than remembered: the ABHA SDK paints its own DOM node (the
+// mount div Journey.tsx hands it, styled from its own vendor stylesheet, see
+// abha/abha.css's header comment) and grants classes this repo never writes
+// down in either direction -- so it never reaches usedNames or declaredNames
+// at all, and needs no exemption here. Nothing else in this renderer paints
+// a class it did not itself declare, so no other exemption exists.
+for (const [name, files] of usedNames) {
+  ok(declaredNames.has(name), `className "${name}" (used in ${files.join(", ")}) has no rule in any .css under web/src`);
+}
+
+// DIRECTION 2: every declared class has a call site.
+for (const r of rules) {
+  const missing = r.classes.filter((c) => !usedNames.has(c));
+  ok(missing.length === 0, `${r.file}: "${r.selector}" has no call site (never granted: ${missing.join(", ")})`);
+}
 
 // -- assertion 9 (RULE B), as a real proxy: the three inset owners and their
 // row-level family -----------------------------------------------------

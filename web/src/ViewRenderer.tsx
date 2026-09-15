@@ -281,7 +281,7 @@ export function Sections({
         <div className="card" key={s.title}>
           <div className="card-h">
             <div className="card-t">{s.title}</div>
-            <span className="badge b-mute">{s.rows?.length ?? 0}</span>
+            <span className="badge">{s.rows?.length ?? 0}</span>
           </div>
           <div className="secbody">
             <SectionRows section={s} onAction={onAction} onReview={onReview} />
@@ -349,7 +349,7 @@ export function Line({ line }: { line: StepStatus[] }) {
   return (
     <div className="states">
       {line.map((s, i) => (
-        <div key={s.station} className={`st ${s.status === "done" ? "done" : s.status === "now" ? "now" : s.status === "skipped" ? "skip" : ""}`}>
+        <div key={s.station} className={`st ${s.status === "done" ? "done" : s.status === "now" ? "now" : ""}`}>
           <span className="n">{s.status === "done" ? "✓" : i + 1}</span>
           {human(s.label || s.station)}
           {s.status === "skipped" && <span className="st-skip">not this visit</span>}

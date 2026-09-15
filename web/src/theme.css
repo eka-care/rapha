@@ -230,6 +230,12 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
    different DOM node from any plate row). */
 .nv .ct[data-over]{color:var(--over)}
 .nv .ct[data-act]{color:var(--act)}
+/* The Alt-digit hint (Shell.tsx: rendered on every rail row while Alt is
+   held) had no rule at all -- found by the class census. Same treatment as
+   .rail-primary-key above, its sibling hint one row up: dimmed mono text,
+   no layout properties of its own, so it takes whatever cell the row's own
+   grid already gives it. */
+.rail-altkey{font:500 13px/20px "Atkinson Hyperlegible Mono",ui-monospace,monospace;opacity:.72}
 
 .rail-section{margin-top:20px;height:24px;flex-shrink:0;display:grid;
   grid-template-columns:1fr auto auto;align-items:center;column-gap:4px}
@@ -400,6 +406,12 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
   color:var(--ink-3);font-size:12px;line-height:1.55;margin-top:7px}
 .props{margin-top:11px;display:flex;flex-direction:column;gap:6px}
 .acts{margin-top:11px;display:flex;gap:8px;align-items:stretch}
+/* The confirm surface, drawn inside the thread instead of over it
+   (Thread.tsx wraps it in this div; OperationPanel's own .mod.inline styles
+   the card itself). The wrapper had no rule at all -- the single most
+   important container in the product was invisible chrome, found by the
+   class census. Same top margin as its siblings .props/.acts above. */
+.inlinepanel{margin-top:11px}
 .prop{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
   border:1px solid var(--border);background:var(--surface);border-radius:var(--r-md);
   padding:9px 11px;cursor:pointer;font:inherit;color:var(--ink);transition:.15s var(--ease)}
@@ -409,19 +421,7 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
    and .resume-take: the primary verb's own fill. */
 .prop.primary{border-color:var(--hand);background:var(--hand);color:var(--hand-ink)}
 .prop.primary:hover{filter:brightness(.94)}
-.prop.primary .p-s{color:var(--hand-ink);opacity:.72}
-.prop.primary .p-tag{background:rgba(0,0,0,.12);color:var(--hand-ink);border-color:transparent}
 .p-l{font-size:12.5px;font-weight:600;line-height:1.25}
-.p-s{font-size:10.5px;color:var(--ink-3);margin-top:2px;line-height:1.3}
-.p-tag{margin-left:auto;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
-  padding:3px 6px;border-radius:4px;background:var(--gray-100);color:var(--ink-3);
-  border:1px solid var(--border);white-space:nowrap}
-/* An instrument tag names how a value was captured, not that anything is
-   wrong with it: neutral, like the tag pill it decorates. */
-.p-tag.scribe{background:var(--gray-100);color:var(--ink-3);border-color:var(--border)}
-.p-tag.form{background:var(--gray-100);color:var(--ink-3);border-color:var(--border)}
-.p-tag.irr{background:var(--gray-100);color:var(--ink-3);border-color:var(--border)}
-.p-tag.hand{background:var(--eka-blue-bg);color:var(--eka-blue-700);border-color:var(--eka-blue-100)}
 .empty{margin:auto;text-align:center;color:var(--ink-3);font-size:12.5px;line-height:1.6;max-width:340px}
 .composer{border-top:1px solid var(--border);padding:11px 14px;display:flex;gap:8px;align-items:center;flex-shrink:0}
 .composer input{flex:1;border:1px solid var(--border);background:var(--gray-50);color:var(--ink);
@@ -433,8 +433,6 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 /* the primary button class: agency, the same --hand fill every other
    primary action in the product uses. */
 .btn-b{background:var(--hand);color:var(--hand-ink)}.btn-b:hover{filter:brightness(.94)}
-.btn-g{background:var(--surface);color:var(--ink-2);border:1px solid var(--border)}
-.btn-g:hover{background:var(--gray-100)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .send{width:36px;height:36px;padding:0;border-radius:50%;justify-content:center}
 .panel{display:flex;flex-direction:column;gap:13px;height:100%;overflow-y:auto}
@@ -442,10 +440,6 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
    is drawn exclusively by ViewRenderer.tsx (Line, SectionRows' flags case,
    AuditRow), so they belong with the component that renders them, not with
    the chat/thread chrome ported from the prototype around them. */
-/* A nudge is a clinical flag rendered as a sentence rather than a badge; the
-   one accent applies here too, for the same reason it applies to a badge. */
-.nudge{font-size:11px;color:var(--ink);background:var(--dial);
-  border-left:3px solid var(--rule);border-radius:var(--r-sm);padding:8px 10px;margin:0 12px 12px;line-height:1.5}
 /* ---------- queue ---------- */
 .qtabs{display:flex;gap:5px;background:var(--gray-100);padding:4px;border-radius:var(--r-md);margin-bottom:14px;flex-wrap:wrap}
 .qtab{border:none;background:none;padding:7px 13px;border-radius:var(--r-sm);font:inherit;
@@ -455,15 +449,6 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .qtab .n{font-size:9.5px;font-weight:700;background:var(--gray-200);color:var(--ink-3);
   border-radius:var(--r-pill);padding:1px 6px}
 .qtab.on .n{background:var(--ink);color:var(--surface)}
-.qgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:12px}
-.qc{padding:13px;cursor:pointer;transition:.15s var(--ease)}
-.qc:hover{transform:translateY(-1px);box-shadow:var(--sh-hover);border-color:var(--eka-blue-100)}
-.qc-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.qc-n{font-size:13px;font-weight:700}
-.qc-m{font-size:10.5px;color:var(--ink-3);margin-top:1px}
-.qc-tok{margin-left:auto;font-size:10px;font-weight:700;color:var(--ink-3);
-  background:var(--gray-100);border:1px solid var(--border);border-radius:var(--r-sm);padding:3px 7px}
-.qc-chips{display:flex;gap:5px;flex-wrap:wrap}
 
 /* ---------- the right rail's records ---------- */
 .rec{display:flex;align-items:center;width:100%;gap:8px;border:none;border-top:1px solid var(--border);
@@ -483,7 +468,6 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .sh-h{padding:15px 17px;border-bottom:1px solid var(--border)}
 .sh-t{font-size:15px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:9px}
 .sh-b{flex:1;overflow-y:auto;padding:15px 17px;border-top:1px solid var(--border)}
-.sh-f{padding:12px 17px;border-top:1px solid var(--border);display:flex;gap:9px;align-items:center}
 
 /* ---------- composer ---------- */
 .cbar{display:flex;gap:6px;padding:0 0 9px;overflow-x:auto}
@@ -649,17 +633,8 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .mod-bar{height:3px;background:var(--grad-rose-line)}
 .mod-h{padding:16px 18px 13px;border-bottom:1px solid var(--border)}
 .mod-t{font-size:15px;font-weight:700;letter-spacing:-.01em}
-.mod-s{font-size:11.5px;color:var(--ink-3);margin-top:3px;line-height:1.45}
 .mod-b{padding:16px 18px;overflow-y:auto;flex:1}
 .mod-f{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:9px;align-items:center}
-.field{margin-bottom:12px}
-.warn-box,.crit-box{border-radius:var(--r-md);padding:10px 12px;font-size:11.5px;
-  line-height:1.5;margin-bottom:13px;display:flex;gap:8px;align-items:flex-start}
-.warn-box{border:1px solid var(--rule);background:var(--dial);color:var(--ink);font-weight:500}
-.crit-box{border:1px solid var(--rule);background:var(--dial);color:var(--ink)}
-.chk{display:flex;gap:9px;align-items:flex-start;font-size:11.5px;color:var(--ink-2);
-  padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-md);cursor:pointer;line-height:1.45}
-.chk input{margin-top:2px;accent-color:var(--eka-blue);width:15px;height:15px;flex-shrink:0}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(12px);
   background:#1A1714;color:#F5EFE4;border-radius:var(--r-md);padding:11px 17px;
   display:flex;align-items:center;gap:9px;opacity:0;transition:.2s var(--ease);
@@ -673,6 +648,6 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .close-h{font-weight:600;flex:1}
 .close-e{color:var(--ink-2)}
 
-@media(max-width:1100px){.chatgrid{grid-template-columns:1fr}.panel{display:none}.agrid{grid-template-columns:1fr}}
+@media(max-width:1100px){.chatgrid{grid-template-columns:1fr}.panel{display:none}}
 @media(max-width:900px){.sb{display:none}.spot-body{flex-direction:column;height:auto}
   .spot-list{width:100%;border-right:none;border-bottom:1px solid var(--border);max-height:150px}}

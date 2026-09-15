@@ -14,7 +14,6 @@
 }
 .v-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .v-row .f-hint { flex:1 1 220px; }
-.v-pick { max-width:220px; }
 
 .v-mic::before { content:"\25CF"; margin-right:6px; color:var(--destructive); }
 .v-mic.on { background:var(--destructive-bg); border-color:var(--destructive-border); color:var(--destructive); }

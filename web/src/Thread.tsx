@@ -367,7 +367,7 @@ function Panel({
             <div className="eyebrow">{human(thread.workflow)}</div>
             <div className="card-t" style={{ marginTop: 0 }}>Where this stands</div>
           </div>
-          <span className="badge b-mute">{done ? human(done.label) : "Not started"}</span>
+          <span className="badge">{done ? human(done.label) : "Not started"}</span>
         </div>
         <Line line={thread.line} />
       </div>

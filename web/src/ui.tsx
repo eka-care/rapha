@@ -26,10 +26,18 @@ export function Empty({ children }: { children: React.ReactNode }) {
   return <div className="card state">{children}</div>;
 }
 
-const STYLE: Record<string, string> = { warn: "b-warn", crit: "b-crit", ok: "b-ok", mute: "b-mute", blue: "b-blue" };
-
-export function Badge({ style = "mute", children }: { style?: string; children: React.ReactNode }) {
-  return <span className={`badge ${STYLE[style] ?? "b-mute"}`}>{children}</span>;
+/** Every badge rank collapses to the one neutral .badge: none of them is a
+ *  per-shift clinical escalation, so none may hold a signal colour (the
+ *  colour law's one genuine exception, .b-crit[data-act], is a hand-written
+ *  span in Form.tsx, never this component). `style` used to select a
+ *  b-warn/b-crit/b-ok/b-mute/b-blue suffix class, but four of those five had
+ *  no rule in any stylesheet and the fifth (.b-crit) never carried the
+ *  [data-act] attribute that would have let it render as anything but
+ *  neutral either -- so the lookup changed nothing on any screen it ever
+ *  ran on. `style` stays in the type so a caller passing a declared flag's
+ *  own colour word still type-checks; it is simply not read. */
+export function Badge({ children }: { style?: string; children: React.ReactNode }) {
+  return <span className="badge">{children}</span>;
 }
 
 export { human, title } from "./words";

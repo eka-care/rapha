@@ -409,7 +409,7 @@ function App() {
             <span className="kbd">⌘K</span>
           </button>
           <div className="tb-actions">
-            <span className={`dot ${cat.error ? "down" : "up"}`} title={cat.error ? "Kernel unreachable" : "Kernel reachable"} />
+            <span className={`dot${cat.error ? " down" : ""}`} title={cat.error ? "Kernel unreachable" : "Kernel reachable"} />
             <button className="icon-btn" onClick={toggleTheme} title="Light or dark">
               <Icon name={theme === "light" ? "moon" : "sun"} />
             </button>

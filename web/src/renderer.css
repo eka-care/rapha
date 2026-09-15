@@ -15,9 +15,6 @@
    means everything else here drops its border-radius rather than reaching
    for one of the deleted --r-* tokens. */
 
-.link { border:none; background:none; color:var(--hand); font:500 13px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;
-  cursor:pointer; padding:0; text-decoration:underline; }
-
 /* ---- the three states every screen owes ---- */
 .state { padding:20px; font:13px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif; color:var(--ink-2); }
 .state.bad { border-color:var(--rule); background:var(--dial); }
@@ -117,7 +114,6 @@
 .caps { padding:12px; display:flex; flex-wrap:wrap; gap:4px; }
 .cap { font:500 11px/16px "Atkinson Hyperlegible Mono",ui-monospace,monospace; padding:4px 8px;
   background:var(--dial); color:var(--ink-2); border:1px solid var(--rule); }
-.audit { padding:12px; max-height:150px; overflow-y:auto; }
 .au { display:flex; align-items:center; gap:8px; font:13px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif; color:var(--ink-2); padding:8px 0; border-top:1px solid var(--rule); }
 .au:first-child { border-top:none; }
 .au b { color:var(--ink); font-weight:600; }
