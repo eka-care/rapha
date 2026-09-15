@@ -75,10 +75,14 @@ for (const { selector, body } of gated) {
 // under their own rules while every existing check stayed green. Mutation-
 // proof by construction: comment out any token :root declares and every one
 // of its call sites fires here, across every stylesheet under web/src.
-// Comments are stripped first so this docstring's own mention of "--x" (and
-// theme.css's header, which lists the very names a past sweep left dangling)
-// cannot trip it.
-const definedTokens = new Set([...theme.matchAll(/--([\w-]+)\s*:/g)].map((m) => m[1]));
+// Comments are stripped first, from theme.css itself as much as from the
+// files scanned below: theme.css's own prose mentions "--dial:" and several
+// other token names inside a colour-ratio comment ("16.0:1 on --dial"), and
+// without stripping, that prose satisfies /--([\w-]+)\s*:/ as if it were a
+// real declaration -- which is exactly how a docstring or a header comment
+// could paper over a token this branch actually deleted.
+const themeNoCommentsForTokens = theme.replace(/\/\*[\s\S]*?\*\//g, "");
+const definedTokens = new Set([...themeNoCommentsForTokens.matchAll(/--([\w-]+)\s*:/g)].map((m) => m[1]));
 ok(definedTokens.size > 40, "found enough declared tokens for the dangling-token scan to mean something");
 for (const file of [
   "web/src/theme.css", "web/src/renderer.css", "web/src/voice/voice.css",
