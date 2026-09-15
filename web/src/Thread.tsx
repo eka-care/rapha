@@ -101,7 +101,14 @@ export function Thread({
         </Scroll>
 
         <div className="composer">
-          <Ask asking={asking} onSay={onSay} about={head.name} />
+          <Composer
+            asking={asking}
+            onSay={onSay}
+            about={head.name}
+            actions={thread.actions}
+            roles={Object.keys(cat.bundles ?? {})}
+            onAction={onAction}
+          />
         </div>
       </div>
 
@@ -319,24 +326,88 @@ function AgentBubble({
   );
 }
 
-/** "Ask about this patient" is the prototype's copy and it is a PHC word. The
- *  thread's own headline is the generic form of the same sentence, and it is
- *  more specific besides. */
-function Ask({ asking, onSay, about }: { asking?: boolean; onSay: (t: string) => void; about: string }) {
+/** The one place a person types. Three things share it, because all three are
+ *  addressed to somebody: a question for the agent, a command, and a note to a
+ *  colleague.
+ *
+ *  `/` lists this thread's own actions -- thread.actions is already narrowed by
+ *  the guard (capability, precondition, actor, drawn_by), so the menu cannot
+ *  offer what the guard would refuse. `@` lists the bundle's declared roles.
+ *  Neither list is written here: point this at the laboratory and it draws the
+ *  laboratory's operations and the laboratory's roles.
+ *
+ *  Typing is not a write. A `/` pick opens that operation's panel, where the
+ *  confirm lives; an `@` note is text until it is sent. */
+function Composer({ asking, onSay, about, actions, roles, onAction }: {
+  asking?: boolean;
+  onSay: (t: string) => void;
+  about: string;
+  actions: Operation[];
+  roles: string[];
+  onAction: (op: Operation) => void;
+}) {
   const [text, setText] = useState("");
+  const [pick, setPick] = useState(0);
+  const box = useRef<HTMLInputElement>(null);
+
+  // The trigger is the last run of non-space characters, and only when it opens
+  // with / or @. Anything mid-word (an email, a date) never opens a menu.
+  const tail = /(^|\s)([/@])([^\s]*)$/.exec(text);
+  const kind = tail?.[2];
+  const query = (tail?.[3] ?? "").toLowerCase();
+
+  const items = !kind ? [] :
+    kind === "/"
+      ? actions.filter((o) => (o.short || o.title).toLowerCase().includes(query))
+          .map((o) => ({ key: o.id, label: o.title, op: o }))
+      : roles.filter((r) => r.toLowerCase().includes(query))
+          .map((r) => ({ key: r, label: human(r), op: undefined }));
+
+  const choose = (it: { label: string; op?: Operation }) => {
+    if (it.op) { setText(text.replace(/(^|\s)[/][^\s]*$/, "$1")); onAction(it.op); }
+    else setText(text.replace(/(^|\s)@[^\s]*$/, `$1@${it.label} `));
+    setPick(0);
+    box.current?.focus();
+  };
+
   const send = () => {
     const t = text.trim();
     if (!t) return;
     setText("");
     onSay(t);
   };
+
   return (
     <div className="crow">
+      {items.length > 0 && (
+        <div className="cmenu" role="listbox">
+          {items.slice(0, 7).map((it, i) => (
+            <button
+              key={it.key}
+              role="option"
+              aria-selected={i === pick}
+              className={`cmenu-i${i === pick ? " on" : ""}`}
+              onMouseDown={(e) => { e.preventDefault(); choose(it); }}
+            >
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
       <input
+        ref={box}
         value={text}
         placeholder={`Ask about ${about}`}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && send()}
+        onChange={(e) => { setText(e.target.value); setPick(0); }}
+        onKeyDown={(e) => {
+          if (items.length) {
+            if (e.key === "ArrowDown") { e.preventDefault(); setPick((p) => (p + 1) % Math.min(items.length, 7)); return; }
+            if (e.key === "ArrowUp") { e.preventDefault(); setPick((p) => (p - 1 + Math.min(items.length, 7)) % Math.min(items.length, 7)); return; }
+            if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); choose(items[pick]); return; }
+            if (e.key === "Escape") { e.preventDefault(); setText(text.replace(/(^|\s)[/@][^\s]*$/, "$1")); return; }
+          }
+          if (e.key === "Enter") send();
+        }}
       />
       <button className="btn btn-b send" onClick={send} title={asking ? "Thinking" : "Send"}>
         <Icon name={asking ? "spark" : "send"} />
