@@ -15,7 +15,15 @@
  */
 import { memo, useState } from "react";
 import type { AuditRecord, MetricValue, Operation, Proposal, QueueRow, SectionResult, StepStatus, TaskRow, ViewDecl, ViewResult } from "./types";
+import { ageLabel, budgetAct, elapsedMinutes, sortByTone, toneOf, type Tone } from "./tone";
 import { Badge, Empty, human, title } from "./ui";
+
+// Re-exported so every existing import site (Home.tsx, home.check.ts's own
+// source-text assertion on this file) stays valid unchanged: the colour
+// law's arithmetic now LIVES in ./tone.ts (a plain .ts a .check.ts may
+// import, unlike this .tsx), not here.
+export type { Tone };
+export { toneOf, elapsedMinutes, ageLabel, sortByTone, budgetAct };
 
 function ViewRendererImpl({
   result, titles, onOpenThread, onAction, onReview, decl, maxRows,
@@ -62,33 +70,13 @@ export const ViewRenderer = memo(ViewRendererImpl);
 // cannot share a React tree with them; Home.tsx imports these instead of
 // reimplementing them a third time, so there is exactly one implementation of
 // "what tone is this row" for every row a subject actually appears in.
-export type Tone = "over" | "act" | null;
-
-function elapsedMinutes(row: { entered_at?: string | null; opened_at?: string }): number | null {
-  const at = row.entered_at ?? row.opened_at;
-  if (!at) return null;
-  const ms = Date.now() - new Date(at).getTime();
-  return Number.isFinite(ms) ? ms / 60000 : null;
-}
-
-export function toneOf(
-  decl: Pick<ViewDecl, "target_minutes" | "escalate_minutes"> | undefined,
-  row: { entered_at?: string | null; opened_at?: string },
-): Tone {
-  if (decl?.target_minutes == null) return null;
-  const minutes = elapsedMinutes(row);
-  if (minutes == null) return null;
-  const escalate = decl.escalate_minutes ?? decl.target_minutes * 2;
-  if (minutes >= escalate) return "act";
-  if (minutes >= decl.target_minutes) return "over";
-  return null;
-}
-
 /** The wait rule's own style+attributes for one row, given the tone it has
  *  already been assigned (which may have been demoted by an act budget --
  *  see QueueView below -- so this never recomputes tone itself). --t is the
- *  elapsed/target fraction, clamped to 1: once a row is over, its bar is
- *  already full width and only its colour still moves. */
+ *  elapsed/target fraction, clamped to [0,1]: a timestamp ahead of the clock
+ *  (the shipped seed's day-walk can produce one) is an unstarted bar, not a
+ *  bar mirrored backwards out of the row's own container; once a row is
+ *  over, its bar is already full width and only its colour still moves. */
 function waitAttrs(
   decl: Pick<ViewDecl, "target_minutes" | "escalate_minutes"> | undefined,
   row: { entered_at?: string | null; opened_at?: string },
@@ -97,24 +85,12 @@ function waitAttrs(
   if (decl?.target_minutes == null) return {};
   const minutes = elapsedMinutes(row);
   if (minutes == null) return {};
-  const t = Math.min(1, minutes / decl.target_minutes);
+  const t = Math.min(1, Math.max(0, minutes / decl.target_minutes));
   const attrs: React.HTMLAttributes<HTMLElement> & { "data-over"?: string; "data-act"?: string } =
     { style: { "--t": t } as React.CSSProperties };
   if (tone === "over" || tone === "act") attrs["data-over"] = "";
   if (tone === "act") attrs["data-act"] = "";
   return attrs;
-}
-
-/** The age cell's own word, so colour is never the only channel: "18m over"
- *  for amber, "41m · act now" for red, a plain "6m" otherwise. Null when
- *  the row carries no timestamp at all (nothing to read back). */
-function ageLabel(row: { entered_at?: string | null; opened_at?: string }, tone: Tone): string | null {
-  const minutes = elapsedMinutes(row);
-  if (minutes == null) return null;
-  const m = Math.max(0, Math.round(minutes));
-  if (tone === "act") return `${m}m · act now`;
-  if (tone === "over") return `${m}m over`;
-  return `${m}m`;
 }
 
 /** The declared short identifier for a subject row. There is no separate
@@ -181,37 +157,6 @@ function TaskList({ rows, onOpenThread, maxRows }: { rows: TaskRow[]; onOpenThre
 }
 
 // ---------------------------------------------------------------- queue ----
-
-/** Grafts item 3's fix, rendered: over-threshold rows sort to the top of an
- *  unambiguous vertical list (the 2x2/auto-fill grid this replaced is exactly
- *  what would have made that position ambiguous). Stable beyond tone: two
- *  rows of the same tone keep their original order. */
-function sortByTone(rows: QueueRow[], decl?: Pick<ViewDecl, "target_minutes" | "escalate_minutes">): { row: QueueRow; tone: Tone }[] {
-  const rank = (t: Tone) => (t === "act" ? 0 : t === "over" ? 1 : 2);
-  return rows
-    .map((row, i) => ({ row, i, tone: toneOf(decl, row), minutes: elapsedMinutes(row) ?? -1 }))
-    // Within the same tone, the longest-waiting row sorts first -- the one
-    // act slot the budget below allows is the most overdue row, not merely
-    // whichever the API happened to list first; two rows of equal wait keep
-    // their original order (stable).
-    .sort((a, b) => rank(a.tone) - rank(b.tone) || b.minutes - a.minutes || a.i - b.i)
-    .map(({ row, tone }) => ({ row, tone }));
-}
-
-/** The act budget: one act element per plate, full stop. The rest are still
- *  exactly as over-threshold (still sorted up, still carry [data-over] and
- *  their own true "Nm over" reading), they are simply not the second red
- *  element on the same screen -- the header's own "+N act now" is where they
- *  are counted, never a hidden row. Returns the demoted tone per row and the
- *  true act total for that header line. */
-function budgetAct(decorated: { row: QueueRow; tone: Tone }[]): { row: QueueRow; tone: Tone; shown: Tone }[] {
-  let used = 0;
-  return decorated.map(({ row, tone }) => {
-    if (tone !== "act") return { row, tone, shown: tone };
-    used += 1;
-    return { row, tone, shown: used === 1 ? "act" : "over" };
-  });
-}
 
 function QueueView({
   result, decl, onOpenThread,

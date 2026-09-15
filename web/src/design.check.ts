@@ -24,6 +24,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { toneOf } from "./tone.ts";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const read = (p: string) => readFileSync(root + p, "utf8");
@@ -63,6 +64,31 @@ for (const { selector, body } of gated) {
   ok(allGated,
     `"${selector}" uses --over/--act ("${body.trim()}") but not every selector in its ` +
     `comma list carries [data-over] or [data-act] -- one bare selector is enough to leak colour`);
+}
+
+// -- no stylesheet spends a token :root never declares -----------------------
+//
+// var(--x) is invalid-at-computed-value-time when --x is undefined, which
+// drops the WHOLE declaration, not just that one property -- this is what
+// let a wholesale :root rewrite silently take the operation modal's panel,
+// the scribe's recording banner and the kernel-reachability dot out from
+// under their own rules while every existing check stayed green. Mutation-
+// proof by construction: comment out any token :root declares and every one
+// of its call sites fires here, across every stylesheet under web/src.
+// Comments are stripped first so this docstring's own mention of "--x" (and
+// theme.css's header, which lists the very names a past sweep left dangling)
+// cannot trip it.
+const definedTokens = new Set([...theme.matchAll(/--([\w-]+)\s*:/g)].map((m) => m[1]));
+ok(definedTokens.size > 40, "found enough declared tokens for the dangling-token scan to mean something");
+for (const file of [
+  "web/src/theme.css", "web/src/renderer.css", "web/src/voice/voice.css",
+  "web/src/scribe/scribe.css", "web/src/abha/abha.css",
+]) {
+  const noComments = read(file).replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const m of noComments.matchAll(/var\(\s*--([\w-]+)\s*\)/g)) {
+    ok(definedTokens.has(m[1]),
+      `${file} spends --${m[1]}, which no :root declares -- the declaration is dropped at computed-value time`);
+  }
 }
 
 // -- CLAUSE ONE OF THE COLOUR LAW: "you are here" is not coloured -----------
@@ -167,7 +193,7 @@ ok(!mockHit, mockHit ? `${mockHit.f} still references mockApi` : "");
 // dark-mode override, not a silent fall-through to the light value ---------
 const rootBlock = /:root\{([\s\S]*?)\n\}/.exec(theme)![1];
 const darkBlock = /\[data-theme="dark"\]\{([\s\S]*?)\n\}/.exec(theme)![1];
-const lightTokens = [...rootBlock.matchAll(/--([\w-]+):/g)].map((m) => m[1]);
+const lightDecls = [...rootBlock.matchAll(/--([\w-]+):\s*([^;]+);/g)].map((m) => ({ name: m[1], value: m[2].trim() }));
 const darkTokens = new Set([...darkBlock.matchAll(/--([\w-]+):/g)].map((m) => m[1]));
 // Tokens that are legitimately theme-invariant (the ease curve, the spacing
 // scale, the inset/rail/stub geometry, the motion durations) are not colour
@@ -177,10 +203,49 @@ const darkTokens = new Set([...darkBlock.matchAll(/--([\w-]+):/g)].map((m) => m[
 // ground that flips), so they are deliberately NOT in this list and DO have
 // to be redeclared below, which they are.
 const INVARIANT = /^(ease|s\d+|inset-|rail-w|stub-w|dur-)/;
-const colourTokens = lightTokens.filter((t) => !INVARIANT.test(t));
+// A token whose own value is a literal colour (hex/rgb/hsl) can silently
+// fall through to the wrong theme if [data-theme="dark"] forgets it -- that
+// is the failure this check exists to catch. A token whose value is instead
+// var(--other-token) cannot fall through: it has no colour of its own, it
+// resolves whatever --other-token resolves to, which already carries (or is
+// itself checked for) a deliberate dark value. The sweep's neutral/agency
+// aliases (--surface, --gray-100, --eka-blue, ...) are exactly this shape by
+// design, so they are correctly exempt, not silently exempted by name.
+const isLiteralColour = (v: string) => /#[0-9a-fA-F]{3,8}\b/.test(v) || /\b(rgba?|hsla?)\(/.test(v);
+const colourTokens = lightDecls.filter(({ name, value }) => !INVARIANT.test(name) && isLiteralColour(value));
 ok(colourTokens.length > 15, "found enough colour tokens for the check to mean something");
-for (const t of colourTokens) {
-  ok(darkTokens.has(t), `--${t} has a deliberate dark-mode value, not a silent fall-through`);
+for (const { name } of colourTokens) {
+  ok(darkTokens.has(name), `--${name} has a deliberate dark-mode value, not a silent fall-through`);
 }
+
+// -- the colour law's arithmetic, RUN, not just read as text ----------------
+//
+// Every assertion above reads theme.css/renderer.css back as text, which is
+// exactly why inverting or deleting toneOf's own body left this file (and
+// every other .check.ts) green: toneOf lived in a .tsx, and a .check.ts may
+// never import one. It now lives in ./tone.ts (a plain .ts, moved verbatim,
+// re-exported from ViewRenderer.tsx so every existing import stays valid),
+// so it can be imported and RUN here. A boundary table, both directions of
+// the mutation proof the spec names: no declared threshold is vacuously
+// monochrome (the laboratory bundle's own guarantee), and a declared one
+// still colours -- so `return null` unconditionally fails the second
+// assertion and `return "over"` unconditionally (ignoring decl) fails the
+// first.
+const longAgo = new Date(Date.now() - 6 * 3600_000).toISOString();
+const soon = new Date(Date.now() + 3600_000).toISOString();
+ok(toneOf(undefined, { opened_at: longAgo }) === null,
+  "no declared view at all: no tone, however long the wait (the laboratory bundle's own guarantee)");
+ok(toneOf({ target_minutes: null }, { opened_at: longAgo }) === null,
+  "a null target_minutes is not a threshold: still no tone, however long the wait");
+ok(toneOf({ target_minutes: 30 }, { opened_at: longAgo }) === "act",
+  "a declared threshold still colours -- toneOf is not vacuously monochrome for every input");
+ok(toneOf({ target_minutes: 30 }, { opened_at: new Date(Date.now() - 40 * 60_000).toISOString() }) === "over",
+  "elapsed at 40 of a 30-minute target (before the default 60-minute escalation): over, not act");
+ok(toneOf({ target_minutes: 30 }, { opened_at: new Date(Date.now() - 20 * 60_000).toISOString() }) === null,
+  "elapsed at 20 of a 30-minute target: no tone yet");
+ok(toneOf({ target_minutes: 30, escalate_minutes: 45 }, { opened_at: new Date(Date.now() - 50 * 60_000).toISOString() }) === "act",
+  "a declared escalate_minutes overrides the 2x-target default");
+ok(toneOf({ target_minutes: 30 }, { opened_at: soon }) === null,
+  "a timestamp ahead of the clock (a future opened_at) is not a wait at all, not a negative one");
 
 console.log(`ok   design: ${checks} checks`);

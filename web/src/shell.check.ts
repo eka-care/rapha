@@ -50,6 +50,27 @@ for (const f of tracked) {
   ok(!/\bLines\b/.test(src), `${f} does not hard-code the queue's title`);
 }
 
+// -- the rail's roving tabindex can actually reach every stop ---------------
+//
+// onRailKeyDown's ArrowUp/Down and ArrowLeft/Right branches find the active
+// stop's index within their own group and used to bail out with
+// `if (i < 0) return;` when the currently focused stop belonged to a
+// DIFFERENT group (the toggle, the primary row and the role chip are all
+// group "none"). Since activeStop starts on "toggle" and Home/End land on
+// "none" stops too, that early return made every arrow key a no-op from the
+// rail's only entry points, and made "Filter and group" and "+" (the "lr"
+// group) permanently unreachable by keyboard -- a WCAG 2.1.1 trap. The fix
+// is deleting the guard, not changing it, because Math.min(i+1,len-1) and
+// Math.max(i-1,0) already do the right thing at i===-1 (enter the group at
+// its head). Anchored on the function's own sliced body so a guard added
+// back anywhere else in the file cannot satisfy this by accident.
+const keyFnStart = shell.indexOf("const onRailKeyDown = ");
+const keyFnEnd = shell.indexOf("\n  };\n", keyFnStart);
+ok(keyFnStart > 0 && keyFnEnd > keyFnStart, "onRailKeyDown is found so its body can be checked");
+const keyFnBody = shell.slice(keyFnStart, keyFnEnd);
+ok(!/if \(i < 0\) return;/.test(keyFnBody),
+  "onRailKeyDown's Arrow branches have no i<0 early return -- every arrow key can enter a group from outside it, so Filter/+ and the pinned nav stay keyboard-reachable from every rail entry point");
+
 // -- Home is first and default ----------------------------------------------
 const main = read("web/src/main.tsx");
 const parseFn = main.slice(main.indexOf("function parse("), main.indexOf("\n}\n", main.indexOf("function parse(")));

@@ -249,7 +249,7 @@ export function Form({
           <div className="f-hint unsure">{from ?? unsureHint(confidence?.[q.link_id] ?? 0)}</div>
         )}
         {critical && !mine.length && (
-          <span className="badge b-crit">Outside range{phc.flags ? ` · ${phc.flags}` : ""}</span>
+          <span className="badge b-crit" data-act="">Outside range{phc.flags ? ` · ${phc.flags}` : ""}</span>
         )}
         {mine.map((p) => <div className="f-bad" key={p.message}>{p.message}</div>)}
       </div>

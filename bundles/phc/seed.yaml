@@ -19,16 +19,23 @@
 #   proposals  a write awaiting a person; the operation must be one this
 #              bundle loads, which is what stops a PHC prescription from
 #              being offered on a laboratory thread
+#   minutes_ago  backdates only this thread's own opened_at, so the wait
+#                rule (target_minutes: 30 on this bundle's queue view) has a
+#                seeded row actually past its declared threshold; every
+#                other thread shares the seed's single "now" stamp
 threads:
   # Walked in, not registered. Stands at reception with no patient row at all.
   - id: enc-001
     token: A01
     status: in_progress
 
-  # Registered, waiting for the nurse.
+  # Registered, waiting for the nurse -- and has been for 45 minutes, past
+  # this bundle's own 30 minute target, so the wait rule always has one row
+  # to actually ink on a fresh seed.
   - id: enc-002
     token: A02
     status: in_progress
+    minutes_ago: 45
     patient: {name: Kamala Devi, age: 34, sex: female, phone: "9800000002",
               village: Sonpur, category: general}
     audit:

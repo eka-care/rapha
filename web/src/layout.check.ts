@@ -405,4 +405,40 @@ ok(/transition:\s*none/.test(sbRule), ".sb sets transition:none -- there is no w
 const nvRule = /(?<![\w-])\.nv\{([^}]*)\}/.exec(themeCss)?.[1] ?? "";
 ok(/transition:\s*none/.test(nvRule), ".nv sets transition:none -- hover has no transition duration to disagree with 0ms");
 
+// -- the signature: the token stub actually holds eight mono glyphs --------
+//
+// "The stub never wraps" needs a browser and a loaded font to measure for
+// real (a .check.ts may not load either). What this file CAN prove is the
+// arithmetic the spec's own sizing claims: --stub-w minus the stub's own
+// padding-right is the content box a glyph run has to fit in, and eight
+// glyphs of the SHIPPED mono face (measured live against both bundles:
+// 8.2159px/glyph at 13px, i.e. 0.632em, not the ~0.6em generic-mono advance
+// the spec assumed) must fit inside it. This is the exact defect the
+// laboratory bundle's "25-0417" exposed (a 44px, then a 64px/13px stub, both
+// measurably wrapped to two lines) and 0.632 is a NAMED constant carrying
+// that live measurement, not a guess. Checked for both .stub and .rail-stub,
+// since the signature runs down every list in the product.
+const STUB_GLYPH_ADVANCE_EM = 0.632; // measured: 8.2159px / 13px, "Atkinson Hyperlegible Mono" 500
+const rootVars = /:root\{([\s\S]*?)\n\}/.exec(themeCss)![1];
+const stubW = parseFloat(/--stub-w:\s*(\d+(?:\.\d+)?)px/.exec(rootVars)?.[1] ?? "NaN");
+ok(Number.isFinite(stubW), "--stub-w is declared as a px value in :root");
+for (const sel of [".stub", ".rail-stub"]) {
+  const rule = new RegExp(`(?<![\\w-])${sel.replace(".", "\\.")}\\{([^}]*)\\}`).exec(themeCss)?.[1] ?? "";
+  ok(rule.length > 0, `"${sel}" has a rule in theme.css`);
+  const padMatch = /padding-right:\s*(\d+(?:\.\d+)?)px/.exec(rule);
+  ok(padMatch, `"${sel}" declares its own padding-right in px (content box is border-box, so this eats into --stub-w)`);
+  const padRight = parseFloat(padMatch?.[1] ?? "NaN");
+  const fontMatch = /font:\s*\d+\s+(\d+(?:\.\d+)?)px\/(\d+(?:\.\d+)?)px/.exec(rule);
+  ok(fontMatch, `"${sel}" declares its font-size via the font shorthand`);
+  const fontSize = parseFloat(fontMatch?.[1] ?? "NaN");
+  const contentBox = stubW - padRight;
+  const glyphRun = 8 * fontSize * STUB_GLYPH_ADVANCE_EM;
+  ok(contentBox >= glyphRun,
+    `"${sel}": --stub-w(${stubW}) - padding-right(${padRight}) = ${contentBox}px must hold eight glyphs at ${fontSize}px ` +
+    `(${glyphRun.toFixed(2)}px at the shipped face's measured 0.632em advance) -- it wraps otherwise, silently, on any ` +
+    `identifier eight glyphs long (the laboratory bundle's own "25-0417" is seven)`);
+  ok(/white-space:\s*nowrap/.test(rule),
+    `"${sel}" sets white-space:nowrap, so an identifier that still overflows does so visibly, not as a silent second line`);
+}
+
 console.log(`ok   layout: ${checks} checks`);

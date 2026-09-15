@@ -160,6 +160,19 @@ class SqliteStore:
         if days <= 0:
             return 0
         cutoff = (seeded_on + timedelta(days=1)).isoformat()
+        # The clamp this docstring already promises ("nothing is ever pushed
+        # into the future") was never enforced: rolling forward by whole
+        # DAYS while keeping the time of day means every row whose seeded
+        # time-of-day is later than the current wall-clock time lands in the
+        # future for the ~11-23 hours of "today" before that time-of-day
+        # arrives. A future opened_at makes elapsedMinutes() negative, which
+        # is what made the wait rule (a 2px bar clamped only above, at 1)
+        # paint backwards out of the row's own container, and made
+        # ageLabel's own Math.max(0, ...) print "0m" on every row all day.
+        # ISO-8601 timestamps of the same +00:00 shape sort lexicographically
+        # in the same order they sort chronologically, so a plain string MIN
+        # against `now` is the whole clamp -- no date parsing needed.
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
         threads = [r["id"] for r in self.db.execute(
             "SELECT id FROM encounter WHERE created_by = ?", [SEED_ACTOR]).fetchall()]
         marks = ", ".join("?" * len(threads))
@@ -176,11 +189,13 @@ class SqliteStore:
                 where = "%s IN (%s)" % (join, marks)
             # SQLite's datetime() understands the +00:00 suffix and drops it,
             # returning "YYYY-MM-DD HH:MM:SS". Everything that compares these
-            # columns compares strings, so the isoformat spelling is put back.
+            # columns compares strings, so the isoformat spelling is put back
+            # before the two candidates are compared and the smaller (i.e.
+            # not-later-than-now) one kept.
             self.db.execute(
-                "UPDATE %s SET %s = replace(datetime(%s, ?), ' ', 'T') || '+00:00'"
+                "UPDATE %s SET %s = MIN(replace(datetime(%s, ?), ' ', 'T') || '+00:00', ?)"
                 " WHERE %s AND %s < ?" % (table, column, column, where, column),
-                ["+%d days" % days] + threads + [cutoff])
+                ["+%d days" % days, now] + threads + [cutoff])
         return days
 
     @property
@@ -335,11 +350,21 @@ class SqliteStore:
         exists = self.db.execute(
             "SELECT 1 FROM %s WHERE id = ?" % _table(resource), [rid]).fetchone()
         if exists:
-            # Authorship is written once. Linking an ABHA updates the patient
+            # Authorship and the moment a row was opened are both written
+            # once, for the same reason: linking an ABHA updates the patient
             # row registration created, and the person linking is not the
-            # person who registered; overwriting created_by would lose the
-            # registrar and leave the row claiming the wrong author.
-            sets = [k for k in record if k not in ("id", "created_by")]
+            # person who registered, so overwriting created_by would lose
+            # the registrar. created_date is the same fact about time rather
+            # than identity -- write("patient", ...) above joins a person to
+            # an already-open thread by re-_put-ing the encounter row with
+            # only {id, patient}, and record.setdefault("created_date",
+            # now()) a few lines up means every such join used to silently
+            # reset opened_at to the moment the person was ATTACHED, not the
+            # moment the thread was OPENED. That is what made a seeded
+            # thread's declared age (see seed()'s own `minutes_ago`) vanish
+            # the instant its patient row was written, and would do the same
+            # to a real visit's wait-rule clock the moment ABHA linking ran.
+            sets = [k for k in record if k not in ("id", "created_by", "created_date")]
             self.db.execute(
                 "UPDATE %s SET %s WHERE id = ?"
                 % (_table(resource), ", ".join("%s = ?" % k for k in sets)),
@@ -518,9 +543,20 @@ def seed(store, threads=None):
 
     for t in threads:
         thread = t["id"]
+        # A thread's own `minutes_ago` backdates only its encounter row (the
+        # one column opened_at is read from, store.threads() above), so the
+        # wait rule has a seeded row that is actually past a declared
+        # target_minutes: without one, the spec's own acceptance criterion
+        # ("one row seeded past target: exactly one [data-over]") is
+        # unsatisfiable against the shipped fixture, since every other row
+        # shares the same "now" stamp. roll_seed_forward's later day-walk
+        # only ever adds whole days, so this relative offset survives it.
+        minutes_ago = t.get("minutes_ago")
+        opened = (datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)).isoformat(timespec="seconds") \
+            if minutes_ago else stamp
         store._put("encounter", {"id": thread, "token": t.get("token"),
                                  "status": t.get("status") or "in_progress",
-                                 "created_by": SEED_ACTOR, "created_date": stamp},
+                                 "created_by": SEED_ACTOR, "created_date": opened},
                    thread=thread)
         if t.get("patient"):
             # write(), not _put(): attaching the person to the thread is the

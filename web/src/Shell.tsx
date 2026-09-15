@@ -14,6 +14,7 @@ import { API_BASE } from "./api";
 import { Icon } from "./icons";
 import { filterOptions, filterRows, sortOptions, sortRows, type Filter, type SortKey } from "./loops";
 import { firstOperation } from "./search";
+import { toneOf, type Tone } from "./tone";
 import type { Catalogue, Facility, QueueRow, ViewDecl, ViewResult } from "./types";
 import { human, title } from "./ui";
 
@@ -137,8 +138,6 @@ function useCollapsed(role: string): [boolean, () => void] {
 
 // -------------------------------------------------------------- colour law
 
-type Tone = "over" | "act" | null;
-
 /** One roving-tabindex stop's own props: which group ArrowUp/Down or
  *  ArrowLeft/Right traverses it in ("list", "lr", or "none" for a standalone
  *  stop reachable only by Tab/Home/End), the type-ahead label, and whether it
@@ -154,24 +153,18 @@ type RoveProps = {
 /** Clause two, computed for the rail's own DOM (the pinned nav's count pill,
  *  the collapsed toggle's badge) rather than read off any element the
  *  renderer paints -- those are different nodes, so each has to set its own
- *  [data-over]/[data-act] from the same declared fields. Mirrors the colour
- *  law exactly: elapsed = now - (entered_at ?? opened_at); over at target;
- *  act at escalate (default 2x target); a view with no declared target never
- *  colours anything, which is the point (the laboratory bundle ships without
- *  one). */
+ *  [data-over]/[data-act] from the same declared fields. Calls toneOf
+ *  (./tone.ts) per row instead of recomputing the escalation arithmetic a
+ *  second time: that second copy was itself unguarded (a check may not
+ *  import a .tsx, and this file is one), so a divergent edit here could
+ *  invert the rail's own colouring while every check stayed green. */
 function rowTone(decl: Pick<ViewDecl, "target_minutes" | "escalate_minutes">, rows: QueueRow[]): { tone: Tone; overN: number; actN: number } {
-  if (decl.target_minutes == null) return { tone: null, overN: 0, actN: 0 };
-  const target = decl.target_minutes;
-  const escalate = decl.escalate_minutes ?? target * 2;
-  const now = Date.now();
   let overN = 0;
   let actN = 0;
   for (const r of rows) {
-    const at = r.entered_at ?? r.opened_at;
-    if (!at) continue;
-    const minutes = (now - new Date(at).getTime()) / 60000;
-    if (minutes >= escalate) actN++;
-    else if (minutes >= target) overN++;
+    const t = toneOf(decl, r);
+    if (t === "act") actN++;
+    else if (t === "over") overN++;
   }
   return { tone: actN > 0 ? "act" : overN > 0 ? "over" : null, overN, actN };
 }
@@ -373,14 +366,20 @@ export function Sidebar({
     };
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       const list = stops.filter((el) => el.dataset.roveGroup === "list");
+      // No early return at i === -1: the active stop is outside this group
+      // (the toggle, the primary row, or the role chip, every one of them
+      // "none") on a fresh load and after Home/End, and an arrow pressed
+      // from there must enter the group at its head rather than no-op --
+      // otherwise nothing can ever move activeStop onto a "list"/"lr" stop
+      // from a "none" one, and the "lr" pair (Filter and group, +) can never
+      // be reached by keyboard at all. Math.min(-1+1,len-1)=0 and
+      // Math.max(-1-1,0)=0 already do the right thing at i===-1.
       const i = list.findIndex((el) => el.dataset.rovestop === activeStop);
-      if (i < 0) return;
       e.preventDefault();
       focusStop(list[e.key === "ArrowDown" ? Math.min(i + 1, list.length - 1) : Math.max(i - 1, 0)]);
     } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       const lr = stops.filter((el) => el.dataset.roveGroup === "lr");
       const i = lr.findIndex((el) => el.dataset.rovestop === activeStop);
-      if (i < 0) return;
       e.preventDefault();
       focusStop(lr[e.key === "ArrowLeft" ? Math.max(i - 1, 0) : Math.min(i + 1, lr.length - 1)]);
     } else if (e.key === "Home" || e.key === "End") {

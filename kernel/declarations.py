@@ -314,8 +314,10 @@ def _lint_seed(threads, manifest, voc, ops):
             bad.append(f"{where}: two threads share this id")
         seen.add(t["id"])
         for key in set(t) - {"id", "token", "status", "patient", "rows",
-                             "flags", "proposals", "audit"}:
+                             "flags", "proposals", "audit", "minutes_ago"}:
             bad.append(f"{where}: unknown key '{key}'")
+        if "minutes_ago" in t and not isinstance(t["minutes_ago"], (int, float)):
+            bad.append(f"{where}: minutes_ago must be a number")
         for row in t.get("rows") or []:
             if not isinstance(row, dict) or "resource" not in row:
                 bad.append(f"{where}: a row needs a 'resource'")

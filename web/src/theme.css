@@ -61,6 +61,40 @@
   /* the two things that genuinely float */
   --sh-overlay:0 24px 70px rgba(30,24,16,.20);
   --sh-pop:0 12px 34px rgba(30,24,16,.13);
+
+  /* the sweep: neutral/agency names the ported sections below (this file's
+     own header names every one of them) still spend, collapsed to real
+     tokens ONCE, here, rather than at each of their ~200 call sites. var()
+     resolves at computed-value time, so aliasing to a token that itself
+     flips under [data-theme="dark"] (--dial, --rule, --ink-3, --hand,
+     --hand-ink) still flips correctly with no second declaration below.
+     --accent* is deliberately NOT here: a signal colour is decided per call
+     site (see .badge/.prop.primary/.dot below), never aliased wholesale --
+     aliasing --accent to --act would let every old accent site paint the
+     wait-rule's colour with no [data-act] gating, and aliasing it to --ink
+     is what erased the crit/warn distinction in the first place. */
+  --surface:var(--dial); --gray-50:var(--dial); --gray-100:var(--rail);
+  --gray-200:var(--ink-3); --gray-300:var(--ink-3); --gray-400:var(--ink-3);
+  --border:var(--rule); --violet-border:var(--rule); --grad-rose-line:var(--rule);
+  --ink-1:var(--ink);
+  --r-sm:4px; --r-md:4px; --r-lg:4px; --r-xl:4px; --r-pill:999px;
+  --sh-card:none; --sh-hover:none;
+  --tier-surface-border:1px solid var(--rule); --tier-surface-radius:4px; --tier-surface-shadow:none;
+  --abdm-bg:var(--dial); --abdm-bd:var(--rule);
+  /* eka-blue retired in favour of --hand (spec: "eka-blue on .link and
+     .f-in:focus goes to --hand"); --hand carries no colour-gate restriction
+     (agency is exempt by construction), so aliasing it wholesale opens no
+     loophole the way --accent->--act would. */
+  --eka-blue:var(--hand); --eka-blue-700:var(--hand); --eka-blue-bg:var(--dial); --eka-blue-100:var(--rule);
+  /* warning* only ever gated a "pending review" surface (a spoken value not
+     yet confirmed), which the spec's own sentence puts in the neutral
+     bucket alongside form errors and proposals. */
+  --warning:var(--ink); --warning-bg:var(--dial); --warning-border:var(--rule);
+  /* destructive* only ever meant "recording is live" (agency) or "this
+     capture/step failed" (a form-error-shaped state); neither is a
+     per-shift clinical escalation, so --hand is the compliant fill for both,
+     the same exemption --hand already carries everywhere else. */
+  --destructive:var(--hand); --destructive-bg:var(--dial); --destructive-border:var(--hand);
 }
 [data-theme="dark"]{
   --bench:#1E211D;
@@ -214,9 +248,17 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
    not also take the --hand bar, which is what a nav row's own selection
    means. */
 .rail-row.on{background:var(--dial)}
+/* 11px, not the type scale's identifier size (13px): eight glyphs of the
+   shipped mono face measure ~8.22px/glyph, so 13px needs ~65.7px against a
+   56px content box (64px stub minus this rule's own 8px padding-right,
+   border-box) and silently wraps to two lines on the laboratory's own
+   "25-0417" data -- exactly the case the spec sized 64px against. 11px
+   holds all eight (8*8.22*11/13 =~55.6px <= 56px) on one line in both
+   bundles. white-space:nowrap turns any identifier that still doesn't fit
+   into a visible overflow instead of a silent second line. */
 .rail-stub{width:var(--stub-w);height:100%;display:flex;align-items:center;justify-content:flex-end;
-  position:relative;padding-right:8px;
-  font:500 13px/20px "Atkinson Hyperlegible Mono",ui-monospace,monospace;
+  position:relative;padding-right:8px;white-space:nowrap;
+  font:500 11px/16px "Atkinson Hyperlegible Mono",ui-monospace,monospace;
   font-variant-numeric:tabular-nums;color:var(--ink)}
 .rail-name{font:400 15px/24px "Atkinson Hyperlegible Next",system-ui,sans-serif;letter-spacing:-.005em;
   color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -281,7 +323,7 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
    said honestly. A plain neutral dot: whether the kernel answers is not an
    urgent, needs-you fact, so it does not reach for the accent. */
 .dot{width:7px;height:7px;border-radius:50%;background:var(--gray-400);flex-shrink:0}
-.dot.down{background:var(--accent)}
+.dot.down{background:var(--ink)}
 .view{flex:1;overflow:hidden;display:flex;justify-content:center;padding-inline:var(--inset-content)}
 .view.scroll{overflow-y:auto}
 .wrap{max-width:none;width:100%;height:100%}
@@ -300,19 +342,19 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .card-h{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px}
 .card-t{font-size:12.5px;font-weight:700}
 .eyebrow{font-size:10px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.09em}
-.badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;
-  padding:3px 8px;border-radius:var(--r-pill);border:1px solid transparent}
-/* A flag and a critical value are both "needs you": the one accent, and nowhere else. */
-/* One hue, two ranks: a flag is tinted (the accent as text on a light wash
-   of itself), a critical is filled (the accent as a solid ground). Same
-   colour, so the "one accent" rule still holds; different weight, so a flag
-   and a critical do not read as the same thing. */
-.b-warn{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-border)}
-.b-crit{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.b-ok{background:var(--gray-100);color:var(--ink-3);border-color:var(--border)}
-.b-mute{background:var(--gray-100);color:var(--ink-3);border-color:var(--border)}
-.b-vio{background:var(--gray-100);color:var(--ink-3);border-color:var(--border)}
-.b-blue{background:var(--eka-blue-bg);color:var(--eka-blue-700);border-color:var(--eka-blue-100)}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;
+  padding:3px 8px;border-radius:var(--r-pill);background:var(--dial);color:var(--ink);
+  border:1px solid var(--rule)}
+/* Every badge rank (warn/ok/mute/vio/blue -- a workflow status, an audit
+   outcome, an irreversibility note) collapsed into the one neutral .badge
+   above: none of them is a per-shift clinical escalation, so none of them
+   may hold a signal colour. The one genuine exception is a value outside
+   its declared critical range, gated on [data-act] (Form.tsx sets that
+   attribute on this exact span, and only there), so clause two of the
+   colour gate still holds -- a bare .b-crit with no [data-act] (the
+   "irreversible" and "denied" uses elsewhere) renders as the plain neutral
+   badge above, same as every other rank. */
+.b-crit[data-act]{background:var(--act);color:var(--hand-ink);border-color:var(--act)}
 
 /* ---------- chat view ---------- */
 /* One row, and it is the height of the screen, not the height of the
@@ -353,7 +395,7 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .kvbox{margin-top:9px;border:1px solid var(--border);border-radius:var(--r-md);padding:8px 10px;background:var(--surface)}
 .kv{display:flex;justify-content:space-between;gap:12px;font-size:11.5px;padding:3px 0;color:var(--ink-3)}
 .kv b{color:var(--eka-blue);font-weight:700}
-.kv.crit b{color:var(--accent)}
+.kv.crit b{color:var(--ink)}
 .quote{border-left:2px solid var(--violet-border);padding-left:10px;font-style:italic;
   color:var(--ink-3);font-size:12px;line-height:1.55;margin-top:7px}
 .props{margin-top:11px;display:flex;flex-direction:column;gap:6px}
@@ -363,12 +405,12 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
   padding:9px 11px;cursor:pointer;font:inherit;color:var(--ink);transition:.15s var(--ease)}
 .prop:hover:not(:disabled){border-color:var(--gray-400);background:var(--gray-100);transform:translateX(2px)}
 .prop:disabled{opacity:.45;cursor:not-allowed}
-/* the one accent, spent here on the primary action: this is the thing the
-   principle means by "needs you". */
-.prop.primary{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+/* agency, exempt from the colour law by construction, same as .rail-primary
+   and .resume-take: the primary verb's own fill. */
+.prop.primary{border-color:var(--hand);background:var(--hand);color:var(--hand-ink)}
 .prop.primary:hover{filter:brightness(.94)}
-.prop.primary .p-s{color:var(--accent-ink);opacity:.72}
-.prop.primary .p-tag{background:rgba(0,0,0,.12);color:var(--accent-ink);border-color:transparent}
+.prop.primary .p-s{color:var(--hand-ink);opacity:.72}
+.prop.primary .p-tag{background:rgba(0,0,0,.12);color:var(--hand-ink);border-color:transparent}
 .p-l{font-size:12.5px;font-weight:600;line-height:1.25}
 .p-s{font-size:10.5px;color:var(--ink-3);margin-top:2px;line-height:1.3}
 .p-tag{margin-left:auto;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
@@ -378,7 +420,7 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
    wrong with it: neutral, like the tag pill it decorates. */
 .p-tag.scribe{background:var(--gray-100);color:var(--ink-3);border-color:var(--border)}
 .p-tag.form{background:var(--gray-100);color:var(--ink-3);border-color:var(--border)}
-.p-tag.irr{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-border)}
+.p-tag.irr{background:var(--gray-100);color:var(--ink-3);border-color:var(--border)}
 .p-tag.hand{background:var(--eka-blue-bg);color:var(--eka-blue-700);border-color:var(--eka-blue-100)}
 .empty{margin:auto;text-align:center;color:var(--ink-3);font-size:12.5px;line-height:1.6;max-width:340px}
 .composer{border-top:1px solid var(--border);padding:11px 14px;display:flex;gap:8px;align-items:center;flex-shrink:0}
@@ -388,9 +430,9 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .btn{border:none;border-radius:var(--r-md);padding:9px 14px;font:inherit;font-size:12.5px;
   font-weight:600;cursor:pointer;transition:.15s var(--ease);white-space:nowrap;
   display:inline-flex;align-items:center;gap:7px}
-/* the primary button class: the one accent, because a primary action is
-   exactly what "needs you" means for a button. */
-.btn-b{background:var(--accent);color:var(--accent-ink)}.btn-b:hover{filter:brightness(.94)}
+/* the primary button class: agency, the same --hand fill every other
+   primary action in the product uses. */
+.btn-b{background:var(--hand);color:var(--hand-ink)}.btn-b:hover{filter:brightness(.94)}
 .btn-g{background:var(--surface);color:var(--ink-2);border:1px solid var(--border)}
 .btn-g:hover{background:var(--gray-100)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
@@ -402,14 +444,14 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
    the chat/thread chrome ported from the prototype around them. */
 /* A nudge is a clinical flag rendered as a sentence rather than a badge; the
    one accent applies here too, for the same reason it applies to a badge. */
-.nudge{font-size:11px;color:var(--accent);background:var(--accent-bg);
-  border-left:3px solid var(--accent-border);border-radius:var(--r-sm);padding:8px 10px;margin:0 12px 12px;line-height:1.5}
+.nudge{font-size:11px;color:var(--ink);background:var(--dial);
+  border-left:3px solid var(--rule);border-radius:var(--r-sm);padding:8px 10px;margin:0 12px 12px;line-height:1.5}
 /* ---------- queue ---------- */
 .qtabs{display:flex;gap:5px;background:var(--gray-100);padding:4px;border-radius:var(--r-md);margin-bottom:14px;flex-wrap:wrap}
 .qtab{border:none;background:none;padding:7px 13px;border-radius:var(--r-sm);font:inherit;
   font-size:11.5px;font-weight:600;color:var(--ink-3);cursor:pointer;transition:.14s var(--ease);
   display:flex;align-items:center;gap:7px}
-.qtab.on{background:var(--surface);color:var(--ink);box-shadow:var(--sh-card)}
+.qtab.on{background:var(--surface);color:var(--ink)}
 .qtab .n{font-size:9.5px;font-weight:700;background:var(--gray-200);color:var(--ink-3);
   border-radius:var(--r-pill);padding:1px 6px}
 .qtab.on .n{background:var(--ink);color:var(--surface)}
@@ -450,7 +492,7 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
   font-weight:600;cursor:pointer;white-space:nowrap;transition:.14s var(--ease)}
 .cq:hover:not(:disabled){border-color:var(--gray-400);color:var(--ink);background:var(--gray-100)}
 .cq:disabled{opacity:.4;cursor:not-allowed}
-.cq.rose{border-color:transparent;background:var(--accent);color:var(--accent-ink);box-shadow:var(--tier-surface-shadow)}
+.cq.rose{border-color:transparent;background:var(--hand);color:var(--hand-ink);box-shadow:var(--tier-surface-shadow)}
 .cq.rose:hover{transform:translateY(-1px);filter:brightness(.94)}
 .crow{display:flex;gap:8px;align-items:center}
 /* ---------- home ---------- */
@@ -547,9 +589,12 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
    before the name. A repeating-gradient strip, not a native dashed border:
    a border's own dash length is not something CSS lets a stylesheet set
    exactly, and the signature is exact by name. */
+/* Same 11px/nowrap fix as .rail-stub, and for the same reason: measured
+   live against the laboratory bundle, 13px wrapped "25-0417" to two lines
+   on every worklist row. */
 .stub{width:var(--stub-w);flex-shrink:0;height:100%;display:flex;align-items:center;
-  justify-content:flex-end;margin-right:8px;padding-right:8px;position:relative;
-  font:500 13px/20px "Atkinson Hyperlegible Mono",ui-monospace,monospace;
+  justify-content:flex-end;margin-right:8px;padding-right:8px;position:relative;white-space:nowrap;
+  font:500 11px/16px "Atkinson Hyperlegible Mono",ui-monospace,monospace;
   font-variant-numeric:tabular-nums;color:var(--ink)}
 .stub::after,.rail-stub::after{content:"";position:absolute;top:8px;bottom:8px;right:0;width:1px;
   background-image:repeating-linear-gradient(to bottom,var(--rule) 0 2px,transparent 2px 5px)}
@@ -610,8 +655,8 @@ svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
 .field{margin-bottom:12px}
 .warn-box,.crit-box{border-radius:var(--r-md);padding:10px 12px;font-size:11.5px;
   line-height:1.5;margin-bottom:13px;display:flex;gap:8px;align-items:flex-start}
-.warn-box{border:1px solid var(--warning-border);background:var(--warning-bg);color:var(--warning);font-weight:500}
-.crit-box{border:1px solid var(--accent-border);background:var(--accent-bg);color:var(--accent)}
+.warn-box{border:1px solid var(--rule);background:var(--dial);color:var(--ink);font-weight:500}
+.crit-box{border:1px solid var(--rule);background:var(--dial);color:var(--ink)}
 .chk{display:flex;gap:9px;align-items:flex-start;font-size:11.5px;color:var(--ink-2);
   padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-md);cursor:pointer;line-height:1.45}
 .chk input{margin-top:2px;accent-color:var(--eka-blue);width:15px;height:15px;flex-shrink:0}

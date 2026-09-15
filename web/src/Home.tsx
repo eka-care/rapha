@@ -433,14 +433,24 @@ function useReorder(order: string[], persist: (next: string[]) => void, plateTit
       for (const [id, el] of plateRefs.current) {
         const before = first[id];
         if (!before) continue;
-        const after = el.getBoundingClientRect();
-        const dy = before.top - after.top;
+        // "Last" has to be read AFTER the drag/preview transform is cleared,
+        // not before: the FLIP rects were captured in reorder() while the
+        // dragged plate's translate and every crossed sibling's preview
+        // translate were still applied, so a "Last" read with those same
+        // transforms still in effect is stale in the same way "First" is --
+        // the two stale offsets cancel and dy collapses to a pure layout
+        // delta with the actual visual offset thrown away, which is why the
+        // release used to teleport into the new slot on frame 0 and animate
+        // back from there instead of the other way around.
         el.style.transition = "none";
-        el.style.transform = dy ? `translate3d(0px, ${dy}px, 0)` : "";
+        el.style.transform = "";
         el.style.position = "";
         el.style.zIndex = "";
         el.style.boxShadow = "";
         el.style.willChange = "";
+        const after = el.getBoundingClientRect();
+        const dy = before.top - after.top;
+        el.style.transform = dy ? `translate3d(0px, ${dy}px, 0)` : "";
       }
       if (reduced) {
         for (const [, el] of plateRefs.current) { el.style.transform = ""; el.style.transition = ""; }
