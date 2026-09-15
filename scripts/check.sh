@@ -89,6 +89,10 @@ if [ -d web/node_modules ]; then
   # rules, a three-step radius/border/shadow scale, Khoj centred by the
   # topbar's own grid, and no "Use demo data" control anywhere.
   (cd web && node --experimental-strip-types src/design.check.ts)
+  # The closed spacing scale, the five-value type scale, and the geometric
+  # rules a text parser can stand behind (no browser, no DOM: see the file's
+  # own header for exactly what that leaves uncovered).
+  (cd web && node --experimental-strip-types src/layout.check.ts)
   echo "ok   web renderer typechecks and builds"
 else
   echo "warn web: run (cd web && npm install) to check the renderer"

@@ -720,10 +720,12 @@ export function Sheet({
   return (
     <div className="sheet show">
       <div className="sh-h">
-        <div className="sh-t">
-          <Icon name="eye" />
-          {heading}
-          <button className="icon-btn ml-auto" onClick={onClose} title="Close">✕</button>
+        <div className="sh-t" style={{ justifyContent: "space-between" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Icon name="eye" />
+            {heading}
+          </span>
+          <button className="icon-btn" onClick={onClose} title="Close">✕</button>
         </div>
       </div>
       <div className="sh-b">{children}</div>

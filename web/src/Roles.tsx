@@ -93,11 +93,11 @@ export function Roles({
   return (
     <div className="mod">
       <div className="mod-bar" />
-      <div className="mod-h" style={{ display: "flex", alignItems: "center", gap: 9 }}>
+      <div className="mod-h" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <div className="mod-t">Roles</div>
         <select
           className="f-in"
-          style={{ width: "auto", marginLeft: "auto" }}
+          style={{ width: "auto" }}
           value={role}
           disabled={!editable.length}
           onChange={(e) => setRole(e.target.value)}
@@ -140,7 +140,7 @@ export function Roles({
         >
           Reset to preset
         </button>
-        <div className="ml-auto" style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 4, flex: 1, justifyContent: "flex-end" }}>
           <button className="cq" onClick={onClose} disabled={busy}>Close</button>
           <button className="cq rose" onClick={save} disabled={busy || !role}>Save</button>
         </div>

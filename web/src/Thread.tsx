@@ -73,7 +73,7 @@ export function Thread({
             {/* Name and station are the topbar's heading; this card names only
                 what the topbar does not: age, sex, village. */}
             <div className="pt-meta">{head.meta.join(" · ")}</div>
-            <div style={{ display: "flex", gap: 6, marginTop: 7, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" }}>
               {head.identity && (
                 <span className="id-badge">
                   <span className="id-lab">{head.identity.label}</span>
@@ -274,7 +274,7 @@ function Refusals({ msgs }: { msgs: Msg[] }) {
         {open && (
           <div className="bubble" style={{ marginTop: 8 }}>
             {old.map((m) => (
-              <div key={m.id} style={{ padding: "3px 0" }}>
+              <div key={m.id} style={{ padding: "4px 0" }}>
                 <b>{clock(m.at)} {m.kind === "denied" ? m.title : ""}</b>
                 {": "}
                 {m.kind === "denied" ? m.reason : ""}
@@ -362,12 +362,12 @@ function Panel({
   return (
     <div className="panel">
       <div className="card">
-        <div className="card-h">
+        <div className="card-h" style={{ justifyContent: "space-between" }}>
           <div>
             <div className="eyebrow">{human(thread.workflow)}</div>
-            <div className="card-t" style={{ marginTop: 2 }}>Where this stands</div>
+            <div className="card-t" style={{ marginTop: 0 }}>Where this stands</div>
           </div>
-          <span className="badge b-mute ml-auto">{done ? human(done.label) : "Not started"}</span>
+          <span className="badge b-mute">{done ? human(done.label) : "Not started"}</span>
         </div>
         <Line line={thread.line} />
       </div>

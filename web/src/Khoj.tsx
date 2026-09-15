@@ -74,9 +74,9 @@ export function Khoj({
       </div>
 
       {missed && !found.length ? (
-        <div style={{ padding: "38px 22px", textAlign: "center", width: "100%", color: "var(--ink-3)" }}>
+        <div style={{ padding: "40px 20px", textAlign: "center", width: "100%", color: "var(--ink-3)" }}>
           <Icon name="search" size="lg" />
-          <p style={{ fontSize: 12.5, margin: "12px 0 14px", lineHeight: 1.6 }}>
+          <p style={{ fontSize: 13, margin: "12px 0", lineHeight: 1.6 }}>
             No match for "<b>{q.trim()}</b>". Opening a new one creates a permanent record.
           </p>
           <button className="btn btn-b" style={{ margin: "0 auto" }} onClick={() => onRegister(q.trim())}>
@@ -111,7 +111,7 @@ export function Khoj({
               );
             })}
             {missed && (
-              <div style={{ padding: "8px 9px", marginTop: 4, borderTop: "1px solid var(--border)" }}>
+              <div style={{ padding: "8px", marginTop: 4, borderTop: "1px solid var(--border)" }}>
                 <button className="qa-b" style={{ width: "100%" }} onClick={() => onRegister(q.trim())}>
                   <Icon name="plus" size="sm" />{word}
                 </button>
@@ -213,7 +213,7 @@ function Preview({
         )}
       </div>
       {badges.length > 0 && (
-        <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 15 }}>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 16 }}>
           {badges.map(([flag, style]) => <Badge key={flag} style={style}>{human(flag)}</Badge>)}
         </div>
       )}

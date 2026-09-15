@@ -236,11 +236,11 @@ export function OperationPanel({
       }}
     >
       <div className="mod-bar" />
-      <div className="mod-h" style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
+      <div className="mod-h" style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
         {/* Title only. The eyebrow said "New entry" on every panel there is,
             and the summary restated the title over the fields it describes. */}
         {!inline && <div className="mod-t">{op.title}</div>}
-        <div className="ml-auto" style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 4, flex: 1, justifyContent: "flex-end" }}>
           <Badge>{op.instrument}</Badge>
           {irreversible && <Badge style="crit">irreversible</Badge>}
         </div>

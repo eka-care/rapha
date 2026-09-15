@@ -405,7 +405,8 @@ function App() {
               stays centred on the bar itself, not on whatever the title or
               the theme toggle happen to measure. */}
           <button className="khoj-trigger" onClick={() => setKhoj(true)} aria-label="Search or ask Khoj">
-            <Icon name="search" size="sm" />Search or ask<span className="kbd">⌘K</span>
+            <span className="khoj-trigger-label"><Icon name="search" size="sm" />Search or ask</span>
+            <span className="kbd">⌘K</span>
           </button>
           <div className="tb-actions">
             <span className={`dot ${cat.error ? "down" : "up"}`} title={cat.error ? "Kernel unreachable" : "Kernel reachable"} />

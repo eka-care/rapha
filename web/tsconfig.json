@@ -20,5 +20,6 @@
   "exclude": ["src/validate.check.ts", "src/voice/voice.check.ts", "src/messages.check.ts",
               "src/scribe/scribe.check.ts", "src/abha/abha.check.ts", "src/loops.check.ts",
               "src/keys.check.ts", "src/grants.check.ts", "src/shell.check.ts",
-              "src/tasklist.check.ts", "src/home.check.ts", "src/design.check.ts"]
+              "src/tasklist.check.ts", "src/home.check.ts", "src/design.check.ts",
+              "src/layout.check.ts"]
 }
