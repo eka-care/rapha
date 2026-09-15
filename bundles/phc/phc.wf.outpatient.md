@@ -14,7 +14,7 @@ steps:
   - station: doctor
     done_when: consult.documented
     operations: [phc.op.consult-document, phc.op.rx-prescribe, phc.op.lab-order,
-                 phc.op.capture-withdraw]
+                 phc.op.capture-withdraw, phc.op.handover]
   - station: lab
     done_when: lab.resulted
     applies_when: lab.ordered

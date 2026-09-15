@@ -156,7 +156,13 @@ def test_a_walk_in_can_be_registered_and_the_line_moves():
 
 def test_a_capability_the_role_lacks_hides_the_action_and_refuses_the_write():
     thread = client.get("/api/threads/enc-005?role=pharmacist").json()
-    assert [op["id"] for op in thread["actions"]] == ["phc.op.pharmacy-dispense"]
+    # Exact equality on purpose: an operation appearing here that nobody meant to
+    # grant is exactly what this test is for. handover is present because six
+    # roles hold that capability and actions() never filters on the caller's
+    # station, so a note is writable from any desk. rx-prescribe is the absence
+    # under test.
+    assert [op["id"] for op in thread["actions"]] == [
+        "phc.op.pharmacy-dispense", "phc.op.handover"]
     denied = client.post("/api/operations/phc.op.rx-prescribe/commit?role=pharmacist",
                          json={"thread": "enc-005", "payload": {"medications": []}})
     assert denied.status_code == 422
@@ -234,7 +240,7 @@ def test_an_utterance_proposes_and_the_card_carries_what_the_thread_must_draw():
     # per field, and only for fields that ended up in the payload.
     assert card["confidence"] == {"systolic": 0.82, "pulse": 0.91}
     assert card["verdict"] == {"allowed": True, "reason": "proposed", "next": ""}
-    assert card["order"] == "the kernel lists it 1 of 3 at nurse", \
+    assert card["order"] == "the kernel lists it 1 of 4 at nurse", \
         "ordering is read from kernel actions(), never decided by the agent"
     assert card["offered_here"] is True
 
@@ -301,7 +307,11 @@ def test_a_refusal_carries_the_guard_own_reason_and_a_next_step():
     body = client.post("/api/khoj",
                        json={"thread": "enc-003", "backend": "router",
                              "utterance": "vitals 120 over 80 and pulse 70"}).json()
-    card = body["proposals"][0]
+    # By operation, not by index: the router offers every candidate the thread
+    # draws and their order is the declared line's, so indexing [0] asserted
+    # ordering this test does not care about. Naming the operation says what the
+    # test means -- the refusal for THIS write carries THIS reason.
+    card = next(c for c in body["proposals"] if c["operation"] == "phc.op.vitals-record")
     assert card["proposal_id"] is None
     assert card["verdict"]["reason"] == "Already vitals recorded."
     assert card["verdict"]["next"] and "kernel decides" in card["verdict"]["next"]

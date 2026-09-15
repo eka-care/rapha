@@ -21,6 +21,7 @@ operations:
   - phc.op.lab-result-enter
   - phc.op.pharmacy-dispense
   - phc.op.household-visit
+  - phc.op.handover
 workflows:
   - phc.wf.outpatient
 views:

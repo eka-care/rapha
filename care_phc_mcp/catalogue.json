@@ -236,7 +236,8 @@
       "phc.op.lab-order",
       "phc.op.lab-result-enter",
       "phc.op.pharmacy-dispense",
-      "phc.op.household-visit"
+      "phc.op.household-visit",
+      "phc.op.handover"
     ],
     "title": "Primary health centre",
     "version": "2026.09.10",
@@ -846,6 +847,43 @@
         "encounter",
         "notes",
         "condition"
+      ]
+    },
+    "phc.op.handover": {
+      "capability": "handover",
+      "description": "A handover is a note with somebody's name on it. The nurse tells the doctor\nwhat the mother said about the cough; the doctor tells the pharmacist why the\ndose is halved; the ASHA asks whether to visit again this week. It is not a\ntransfer of custody and it moves nobody: the patient is where the line says\nthey are, and this adds a sentence to the visit.\n\nIt is deliberately back and forth. Nothing here closes a conversation, there\nis no acknowledgement to chase and no inbox to clear, so a reply is another\nnote and the visit carries the whole exchange.",
+      "emits": [],
+      "fields": [
+        {
+          "link_id": "note",
+          "options": null,
+          "required": true,
+          "text": "Note",
+          "type": "text"
+        }
+      ],
+      "id": "phc.op.handover",
+      "input": "phc.schema.handover-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "registered"
+      ],
+      "scope_qualifier": null,
+      "short": "Hand over",
+      "station": "doctor",
+      "summary": "A note on this visit, addressed to whoever picks it up next.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Hand over",
+      "tool": "propose_handover",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "questionnaire_response"
       ]
     },
     "phc.op.household-visit": {
@@ -1665,7 +1703,8 @@
             "phc.op.consult-document",
             "phc.op.rx-prescribe",
             "phc.op.lab-order",
-            "phc.op.capture-withdraw"
+            "phc.op.capture-withdraw",
+            "phc.op.handover"
           ],
           "station": "doctor"
         },

@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "slug": "phc.schema.handover-v1",
+  "title": "Hand over",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": { "phc": { "operation": "phc.op.handover" } },
+  "questions": [
+    { "link_id": "note", "text": "Note", "type": "text", "required": true }
+  ]
+}
