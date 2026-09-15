@@ -31,8 +31,6 @@
   padding:8px 12px; }
 .f-lab { font:500 13px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif; display:flex;
   align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
-.f-req { font-family:"Atkinson Hyperlegible Mono",ui-monospace,monospace; font-weight:600; font-size:11px; line-height:16px;
-  text-transform:uppercase; letter-spacing:.02em; color:var(--ink-3); }
 .f-unit { font-family:"Atkinson Hyperlegible Mono",ui-monospace,monospace; font-weight:500; font-size:11px; line-height:16px;
   text-transform:uppercase; letter-spacing:.02em; color:var(--ink-3); }
 .f-in { width:100%; border:1px solid var(--rule); background:var(--dial); color:var(--ink);

@@ -233,7 +233,6 @@ export function Form({
       <div className={`f-field${mine.length ? " bad" : ""}${unsure ? " unsure" : ""}`} key={q.link_id}>
         <label className="f-lab">
           {q.text}
-          {q.required && <span className="f-req">required</span>}
           {phc.unit && <span className="f-unit">{phc.unit}</span>}
         </label>
         {q.description && <div className="f-hint">{q.description}</div>}
@@ -263,7 +262,7 @@ export function Form({
       {blocked && (
         <div className="f-field override">
           <label className="f-lab">
-            Reason for overriding the range<span className="f-req">required</span>
+            Reason for overriding the range
           </label>
           <textarea className="f-in" rows={2} disabled={disabled}
                     value={String(value[OVERRIDE] ?? "")}

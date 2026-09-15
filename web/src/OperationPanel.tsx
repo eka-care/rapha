@@ -27,7 +27,7 @@ import { walk } from "./validate";
 import { questionnaire } from "./declarations";
 import { CONSENT, fmt } from "./messages";
 import type { Operation, Payload, Proposal } from "./types";
-import { Badge, Failed, human } from "./ui";
+import { Failed, human } from "./ui";
 import { Recorder } from "./scribe/Recorder";
 import { mountsFor } from "./voice/instruments";
 import { VoiceCapture } from "./voice/VoiceCapture";
@@ -236,14 +236,14 @@ export function OperationPanel({
       }}
     >
       <div className="mod-bar" />
-      <div className="mod-h" style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+      <div className="mod-h">
         {/* Title only. The eyebrow said "New entry" on every panel there is,
-            and the summary restated the title over the fields it describes. */}
+            and the summary restated the title over the fields it describes.
+            No taxonomy badge either: the instrument is either on the panel
+            or it is not, and an irreversible operation says so by making you
+            do it twice (the confirm stage below), not by a word beside the
+            title. */}
         {!inline && <div className="mod-t">{op.title}</div>}
-        <div style={{ display: "flex", gap: 4, flex: 1, justifyContent: "flex-end" }}>
-          <Badge>{op.instrument}</Badge>
-          {irreversible && <Badge style="crit">irreversible</Badge>}
-        </div>
       </div>
 
       <div className="mod-b">

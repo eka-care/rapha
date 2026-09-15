@@ -20,10 +20,10 @@
  *  moves pixels without re-rendering a single metric or task row.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { API_BASE, currentRole } from "./api";
+import { API_BASE } from "./api";
 import { Icon } from "./icons";
 import type { Catalogue, QueueRow, ViewDecl, ViewResult } from "./types";
-import { human, title } from "./ui";
+import { title } from "./ui";
 import { shortId, toneOf, ViewRenderer } from "./ViewRenderer";
 import type { Recent } from "./Shell";
 
@@ -229,11 +229,11 @@ function ResumeBand({ cat, onGo }: { cat: Catalogue; onGo: (hash: string) => voi
       </div>
     );
   }
-  const role = currentRole();
-  const roleLabel = role === "demo" ? "Every capability (demo)" : human(role);
+  // No role here: the rail footer's account switcher already names it, 200px
+  // to the left, and is the only place that changes it.
   return (
     <div className="resume">
-      <span className="resume-t">{cat.manifest?.title ?? "Workspace"} · {dateLabel()} · {roleLabel}</span>
+      <span className="resume-t">{cat.manifest?.title ?? "Workspace"} · {dateLabel()}</span>
     </div>
   );
 }

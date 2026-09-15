@@ -45,8 +45,14 @@ ok(iStack > iScale, "the plate stack is written after the live scale");
 // resume band's own fallback text draws facility/date/role, never a "Good
 // morning" clock -----------------------------------------------------------
 ok(!/\bgreet\b/.test(stripped), "no .greet class or word survives Home.tsx");
-ok(/cat\.manifest\?\.title/.test(src) && /roleLabel/.test(src),
-  "the resume band's fallback reads the facility and the role, not a greeting");
+ok(/cat\.manifest\?\.title/.test(src) && /dateLabel\(\)/.test(src),
+  "the resume band's fallback reads the facility and the date, not a greeting");
+// The role is deliberately NOT printed a second time here: the rail
+// footer's account switcher already names it, 200px to the left, and is the
+// only place that changes it. A role duplicated onto this band is the exact
+// regression this asserts against, not just a thing that happens to be
+// absent today.
+ok(!/roleLabel|currentRole/.test(src), "the resume band does not print the role a second time");
 
 // -- HTML5 drag-and-drop is deleted, not fixed: it never fires on touch, and
 // dropOnto always spliced the source BEFORE the destination, a silent no-op

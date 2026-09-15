@@ -154,7 +154,7 @@ function Message({
     return (
       <Bubble
         av="x"
-        meta={<>System · {clock(m.at)} <Badge>{m.actor}</Badge> <Badge>refused</Badge></>}
+        meta={<>System · {clock(m.at)}</>}
       >
         <div className="t">{m.title}</div>
         {m.reason}
@@ -167,7 +167,7 @@ function Message({
         av="agent"
         meta={
           <>
-            Agent · {clock(m.at)} <Badge>over {m.surface}</Badge>
+            Agent · {clock(m.at)}
             {m.stale
               ? <Badge>superseded</Badge>
               : <Badge style="warn">awaiting a person</Badge>}
@@ -363,10 +363,7 @@ function Panel({
     <div className="panel">
       <div className="card">
         <div className="card-h" style={{ justifyContent: "space-between" }}>
-          <div>
-            <div className="eyebrow">{human(thread.workflow)}</div>
-            <div className="card-t" style={{ marginTop: 0 }}>Where this stands</div>
-          </div>
+          <div className="card-t">Where this stands</div>
           <span className="badge">{done ? human(done.label) : "Not started"}</span>
         </div>
         <Line line={thread.line} />
