@@ -149,4 +149,45 @@ ok(/position:fixed/.test(read("web/src/scribe/scribe.css")),
 ok(!/mic-live/.test(rec) && !/Microphone live/.test(rec),
    "the recorder does not borrow the voice path's indicator: they must not look alike");
 
+
+// -- §2.6: scribe is a composer mode, not a place ---------------------------
+//
+// "Scribe does not get its own navigation item, its own dashboard, its own
+// persistent panel, its own product surface." Three of those four are
+// properties of files rather than of runtime, so they are checkable here.
+//
+// This matters because the microphone spent this project's whole life on a
+// form, and the instruction that moved it can be undone by one import.
+{
+  const composer = read("web/src/thread/Composer.tsx");  // prose here is fine: the assertions below look for code that must be present
+  // Anchored, not a substring: /composer__mic/ alone still matched after the
+  // class was renamed to composer__micro, so this assertion passed under an
+  // implementation with no microphone in it at all.
+  ok(/className="composer__mic"/.test(composer) && /onClick=\{onStartScribe\}/.test(composer),
+    "the microphone that starts a consultation lives in the composer, and starts it");
+  ok(/aria-label=\{micReason \|\| "Dictate"\}/.test(composer),
+    "and names itself, or names why it is unavailable, for a screen reader");
+
+  // The rail is built from declared views. An operation reaching it -- by
+  // instrument, by id, or by the word -- would be scribe acquiring the
+  // navigation item §2.6 forbids. Comments are stripped first: a file that
+  // explains the rule in prose is not a file breaking it, and the first
+  // spelling of this check failed on its own docstring.
+  const code = (src: string) =>
+    src.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
+  const rail = code(read("web/src/app/Sidebar.tsx"));
+  ok(!/scribe|mic|dictat/i.test(rail), "scribe has no navigation item");
+  ok(!/instrument|operations\b/.test(rail), "no operation reaches the rail at all");
+
+  // Started from the composer, the draft opens inline in the thread. A modal
+  // over the screen is the "persistent panel" §2.6 rules out, and it is also
+  // what put the recorder a full viewport away from its own microphone.
+  const enc = code(read("web/src/screens/Encounter.tsx"));
+  const dictation = enc.slice(enc.indexOf("{dictating && ("), enc.indexOf("<Composer"));
+  ok(dictation.includes("<OperationPanel"), "the draft surface is the same panel every operation uses");
+  ok(/\binline\b/.test(dictation), "drawn inline in the thread, not over it");
+  ok(enc.indexOf("{dictating && (") > enc.indexOf("<Stream"),
+    "and it sits between the thread and the composer that started it");
+}
+
 console.log(`ok   scribe: ${checks} checks`);

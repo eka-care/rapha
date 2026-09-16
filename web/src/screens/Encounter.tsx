@@ -33,6 +33,12 @@ export function Encounter({
   onChanged: () => void;
 }) {
   const [modal, setModal] = useState<{ op: Operation; seed?: Payload } | null>(null);
+  // §2.6: scribe gets no panel of its own. Started from the composer's
+  // microphone, its draft surface opens INSIDE the thread, directly above the
+  // composer it was started from -- the same OperationPanel every other
+  // operation uses, drawn inline. Nothing about the write path changes: the
+  // recorder still hands values to fields, and a person still taps commit.
+  const [dictating, setDictating] = useState<Operation | null>(null);
 
   const head = useMemo(() => header(thread, queueViewFor(cat, thread.workflow)), [thread, cat]);
   const msgs = useMemo(() => messages(thread, ctx, said), [thread, ctx, said]);
@@ -109,6 +115,21 @@ export function Encounter({
           onDone={onChanged}
         />
 
+        {dictating && (
+          <div className="dictation">
+            <OperationPanel
+              op={dictating}
+              thread={thread.id}
+              client={client}
+              instruments={cat.instruments}
+              flags={thread.flags}
+              inline
+              onDone={() => { setDictating(null); onChanged(); }}
+              onCancel={() => setDictating(null)}
+            />
+          </div>
+        )}
+
         {/* The agent's closing line sits above the composer, because it is
             about what to do next and the composer is where you do it. */}
         {line.sentences.length > 0 && (
@@ -125,7 +146,8 @@ export function Encounter({
           asking={asking}
           onSay={onSay}
           onAction={(op) => setModal({ op })}
-          onStartScribe={scribeOp ? () => setModal({ op: scribeOp }) : undefined}
+          onStartScribe={scribeOp ? () => setDictating(scribeOp) : undefined}
+          micReason={scribeOp ? undefined : "Dictation is not offered at this step"}
         />
       </div>
 
