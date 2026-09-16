@@ -139,6 +139,16 @@ def _lint_workflow(fm, ops, fail, voc):
     if fm["subject"] not in vocab.CARE_RESOURCES:
         fail(f"subject '{fm['subject']}' is not a CARE resource")
 
+    # `spine` names both a resource and the field on `subject` that points at
+    # it. Optional; a workflow without one has no continuing subject and the
+    # spine route answers 404 for it, which is the honest answer rather than
+    # a guess at which field means "the same person again".
+    if fm.get("spine") is not None:
+        if fm["spine"] not in vocab.CARE_RESOURCES:
+            fail(f"spine '{fm['spine']}' is not a CARE resource")
+        elif fm["spine"] == fm["subject"]:
+            fail(f"spine '{fm['spine']}' is the subject itself, so it joins nothing")
+
     states = fm["states"] or {}
     if set(states) != set(voc.states):
         missing = sorted(set(voc.states) - set(states))
@@ -314,10 +324,18 @@ def _lint_seed(threads, manifest, voc, ops):
             bad.append(f"{where}: two threads share this id")
         seen.add(t["id"])
         for key in set(t) - {"id", "token", "status", "patient", "rows",
-                             "flags", "proposals", "audit", "minutes_ago"}:
+                             "flags", "proposals", "audit", "minutes_ago",
+                             "same_patient_as"}:
             bad.append(f"{where}: unknown key '{key}'")
         if "minutes_ago" in t and not isinstance(t["minutes_ago"], (int, float)):
             bad.append(f"{where}: minutes_ago must be a number")
+        if "same_patient_as" in t:
+            if "patient" in t:
+                bad.append(f"{where}: has both 'patient' and 'same_patient_as'; "
+                           "a returning visit does not re-register the person")
+            elif t["same_patient_as"] not in seen:
+                bad.append(f"{where}: same_patient_as '{t['same_patient_as']}' "
+                           "is not an earlier thread in this file")
         for row in t.get("rows") or []:
             if not isinstance(row, dict) or "resource" not in row:
                 bad.append(f"{where}: a row needs a 'resource'")
@@ -447,7 +465,7 @@ def lint(manifest, decls, ops, seed=()):
 def _workflow(fm, stored):
     return c.Workflow(
         id=fm["id"], title=fm["title"], summary=fm["summary"].strip(),
-        subject=fm["subject"], states=fm["states"], stored=stored,
+        subject=fm["subject"], spine=fm.get("spine"), states=fm["states"], stored=stored,
         steps=[c.Step(station=s["station"], done_when=s["done_when"],
                       applies_when=s.get("applies_when"),
                       operations=list(s.get("operations") or []))

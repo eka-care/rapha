@@ -4,6 +4,7 @@ type: workflow
 title: Outpatient line
 summary: Reception, vitals, doctor, then lab and pharmacy when ordered.
 subject: encounter
+spine: patient
 steps:
   - station: reception
     done_when: registered

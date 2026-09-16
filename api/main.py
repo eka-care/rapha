@@ -40,7 +40,7 @@ from adapters.local.store import SqliteStore, seed
 from agent import turn
 from api import scribe
 from catalogue import validate, vocab
-from kernel import declarations, proposals, state, views
+from kernel import declarations, spine, proposals, state, views
 from kernel.contracts import ThreadRef
 
 BUNDLE = declarations.load(os.environ.get("PHC_BUNDLE", "phc"))
@@ -252,6 +252,30 @@ def catalogue():
 @router.get("/threads/{thread_id}")
 def get_thread(thread_id: str, request: Request):
     return panel(thread_id, caller(request))
+
+
+@router.get("/subjects/{subject_id}")
+def get_subject(subject_id: str, request: Request):
+    """The spine: one subject, and every visit it has had.
+
+    A thread is one encounter, which is the right unit for the guard and the
+    wrong one for a person. What joins encounters is declared by the workflow
+    (`spine:`), never assumed here, so a bundle that declares none gets a 404
+    rather than a screen built on a guess.
+
+    Read only, and scoped by the same capability that opens a thread: this
+    returns clinical state across visits, so it is not more public than one.
+    """
+    user = caller(request)
+    workflow = WORKFLOW
+    if not spine.declared(workflow):
+        raise HTTPException(404, "this bundle declares no spine")
+    if "patient.find" not in set(user["capabilities"]):
+        raise HTTPException(403, "missing capability patient.find")
+    found = spine.of(BUNDLE, store, workflow, subject_id)
+    if not found:
+        raise HTTPException(404, "unknown subject %r" % subject_id)
+    return found
 
 
 @router.post("/threads")

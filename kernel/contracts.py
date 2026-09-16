@@ -166,6 +166,12 @@ class Workflow:
     states: dict                    # flag -> StateRule, ordered
     stored: list                    # flags with {"stored": true}
     type: str = "workflow"
+    # The field on `subject` naming what continues across threads: a health
+    # centre's patient, a laboratory's own. Optional, because a bundle whose
+    # threads genuinely do not join up should say so by declaring nothing
+    # rather than by pointing at a field that means something else. See
+    # kernel/spine.py.
+    spine: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -522,6 +528,7 @@ ROUTES = {
     "confirm": "POST /api/v1/phc/proposals/{id}/confirm/",    # rendered only; body {payload, confirmed}
     "reject": "POST /api/v1/phc/proposals/{id}/reject/",
     "thread": "GET  /api/v1/phc/threads/{id}/",
+    "subject": "GET  /api/v1/phc/subjects/{id}/",   # the spine: one subject, every visit
     "view": "GET  /api/v1/phc/views/{id}/",
     "catalogue": "GET  /api/v1/phc/catalogue/",
 }

@@ -62,8 +62,13 @@ def test_the_star_condition_means_present_and_not_empty():
 
 def test_gte_compares_and_an_unknown_field_is_refused():
     store = fresh()
+    # Against the declared seed, not a number typed here: this test is about
+    # the gte clause matching everything, and a literal turns every seed
+    # change into a failure in a file that has nothing to do with seeds.
+    seeded = len(declarations.load("phc").seed)
+    assert seeded >= 2, "the seed is what makes this assertion meaningful"
     assert store.count("encounter", thread=None,
-                       where={"created_date": {"gte": "0000-01-01"}}) == 6
+                       where={"created_date": {"gte": "0000-01-01"}}) == seeded
     assert store.count("encounter", thread=None,
                        where={"created_date": {"gte": "9999-01-01"}}) == 0
     try:

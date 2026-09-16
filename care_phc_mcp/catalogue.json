@@ -1565,6 +1565,7 @@
   "workflows": {
     "phc.wf.outpatient": {
       "id": "phc.wf.outpatient",
+      "spine": "patient",
       "states": {
         "abha.linked": {
           "exists": {

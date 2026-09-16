@@ -21,7 +21,7 @@ import { human } from "../words";
 const QUICK = 6;   // §33
 
 export function Encounter({
-  thread, cat, ctx, client, said, asking, onSay, onChanged,
+  thread, cat, ctx, client, said, asking, onSay, onChanged, onOpenSubject,
 }: {
   thread: ThreadView;
   cat: Catalogue;
@@ -31,6 +31,7 @@ export function Encounter({
   asking: boolean;
   onSay: (text: string) => void;
   onChanged: () => void;
+  onOpenSubject: (subjectId: string) => void;
 }) {
   const [modal, setModal] = useState<{ op: Operation; seed?: Payload } | null>(null);
   // §2.6: scribe gets no panel of its own. Started from the composer's
@@ -64,12 +65,34 @@ export function Encounter({
 
   const roles = Object.keys(cat.bundles ?? {});
 
+  // The subject row is merged into thread.subject by the API, so its own `id`
+  // is the spine id. Read only when the workflow declares a spine: without
+  // that declaration this is just some resource's primary key and opening a
+  // screen on it would be a guess.
+  const spineId = cat.workflows?.[thread.workflow]?.spine
+    ? (typeof thread.subject?.id === "string" ? thread.subject.id : "")
+    : "";
+
   return (
     <div className="encounter">
       <div className="encounter__main">
         <header className="subject">
           <div className="subject__row">
-            <h1 className="t-page" style={{ margin: 0 }}>{head.name}</h1>
+            {/* §2.3: the name opens the person, not just this visit. Only
+                when the workflow declared a spine and the subject row is
+                actually there -- a thread with no subject row (a laboratory's
+                accession before it is matched) links nowhere, correctly. */}
+            {spineId ? (
+              <button
+                className="btn" data-variant="ghost"
+                style={{ padding: 0, minHeight: 0, font: "inherit" }}
+                onClick={() => onOpenSubject(spineId)}
+              >
+                <h1 className="t-page" style={{ margin: 0 }}>{head.name}</h1>
+              </button>
+            ) : (
+              <h1 className="t-page" style={{ margin: 0 }}>{head.name}</h1>
+            )}
             {head.identity && (
               <span className="status" data-tone="abdm">
                 {head.identity.label} {head.identity.value}

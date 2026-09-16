@@ -532,6 +532,11 @@ def seed(store, threads=None):
         threads = declared_seed()
     stamp = now()
     serial = [0]
+    # thread id -> the patient row it created, so a later thread can declare
+    # itself the same person returning. Without this every seeded thread makes
+    # its own patient row and the spine (kernel/spine.py) can only ever show
+    # one visit per person, which is the one shape that cannot demonstrate it.
+    patient_of = {}
 
     def row_id():
         serial[0] += 1
@@ -558,10 +563,23 @@ def seed(store, threads=None):
                                  "status": t.get("status") or "in_progress",
                                  "created_by": SEED_ACTOR, "created_date": opened},
                    thread=thread)
-        if t.get("patient"):
+        returning = t.get("same_patient_as")
+        if returning:
+            # The same person, back again. Point this encounter at the row the
+            # earlier thread created rather than writing a second person with
+            # the same name, which is what a duplicate registration looks like
+            # and is not what a returning patient is.
+            known = patient_of.get(returning)
+            if known is None:
+                raise ValueError(
+                    "seed thread %r: same_patient_as %r, which has no patient "
+                    "(is it declared later in the file?)" % (thread, returning))
+            store._put("encounter", {"id": thread, "patient": known}, thread=thread)
+            patient_of[thread] = known
+        elif t.get("patient"):
             # write(), not _put(): attaching the person to the thread is the
             # adapter's own join and it is already written down once.
-            store.write("patient", stamped(t["patient"]), thread=thread)
+            patient_of[thread] = store.write("patient", stamped(t["patient"]), thread=thread)
         for record in t.get("rows") or []:
             record = dict(record)
             store._put(record.pop("resource"), stamped(record), thread=thread)

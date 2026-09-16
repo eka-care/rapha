@@ -12,6 +12,7 @@ import { header, queueViewFor, type Ctx, type Said } from "../messages";
 import { Boundary, Failed, Loading } from "../parts";
 import { Encounter } from "../screens/Encounter";
 import { ListScreen } from "../screens/ListScreen";
+import { Patient } from "../screens/Patient";
 import { Roles } from "../screens/Settings";
 import { Today } from "../screens/Today";
 import type { QueueRow, ViewDecl, ViewResult } from "../types";
@@ -24,6 +25,7 @@ type Route =
   | { kind: "today" }
   | { kind: "view"; id: string }
   | { kind: "thread"; id: string }
+  | { kind: "patient"; id: string }
   | { kind: "settings" }
   | { kind: "notfound"; id: string };
 
@@ -31,6 +33,7 @@ function parse(hash: string): Route {
   const [head, id] = hash.replace(/^#\/?/, "").split("/");
   if (head === "threads" && id) return { kind: "thread", id };
   if (head === "views" && id) return { kind: "view", id };
+  if (head === "patients" && id) return { kind: "patient", id };
   if (head === "settings") return { kind: "settings" };
   if (!head || head === "today") return { kind: "today" };
   // A second segment under an unrecognised first one is a malformed route,
@@ -219,6 +222,7 @@ export function App() {
                 said={said[route.id] ?? []} asking={asking}
                 onSay={(t) => onSay(route.id, t)}
                 onChanged={reload}
+                onOpenSubject={(sid) => go(`#/patients/${sid}`)}
                 onRemember={remember}
               />
             ) : (
@@ -232,6 +236,9 @@ export function App() {
                 )}
                 {route.kind === "view" && (
                   <ViewScreen id={route.id} nonce={nonce} decl={catalogue.views?.[route.id]} />
+                )}
+                {route.kind === "patient" && (
+                  <Patient id={route.id} onOpenThread={(t) => go(`#/threads/${t}`)} />
                 )}
                 {route.kind === "settings" && (
                   <Roles client={api} cat={catalogue} roleIds={facility.data?.roles ?? []} onClose={() => go("#/")} />
@@ -280,6 +287,7 @@ function titleFor(route: Route, views: ViewDecl[]): string {
   if (route.kind === "settings") return "Settings";
   if (route.kind === "view") return views.find((v) => v.id === route.id)?.title ?? "List";
   if (route.kind === "thread") return "Encounter";
+  if (route.kind === "patient") return "Patient";
   return "Not found";
 }
 
@@ -290,10 +298,11 @@ function ViewScreen({ id, decl, nonce }: { id: string; decl?: ViewDecl; nonce: n
   return <ListScreen result={data!} decl={decl} onOpenThread={(t) => go(`#/threads/${t}`)} />;
 }
 
-function ThreadScreen({ id, cat, ctx, said, asking, nonce, onSay, onChanged, onRemember }: {
+function ThreadScreen({ id, cat, ctx, said, asking, nonce, onSay, onChanged, onRemember, onOpenSubject }: {
   id: string; cat: ReturnType<typeof Object>; ctx: Ctx; said: Said[];
   asking: boolean; nonce: number;
   onSay: (t: string) => void; onChanged: () => void; onRemember: (r: Recent) => void;
+  onOpenSubject: (subjectId: string) => void;
 }) {
   const { data, error, loading, reload } = useAsync(() => api.thread(id), [id, nonce]);
   // header() already answers "what is this thread called", using the queue
@@ -315,6 +324,7 @@ function ThreadScreen({ id, cat, ctx, said, asking, nonce, onSay, onChanged, onR
       asking={asking}
       onSay={onSay}
       onChanged={() => { reload(); onChanged(); }}
+      onOpenSubject={onOpenSubject}
     />
   );
 }

@@ -5,7 +5,7 @@
  *  ApiError is never blank and never says "something went wrong".
  */
 import { useCallback, useEffect, useState } from "react";
-import type { Catalogue, Facility, ThreadView, ViewResult } from "./types";
+import type { Catalogue, Facility, SubjectView, ThreadView, ViewResult } from "./types";
 
 export const API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
@@ -107,6 +107,9 @@ export const api = {
   view: (id: string, thread?: string) =>
     req<ViewResult>(`/views/${id}/${thread ? `?thread=${encodeURIComponent(thread)}` : ""}`),
   thread: (id: string) => req<ThreadView>(`/threads/${id}/`),
+  /** The spine: one subject and every visit it has had. 404 when the bundle
+   *  declares no spine, which is a real answer and not an error to hide. */
+  subject: (id: string) => req<SubjectView>(`/subjects/${id}/`),
   /** The rendered surface's write. `confirmed` is only ever true because a
    *  person ticked an empty box on this screen. */
   commit: (op: string, body: { thread: string; payload: unknown; confirmed: boolean }) =>

@@ -205,3 +205,33 @@ threads:
             - {medication: Paracetamol 500mg, quantity: "1"}
             - {medication: ORS sachet, quantity: "1"}
           partial: false
+
+  # Ramesh Kumar, three months ago. The same person as enc-003, not a second
+  # registration: `same_patient_as` points this encounter at the patient row
+  # that thread already created.
+  #
+  # It exists because a spine with one visit per person proves nothing. Every
+  # other seeded thread makes its own patient, so without this the patient
+  # screen (§7, kernel/spine.py) would draw a single visit for everybody and
+  # a join that had stopped joining would look exactly the same.
+  - id: enc-000
+    token: A44
+    status: completed
+    same_patient_as: enc-003
+    minutes_ago: 129600          # ninety days, so the timeline has a gap in it
+    rows:
+      - {resource: observation, category: vital-signs, code: systolic, value: 148, unit: "mm[Hg]"}
+      - {resource: observation, category: vital-signs, code: diastolic, value: 94, unit: "mm[Hg]"}
+      - {resource: notes, text: "Raised pressure on two readings. Advised salt reduction, review in three months."}
+    flags: [vitals.flagged]
+    audit:
+      - operation: phc.op.vitals-record
+        actor: "user:nurse"
+        payload: {systolic: 148, diastolic: 94, pulse: 88}
+      - operation: phc.op.consult-document
+        actor: "user:mo"
+        payload:
+          history: Headache on waking for two weeks.
+          examination: No focal neurological deficit.
+          assessment: Raised blood pressure, first presentation.
+          plan: Salt reduction advised. Review in three months.

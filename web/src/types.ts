@@ -51,6 +51,10 @@ export type Payload = Record<string, unknown>;
  *  first thing a bundle does to a brand new thread. */
 export type Workflow = {
   id: string; title: string; summary?: string; subject?: string;
+  /** The field on `subject` naming what continues across threads. Absent when
+   *  the bundle declares none, and then there is no patient screen to link
+   *  to -- which is the correct answer, not a missing feature. */
+  spine?: string | null;
   steps: { station: string; done_when: string; applies_when: string | null; operations: string[] }[];
 };
 
@@ -193,4 +197,19 @@ export type ViewResult = {
   /** Not on contracts.ViewResult. Nav needs a human title; if the API omits it
    *  we fall back to the view id. */
   title?: string;
+};
+
+/** GET /subjects/{id}: the spine. One subject, every thread that shares it,
+ *  newest first. `spine` names the field the workflow declared as the join,
+ *  so a screen can say what it is grouping by without assuming "patient". */
+export type SubjectView = {
+  subject: Record<string, unknown>;
+  spine: string;
+  encounters: {
+    thread: string; opened_at: string; status: string; token: string;
+    flags: string[]; station: string | null;
+    /** What this visit actually committed, titled by the operation's own
+     *  declaration, deduplicated, refusals excluded. §26's timeline entry. */
+    did: { operation: string; title: string }[];
+  }[];
 };

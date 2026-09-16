@@ -20,6 +20,9 @@ python3 -m care_phc.tests.test_thread
 python3 -m kernel.tests.test_contracts
 python3 -m kernel.tests.test_kernel
 python3 -m kernel.tests.test_mapping
+# The spine: one subject, every visit, joined by what the workflow declares
+# rather than by a resource name written into the kernel.
+python3 -m kernel.tests.test_spine
 python3 -m bundles.lab.check      # a second bundle on the same kernel; SKIP_E2E=1 skips its socket half
 python3 -m bundles.phc.check      # capture consent: raised, declined, scoped to the visit, withdrawable
 
