@@ -118,8 +118,8 @@
   border-top: 1px solid var(--color-border-subtle);
 }
 
-/* ---- palette (§35) ---------------------------------------------------- */
-.palette {
+/* ---- khoj, the command bar (§35) ---------------------------------------------------- */
+.khoj {
   position: fixed; z-index: 31; top: 12vh; left: 50%; transform: translateX(-50%);
   width: min(620px, calc(100vw - var(--space-8)));
   max-height: 70vh; display: flex; flex-direction: column;
@@ -129,23 +129,23 @@
   border: 1px solid var(--color-border-subtle);
   overflow: hidden;
 }
-.palette__input {
+.khoj__input {
   width: 100%; border: 0; outline: 0; background: transparent;
   padding: var(--space-4) var(--space-5); font-size: 16px;
   border-bottom: 1px solid var(--color-border-subtle);
   color: var(--color-text-primary);
 }
-.palette__input::placeholder { color: var(--color-text-tertiary); }
-.palette__list { overflow-y: auto; padding: var(--space-2); }
-.palette__item {
+.khoj__input::placeholder { color: var(--color-text-tertiary); }
+.khoj__list { overflow-y: auto; padding: var(--space-2); }
+.khoj__item {
   display: flex; align-items: center; gap: var(--space-3);
   width: 100%; padding: 10px var(--space-3);
   border: 0; border-radius: var(--radius-md); background: transparent;
   text-align: left; cursor: pointer; color: inherit;
 }
-.palette__item[data-active="true"] { background: var(--color-bg-hover); }
-.palette__item-sub { margin-left: auto; font-size: 12px; color: var(--color-text-tertiary); }
-.palette__empty { padding: var(--space-6) var(--space-5); display: grid; gap: var(--space-3); justify-items: start; }
+.khoj__item[data-active="true"] { background: var(--color-bg-hover); }
+.khoj__item-sub { margin-left: auto; font-size: 12px; color: var(--color-text-tertiary); }
+.khoj__empty { padding: var(--space-6) var(--space-5); display: grid; gap: var(--space-3); justify-items: start; }
 
 /* ---- keyboard hint ---------------------------------------------------- */
 .kbd {

@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createLabel, isAsk, rows as searchRows, type Row } from "../search";
 import type { Catalogue, ViewDecl, ViewResult } from "../types";
 
-export function Palette({ queues, nav, cat, workflow, onClose, onOpenThread, onGoView, onAsk, onCreate }: {
+export function Khoj({ queues, nav, cat, workflow, onClose, onOpenThread, onGoView, onAsk, onCreate }: {
   queues: { decl: ViewDecl; result: ViewResult }[];
   nav: ViewDecl[];
   cat: Catalogue;
@@ -47,10 +47,10 @@ export function Palette({ queues, nav, cat, workflow, onClose, onOpenThread, onG
   return (
     <>
       <div className="scrim" onClick={onClose} />
-      <div className="palette" role="dialog" aria-modal="true" aria-label="Search">
+      <div className="khoj" role="dialog" aria-modal="true" aria-label="Search">
         <input
           ref={box}
-          className="palette__input"
+          className="khoj__input"
           value={q}
           placeholder="Search patients, lists, or ask a question"
           aria-label="Search patients, lists, or ask a question"
@@ -63,7 +63,7 @@ export function Palette({ queues, nav, cat, workflow, onClose, onOpenThread, onG
             if (e.key === "Enter") { e.preventDefault(); choose(rows[pick]); }
           }}
         />
-        <div className="palette__list" role="listbox">
+        <div className="khoj__list" role="listbox">
           {groups.map((g) => (
             <div key={g.name}>
               <div className="composer-menu__section">{g.name}</div>
@@ -73,11 +73,11 @@ export function Palette({ queues, nav, cat, workflow, onClose, onOpenThread, onG
                   role="option"
                   aria-selected={i === pick}
                   data-active={i === pick}
-                  className="palette__item"
+                  className="khoj__item"
                   onMouseDown={(e) => { e.preventDefault(); choose(r); }}
                 >
                   <span>{r.name}</span>
-                  {r.meta && <span className="palette__item-sub">{r.meta}</span>}
+                  {r.meta && <span className="khoj__item-sub">{r.meta}</span>}
                 </button>
               ))}
             </div>
@@ -85,7 +85,7 @@ export function Palette({ queues, nav, cat, workflow, onClose, onOpenThread, onG
 
           {/* §2.9: a search miss must not silently become a creation. */}
           {!rows.length && (
-            <div className="palette__empty">
+            <div className="khoj__empty">
               <div className="t-strong">
                 {q.trim() ? "No matching patient." : "Type a name, phone number or token."}
               </div>

@@ -16,7 +16,7 @@ import { Roles } from "../screens/Settings";
 import { Today } from "../screens/Today";
 import type { QueueRow, ViewDecl, ViewResult } from "../types";
 import { IconSheet } from "../icons";
-import { Palette } from "./Palette";
+import { Khoj } from "./Khoj";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 
@@ -73,7 +73,7 @@ export function App() {
   }, []);
 
   const [theme, flipTheme] = useTheme();
-  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [khojOpen, setKhojOpen] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [said, setSaid] = useState<Record<string, Said[]>>(() => read(SAID_KEY, {}));
   const [recents, setRecents] = useState<Recent[]>(() => read(RECENT_KEY, []));
@@ -88,7 +88,7 @@ export function App() {
     const on = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setPaletteOpen(true);
+        setKhojOpen(true);
       }
     };
     addEventListener("keydown", on);
@@ -98,7 +98,7 @@ export function App() {
   const navViews = useMemo<ViewDecl[]>(() => facility.data?.views ?? [], [facility.data]);
 
   // Every declared view, loaded once, because the sidebar's counts, Today and
-  // the palette all read the same rows and loading them three times would
+  // the command bar all read the same rows and loading them three times would
   // show three different numbers.
   const [loaded, setLoaded] = useState<{ decl: ViewDecl; result: ViewResult }[]>([]);
   const [loadError, setLoadError] = useState<ApiError | null>(null);
@@ -198,7 +198,7 @@ export function App() {
         counts={counts}
         open={drawer}
         onGo={go}
-        onNew={() => setPaletteOpen(true)}
+        onNew={() => setKhojOpen(true)}
         onSettings={() => go("#/settings")}
         onCloseDrawer={() => setDrawer(false)}
       />
@@ -207,7 +207,7 @@ export function App() {
           title={title}
           sub={facility.data?.bundle.title}
           theme={theme}
-          onSearch={() => setPaletteOpen(true)}
+          onSearch={() => setKhojOpen(true)}
           onTheme={flipTheme}
           onMenu={() => setDrawer((d) => !d)}
         />
@@ -251,13 +251,13 @@ export function App() {
         </div>
       </div>
 
-      {paletteOpen && (
-        <Palette
+      {khojOpen && (
+        <Khoj
           queues={loaded.filter((l) => l.decl.kind === "queue")}
           nav={navViews}
           cat={catalogue}
           workflow={facility.data?.bundle.workflow}
-          onClose={() => setPaletteOpen(false)}
+          onClose={() => setKhojOpen(false)}
           onOpenThread={(t) => go(`#/threads/${t}`)}
           onGoView={(v) => go(v ? `#/views/${v}` : "#/")}
           onAsk={(q) => {
