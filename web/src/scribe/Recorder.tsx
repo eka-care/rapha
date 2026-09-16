@@ -22,7 +22,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ApiError } from "../api";
 import type { Payload, Questionnaire } from "../types";
-import { human } from "../ui";
+import { human } from "../words";
 import type { Mount } from "../voice/instruments";
 import { dropSession, pollSession, startSession } from "./client";
 import {

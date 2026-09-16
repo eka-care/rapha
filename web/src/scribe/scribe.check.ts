@@ -114,7 +114,7 @@ for (const f of sources) {
   ok(!hit, `${f} contains no commit: ${hit ?? ""}`);
 }
 
-const panel = read("web/src/OperationPanel.tsx");
+const panel = read("web/src/form/Panel.tsx");
 for (const call of ["client.commit(", "client.confirm("])
   ok(panel.split(call).length === 2, `${call} still appears exactly once in the panel`);
 ok(panel.includes("<Recorder"), "the panel draws the recorder");

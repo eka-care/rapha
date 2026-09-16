@@ -303,8 +303,10 @@ assert.equal(fmt("plain"), "plain");
 
 // The thread screen composes from these four modules. If a commit or a confirm
 // ever appears in one of them, the conversation has become a machine surface.
-for (const file of ["src/messages.ts", "src/search.ts", "src/ask.ts", "src/Thread.tsx",
-                    "src/structured.ts"]) {
+for (const file of ["src/messages.ts", "src/search.ts", "src/ask.ts",
+                    "src/thread/Thread.tsx", "src/thread/Message.tsx",
+                    "src/thread/ThreadObject.tsx", "src/thread/Composer.tsx",
+                    "src/thread/Menu.tsx", "src/structured.ts"]) {
   const body = read(`web/${file}`)
     .split("\n")
     .filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l))          // prose about commits is fine
@@ -343,25 +345,33 @@ for (const sentence of agentSentences) {
     `FAIL a refusal that offers nothing is a dead end: ${sentence}`);
 }
 
-// -- a posted card on your own station names who did it, not "System" -------
-// Thread.tsx is a .tsx file: this check runs under node's type stripping,
-// which does not compile JSX, so it reads the source as text rather than
-// importing it (the same technique the "no write from here" block above
-// already uses). "System" is still the right word for a refusal, where
-// nobody performed the refused thing; a posted card for a committed record
-// has to name who committed it, the same actor the folded summary shows for
-// another station's work.
-const threadSrc = read("web/src/Thread.tsx");
-assert.equal(
-  (threadSrc.match(/System · \{clock\(m\.at\)\}/g) ?? []).length, 1,
-  'exactly one "System" placeholder should remain (the refusal bubble); a posted card must not say it',
-);
-assert.ok(
-  /\{m\.actor\} · \{clock\(m\.at\)\}/.test(threadSrc),
-  "a posted card's meta line reads the audit record's own actor",
-);
+// -- a posted card names who did it, and "System" is nobody -----------------
+// The thread files are .tsx: this check runs under node's type stripping,
+// which does not compile JSX, so it reads them as text rather than importing
+// them (the same technique the block above already uses).
+//
+// The old spelling of this check allowed exactly one literal "System" in the
+// renderer, for the refusal bubble. That allowance is gone: attribution is
+// decided once, by actorOf(), which answers "unattributed" for a null actor
+// and "agent" for a machine. A renderer that types the word at all is a
+// renderer deciding attribution for itself, and it would go on saying it
+// after actorOf changed its mind.
+for (const file of ["src/thread/Thread.tsx", "src/thread/Message.tsx"]) {
+  const src = read(`web/${file}`)
+    .split("\n")
+    .filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l))
+    .join("\n");
+  assert.ok(!/["'`>\s]System\b/.test(src),
+    `${file} must not name an actor itself; actorOf() decides attribution`);
+}
+const threadSrc = read("web/src/thread/Thread.tsx");
+assert.ok(/\{m\.actor\}/.test(threadSrc),
+  "a posted card's footer reads the audit record's own actor");
+assert.equal(actorOf(null), "unattributed",
+  "a record with no actor is unattributed, not System");
+assert.equal(actorOf("agent:mo"), "agent", "a machine's card says a machine asked");
 
 console.log("ok   thread messages, agent line, summary views, header and palette rows");
 console.log("ok   a structured answer's fields come from the operation's own mapping");
 console.log("ok   the agent narrates nothing already on screen");
-console.log("ok   a posted card names who did it, not System");
+console.log("ok   a posted card names who did it; the renderer never decides attribution");

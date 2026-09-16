@@ -1,0 +1,74 @@
+/* §51 CSS foundation, plus §44's type scale as named classes.
+ * No colour literal may appear in this file; see tokens.css. */
+
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; }
+#root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button, input, textarea, select { font: inherit; }
+button { color: inherit; }
+
+/* §68: focus must be visible. The ring is --color-agent, which clears 3:1 on
+ * every ground (SC 1.4.11); style.check.ts asserts it. */
+:focus-visible {
+  outline: 2px solid var(--color-agent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* §70 icons: 16px default, 20px emphasis, 1.5px stroke, rounded joins, one
+ * family. The sheet in icons.tsx draws paths with no presentation attributes,
+ * so every one of those properties is set here -- an unsized <svg> falls back
+ * to the SVG default of 300x150 and paints a shape the width of a column,
+ * which is what an un-styled icon actually looks like. */
+.i {
+  width: 16px; height: 16px; flex: 0 0 auto; display: block;
+  fill: none; stroke: currentColor; stroke-width: 1.5;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.i.lg { width: 20px; height: 20px; }
+/* The brand mark is the one glyph drawn from filled paths. */
+.i use { pointer-events: none; }
+
+/* §44 type scale. Eight steps, and nothing outside them. */
+.t-display { font-size: 28px; line-height: 34px; font-weight: 600; letter-spacing: -.02em; }
+.t-page    { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -.01em; }
+.t-section { font-size: 17px; line-height: 24px; font-weight: 600; }
+.t-body    { font-size: 14px; line-height: 21px; font-weight: 400; }
+.t-strong  { font-size: 14px; line-height: 21px; font-weight: 550; }
+.t-label   { font-size: 13px; line-height: 18px; font-weight: 500; }
+.t-meta    { font-size: 12px; line-height: 17px; font-weight: 400; }
+.t-micro   { font-size: 11px; line-height: 15px; font-weight: 500; }
+
+/* §39: numeric fields use tabular numerals, so a column of results lines up
+ * and a changing value does not make the row twitch. */
+.t-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+.u-mute { color: var(--color-text-secondary); }
+.u-faint { color: var(--color-text-tertiary); }
+.u-right { text-align: right; }
+.u-sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* §69: motion communicates state, and is never the only thing that does. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

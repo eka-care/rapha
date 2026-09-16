@@ -1,0 +1,100 @@
+/* §58 composer, §59 recording, §60 the @ and / menus. */
+
+.composer {
+  position: relative; flex: 0 0 auto; z-index: 20;
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  background: var(--color-bg-canvas);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.composer__context {
+  max-width: 900px; margin: 0 auto var(--space-2);
+  display: flex; align-items: center; gap: var(--space-2);
+  color: var(--color-text-tertiary); font-size: 12px;
+}
+
+.composer__inner {
+  display: flex; align-items: flex-end; gap: var(--space-2);
+  max-width: 900px; min-height: 48px; margin: 0 auto;
+  padding: 5px 6px 5px var(--space-3);
+  border: 1px solid var(--color-border-control);
+  border-radius: 14px;
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-sm);
+}
+.composer__inner:focus-within { border-color: var(--color-agent); }
+
+.composer__input {
+  flex: 1; min-width: 0; padding: var(--space-2) var(--space-1);
+  border: 0; outline: 0; background: transparent;
+  color: var(--color-text-primary);
+  resize: none; max-height: 200px; line-height: 21px;
+  font-family: inherit; font-size: 14px;
+}
+.composer__input::placeholder { color: var(--color-text-tertiary); }
+
+.composer__mic, .composer__send {
+  width: 34px; height: 34px; flex: 0 0 auto; position: relative;
+  display: grid; place-items: center;
+  border: 0; border-radius: var(--radius-md);
+  background: transparent; color: var(--color-text-secondary); cursor: pointer;
+}
+/* §68: 44px target without a 44px box. */
+.composer__mic::after, .composer__send::after { content: ""; position: absolute; inset: -5px; }
+.composer__mic:hover, .composer__send:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+.composer__send[data-ready="true"] { background: var(--color-accent); color: var(--color-bg-surface); }
+.composer__mic:disabled, .composer__send:disabled { color: var(--color-text-disabled); cursor: not-allowed; }
+.composer__mic:disabled:hover, .composer__send:disabled:hover { background: transparent; }
+
+/* §59 recording. The dot pulses, but the words "Listening" and the timer are
+ * what actually say so; §95 forbids colour as the only signal. */
+.composer[data-state="recording"] .composer__inner { border-color: var(--color-critical); }
+.composer__recording {
+  display: flex; align-items: center; gap: var(--space-2);
+  color: var(--color-critical); font-size: 12px; font-weight: 600;
+}
+.composer__recording-time { font-variant-numeric: tabular-nums; }
+.recording-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: currentColor;
+  animation: pulse-recording 1.2s ease-in-out infinite;
+}
+@keyframes pulse-recording { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .recording-dot { animation: none; } }
+
+.composer__expanded {
+  max-width: 900px; margin: 0 auto var(--space-2);
+  display: grid; gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+.composer__expanded-row { display: flex; align-items: center; gap: var(--space-3); }
+
+/* §60 the @ and / menus */
+.composer-menu {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: calc(100% - var(--space-2));
+  width: min(420px, calc(100vw - var(--space-10)));
+  max-height: 360px; overflow-y: auto; z-index: 25;
+  padding: 6px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-lg);
+}
+.composer-menu__section {
+  padding: var(--space-2) 10px 5px;
+  color: var(--color-text-tertiary);
+  font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+}
+.composer-menu__item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 9px 10px;
+  border: 0; border-radius: var(--radius-md);
+  background: transparent; color: inherit; text-align: left; cursor: pointer;
+}
+.composer-menu__item:hover,
+.composer-menu__item[data-active="true"] { background: var(--color-bg-hover); }
+.composer-menu__item-sub { margin-left: auto; font-size: 12px; color: var(--color-text-tertiary); }
+.composer-menu__empty { padding: var(--space-4) 10px; color: var(--color-text-tertiary); font-size: 13px; }

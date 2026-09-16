@@ -1,37 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    {
-      "name": "web-phc",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "--prefix",
-        "web",
-        "run",
-        "dev",
-        "--",
-        "--port",
-        "5173",
-        "--strictPort"
-      ],
-      "port": 5173,
-      "autoPort": false
-    },
-    {
-      "name": "web-lab",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "--prefix",
-        "web",
-        "run",
-        "dev:lab",
-        "--",
-        "--port",
-        "5174",
-        "--strictPort"
-      ],
-      "port": 5174,
-      "autoPort": false
-    }
+    { "name": "web", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--prefix", "web"], "port": 5173 }
   ]
 }

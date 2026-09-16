@@ -1,0 +1,144 @@
+/* §55 thread and message, §56 thread object, §57 handover.
+ * §9.1: open message blocks, not chat bubbles. Nothing here draws a bubble. */
+
+.encounter { display: flex; min-height: 0; flex: 1; }
+.encounter__main { display: flex; flex-direction: column; min-width: 0; flex: 1; min-height: 0; }
+
+/* §8: the context panel collapses below 1100px. */
+.context {
+  width: 320px; flex: 0 0 auto; min-height: 0; overflow-y: auto;
+  border-left: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+  padding: var(--space-5);
+}
+.context__section { border-bottom: 1px solid var(--color-border-subtle); padding: var(--space-3) 0; }
+.context__section:last-child { border-bottom: 0; }
+.context__head {
+  display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; border: 0; background: transparent; padding: 0; cursor: pointer;
+  color: var(--color-text-tertiary);
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+}
+.context__body { padding-top: var(--space-3); display: grid; gap: var(--space-2); }
+@media (max-width: 1100px) { .context { display: none; } }
+
+/* ---- the encounter header (§7.1) -------------------------------------- */
+.subject {
+  flex: 0 0 auto; padding: var(--space-5) var(--space-8) var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+}
+.subject__row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.subject__meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  color: var(--color-text-secondary); }
+.subject__tags { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
+
+/* ---- the line (a thread's declared steps) ----------------------------- */
+.line { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
+.line__step {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 500; color: var(--color-text-tertiary);
+}
+.line__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-border-strong); }
+.line__step[data-status="done"] .line__dot { background: var(--color-success); }
+.line__step[data-status="now"] { color: var(--color-text-primary); font-weight: 600; }
+.line__step[data-status="now"] .line__dot { background: var(--color-accent); }
+.line__step[data-status="skipped"] { text-decoration: line-through; }
+
+/* ---- the stream (§55) ------------------------------------------------- */
+.thread {
+  display: flex; flex-direction: column; gap: var(--space-5);
+  min-height: 0; flex: 1; overflow-y: auto;
+  padding: var(--space-6) var(--space-6);
+}
+/* A flex item shrinks by default, and .thread-object clips what overflows it.
+   Together those two defaults squeezed every card down to share the column's
+   height and hid the bottom of each one: a seven value registration drew two
+   rows and a refusal drew none of its reason. Cards are their own height and
+   the column scrolls. */
+.thread > * { flex: 0 0 auto; }
+
+.message { display: flex; gap: var(--space-3); max-width: 760px; }
+.message__content { min-width: 0; flex: 1; }
+.message__meta {
+  display: flex; align-items: center; gap: 7px; margin-bottom: 5px;
+  color: var(--color-text-tertiary); font-size: 12px;
+}
+.message__body { color: var(--color-text-secondary); font-size: 14px; line-height: 1.65; }
+.message__body strong { color: var(--color-text-primary); }
+
+.avatar {
+  width: 28px; height: 28px; flex: 0 0 auto; margin-top: 2px;
+  display: grid; place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-subtle); color: var(--color-text-secondary);
+  font-size: 11px; font-weight: 600;
+}
+.avatar[data-who="agent"] { background: var(--color-agent-soft); color: var(--color-agent); }
+
+/* §13: a mention is a person or a role, and it should look like one. */
+.mention {
+  font-weight: 600; color: var(--color-agent);
+  background: var(--color-agent-soft);
+  border-radius: var(--radius-sm); padding: 0 3px;
+}
+
+/* ---- thread object (§56) ---------------------------------------------- */
+.thread-object {
+  width: min(100%, 760px);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  overflow: hidden;
+}
+.thread-object__header {
+  display: flex; align-items: center; gap: var(--space-2);
+  min-height: 40px; padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-tertiary);
+  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+}
+.thread-object__header-end { margin-left: auto; text-transform: none; letter-spacing: 0; }
+.thread-object__body { padding: 14px var(--space-4); }
+.thread-object__footer {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 9px var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-tertiary); font-size: 12px;
+}
+
+/* A committed operation's values, label left and value right (§44 rule 4). */
+.kv { display: grid; gap: var(--space-2); }
+.kv__row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
+.kv__label { color: var(--color-text-secondary); font-size: 13px; }
+.kv__value { font-weight: 550; font-variant-numeric: tabular-nums; text-align: right; }
+/* §40: a critical value is named as critical, not merely coloured. */
+.kv__row[data-critical="true"] .kv__value { color: var(--color-critical); }
+
+/* ---- handover (§57) --------------------------------------------------- */
+/* DEVIATION FROM SPEC, DELIBERATE. §57 sets border-color: var(--color-agent).
+ * §50 reserves the agent colour for AI activity, so an agent-bordered card
+ * says "a model wrote this" about a note a nurse wrote. The route line below
+ * carries the identity instead, and the border stays neutral. */
+.handover { border-color: var(--color-border-strong); }
+.handover__route {
+  display: flex; align-items: center; gap: var(--space-2);
+  color: var(--color-text-primary); font-weight: 600;
+}
+.handover__message { margin-top: 10px; color: var(--color-text-secondary); }
+.handover__state {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--color-text-tertiary); font-size: 12px;
+}
+
+/* ---- transcript (§19): evidence, at low visual weight --------------- */
+.transcript {
+  display: grid; gap: var(--space-2);
+  padding: var(--space-3); border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary); font-size: 13px; line-height: 1.6;
+}
+.transcript__who { font-size: 11px; font-weight: 600; color: var(--color-text-tertiary); }
+
+/* ---- quick actions (§34) ---------------------------------------------- */
+.quick { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }

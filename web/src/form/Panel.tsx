@@ -19,19 +19,20 @@
  *  single client call below are the same ones the modal uses.
  */
 import { useId, useMemo, useState } from "react";
-import { ABHA_OP, ABHA_PENDING, demographicsFrom, payloadFor, type AbhaOutcome } from "./abha/sdk";
-import { Journey } from "./abha/Journey";
-import { ApiError, type Client } from "./api";
+import { ABHA_OP, ABHA_PENDING, demographicsFrom, payloadFor, type AbhaOutcome } from "../abha/sdk";
+import { Journey } from "../abha/Journey";
+import { ApiError, type Client } from "../api";
 import { Form, labelled, validate } from "./Form";
-import { walk } from "./validate";
-import { questionnaire } from "./declarations";
-import { CONSENT, fmt } from "./messages";
-import type { Operation, Payload, Proposal } from "./types";
-import { Failed, human } from "./ui";
-import { Recorder } from "./scribe/Recorder";
-import { mountsFor } from "./voice/instruments";
-import { VoiceCapture } from "./voice/VoiceCapture";
-import { SpokenPrompt } from "./voice/SpokenPrompt";
+import { walk } from "../validate";
+import { questionnaire } from "../declarations";
+import { CONSENT, fmt } from "../messages";
+import type { Operation, Payload, Proposal } from "../types";
+import { Failed } from "../parts";
+import { human } from "../words";
+import { Recorder } from "../scribe/Recorder";
+import { mountsFor } from "../voice/instruments";
+import { VoiceCapture } from "../voice/VoiceCapture";
+import { SpokenPrompt } from "../voice/SpokenPrompt";
 
 const IRREVERSIBLE = "irreversible";
 

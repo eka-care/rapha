@@ -4,7 +4,7 @@
  *  precondition is unmet or whose capability is not held is absent, never
  *  disabled. So everything here is a question of weight, not permission.
  */
-import type { Recent } from "./Shell.tsx";
+
 import type { Operation, QueueRow, SectionResult, ViewDecl } from "./types";
 
 /** One filled button, everything else one level down.
@@ -107,6 +107,11 @@ export function records(sections: SectionResult[]): { title: string; count: numb
     .filter((s) => s.resource && s.rows.length > 0)
     .map((s) => ({ title: s.title, count: s.rows.length }));
 }
+
+/** A thread somebody opened recently. Lives here rather than in a component
+ *  because keep() is pure and runs under plain node: a .check.ts may not
+ *  import a .tsx, and this type used to be declared in one. */
+export type Recent = { id: string; name: string };
 
 /** Recents the kernel still serves. A reseed changes every thread id, and the
  *  list survives it in localStorage, so the sidebar filled with dead tokens

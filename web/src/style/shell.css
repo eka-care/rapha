@@ -1,0 +1,91 @@
+/* §52 app shell, §53 sidebar. */
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  height: 100%;
+  overflow: hidden;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--color-bg-subtle);
+  border-right: 1px solid var(--color-border-subtle);
+  overflow: hidden;
+}
+
+.sidebar-head {
+  display: flex; align-items: center; gap: var(--space-2);
+  height: 56px; padding: 0 var(--space-4); flex: 0 0 auto;
+}
+.sidebar-brand { font-size: 13px; font-weight: 600; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sidebar-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+
+.sidebar-nav { display: flex; flex-direction: column; gap: 2px; padding: var(--space-2); }
+
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; min-height: 36px; padding: var(--space-2) 10px;
+  border: 0; border-radius: var(--radius-md);
+  background: transparent; color: var(--color-text-secondary);
+  font-size: 13px; font-weight: 500; text-align: left; cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.nav-item:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+.nav-item[data-active="true"] {
+  background: var(--color-bg-selected); color: var(--color-text-primary); font-weight: 600;
+}
+.nav-item__count {
+  margin-left: auto; font-size: 11px; font-weight: 600;
+  font-variant-numeric: tabular-nums; color: var(--color-text-tertiary);
+}
+.nav-item__icon { flex: 0 0 auto; display: grid; place-items: center; }
+
+.sidebar-group {
+  padding: var(--space-4) 18px var(--space-1);
+  font-size: 10px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--color-text-tertiary);
+}
+
+.sidebar-foot { flex: 0 0 auto; border-top: 1px solid var(--color-border-subtle); padding: var(--space-2); }
+
+.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+.topbar {
+  height: 56px; flex: 0 0 auto;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 0 var(--space-5);
+  background: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.topbar__title { min-width: 0; overflow: hidden; }
+.topbar__spacer { margin-left: auto; }
+
+.workspace { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.workspace-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-8); }
+
+/* §66. Below 1000px the rail becomes a 64px icon strip; below 768px it is a
+ * drawer and the workspace is the whole screen. */
+@media (max-width: 1000px) {
+  .app-shell { grid-template-columns: 64px minmax(0, 1fr); }
+  .sidebar-brand, .nav-item span:not(.nav-item__count), .sidebar-group { display: none; }
+  .nav-item { justify-content: center; padding: var(--space-2); }
+  .workspace-scroll { padding: var(--space-5) var(--space-5); }
+}
+@media (max-width: 768px) {
+  .app-shell { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { display: none; }
+  .sidebar[data-open="true"] {
+    display: flex; position: fixed; inset: 0 auto 0 0; width: 248px; z-index: 40;
+    box-shadow: var(--shadow-lg);
+  }
+  .sidebar[data-open="true"] .sidebar-brand,
+  .sidebar[data-open="true"] .nav-item span,
+  .sidebar[data-open="true"] .sidebar-group { display: initial; }
+  .sidebar[data-open="true"] .nav-item { justify-content: flex-start; padding: var(--space-2) 10px; }
+  .workspace-scroll { padding: var(--space-4); }
+}

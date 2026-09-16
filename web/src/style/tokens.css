@@ -1,0 +1,202 @@
+/* The only file in web/src permitted to name a colour.
+ *
+ * Spec: docs/superpowers/specs/2026-09-16-emr-ui-ux-spec-v0.3.md, §44-§51.
+ * Enforced by src/style.check.ts, which fails the build if a hex, rgb(),
+ * hsl() or oklch() appears in any other stylesheet. That containment is the
+ * whole point: a palette change is a diff in this file and nowhere else.
+ *
+ * WHERE THIS DEPARTS FROM THE SPEC, AND WHY.
+ *
+ * The spec targets WCAG 2.2 AA (§68) and its own §48/§49 palettes miss it in
+ * eleven places. Measured, not eyeballed; style.check.ts recomputes every one
+ * on each run. Corrections preserve hue and saturation and move lightness
+ * only, so the palette still reads as the spec intended.
+ *
+ *   light  --color-text-tertiary  #8D8981 -> #69665F   2.75 -> 4.51
+ *          --color-agent          #72798A -> #606675   3.44 -> 4.53
+ *          --color-success        #74856B -> #5D6A56   3.12 -> 4.52
+ *          --color-warning        #9A7B48 -> #7B623A   3.12 -> 4.53
+ *          --color-critical       #A96E67 -> #8F5751   3.24 -> 4.53
+ *          --color-abdm           #657FB8 -> #4A65A1   3.13 -> 4.51
+ *   dark   --color-text-tertiary  #777C76 -> #949893   3.10 -> 4.51
+ *
+ * The ratios above are the WORST case across every ground the token lands on
+ * (surface, canvas, subtle, hover, selected, and for a semantic ink its own
+ * soft chip background from §62) -- not the flattering one against surface.
+ * Testing only against surface is how the first pass of this file called the
+ * dark palette clean when two of its tokens were failing.
+ *
+ * --color-border-control is NOT in the spec. The spec has subtle and strong,
+ * and §58 draws the composer -- an input -- with strong. WCAG 2.2 SC 1.4.11
+ * wants 3:1 for a boundary that identifies a control, and the composer's own
+ * background is 1.06:1 against the canvas behind it, so the border is the
+ * only thing that says "this is a field". Raising --color-border-strong to
+ * 3:1 would have dragged every table rule and panel divider up with it and
+ * made the whole interface heavy. A divider identifies nothing and needs
+ * nothing; a control boundary does. Two jobs, two tokens.
+ *
+ * --color-text-disabled is below 4.5:1 by definition. It may only be used on
+ * a genuinely disabled control. It may never carry text a person must read.
+ */
+
+:root {
+  /* ---- type (§44, §51) ---- */
+  --font-sans: "Geist", Inter, ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, monospace;
+
+  /* ---- space (§45) ---- */
+  --space-1: 4px;   --space-2: 8px;   --space-3: 12px;  --space-4: 16px;
+  --space-5: 20px;  --space-6: 24px;  --space-8: 32px;  --space-10: 40px;
+  --space-12: 48px; --space-16: 64px;
+
+  /* ---- radius (§46): 6 controls, 8 inputs, 12 panels, 16 prominent ---- */
+  --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* ---- motion (§69) ---- */
+  --duration-fast: 100ms; --duration-normal: 180ms; --duration-slow: 240ms;
+  --ease-out: cubic-bezier(.22,.61,.36,1);
+
+  /* ---- shadow (§47): floating surfaces only, never hierarchy ---- */
+  --shadow-sm: 0 1px 2px rgba(20,18,15,.05);
+  --shadow-md: 0 6px 18px rgba(20,18,15,.08);
+  --shadow-lg: 0 16px 48px rgba(20,18,15,.14);
+  --shadow-overlay: 0 24px 70px rgba(20,18,15,.20);
+
+  /* ---- light surfaces (§48) ---- */
+  --color-bg-canvas: #F7F5F1;
+  --color-bg-surface: #FFFDFC;
+  --color-bg-subtle: #F1EEE8;
+  --color-bg-hover: #ECE8E1;
+  --color-bg-selected: #E7E4DE;
+
+  --color-border-subtle: #E4DFD6;
+  --color-border-strong: #D1CBC1;
+  --color-border-control: #8F816A;
+
+  --color-text-primary: #1C1B19;
+  --color-text-secondary: #625F59;
+  --color-text-tertiary: #69665F;
+  --color-text-disabled: #AAA69F;
+
+  --color-accent: #26231F;
+  --color-accent-soft: #ECE8E1;
+
+  --color-agent: #606675;
+  --color-agent-soft: #ECEEF2;
+
+  --color-abdm: #4A65A1;
+  --color-abdm-soft: #EDF1F8;
+  --color-abdm-border: #D7E0F0;
+
+  --color-success: #5D6A56;
+  --color-success-soft: #EFF2EC;
+  --color-success-border: #DCE3D6;
+
+  --color-warning: #7B623A;
+  --color-warning-soft: #FAF3E5;
+  --color-warning-border: #EBDDC2;
+
+  --color-critical: #8F5751;
+  --color-critical-soft: #F8ECEA;
+  --color-critical-border: #EACFCB;
+}
+
+/* Dark (§49). Hierarchy from luminosity and border contrast, never from
+ * inverting a light card (§65). */
+[data-theme="dark"] {
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.40);
+  --shadow-md: 0 6px 18px rgba(0,0,0,.50);
+  --shadow-lg: 0 16px 48px rgba(0,0,0,.60);
+  --shadow-overlay: 0 24px 70px rgba(0,0,0,.70);
+
+  --color-bg-canvas: #111210;
+  --color-bg-surface: #181A18;
+  --color-bg-subtle: #202320;
+  --color-bg-hover: #272A27;
+  --color-bg-selected: #2D312D;
+
+  --color-border-subtle: #2C302C;
+  --color-border-strong: #3B403B;
+  --color-border-control: #717B71;
+
+  --color-text-primary: #ECEDE9;
+  --color-text-secondary: #A7ABA4;
+  --color-text-tertiary: #949893;
+  --color-text-disabled: #555A55;
+
+  --color-accent: #F0EEE8;
+  --color-accent-soft: #2A2925;
+
+  --color-agent: #A2A9BA;
+  --color-agent-soft: #292D36;
+
+  --color-abdm: #91A8DE;
+  --color-abdm-soft: #1B2233;
+  --color-abdm-border: #303B58;
+
+  --color-success: #9CAF8C;
+  --color-success-soft: #1D261A;
+  --color-success-border: #33422E;
+
+  --color-warning: #D4AA5C;
+  --color-warning-soft: #292216;
+  --color-warning-border: #514224;
+
+  --color-critical: #DA9185;
+  --color-critical-soft: #2B1B18;
+  --color-critical-border: #53302A;
+}
+
+/* The viewer who never chose. No attribute is stamped on <html> until someone
+ * picks a theme, so without this block a browser set to dark renders the light
+ * palette. Guarded on :not([data-theme="light"]) so an explicit light choice
+ * still wins. Every name under [data-theme="dark"] must appear here too;
+ * style.check.ts fails if one is missing. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.40);
+    --shadow-md: 0 6px 18px rgba(0,0,0,.50);
+    --shadow-lg: 0 16px 48px rgba(0,0,0,.60);
+    --shadow-overlay: 0 24px 70px rgba(0,0,0,.70);
+
+    --color-bg-canvas: #111210;
+    --color-bg-surface: #181A18;
+    --color-bg-subtle: #202320;
+    --color-bg-hover: #272A27;
+    --color-bg-selected: #2D312D;
+
+    --color-border-subtle: #2C302C;
+    --color-border-strong: #3B403B;
+    --color-border-control: #717B71;
+
+    --color-text-primary: #ECEDE9;
+    --color-text-secondary: #A7ABA4;
+    --color-text-tertiary: #949893;
+    --color-text-disabled: #555A55;
+
+    --color-accent: #F0EEE8;
+    --color-accent-soft: #2A2925;
+
+    --color-agent: #A2A9BA;
+    --color-agent-soft: #292D36;
+
+    --color-abdm: #91A8DE;
+    --color-abdm-soft: #1B2233;
+    --color-abdm-border: #303B58;
+
+    --color-success: #9CAF8C;
+    --color-success-soft: #1D261A;
+    --color-success-border: #33422E;
+
+    --color-warning: #D4AA5C;
+    --color-warning-soft: #292216;
+    --color-warning-border: #514224;
+
+    --color-critical: #DA9185;
+    --color-critical-soft: #2B1B18;
+    --color-critical-border: #53302A;
+  }
+}

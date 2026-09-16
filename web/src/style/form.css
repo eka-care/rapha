@@ -1,0 +1,165 @@
+/* §39 forms and §40 clinical numeric input, for the commit and proposal
+ * surface in form/Panel.tsx and the fields in form/Form.tsx.
+ *
+ * The markup is carried over from the previous renderer unchanged, on purpose:
+ * the validation, the confidence marks, the ABHA journey, the spoken prompt
+ * and the two-stage confirm are logic that took a long time to get right and
+ * has its own checks. This file restyles that markup; it does not restate it.
+ */
+
+/* ---- the panel, inline in the thread or over the screen (§63) --------- */
+.mod {
+  position: fixed; z-index: 31; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(620px, calc(100vw - var(--space-8)));
+  max-height: calc(100vh - var(--space-12));
+  display: flex; flex-direction: column;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-overlay);
+  overflow: hidden;
+}
+/* Inline is the same screen inside the thread: a proposal belongs in the
+ * conversation that produced it, not over the top of it. */
+.mod.inline {
+  position: static; transform: none; width: min(100%, 760px);
+  max-height: none; box-shadow: none;
+  border-radius: var(--radius-lg);
+}
+.mod-bar { display: none; }        /* the old accent stripe; §71 forbids it */
+.mod-h { padding: var(--space-5) var(--space-5) var(--space-3); }
+.mod.inline .mod-h { padding: var(--space-4) var(--space-4) var(--space-2); }
+.mod-t { font-size: 17px; line-height: 24px; font-weight: 600; }
+.mod-b { padding: 0 var(--space-5) var(--space-4); overflow-y: auto; flex: 1; min-height: 0; }
+.mod.inline .mod-b { padding: 0 var(--space-4) var(--space-3); }
+.mod-f {
+  display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--color-border-subtle);
+  flex-wrap: wrap;
+}
+.mod.inline .mod-f { padding: var(--space-3) var(--space-4); }
+
+.card-t { font-size: 13px; font-weight: 600; margin-bottom: var(--space-2); }
+.eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+/* ---- buttons in the panel --------------------------------------------- */
+.cq {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: 36px; padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border-control); border-radius: var(--radius-sm);
+  background: var(--color-bg-surface); color: var(--color-text-primary);
+  font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.cq:hover:not(:disabled) { background: var(--color-bg-hover); }
+.cq:disabled { color: var(--color-text-disabled); border-color: var(--color-border-subtle); cursor: not-allowed; }
+/* The commit. Named `rose` by the prototype it came from; §71 rules out the
+ * gradient, so the primary action is carried by the accent instead. */
+.cq.rose {
+  background: var(--color-accent); border-color: var(--color-accent);
+  color: var(--color-bg-surface);
+}
+.cq.rose:hover:not(:disabled) { background: var(--color-accent); opacity: .9; }
+
+/* ---- fields (§39) ------------------------------------------------------ */
+.f-form { display: grid; gap: var(--space-4); }
+.f-group { display: grid; gap: var(--space-3); }
+.f-field { display: grid; gap: var(--space-1); }
+
+.f-lab {
+  display: flex; align-items: baseline; justify-content: space-between;
+  flex-wrap: wrap; gap: var(--space-2);
+  font-size: 13px; line-height: 18px; font-weight: 500;
+}
+.f-unit {
+  font-family: var(--font-mono); font-size: 11px; line-height: 16px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .02em; color: var(--color-text-tertiary);
+}
+
+.f-in {
+  width: 100%; min-height: 36px;
+  border: 1px solid var(--color-border-control); border-radius: var(--radius-md);
+  background: var(--color-bg-surface); color: var(--color-text-primary);
+  padding: var(--space-2) var(--space-3);
+  font: inherit; font-size: 14px; line-height: 21px; outline: none;
+}
+/* §39: a numeric field uses tabular numerals so a column of them lines up. */
+.f-in[inputmode="decimal"], .f-in[type="number"] { font-variant-numeric: tabular-nums; }
+.f-in:focus-visible { outline: 2px solid var(--color-agent); outline-offset: 1px; }
+.f-in:disabled { color: var(--color-text-disabled); background: var(--color-bg-subtle); }
+
+.f-hint { font-size: 12px; line-height: 17px; color: var(--color-text-tertiary); }
+
+/* §75: say what is wrong, next to the thing that is wrong. */
+.f-bad { font-size: 12px; line-height: 17px; color: var(--color-critical); }
+.f-bad.block { display: block; margin-top: var(--space-1); }
+
+/* A field a person still owes, and one an instrument was unsure about. Both
+ * are named in words by the hint beneath; the border is reinforcement (§95). */
+.f-field.bad .f-in { border-color: var(--color-critical); }
+.f-field.unsure .f-in { border-color: var(--color-warning); }
+.f-hint.unsure { color: var(--color-warning); }
+.f-field.override .f-in { border-color: var(--color-abdm); }
+.provenance { font-size: 11px; font-weight: 600; color: var(--color-abdm); }
+
+/* repeating rows (a structured answer: medications, investigations) */
+.f-rows { display: grid; gap: var(--space-2); }
+.f-item { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-end; width: 100%; }
+.f-item-n {
+  flex: 0 0 auto; min-width: 18px;
+  font: 500 11px/16px var(--font-mono); color: var(--color-text-tertiary);
+}
+.f-sub { flex: 1 1 140px; min-width: 0; display: grid; gap: var(--space-1); }
+
+.f-check { display: flex; align-items: flex-start; gap: var(--space-2); font-size: 13px; }
+.f-check.big { font-size: 14px; font-weight: 500; }
+.f-check input { margin-top: 2px; width: 16px; height: 16px; flex: 0 0 auto; }
+
+.f-flags { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+/* §40: a critical value is confirmed by readback before it commits. */
+.confirmbox {
+  display: grid; gap: var(--space-2);
+  padding: var(--space-4); border-radius: var(--radius-lg);
+  border: 1px solid var(--color-critical-border);
+  background: var(--color-critical-soft);
+}
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  min-height: 22px; padding: 2px 7px; border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-subtle); background: var(--color-bg-subtle);
+  color: var(--color-text-secondary); font-size: 11px; font-weight: 600;
+}
+.badge.b-crit {
+  background: var(--color-critical-soft); border-color: var(--color-critical-border);
+  color: var(--color-critical);
+}
+
+/* What a machine proposed, beside what is on screen now. Never hidden. */
+.diff {
+  display: grid; gap: var(--space-1);
+  padding: var(--space-3); border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+  font-size: 12px; color: var(--color-text-secondary);
+}
+.missing { color: var(--color-critical); }
+
+.state { display: grid; gap: var(--space-3); justify-items: start; padding: var(--space-6) 0; }
+.state-t { font-size: 14px; font-weight: 550; }
+
+.transcript {
+  display: grid; gap: var(--space-2);
+  padding: var(--space-3); border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary); font-size: 13px; line-height: 1.6;
+}
+
+/* the spoken prompt's own row, and its off switch */
+.v-row { display: flex; align-items: center; gap: var(--space-2); font-size: 13px; }
+.v-off {
+  border: 0; background: transparent; padding: 0; cursor: pointer;
+  color: var(--color-text-tertiary); font-size: 12px; text-decoration: underline;
+}

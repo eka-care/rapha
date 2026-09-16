@@ -120,9 +120,9 @@ for (const f of sources) {
 }
 
 // And in the panel, the writes live in the one function the button calls.
-const panel = read("web/src/OperationPanel.tsx");
+const panel = read("web/src/form/Panel.tsx");
 const from = panel.indexOf("const send = async () => {");
-ok(from > 0, "OperationPanel still has a send()");
+ok(from > 0, "Panel still has a send()");
 const to = panel.indexOf("\n  };", from);
 const send = panel.slice(from, to);
 for (const call of ["client.commit(", "client.confirm("]) {

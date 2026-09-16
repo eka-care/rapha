@@ -6,9 +6,9 @@
  *  behaviour below is driven by the declaration: type, required,
  *  answer_option, and styling_metadata.phc range / critical / unit.
  */
-import type { Operation, Payload, Question, Questionnaire } from "./types";
-import { blankRow, itemFields, toRow, type ItemField } from "./structured";
-import { enabled, labelOf, phcOf, prune, validate, raisedFlags, rangeBlocked, walk } from "./validate";
+import type { Operation, Payload, Question, Questionnaire } from "../types";
+import { blankRow, itemFields, toRow, type ItemField } from "../structured";
+import { enabled, labelOf, phcOf, prune, validate, raisedFlags, rangeBlocked, walk } from "../validate";
 
 export { validate, rangeBlocked, raisedFlags };
 

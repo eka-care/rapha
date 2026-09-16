@@ -8,47 +8,47 @@
    or not the browser also speaks it. */
 .say-row { margin:0 0 4px; }
 .say-line {
-  font-size:13px; font-weight:600; color:var(--ink-1);
-  background:var(--gray-50); border:1px solid var(--border);
-  border-radius:var(--r-md); padding:9px 12px;
+  font-size:13px; font-weight:600; color:var(--color-text-primary);
+  background:var(--color-bg-subtle); border:1px solid var(--color-border-subtle);
+  border-radius:var(--radius-md); padding:9px 12px;
 }
 .v-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .v-row .f-hint { flex:1 1 220px; }
 
-.v-mic::before { content:"\25CF"; margin-right:6px; color:var(--destructive); }
-.v-mic.on { background:var(--destructive-bg); border-color:var(--destructive-border); color:var(--destructive); }
+.v-mic::before { content:"\25CF"; margin-right:6px; color:var(--color-critical); }
+.v-mic.on { background:var(--color-critical-soft); border-color:var(--color-critical-border); color:var(--color-critical); }
 
 .v-off {
   font-size:10.5px; font-weight:600; letter-spacing:.02em; padding:3px 8px;
-  border-radius:var(--r-pill); background:var(--gray-100); color:var(--ink-3);
-  border:1px solid var(--border); white-space:nowrap;
+  border-radius:var(--radius-pill); background:var(--color-bg-subtle); color:var(--color-text-tertiary);
+  border:1px solid var(--color-border-subtle); white-space:nowrap;
 }
 
 .v-heard {
-  border:1px solid var(--warning-border); background:var(--warning-bg);
-  border-radius:var(--r-md); padding:10px 12px; display:grid; gap:6px;
+  border:1px solid var(--color-warning-border); background:var(--color-warning-soft);
+  border-radius:var(--radius-md); padding:10px 12px; display:grid; gap:6px;
 }
-.v-heard.bad { border-color:var(--destructive-border); background:var(--destructive-bg); }
+.v-heard.bad { border-color:var(--color-critical-border); background:var(--color-critical-soft); }
 .v-vals { display:flex; gap:8px; flex-wrap:wrap; }
 .v-val {
   display:inline-flex; align-items:baseline; gap:6px; padding:4px 9px;
-  border-radius:var(--r-pill); background:var(--surface);
-  border:1px solid var(--warning-border); font-size:12px;
+  border-radius:var(--radius-pill); background:var(--color-bg-surface);
+  border:1px solid var(--color-warning-border); font-size:12px;
 }
-.v-conf { font-size:10px; color:var(--ink-3); }
+.v-conf { font-size:10px; color:var(--color-text-tertiary); }
 
 /* Live capture is never a setting in a menu. It is a fixed badge that cannot
    scroll off the screen, and it stays until the microphone stops. */
 .mic-live {
   position:fixed; top:12px; right:14px; z-index:60;
   display:flex; align-items:center; gap:8px;
-  padding:7px 12px; border-radius:var(--r-pill);
-  background:var(--destructive-bg); color:var(--destructive);
-  border:1px solid var(--destructive-border); box-shadow:var(--sh-hover);
+  padding:7px 12px; border-radius:var(--radius-pill);
+  background:var(--color-critical-soft); color:var(--color-critical);
+  border:1px solid var(--color-critical-border); box-shadow:var(--shadow-md);
   font-size:12px; font-weight:600;
 }
 .mic-dot {
-  width:9px; height:9px; border-radius:50%; background:var(--destructive);
+  width:9px; height:9px; border-radius:50%; background:var(--color-critical);
   animation:mic-pulse 1s ease-in-out infinite;
 }
 .mic-stop { padding:2px 8px; font-size:11px; }

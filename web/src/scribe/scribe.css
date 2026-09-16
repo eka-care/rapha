@@ -7,8 +7,8 @@
 .sc-bar { display:grid; gap:8px; margin:10px 0 14px; }
 .sc-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 
-.sc-rec::before { content:"\25CF"; margin-right:6px; color:var(--destructive); }
-.sc-rec.on { background:var(--destructive-bg); border-color:var(--destructive-border); color:var(--destructive); }
+.sc-rec::before { content:"\25CF"; margin-right:6px; color:var(--color-critical); }
+.sc-rec.on { background:var(--color-critical-soft); border-color:var(--color-critical-border); color:var(--color-critical); }
 
 /* Live capture is never a setting in a menu (addendum E.3). A full width bar
    pinned to the top of the viewport, above everything, with the stop control
@@ -17,16 +17,16 @@
   position:fixed; inset:0 0 auto 0; z-index:70;
   display:flex; align-items:center; gap:12px; flex-wrap:wrap;
   padding:9px 16px; font-size:12.5px;
-  background:var(--destructive); color:var(--hand-ink);
-  border-bottom:2px solid var(--destructive-border); box-shadow:var(--sh-hover);
+  background:var(--color-critical); color:var(--color-bg-surface);
+  border-bottom:2px solid var(--color-critical-border); box-shadow:var(--shadow-md);
 }
 .sc-live b { letter-spacing:.02em; text-transform:uppercase; font-size:12px; }
 .sc-clock { font-variant-numeric:tabular-nums; opacity:.9; }
-.sc-live .sc-act { margin-left:auto; background:#fff; }
+.sc-live .sc-act { margin-left:auto; background:var(--color-bg-surface); }
 .sc-live .sc-act + .sc-act { margin-left:0; }
 
 .sc-dot {
-  width:11px; height:11px; border-radius:50%; background:#fff;
+  width:11px; height:11px; border-radius:50%; background:var(--color-bg-surface);
   animation:sc-pulse 1.1s ease-in-out infinite;
 }
 @keyframes sc-pulse { 0%,100% { opacity:1; } 50% { opacity:.25; } }
@@ -34,22 +34,22 @@
 
 .sc-wait {
   display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-  border:1px dashed var(--border); border-radius:var(--r-md);
-  padding:9px 12px; font-size:12.5px; color:var(--ink-2);
+  border:1px dashed var(--color-border-subtle); border-radius:var(--radius-md);
+  padding:9px 12px; font-size:12.5px; color:var(--color-text-secondary);
 }
 .sc-spin {
   width:12px; height:12px; border-radius:50%;
-  border:2px solid var(--border); border-top-color:var(--ink-3);
+  border:2px solid var(--color-border-subtle); border-top-color:var(--color-text-tertiary);
   animation:sc-spin 1s linear infinite;
 }
 @keyframes sc-spin { to { transform:rotate(360deg); } }
 @media (prefers-reduced-motion:reduce) { .sc-spin { animation:none; } }
 
 .sc-heard {
-  border:1px solid var(--warning-border); background:var(--warning-bg);
-  border-radius:var(--r-md); padding:10px 12px; display:grid; gap:6px;
+  border:1px solid var(--color-warning-border); background:var(--color-warning-soft);
+  border-radius:var(--radius-md); padding:10px 12px; display:grid; gap:6px;
 }
-.sc-heard.bad { border-color:var(--destructive-border); background:var(--destructive-bg); }
+.sc-heard.bad { border-color:var(--color-critical-border); background:var(--color-critical-soft); }
 .sc-heard.held { border-style:dashed; }
 .sc-held { display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:12.5px; }
-.sc-held span { flex:1 1 200px; color:var(--ink-2); }
+.sc-held span { flex:1 1 200px; color:var(--color-text-secondary); }

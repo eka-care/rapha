@@ -69,30 +69,15 @@ if [ -d web/node_modules ]; then
   # One primary action per station, everything else in overflow: pure rules
   # over declarations, checked without a browser.
   (cd web && node --experimental-strip-types src/loops.check.ts)
-  # Home first and default, the sidebar built from declarations, and "Lines"
-  # is the atom's own word, never typed into a renderer.
-  (cd web && node --experimental-strip-types src/shell.check.ts)
-  # Enter commits, Escape cancels, Tab never traps: the keyboard contract for
-  # a clerk who cannot reach for a mouse between patients.
-  (cd web && node --experimental-strip-types src/keys.check.ts)
   # A capability a workflow draws is grantable; one it does not is inert, and
   # says so from the operation's own station and the workflow's own title.
   (cd web && node --experimental-strip-types src/grants.check.ts)
-  # kind: tasklist's renderer: dispatch reaches it, a row is a title and a
-  # count, and the Open button is genuinely gated behind `operation`.
-  (cd web && node --experimental-strip-types src/tasklist.check.ts)
-  # Home: three bands in order, a card's own handle (not the card body)
-  # starts a drag or takes arrow keys, and the order that reads back is keyed
-  # by declaration id, so a reseed does not lose it.
-  (cd web && node --experimental-strip-types src/home.check.ts)
-  # The visual system: the accent token appears only in flag/critical/primary
-  # rules, a three-step radius/border/shadow scale, Khoj centred by the
-  # topbar's own grid, and no "Use demo data" control anywhere.
-  (cd web && node --experimental-strip-types src/design.check.ts)
-  # The closed spacing scale, the five-value type scale, and the geometric
-  # rules a text parser can stand behind (no browser, no DOM: see the file's
-  # own header for exactly what that leaves uncovered).
-  (cd web && node --experimental-strip-types src/layout.check.ts)
+  # The colour system: tokens.css is the only file that may name a colour,
+  # every semantic pair clears WCAG 2.2 AA in BOTH themes, and every var()
+  # resolves. npm run check runs this too; it is named here because the three
+  # bugs it exists to catch (a flattened palette, a 1.3:1 banner, 240 dangling
+  # references) all shipped on this branch.
+  (cd web && node --experimental-strip-types src/style.check.ts)
   echo "ok   web renderer typechecks and builds"
 else
   echo "warn web: run (cd web && npm install) to check the renderer"

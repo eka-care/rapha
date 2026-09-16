@@ -12,21 +12,21 @@
    makes a permanent national health account. */
 .abha-env {
   padding:2px 8px; border-radius:999px;
-  border:1px solid var(--border); background:var(--surface); color:var(--ink-2);
+  border:1px solid var(--color-border-subtle); background:var(--color-bg-surface); color:var(--color-text-secondary);
 }
 .abha-env.danger {
-  background:var(--destructive); border-color:var(--destructive-border);
-  color:var(--hand-ink); font-weight:600; letter-spacing:.02em;
+  background:var(--color-critical); border-color:var(--color-critical-border);
+  color:var(--color-bg-surface); font-weight:600; letter-spacing:.02em;
 }
 
-.abha-note { font-size:12.5px; color:var(--ink-2); line-height:1.5; }
+.abha-note { font-size:12.5px; color:var(--color-text-secondary); line-height:1.5; }
 .abha-note.bad {
   display:grid; gap:9px; justify-items:start;
-  border:1px solid var(--destructive-border); background:var(--destructive-bg);
-  border-radius:var(--r-md); padding:10px 12px; color:var(--ink);
+  border:1px solid var(--color-critical-border); background:var(--color-critical-soft);
+  border-radius:var(--radius-md); padding:10px 12px; color:var(--color-text-primary);
 }
 
 /* The SDK sizes itself to its container and expects a real box. Empty before
    it mounts and after it unmounts, so it takes no room then. */
-.abha-mount { border-radius:var(--r-md); overflow:hidden; }
-.abha-mount.live { min-height:520px; border:1px solid var(--border); }
+.abha-mount { border-radius:var(--radius-md); overflow:hidden; }
+.abha-mount.live { min-height:520px; border:1px solid var(--color-border-subtle); }

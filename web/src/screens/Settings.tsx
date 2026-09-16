@@ -8,10 +8,10 @@
  *  capability, and the only prose is the reason a switch is disabled.
  */
 import { useEffect, useState } from "react";
-import type { Client } from "./api";
-import { inert, inertReason } from "./grants";
-import type { Catalogue, Operation } from "./types";
-import { human } from "./ui";
+import type { Client } from "../api";
+import { inert, inertReason } from "../grants";
+import type { Catalogue, Operation } from "../types";
+import { human } from "../words";
 
 type Group = { title: string; rows: { cap: string; op?: Operation }[] };
 
