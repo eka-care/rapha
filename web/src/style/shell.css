@@ -66,6 +66,19 @@
 /* Only where the rail is a drawer. Above that the rail is on screen and a
    button to reveal it would open nothing. */
 .topbar__menu { display: none; }
+
+/* Tapping away closes the drawer; without it the only way out is the control
+   the drawer now covers.
+   position and display are declared HERE, outside the media query, on purpose.
+   Inside it, this element was position:static above 768px -- an ordinary grid
+   item that took column two and pushed .main onto a second row, collapsing the
+   whole app to a 64px strip. A fixed overlay must be taken out of flow
+   everywhere it can exist, not only where it is visible. */
+.drawer-scrim {
+  display: none;
+  position: fixed; inset: 0; z-index: 39;
+  background: var(--color-accent); opacity: .28;
+}
 .topbar__spacer { margin-left: auto; }
 
 .workspace { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
@@ -91,8 +104,6 @@
   .sidebar[data-open="true"] .nav-item span,
   .sidebar[data-open="true"] .sidebar-group { display: initial; }
   .sidebar[data-open="true"] .nav-item { justify-content: flex-start; padding: var(--space-2) 10px; }
-  /* Tapping away closes it. Without this the drawer can only be dismissed by
-     the control that opened it, which is now behind the drawer. */
-  .drawer-scrim { position: fixed; inset: 0; z-index: 39; background: var(--color-accent); opacity: .28; }
+  .drawer-scrim { display: block; }
   .workspace-scroll { padding: var(--space-4); }
 }
