@@ -631,12 +631,24 @@ def collect_if_consent_stands(session):
     return scribe.collect(session)
 
 
-def scribe_or_404(session_id):
+def scribe_or_404(session_id, request):
+    """The caller's own session, with consent re-read, or a 404.
+
+    Every browser facing session route comes through here, so none of them can
+    forget either rule. A session belongs to the actor who started it: its
+    transcript is somebody's consultation, kept for a day, and another desk
+    asking for it by id gets the same 404 as an id nobody started, so an id is
+    not a way to learn that a recording exists. And a visit whose consent has
+    since been turned off is withdrawn before the route sees it, which is E.3
+    again: the next thing anyone asks of that session is its withdrawal.
+    """
     scribe.expire()
     session = scribe.SESSIONS.get(session_id)
-    if not session:
+    if not session or session["actor"] != caller(request)["id"]:
         raise HTTPException(404, "no such scribe session %r. Nothing was kept."
                             % session_id)
+    if CONSENT not in set(state.flags(store, session["thread"], WORKFLOW)):
+        scribe.withdraw(session)
     return session
 
 
@@ -699,8 +711,8 @@ async def scribe_status(session_id: str, request: Request):
     below; this is the same rule for the half of the world that is not the
     browser.
     """
-    caller(request)
-    session = await run_in_threadpool(collect_if_consent_stands, scribe_or_404(session_id))
+    session = await run_in_threadpool(collect_if_consent_stands,
+                                      scribe_or_404(session_id, request))
     return scribe.public(session)
 
 
@@ -709,16 +721,23 @@ def scribe_withdraw(session_id: str, request: Request):
     """Withdrawal, mid visit. Nothing further is fetched and any draft already
     held is dropped. Records already confirmed stand, because they are rows and
     this never touched them."""
-    caller(request)
-    return scribe.public(scribe.withdraw(scribe_or_404(session_id)))
+    return scribe.public(scribe.withdraw(scribe_or_404(session_id, request)))
 
 
 @router.post("/scribe/sessions/{session_id}/extract")
 async def scribe_extract(session_id: str, request: Request):
     """The template switch. Rebuilds drafts from the transcript this kernel
-    already holds; nothing is uploaded and nothing is recorded again."""
+    already holds; nothing is uploaded and nothing is recorded again.
+
+    A withdrawn session is refused outright rather than answered with an empty
+    draft, because a switch the doctor asked for that silently came back empty
+    would read as "nothing in the recording", which is not what happened."""
     user = caller(request)
-    session = scribe_or_404(session_id)
+    session = scribe_or_404(session_id, request)
+    if session["status"] == "withdrawn":
+        raise HTTPException(403, "Capture consent was withdrawn on this visit, so "
+                                 "nothing from the recording is kept. Type the note: "
+                                 "the record is the same either way.")
     if session["status"] != "ready":
         raise HTTPException(409, "There is no transcript to fill from yet.")
     body = await request.json()

@@ -500,11 +500,11 @@ def test_withdrawal_stops_the_fetching_and_drops_the_draft():
         f"/api/scribe/sessions?thread={thread}&role=mo&operations=phc.op.consult-document",
         content=AUDIO, headers={"Content-Type": "audio/webm"}).json()
     asked = fake.v2rx.asked
-    gone = client.delete("/api/scribe/sessions/%s" % started["session"]).json()
+    gone = client.delete("/api/scribe/sessions/%s?role=mo" % started["session"]).json()
     assert gone["status"] == "withdrawn" and gone["drafts"] == []
     # The job may well finish at the service. Nothing here ever looks again.
     fake.v2rx.answers = [TRANSCRIPT]
-    after = client.get("/api/scribe/sessions/%s" % started["session"]).json()
+    after = client.get("/api/scribe/sessions/%s?role=mo" % started["session"]).json()
     assert after["status"] == "withdrawn" and after["drafts"] == []
     assert fake.v2rx.asked == asked, "a withdrawn session is never fetched again"
 
@@ -522,13 +522,14 @@ def test_consent_withdrawn_while_the_job_runs_stops_the_poll_and_the_webhook():
     with its own one question form, so this posts that instead.
     """
     fake = fake_scribe(RUNNING)
+    thread = consented_thread()
     started = client.post(
-        "/api/scribe/sessions?thread=enc-003&role=mo&operations=phc.op.consult-document",
+        f"/api/scribe/sessions?thread={thread}&role=mo&operations=phc.op.consult-document",
         content=AUDIO, headers={"Content-Type": "audio/webm"}).json()
     assert started["status"] == "running"
 
     stop = client.post("/api/operations/phc.op.capture-withdraw/commit?role=mo",
-                       json={"thread": "enc-003", "confirmed": True,
+                       json={"thread": thread, "confirmed": True,
                              "payload": {"capture_stop": True}})
     assert stop.status_code == 200, stop.text
     assert "capture.withdrawn" in stop.json()["thread"]["flags"]
@@ -536,7 +537,7 @@ def test_consent_withdrawn_while_the_job_runs_stops_the_poll_and_the_webhook():
 
     fake.v2rx.answers = [TRANSCRIPT]             # the service finished anyway
     asked = fake.v2rx.asked
-    after = client.get("/api/scribe/sessions/%s" % started["session"]).json()
+    after = client.get("/api/scribe/sessions/%s?role=mo" % started["session"]).json()
     assert after["status"] == "withdrawn" and after["drafts"] == [], after
     assert fake.v2rx.asked == asked, "a withdrawn visit's job is never fetched"
 
@@ -548,7 +549,7 @@ def test_consent_withdrawn_while_the_job_runs_stops_the_poll_and_the_webhook():
 
     # And a second recording cannot be started on that visit at all.
     again = client.post(
-        "/api/scribe/sessions?thread=enc-003&role=mo&operations=phc.op.consult-document",
+        f"/api/scribe/sessions?thread={thread}&role=mo&operations=phc.op.consult-document",
         content=AUDIO, headers={"Content-Type": "audio/webm"})
     assert again.status_code == 403, again.text
 
@@ -569,7 +570,51 @@ def test_the_webhook_only_collects_a_session_this_kernel_started():
 
     mine = client.post("/api/scribe/webhook", json={"payload": {"transaction_id": txn}}).json()
     assert mine == {"ok": True, "collected": True}
-    assert client.get("/api/scribe/sessions/%s" % started["session"]).json()["status"] == "ready"
+    assert client.get("/api/scribe/sessions/%s?role=mo" % started["session"]).json()["status"] == "ready"
+
+
+def test_consent_withdrawn_after_the_draft_is_ready_refuses_the_template_switch():
+    """The extract route rebuilds drafts from a transcript, so it is a draft
+    returning path like the poll and must re-read consent like the poll."""
+    reset()
+    fake_scribe(TRANSCRIPT)
+    scribe.extractor_module.extract = fake_extract
+    try:
+        thread = consented_thread()
+        started = client.post(
+            f"/api/scribe/sessions?thread={thread}&role=mo&operations=phc.op.consult-document",
+            content=AUDIO, headers={"Content-Type": "audio/webm"}).json()
+        ready = client.get(f"/api/scribe/sessions/{started['session']}?role=mo").json()
+        assert ready["status"] == "ready", ready
+        stop = client.post("/api/operations/phc.op.capture-withdraw/commit?role=mo",
+                           json={"thread": thread, "confirmed": True,
+                                 "payload": {"capture_stop": True}})
+        assert stop.status_code == 200, stop.text
+        switched = client.post(f"/api/scribe/sessions/{started['session']}/extract?role=mo",
+                               json={"operations": ["phc.op.consult-document"]})
+        assert switched.status_code == 403, switched.text
+        assert "type the note" in switched.json()["detail"].lower()
+        session = scribe.SESSIONS[started["session"]]
+        assert session["status"] == "withdrawn" and session["transcript"] == "" \
+            and session["drafts"] == [], session
+    finally:
+        importlib.reload(scribe.extractor_module)
+        reset()
+
+
+def test_a_session_is_only_the_callers_who_started_it():
+    fake_scribe(RUNNING)
+    started = client.post(
+        f"/api/scribe/sessions?thread={consented_thread()}&role=mo"
+        "&operations=phc.op.consult-document",
+        content=AUDIO, headers={"Content-Type": "audio/webm"}).json()
+    sid = started["session"]
+    other = {"X-PHC-Role": "mo", "X-PHC-Actor": "user:someone-else"}
+    assert client.get(f"/api/scribe/sessions/{sid}", headers=other).status_code == 404
+    assert client.delete(f"/api/scribe/sessions/{sid}", headers=other).status_code == 404
+    assert client.post(f"/api/scribe/sessions/{sid}/extract", headers=other,
+                       json={"operations": []}).status_code == 404
+    assert scribe.SESSIONS[sid]["status"] == "running", "a stranger changed nothing"
 
 
 def test_a_session_id_nobody_started_is_a_404_that_says_so():
@@ -589,6 +634,9 @@ def test_templates_are_the_stations_and_the_callers():
     assert nurse_as_pharmacist["choose"] == [], "no capability, no template"
 
 
+ACTOR = {"X-PHC-Actor": "user:ward-1"}
+
+
 def test_a_recording_fills_the_named_template_and_switches_without_rerecording():
     reset()
     fake = fake_scribe(TRANSCRIPT)
@@ -598,14 +646,17 @@ def test_a_recording_fills_the_named_template_and_switches_without_rerecording()
         started = client.post(
             f"/api/scribe/sessions?thread={thread}&operations=phc.op.vitals-record"
             "&language=hinglish&role=nurse",
-            content=AUDIO, headers={"Content-Type": "audio/webm"}).json()
-        ready = client.get(f"/api/scribe/sessions/{started['session']}?role=nurse").json()
+            content=AUDIO, headers=ACTOR | {"Content-Type": "audio/webm"}).json()
+        ready = client.get(f"/api/scribe/sessions/{started['session']}?role=nurse",
+                           headers=ACTOR).json()
         assert ready["status"] == "ready", ready
         assert ready["drafts"][0]["values"] == {"systolic": 140}
         assert ready["drafts"][0]["tick"] == ["systolic"]
         assert fake.v2rx.uploads[0]["bytes"] == AUDIO
 
+        # One person at one desk, whose role changes: the session is the actor's.
         switched = client.post(f"/api/scribe/sessions/{started['session']}/extract?role=mo",
+                               headers=ACTOR,
                                json={"operations": ["phc.op.consult-document"]}).json()
         assert switched["operations"] == ["phc.op.consult-document"]
         assert len(fake.v2rx.uploads) == 1, "switching never uploads again"
