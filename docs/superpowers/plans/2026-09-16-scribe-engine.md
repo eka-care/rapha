@@ -762,7 +762,7 @@ misheard "one forty" is still the risk; the tick is where it is caught.
 
 - [ ] **Step 3: Write the failing lint check**
 
-In `kernel/tests/` find the declarations test (`ls kernel/tests`). Add, following that file's style:
+Add to `kernel/tests/test_kernel.py`, following that file's style:
 
 ```python
 def test_scribe_station_config_is_linted():
@@ -774,7 +774,7 @@ def test_scribe_station_config_is_linted():
     assert any("phc.op.nope" in p for p in problems), problems
 ```
 
-Run: `python3 -m kernel.tests.<that file>` (or the runner its docstring names)
+Run: `python3 -m kernel.tests.test_kernel`
 Expected: FAIL, `Bundle has no attribute scribe`
 
 - [ ] **Step 4: Implement in `kernel/declarations.py`**
@@ -831,7 +831,7 @@ Replace the bullet "A `scribe` instrument may not list an operation whose defaul
 
 - [ ] **Step 6: Compile and run**
 
-Run: `python3 -m catalogue.build && python3 -m kernel.declarations && python3 -m kernel.tests.<that file>`
+Run: `python3 -m catalogue.build && python3 -m kernel.declarations && python3 -m kernel.tests.test_kernel`
 Expected: no `FAIL` lines; test passes; `grep -c '"scribe"' catalogue/catalogue.json` ≥ 1.
 
 - [ ] **Step 7: Commit**
