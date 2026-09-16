@@ -131,8 +131,7 @@ discrete value, so all discrete values still render unconfirmed (current rule).
   targets from operations. `templates` defaults from station config.
 - `POST /scribe/sessions/{id}/extract` `{templates: [slug]}` reruns extraction on the
   held transcript (the template switch).
-- Transcript retention follows the existing `AudioRetention` rule; the transcript is
-  held for the same window as audio, then dropped.
+- Transcript is held for 24 hours (see §10), then dropped.
 
 ### 4.7 Custom forms
 
@@ -208,8 +207,14 @@ marking it `active`; until then `status: draft`.
   by field_code with read-back. We reuse its choice-matching and verify-after-fill
   ideas; the transcript → values step is new.
 
-## 10. Open questions
+## 10. Decisions (2026-09-16)
 
-1. Transcript retention window: same as audio (proposed) or longer for audit?
-2. Which clinician reviews each specialty template?
-3. Languages beyond en-IN / Hinglish for v1?
+1. **Transcript retention: 24 hours**, independent of the audio window. Audio
+   follows the existing `AudioRetention` rule; the transcript is deleted 24h after
+   the session ends. §4.6 is superseded on this point.
+2. **Clinical review**: templates are built now as `status: draft`. Doctors at Eka
+   review each specialty template before it is flipped to `active`.
+3. **Languages in v1**: en-IN, Hinglish, Hindi, Tamil, Telugu. Golden transcripts
+   (§7) cover each language for at least `rx-general-v1` and `phc-vitals-v1`.
+   Extraction works on the native-script transcript directly; field values are
+   written in English except free-text fields, which keep the spoken language.
