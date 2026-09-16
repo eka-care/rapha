@@ -29,7 +29,7 @@ import { fmt } from "../messages";
 import type { Operation, Payload, Proposal } from "../types";
 import { Failed } from "../parts";
 import { human } from "../words";
-import { Recorder } from "../scribe/Recorder";
+import { mustTick, type ScribeDraft } from "../scribe/session";
 import { mountsFor } from "../voice/instruments";
 import { VoiceCapture } from "../voice/VoiceCapture";
 import { SpokenPrompt } from "../voice/SpokenPrompt";
@@ -42,7 +42,7 @@ const IRREVERSIBLE = "irreversible";
 const FROM_ABHA = "From ABHA";
 
 export function OperationPanel({
-  op, thread, client, proposal, instruments, flags, inline, mobile, seed, onDone, onCancel,
+  op, thread, client, proposal, draft, instruments, inline, mobile, seed, onDone, onCancel,
 }: {
   op: Operation;
   thread: string;
@@ -61,23 +61,30 @@ export function OperationPanel({
   /** The compiled instrument declarations. Which capture controls appear on
    *  this screen is entirely their answer, never this file's. */
   instruments?: Record<string, unknown>;
-  /** The thread's flags, because the scribe declaration gates on one. */
+  /** The thread's flags. Unused since the encounter took the scribe's consent
+   *  gate; kept so callers need not change. */
   flags?: string[];
   /** Whichever kernel this screen is talking to. The panel does not know or
    *  care which, so demo mode cannot write to a real store by accident. */
   client: Client;
   proposal?: Proposal;
+  /** What a recording drafted for this operation. Its values open in the
+   *  fields like any other answer, and every non-text one needs a tick before
+   *  Commit: a heard number is not committed on the strength of the audio. */
+  draft?: ScribeDraft;
   /** `carried` is what this commit learned that the NEXT panel needs: the ABHA
    *  identifier, when the journey ran on this screen. */
   onDone: (carried?: Payload) => void;
   onCancel?: () => void;
 }) {
   const schema = questionnaire(op.input);
-  const [payload, setPayload] = useState<Payload>({ ...(proposal?.payload ?? seed ?? {}) });
+  const [payload, setPayload] = useState<Payload>({ ...(proposal?.payload ?? draft?.values ?? seed ?? {}) });
+  const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const unticked = mustTick(draft ?? null, ticked, payload);
   /** Per link_id, how sure the instrument that produced the value was. A
    *  value under 0.9 draws the field as unconfirmed. Typing over a value
    *  clears its entry: a number a person typed is not a heard number. */
-  const [heard, setHeard] = useState<Record<string, number>>({});
+  const [heard, setHeard] = useState<Record<string, number>>(draft?.confidence ?? {});
   /** Which fields came back from the ABHA journey rather than off the keyboard.
    *  Marked on the form the same way an instrument's values are, and cleared
    *  field by field the moment somebody types over one. */
@@ -272,37 +279,6 @@ export function OperationPanel({
           onValues={fromInstrument}
         />
 
-        {/* The scribe, which is a recording and not a microphone in this
-            browser, so it is drawn by its own component with its own bar. It
-            appears only where the declaration allows it AND the visit carries
-            whatever flag that declaration REQUIRES; without it the reason is
-            said in words and the keyboard below is the whole of the fallback.
-            The flag is `requires:` on the instrument, not a constant in this
-            renderer: the health centre's consent flag used to be written here,
-            which gated nothing in a bundle that spells its own differently.
-            The kernel refuses it a second time besides, which is the check
-            that counts. */}
-        {mounts.filter((m) => m.kind === "scribe").map((m) =>
-          (!m.requires || (flags ?? []).includes(m.requires)) ? (
-            <Recorder
-              key={m.id}
-              mount={m as Extract<typeof m, { kind: "scribe" }>}
-              thread={thread}
-              operation={op.id}
-              schema={schema}
-              payload={payload}
-              ids={ids}
-              disabled={busy}
-              onValues={fromInstrument}
-            />
-          ) : (
-            <div className="v-row" key={m.id}>
-              <span className="v-off">Scribe off</span>
-              <div className="f-hint">No capture consent.</div>
-            </div>
-          ),
-        )}
-
         {/* Gone the moment the form is showing. What is left of it by then is
             a stale note and a button that would do what has already happened,
             and a control that does nothing is how a person learns to distrust
@@ -356,6 +332,8 @@ export function OperationPanel({
           problems={tried ? problems : []}
           confidence={{ ...(proposal?.confidence ?? {}), ...heard }}
           sources={fromAbha}
+          evidence={draft?.evidence}
+          ticks={{ need: unticked, ticked, onTick: (id) => setTicked((s) => new Set(s).add(id)) }}
           disabled={busy}
         />}
 
@@ -391,6 +369,10 @@ export function OperationPanel({
         {error && <Failed error={error} what="Not saved" onRetry={() => setError(null)} />}
       </div>
 
+      {unticked.length > 0 && <div className="f-hint unsure">Tick each heard value to commit ({unticked.length} left).</div>}
+      {draft && draft.unfilled.length > 0 && (
+        <div className="f-hint">Heard but not filled: {draft.unfilled.map((id) => labels.get(id) ?? id).join(", ")}</div>
+      )}
       <div className="mod-f">
         <span style={{ flex: 1 }} />
         {onCancel && <button className="cq" onClick={onCancel} disabled={busy}>Cancel</button>}
@@ -400,7 +382,7 @@ export function OperationPanel({
         {showForm && <button
           className="cq rose"
           onClick={send}
-          disabled={busy || (stage === "confirm" && !confirmed)}
+          disabled={busy || unticked.length > 0 || (stage === "confirm" && !confirmed)}
         >
           {busy ? "Sending..." : stage === "confirm" ? "Commit" : proposal ? "Confirm" : irreversible ? "Continue" : "Commit"}
         </button>}

@@ -58,3 +58,11 @@
 .sc-heard.held { border-style:dashed; }
 .sc-held { display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:12.5px; }
 .sc-held span { flex:1 1 200px; color:var(--color-text-secondary); }
+
+/* The encounter's recording bar: one row between the thread and the composer. */
+.scribe-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 15px; font-size:12.5px; }
+.scribe-dot { width:9px; height:9px; border-radius:50%; background:var(--color-border-strong); }
+.scribe-dot.on { background:var(--color-critical); }
+.scribe-phase { font-variant-numeric:tabular-nums; font-weight:600; }
+.scribe-bar > .cq:last-child { margin-left:auto; }
+.f-hint.heard { font-style: italic; }

@@ -134,16 +134,16 @@ for (const f of sources) {
 const panel = read("web/src/form/Panel.tsx");
 for (const call of ["client.commit(", "client.confirm("])
   ok(panel.split(call).length === 2, `${call} still appears exactly once in the panel`);
-ok(panel.includes("<Recorder"), "the panel draws the recorder");
-// The gate is the instrument's own `requires:`, read off the mount. It used
-// to be a constant in messages.ts holding this bundle's consent flag, which
-// gated nothing at all in a bundle that spells its consent differently -- and
-// the atom's prose was the only place the rule was actually written down.
-ok(/\(!m\.requires \|\| \(flags \?\? \[\]\)\.includes\(m\.requires\)\)/.test(panel),
-   "the recorder is behind whatever flag its declaration requires, and the reason is drawn when it is missing");
-ok(!/CONSENT/.test(panel) && !/capture\.consented/.test(panel),
-   "and the panel does not name the flag itself");
+// The gate is the instrument's own `requires:`, read in the encounter that
+// owns the microphone. It used to be a constant in messages.ts holding this
+// bundle's consent flag, which gated nothing at all in a bundle that spells
+// its consent differently.
 {
+  const enc = read("web/src/screens/Encounter.tsx");
+  ok(/!consentFlag \|\| \(thread\.flags \?\? \[\]\)\.includes\(consentFlag\)/.test(enc),
+     "the microphone is behind whatever flag the scribe declaration requires");
+  ok(!/CONSENT/.test(enc) && !/capture\.consented/.test(enc) && !/capture\.consented/.test(panel),
+     "and neither screen names the flag itself");
   const declared = JSON.parse(read("catalogue/catalogue.json"));
   const scribe = Object.values(declared.instruments ?? {})
     .find((i: any) => i.kind === "scribe") as any;
@@ -152,21 +152,12 @@ ok(!/CONSENT/.test(panel) && !/capture\.consented/.test(panel),
   ok((declared.states ?? []).includes(scribe.requires),
      "and the flag it names is one this bundle really has");
 }
-ok(/onValues=\{fromInstrument\}/.test(panel.slice(panel.indexOf("<Recorder"))),
-   "a draft lands through the same path a spoken value does: editable fields, then a tap");
+ok(/draft\?\.values/.test(panel),
+   "a draft lands in the panel's own editable fields, then a tap");
 
 // -- 4. withdrawal discards rather than merely stopping -------------------
-const rec = read("web/src/scribe/Recorder.tsx");
-// Seen failing in a browser before it was a check: the poll that applies the
-// draft is started several renders before it answers, so reading the payload
-// prop through that closure reads the form as it was when the recording
-// stopped, and a doctor who typed while waiting loses it.
-ok(/apply\(draft, narrative\(schema\), latest\.current\)/.test(rec),
-   "the draft is weighed against the form as it is now, not as it was");
-ok(/latest\.current = payload/.test(rec), "and that ref is refreshed every render");
-// Also seen failing in a browser: two polls in flight, both answering ready,
-// the second one finding the fields the first had just filled and calling the
-// whole draft text the doctor had written.
+const rec = read("web/src/scribe/ScribeBar.tsx");
+// Seen failing in a browser: two polls in flight, both answering ready.
 ok(/if \(taken\.current\) return;/.test(rec), "a recording produces one outcome, not one per poll");
 
 ok(/keep\.current = false/.test(rec), "withdrawal marks the blob unsendable");
@@ -174,8 +165,8 @@ ok(/if \(!keep\.current \|\| !parts\.length\) return;/.test(rec),
    "a withdrawn recording is never uploaded");
 ok(/chunks\.current = \[\]/.test(rec), "and what was captured is dropped");
 ok(rec.indexOf("dropSession") > 0, "the kernel is told to keep nothing either");
-ok(/Patient asked to stop/.test(rec) && rec.indexOf("Patient asked to stop") < rec.indexOf("sc-row"),
-   "the withdrawal control is inside the live indicator, reachable from any scroll position");
+ok(/phase === "recording"[^\n]*\n?[^\n]*withdraw/.test(rec),
+   "the discard control is on the bar while recording");
 ok(/position:fixed/.test(read("web/src/scribe/scribe.css")),
    "the live indicator cannot be scrolled off the screen");
 ok(!/mic-live/.test(rec) && !/Microphone live/.test(rec),
@@ -215,11 +206,23 @@ ok(!/mic-live/.test(rec) && !/Microphone live/.test(rec),
   // over the screen is the "persistent panel" §2.6 rules out, and it is also
   // what put the recorder a full viewport away from its own microphone.
   const enc = code(read("web/src/screens/Encounter.tsx"));
-  const dictation = enc.slice(enc.indexOf("{dictating && ("), enc.indexOf("<Composer"));
+  const dictation = enc.slice(enc.indexOf("{scribing && ("), enc.indexOf("<Composer"));
   ok(dictation.includes("<OperationPanel"), "the draft surface is the same panel every operation uses");
   ok(/\binline\b/.test(dictation), "drawn inline in the thread, not over it");
-  ok(enc.indexOf("{dictating && (") > enc.indexOf("<Stream"),
+  ok(enc.indexOf("{scribing && (") > enc.indexOf("<Stream"),
     "and it sits between the thread and the composer that started it");
+}
+
+// 5. The mic does not open a form, and the panel refuses Commit while a heard number is unticked.
+{
+  const enc = read("web/src/screens/Encounter.tsx");
+  assert.ok(!enc.includes("Dictation is not offered at this step"), "the mic no longer needs a scribe operation");
+  assert.ok(enc.includes("<ScribeBar"), "the encounter owns the recording bar");
+  const panel = read("web/src/form/Panel.tsx");
+  assert.ok(!panel.includes("<Recorder"), "the form no longer starts recordings");
+  assert.ok(/disabled=\{[^}]*unticked\.length/.test(panel), "Commit waits on the ticks");
+  assert.throws(() => read("web/src/scribe/Recorder.tsx"));
+  checks += 5;
 }
 
 console.log(`ok   scribe: ${checks} checks`);

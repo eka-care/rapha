@@ -52,17 +52,6 @@ export type ScribeSession = {
 
 // ----------------------------------------------------------------- the pure half
 
-/** One recording fills more than one form: the declaration names the consult
- *  and the prescription. The panel is per operation, so a session outlives the
- *  panel that started it and the next panel finds it here. Module level, so a
- *  reload loses it, which costs one re-recording and costs the record nothing.
- */
-const LIVE = new Map<string, string>();
-
-export const remember = (thread: string, session: string) => LIVE.set(thread, session);
-export const forget = (thread: string) => LIVE.delete(thread);
-export const liveSession = (thread: string) => LIVE.get(thread);
-
 export const draftFor = (s: ScribeSession | null, operation: string): ScribeDraft | null =>
   s?.drafts.find((d) => d.operation === operation) ?? null;
 

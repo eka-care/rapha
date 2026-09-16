@@ -161,7 +161,7 @@ function Add({ disabled, onClick }: { disabled?: boolean; onClick: () => void })
 }
 
 export function Form({
-  schema, op, value, onChange, problems, confidence, sources, disabled, ids = "f",
+  schema, op, value, onChange, problems, confidence, sources, evidence, ticks, disabled, ids = "f",
 }: {
   schema: Questionnaire;
   /** The operation this form commits. Only a structured question needs it, to
@@ -178,6 +178,11 @@ export function Form({
    *  values get, because it is the same instruction to the reader, and the
    *  chip says which instrument rather than making them guess. */
   sources?: Record<string, string>;
+  /** The words a recording took each value from, drawn under the field so the
+   *  person checks the value against what was said rather than against memory. */
+  evidence?: Record<string, string>;
+  /** Heard values still owed a tick before Commit, and where the tick goes. */
+  ticks?: { need: string[]; ticked: Set<string>; onTick(id: string): void };
   disabled?: boolean;
   /** The prefix for every field's DOM id. Two of these forms can be on screen
    *  at once now, one per pending proposal, so the ids cannot be the link_id
@@ -246,6 +251,13 @@ export function Form({
         )}
         {unsure && (
           <div className="f-hint unsure">{from ?? unsureHint(confidence?.[q.link_id] ?? 0)}</div>
+        )}
+        {evidence?.[q.link_id] && <div className="f-hint heard">“{evidence[q.link_id]}”</div>}
+        {ticks?.need.includes(q.link_id) && (
+          <label className="f-check">
+            <input type="checkbox" checked={false} onChange={() => ticks.onTick(q.link_id)} />
+            <span>Checked against what was said</span>
+          </label>
         )}
         {critical && !mine.length && (
           <span className="badge b-crit" data-act="">Outside range{phc.flags ? ` · ${phc.flags}` : ""}</span>

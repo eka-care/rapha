@@ -19,6 +19,8 @@ import { weigh } from "../loops";
 import { agentLine, header, messages, queueViewFor, valuesOf, type Ctx, type Said } from "../messages";
 import type { Catalogue, Operation, Payload, ThreadView } from "../types";
 import { Composer } from "../thread/Composer";
+import { ScribeBar } from "../scribe/ScribeBar";
+import type { ScribeDraft } from "../scribe/session";
 import { Stream } from "../thread/Thread";
 import { Line } from "../view/View";
 import { human, title } from "../words";
@@ -46,7 +48,15 @@ export function Encounter({
   onOpenSubject: (subjectId: string) => void;
 }) {
   const [modal, setModal] = useState<{ op: Operation; seed?: Payload } | null>(null);
-  const [dictating, setDictating] = useState<Operation | null>(null);
+  const [scribing, setScribing] = useState(false);
+  const [drafts, setDrafts] = useState<ScribeDraft[]>([]);
+  // The microphone is gated on the scribe instrument's own `requires:`, not a
+  // flag named here: a bundle that spells its consent differently is gated by
+  // its own spelling. The kernel refuses without it besides.
+  const consentFlag = Object.values(cat.instruments ?? {})
+    .map((i) => i as { kind?: string; requires?: string })
+    .find((i) => i.kind === "scribe")?.requires;
+  const consented = !consentFlag || (thread.flags ?? []).includes(consentFlag);
 
   const head = useMemo(() => header(thread, queueViewFor(cat, thread.workflow)), [thread, cat]);
   const msgs = useMemo(() => messages(thread, ctx, said), [thread, ctx, said]);
@@ -56,7 +66,6 @@ export function Encounter({
   const { primary, overflow } = useMemo(() => weigh(thread.actions, thread.closes), [thread.actions, thread.closes]);
   const ranked = useMemo(() => (primary ? [primary, ...overflow] : overflow), [primary, overflow]);
   const offered = ranked.slice(0, QUICK);
-  const scribeOp = ranked.find((o) => o.instrument === "scribe");
 
   const spine = cat.workflows?.[thread.workflow]?.spine;
   const spineId = spine && typeof thread.subject?.id === "string" ? thread.subject.id : "";
@@ -133,16 +142,24 @@ export function Encounter({
           )}
         </Stream>
 
-        {dictating && (
-          <div style={{ padding: "0 15px 12px", maxHeight: "42vh", overflowY: "auto", flexShrink: 0 }}>
-            <OperationPanel
-              op={dictating} thread={thread.id} client={client}
-              instruments={cat.instruments} flags={thread.flags} inline
-              onDone={() => { setDictating(null); onChanged(); }}
-              onCancel={() => setDictating(null)}
-            />
-          </div>
+        {/* The station comes off the thread view, the same field the header
+            badge draws; a thread past its last station has none. */}
+        {scribing && (
+          <ScribeBar thread={thread.id} station={thread.station ?? ""}
+                     onDrafts={(s) => setDrafts(s.drafts)}
+                     onClose={() => { setScribing(false); setDrafts([]); }} />
         )}
+        {drafts.map((d) => {
+          const op = cat.operations[d.operation];
+          return op ? (
+            <div key={d.operation} style={{ padding: "0 15px 12px", maxHeight: "42vh", overflowY: "auto", flexShrink: 0 }}>
+              <OperationPanel op={op} thread={thread.id} client={client} draft={d}
+                instruments={cat.instruments} flags={thread.flags} inline
+                onDone={() => { setDrafts((all) => all.filter((x) => x.operation !== d.operation)); onChanged(); }}
+                onCancel={() => setDrafts((all) => all.filter((x) => x.operation !== d.operation))} />
+            </div>
+          ) : null;
+        })}
 
         <Composer
           about={head.name}
@@ -151,8 +168,8 @@ export function Encounter({
           asking={asking}
           onSay={onSay}
           onAction={(op) => setModal({ op })}
-          onStartScribe={scribeOp ? () => setDictating(scribeOp) : undefined}
-          micReason={scribeOp ? undefined : "Dictation is not offered at this step"}
+          onStartScribe={() => setScribing(true)}
+          micReason={consented ? undefined : "Capture consent is not recorded on this visit"}
           quick={
             <>
               {threadAsks({ hasHistory: !!spineId, flags: thread.flags }).slice(0, 2).map((q) => (
