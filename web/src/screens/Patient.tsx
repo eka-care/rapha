@@ -11,18 +11,25 @@
  */
 import { useState } from "react";
 import { api, useAsync } from "../api";
+import { questionnaire } from "../declarations";
+import { Icon } from "../icons";
+import { valuesOf, type Ctx } from "../messages";
+import type { ThreadView } from "../types";
 import { Failed, Loading } from "../parts";
-import type { SubjectView } from "../types";
+import type { Catalogue, SubjectView } from "../types";
 import { human, title } from "../words";
 
 type Tab = "overview" | "encounters" | "timeline";
 
-export function Patient({ id, onOpenThread }: {
+export function Patient({ id, cat, onOpenThread }: {
   id: string;
+  cat: Catalogue;
   onOpenThread: (thread: string) => void;
 }) {
   const { data, error, loading, reload } = useAsync(() => api.subject(id), [id]);
-  const [tab, setTab] = useState<Tab>("overview");
+  // Encounters first. §2.3: "The current encounter is always the primary
+  // workspace." What a person came here for is the visits, not the demographics.
+  const [tab, setTab] = useState<Tab>("encounters");
 
   if (loading) return <Loading what="this patient" />;
   if (error) return <Failed error={error} what="open this patient" onRetry={reload} />;
@@ -80,7 +87,7 @@ export function Patient({ id, onOpenThread }: {
       </div>
 
       {tab === "overview" && <Overview view={view} />}
-      {tab === "encounters" && <Encounters view={view} onOpenThread={onOpenThread} />}
+      {tab === "encounters" && <Encounters view={view} cat={cat} onOpenThread={onOpenThread} />}
       {tab === "timeline" && <Timeline view={view} onOpenThread={onOpenThread} />}
     </div>
   );
@@ -105,30 +112,104 @@ function Overview({ view }: { view: SubjectView }) {
   );
 }
 
-function Encounters({ view, onOpenThread }: { view: SubjectView; onOpenThread: (t: string) => void }) {
+/** §2.3, and the owner's own words: "when a visit is over it gets compacted
+ *  into a dated collation; on click it shows all actions endured in that
+ *  visit." So a visit is a closed card until somebody opens it, and opening
+ *  one reads the thread rather than pre-loading every visit a person has had.
+ */
+function Encounters({ view, cat, onOpenThread }: { view: SubjectView; cat: Catalogue; onOpenThread: (t: string) => void }) {
+  const [open, setOpen] = useState<string | null>(
+    view.encounters.find((e) => e.status !== "completed")?.thread ?? view.encounters[0]?.thread ?? null);
   return (
-    <div className="patient-list">
+    <div style={{ display: "grid", gap: "var(--space-3)" }}>
       {view.encounters.map((e) => (
-        <button
-          className="patient-row"
-          style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1fr) auto" }}
+        <Collation
           key={e.thread}
-          onClick={() => onOpenThread(e.thread)}
-        >
-          <span className="patient-cell">
-            <span className="patient-name">{when(e.opened_at)}</span>
-            {e.station && <span className="patient-sub"> · {human(e.station)}</span>}
-          </span>
-          <span className="patient-cell patient-sub">
-            {e.did.map((d) => d.title).join(" · ") || "Nothing recorded"}
-          </span>
-          <span className="patient-cell patient-cell--tags">
-            {e.status !== "completed" && <span className="status" data-tone="warning">Open</span>}
-          </span>
-        </button>
+          encounter={e}
+          cat={cat}
+          open={open === e.thread}
+          onToggle={() => setOpen(open === e.thread ? null : e.thread)}
+          onOpenThread={onOpenThread}
+        />
       ))}
     </div>
   );
+}
+
+function Collation({ encounter, cat, open, onToggle, onOpenThread }: {
+  encounter: SubjectView["encounters"][number];
+  cat: Catalogue;
+  open: boolean;
+  onToggle: () => void;
+  onOpenThread: (t: string) => void;
+}) {
+  // Read the visit only when it is opened. A person with a decade of visits
+  // should not fetch a decade to look at one.
+  const { data } = useAsync(
+    () => (open ? api.thread(encounter.thread) : Promise.resolve(null)),
+    [open, encounter.thread]);
+
+  return (
+    <section className="visit" data-open={open}>
+      <button className="visit__head" onClick={onToggle} aria-expanded={open}>
+        <span className="visit__chev" data-open={open} aria-hidden="true"><Icon name="chev" /></span>
+        <span className="visit__when">{when(encounter.opened_at)}</span>
+        <span className="visit__did">
+          {encounter.did.map((d) => d.title).join(" · ") || "Nothing recorded"}
+        </span>
+        {encounter.status !== "completed" && (
+          <span className="status" data-tone="warning">Open</span>
+        )}
+        {encounter.station && (
+          <span className="t-meta u-faint">{human(encounter.station)}</span>
+        )}
+      </button>
+
+      {open && (
+        <div className="visit__body">
+          {!data ? (
+            <div className="skeleton" style={{ height: 48 }} />
+          ) : (
+            <>
+              {committed(data, cat).map((c) => (
+                <div className="visit__block" key={c.id}>
+                  <div className="t-micro u-faint visit__op">{c.title}</div>
+                  <div className="kv">
+                    {c.values.map((v) => (
+                      <div className="kv__row" key={v.link_id} data-critical={v.crit}>
+                        <span className="kv__label">{v.label}</span>
+                        <span className="kv__value">{v.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {committed(data, cat).length === 0 && (
+                <div className="t-meta u-faint">Nothing was recorded on this visit.</div>
+              )}
+              <button className="btn" data-variant="ghost" onClick={() => onOpenThread(encounter.thread)}>
+                Open this visit
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Everything this visit actually committed, with the values, labelled by the
+ *  questionnaire each operation declares. */
+function committed(thread: ThreadView, cat: Catalogue) {
+  const ctx: Ctx = { operations: cat.operations ?? {}, schema: questionnaire, badges: {} };
+  return (thread.audit ?? [])
+    .filter((a) => /^(committed|confirmed|allowed)/.test(a.outcome))
+    .map((a) => ({
+      id: a.id,
+      title: ctx.operations[a.operation]?.title ?? human(a.operation),
+      values: valuesOf(ctx, a.operation, a.payload),
+    }))
+    .filter((c) => c.values.length);
 }
 
 /** §26: longitudinal, not conversational. Dates down the left, what happened

@@ -86,6 +86,10 @@ if [ -d web/node_modules ]; then
   # the / and @ menus are sourced from declarations rather than written down,
   # the quick action row is capped and says what it hid, and the §68 basics.
   (cd web && node --experimental-strip-types src/ui.check.ts)
+  # The brief and the suggested questions: composed from declarations and live
+  # rows, in whatever words the bundle declared, and they read correctly at 0
+  # and 1 as well as at the number somebody wrote them against.
+  (cd web && node --experimental-strip-types src/agent.check.ts)
   echo "ok   web renderer typechecks and builds"
 else
   echo "warn web: run (cd web && npm install) to check the renderer"

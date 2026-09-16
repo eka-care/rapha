@@ -231,15 +231,20 @@ export function App() {
                 {route.kind === "today" && (
                   <Today
                     loaded={loaded} recents={shownRecents}
+                    role={facility.data?.user.role}
                     onOpenThread={(t) => go(`#/threads/${t}`)}
                     onGoView={(v) => go(`#/views/${v}`)}
+                    onAsk={(q) => {
+                      const first = shownRecents[0]?.id ?? liveThreads[0];
+                      if (first) { go(`#/threads/${first}`); onSay(first, q); }
+                    }}
                   />
                 )}
                 {route.kind === "view" && (
                   <ViewScreen id={route.id} nonce={nonce} decl={catalogue.views?.[route.id]} />
                 )}
                 {route.kind === "patient" && (
-                  <Patient id={route.id} onOpenThread={(t) => go(`#/threads/${t}`)} />
+                  <Patient id={route.id} cat={catalogue} onOpenThread={(t) => go(`#/threads/${t}`)} />
                 )}
                 {route.kind === "settings" && (
                   <Roles client={api} cat={catalogue} roleIds={facility.data?.roles ?? []} onClose={() => go("#/")} />

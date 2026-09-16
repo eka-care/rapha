@@ -10,13 +10,14 @@ import { useMemo, useState } from "react";
 import type { Client } from "../api";
 import { OperationPanel } from "../form/Panel";
 import { Icon } from "../icons";
+import { threadAsks } from "../agent";
 import { cue, mine, offered, weigh } from "../loops";
 import { agentLine, header, messages, queueViewFor, valuesOf, type Ctx, type Said } from "../messages";
 import type { Catalogue, Operation, Payload, ThreadView } from "../types";
 import { Composer } from "../thread/Composer";
 import { Stream } from "../thread/Thread";
 import { Line } from "../view/View";
-import { human } from "../words";
+import { human, title } from "../words";
 
 const QUICK = 6;   // §33
 
@@ -82,21 +83,20 @@ export function Encounter({
                 when the workflow declared a spine and the subject row is
                 actually there -- a thread with no subject row (a laboratory's
                 accession before it is matched) links nowhere, correctly. */}
-            {spineId ? (
-              <button
-                className="btn" data-variant="ghost"
-                style={{ padding: 0, minHeight: 0, font: "inherit" }}
-                onClick={() => onOpenSubject(spineId)}
-              >
-                <h1 className="t-page" style={{ margin: 0 }}>{head.name}</h1>
-              </button>
-            ) : (
-              <h1 className="t-page" style={{ margin: 0 }}>{head.name}</h1>
-            )}
+            <h1 className="t-page" style={{ margin: 0 }}>{head.name}</h1>
             {head.identity && (
               <span className="status" data-tone="abdm">
                 {head.identity.label} {head.identity.value}
               </span>
+            )}
+            {/* The way to the person behind this visit. It was the heading
+                itself, styled as a ghost button, which is to say invisible:
+                nothing on screen said the name could be opened. */}
+            {spineId && (
+              <button className="chip" data-role="button" onClick={() => onOpenSubject(spineId)}>
+                <Icon name="folder" />
+                All visits
+              </button>
             )}
           </div>
           <div className="subject__meta t-meta">{head.meta.join(" · ")}</div>
@@ -113,11 +113,16 @@ export function Encounter({
               {quick.map((op, i) => (
                 <button
                   key={op.id}
-                  className="btn"
+                  className="act"
                   data-variant={i === 0 ? "primary" : undefined}
                   onClick={() => setModal({ op })}
+                  title={op.summary}
                 >
-                  {op.title}
+                  <span className="act__t">{op.title}</span>
+                  {/* Every operation declares a summary and none of it was on
+                      screen. It is the difference between a row of verbs and
+                      an interface that says what each one does. */}
+                  {op.summary && <span className="act__s">{op.summary}</span>}
                 </button>
               ))}
               {ranked.length > QUICK && (
@@ -155,11 +160,25 @@ export function Encounter({
 
         {/* The agent's closing line sits above the composer, because it is
             about what to do next and the composer is where you do it. */}
-        {line.sentences.length > 0 && (
-          <div className="composer__context" style={{ paddingInline: "var(--space-5)" }}>
-            {line.sentences.join(" ")}
+        {/* §21 and §2.7: the agent is a participant. It says what it makes of
+            the thread, and offers the questions worth asking next, where they
+            can be asked. The questions are kernel concepts, not this
+            bundle's words; agent.ts says why. */}
+        <div className="suggest">
+          {line.sentences.length > 0 && (
+            <div className="suggest__line">
+              <span className="suggest__mark" aria-hidden="true"><Icon name="spark" /></span>
+              <span>{line.sentences.join(" ")}</span>
+            </div>
+          )}
+          <div className="suggest__chips">
+            {threadAsks({ hasHistory: !!spineId, flags: thread.flags }).map((q) => (
+              <button className="chip" data-role="button" key={q} onClick={() => onSay(q)}>
+                {q}
+              </button>
+            ))}
           </div>
-        )}
+        </div>
 
         <Composer
           about={head.name}
@@ -174,7 +193,7 @@ export function Encounter({
         />
       </div>
 
-      <ContextPanel thread={thread} ctx={ctx} />
+      <ContextPanel thread={thread} cat={cat} ctx={ctx} />
 
       {modal && (
         <>
@@ -212,7 +231,23 @@ const toneOf = (style: string) =>
  *  permissions the caller holds, which is plumbing -- it belongs in settings,
  *  not in a panel headed with the patient's name.
  */
-function ContextPanel({ thread, ctx }: { thread: ThreadView; ctx: Ctx }) {
+function ContextPanel({ thread, cat, ctx }: { thread: ThreadView; cat: Catalogue; ctx: Ctx }) {
+  // The workflow says what continues across visits ("patient"), and that is
+  // the right heading for the subject's own details. They were appearing
+  // under "Register a new patient" -- the title of the operation that typed
+  // them -- which is correct provenance and an absurd thing to call a
+  // reference panel. Provenance belongs on the thread; this panel answers
+  // "what is known", not "who typed it".
+  const spine = cat.workflows?.[thread.workflow]?.spine ?? null;
+  const details = useMemo(() => {
+    const queue = queueViewFor(cat, thread.workflow);
+    const subject = thread.subject ?? {};
+    const keys = (queue?.columns ?? []).filter((k) => subject[k] !== undefined && subject[k] !== null && subject[k] !== "");
+    const extra = Object.keys(subject).filter(
+      (k) => !keys.includes(k) && !/(^|_)id$|_date$|_by$|^status$/.test(k) && subject[k]);
+    return [...keys, ...extra].map((k) => ({ label: title(human(k)), value: String(subject[k]) }));
+  }, [thread.subject, thread.workflow, cat]);
+
   const recorded = useMemo(() => {
     const out: { title: string; rows: { label: string; value: string; crit: boolean }[] }[] = [];
     for (const a of thread.audit) {
@@ -223,6 +258,10 @@ function ContextPanel({ thread, ctx }: { thread: ThreadView; ctx: Ctx }) {
       // is how a panel meant for problems and vitals fills up with chat.
       const presents = ctx.operations[a.operation]?.presents ?? "event";
       if (presents !== "event" && presents !== "artifact") continue;
+      // The operation that wrote the subject row wrote the demographics, and
+      // those are already the panel's first section. Repeating them under its
+      // title is what produced "REGISTER A NEW PATIENT" above a name and an age.
+      if (spine && (ctx.operations[a.operation]?.writes ?? []).includes(spine)) continue;
       const rows = valuesOf(ctx, a.operation, a.payload).map((v) => ({
         label: v.label, value: v.value, crit: v.crit,
       }));
@@ -234,7 +273,7 @@ function ContextPanel({ thread, ctx }: { thread: ThreadView; ctx: Ctx }) {
 
   const flags = thread.flags.map(human);
 
-  if (!flags.length && !recorded.length) {
+  if (!flags.length && !recorded.length && !details.length) {
     return (
       <aside className="context" aria-label="Context">
         <div className="t-meta u-faint">Nothing recorded yet.</div>
@@ -244,6 +283,23 @@ function ContextPanel({ thread, ctx }: { thread: ThreadView; ctx: Ctx }) {
 
   return (
     <aside className="context" aria-label="Context">
+      {details.length > 0 && (
+        <div className="context__section">
+          <div className="context__head" style={{ cursor: "default" }}>
+            {spine ? title(human(spine)) : "Details"}
+          </div>
+          <div className="context__body">
+            <div className="kv">
+              {details.map((d) => (
+                <div className="kv__row" key={d.label}>
+                  <span className="kv__label">{d.label}</span>
+                  <span className="kv__value">{d.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       {flags.length > 0 && <Section title="State" rows={flags} />}
       {recorded.map((r, i) => (
         <div className="context__section" key={`${r.title}-${i}`}>

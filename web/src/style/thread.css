@@ -162,3 +162,40 @@
   background: var(--color-bg-canvas);
 }
 .dictation .mod.inline { margin-top: var(--space-3); }
+
+/* §34: a quick action is not navigation, and it should say what it does.
+   Every operation declares a summary; a row of bare verbs was throwing it
+   away and making the screen look like a toolbar. */
+.act {
+  display: grid; gap: 1px; text-align: left;
+  min-height: 44px; padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface); color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.act:hover { background: var(--color-bg-hover); }
+.act__t { font-size: 13px; font-weight: 550; }
+.act__s { font-size: 11px; line-height: 15px; color: var(--color-text-tertiary); }
+.act[data-variant="primary"] {
+  background: var(--color-accent); border-color: var(--color-accent);
+  color: var(--color-bg-surface);
+}
+.act[data-variant="primary"] .act__s { color: var(--color-bg-surface); opacity: .72; }
+
+/* The agent's line and the questions worth asking, directly above the box
+   they would be asked in. */
+.suggest {
+  flex: 0 0 auto; display: grid; gap: var(--space-2);
+  padding: var(--space-3) var(--space-5) 0;
+  max-width: 940px; width: 100%; margin: 0 auto;
+}
+.suggest__line {
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  font-size: 13px; line-height: 1.5; color: var(--color-text-secondary);
+}
+.suggest__mark { flex: 0 0 auto; color: var(--color-agent); margin-top: 1px; }
+.suggest__chips { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.suggest__chips .chip { cursor: pointer; font-size: 12px; min-height: 26px; }
+.suggest__chips .chip:hover { border-color: var(--color-agent); color: var(--color-agent); }

@@ -171,3 +171,88 @@
   border: 1px solid var(--color-critical-border);
   background: var(--color-critical-soft);
 }
+
+/* ---- Today (§5) -------------------------------------------------------- */
+.today { display: grid; gap: var(--space-8); max-width: 880px; }
+.today__h2 { margin: 0 0 var(--space-3); }
+
+/* The agent's own block. §71: the AI reads as AI because it says something
+   the numbers do not, not because it glows. One quiet mark, one tinted
+   ground, and the agent colour used exactly where §50 allows it. */
+.brief {
+  display: flex; gap: var(--space-3); align-items: flex-start;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+  border-left: 3px solid var(--color-agent);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+.brief__mark {
+  flex: 0 0 auto; width: 26px; height: 26px; display: grid; place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--color-agent-soft); color: var(--color-agent);
+}
+.brief__text {
+  margin: var(--space-2) 0 0;
+  font-size: 15px; line-height: 1.6; color: var(--color-text-primary);
+}
+.brief__link {
+  color: var(--color-text-primary); font-weight: 600;
+  text-decoration: underline; text-decoration-color: var(--color-border-control);
+  text-underline-offset: 3px;
+}
+.brief__link:hover { text-decoration-color: var(--color-agent); }
+.brief__asks { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-4); }
+.brief__asks .chip { cursor: pointer; }
+.brief__asks .chip:hover { border-color: var(--color-agent); color: var(--color-agent); }
+.brief__asks .chip .i { width: 13px; height: 13px; }
+
+/* A row that is about somebody, not about a number. The count leads because
+   it is what the eye is looking for; the name follows because it is what the
+   row is actually for (§77). */
+.attention {
+  display: flex; align-items: center; gap: var(--space-4);
+  width: 100%; min-height: 58px; padding: var(--space-3) var(--space-4);
+  border: 0; border-bottom: 1px solid var(--color-border-subtle);
+  background: transparent; color: inherit; text-align: left; cursor: pointer;
+}
+.attention:last-child { border-bottom: 0; }
+.attention:hover { background: var(--color-bg-hover); }
+.attention__n {
+  flex: 0 0 auto; min-width: 28px;
+  font-size: 20px; font-weight: 600; letter-spacing: -.02em;
+  color: var(--color-text-primary);
+}
+.attention__body { display: grid; gap: 1px; min-width: 0; flex: 1; }
+
+/* ---- a visit, compacted (§2.3, §26) ------------------------------------ */
+/* Closed until somebody opens it; open, it shows what the visit actually
+   did, read from that thread rather than pre-loaded for every visit. */
+.visit {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  overflow: hidden;
+}
+.visit[data-open="true"] { border-color: var(--color-border-strong); }
+.visit__head {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; min-height: 52px; padding: var(--space-3) var(--space-4);
+  border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer;
+}
+.visit__head:hover { background: var(--color-bg-hover); }
+.visit__chev { display: grid; place-items: center; color: var(--color-text-tertiary);
+  transition: transform var(--duration-fast) var(--ease-out); }
+.visit__chev[data-open="true"] { transform: rotate(180deg); }
+.visit__when { font-weight: 600; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.visit__did {
+  flex: 1; min-width: 0; color: var(--color-text-tertiary); font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.visit__body {
+  display: grid; gap: var(--space-4); justify-items: start;
+  padding: var(--space-2) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+.visit__block { display: grid; gap: var(--space-2); width: 100%; }
+.visit__op { letter-spacing: .06em; text-transform: uppercase; }
