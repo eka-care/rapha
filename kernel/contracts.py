@@ -363,12 +363,14 @@ class Draft:
     set of values to put in editable fields. `values` are keyed by link_id.
     `confidence` is per link_id, 0 to 1, and the renderer must highlight any
     field below 0.9 for re-reading. A Draft with no values is the fail-closed
-    outcome and means: show the keypad."""
+    outcome and means: show the keypad. `evidence` is per link_id, the
+    words the value was taken from, shown beside it for the readback."""
     instrument: str
     operation: str
     values: dict
     confidence: dict = field(default_factory=dict)
     transcript: Optional[str] = None
+    evidence: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

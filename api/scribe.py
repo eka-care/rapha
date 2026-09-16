@@ -20,9 +20,10 @@ Doctrine this module enforces rather than documents
   renderer checks so the button is absent; api/main.py checks again before a
   single byte is uploaded, because that is the trust boundary and the
   renderer's check is a courtesy.
-- Vitals are not in the scribe's operations and this module fills no numeric
-  field. Eka's own output carries a temperature; it is dropped on purpose.
-  A misheard number is silent, plausible and unrecoverable.
+- Eka is asked for the transcript only (`transcript_template`, no EMR JSON).
+  Structure is ours: `api/fill.py` and `api/extract.py` fill whatever
+  questionnaire the operation names from that transcript, so a field this
+  module was never told about is never guessed at from Eka's own parse of it.
 
 What Eka actually answers, seen live against https://api.eka.care on
 2026-09-11 (not read from a document):
@@ -42,18 +43,9 @@ What Eka actually answers, seen live against https://api.eka.care on
               "template_results": {"custom": [...], "transcript": [...]}}}
            A job still running answers 202 with "output": [].
 
-  templates  `eka_emr_template` decodes to a JSON prescription (symptoms,
-           diagnosis with SNOMED and ICD-10 codes, medications with dose
-           patterns, advices, followup). `transcript_template` decodes to the
-           plain transcript. `clinical_notes_template` is markdown prose and
-           is not requested here: everything in it is in the EMR JSON, with
-           structure instead of headings to parse.
-
-  There is NO per field recognition confidence anywhere in that response.
-  `audio_matrix.quality` is about the audio, and the `confidence: true` inside
-  a code linkage is about the code, not about what was heard. So this module
-  reports a confidence of 0.0 for every field it fills, which the renderer
-  draws as "heard, with no score reported", and it does not invent a number.
+  Confidence per field comes from `api/extract.py`'s model call against the
+  transcript, not from Eka: there is no per field recognition confidence
+  anywhere in Eka's response, only `audio_matrix.quality` about the audio.
 
 Run the check: python3 -m api.scribe
 """
@@ -62,20 +54,33 @@ from __future__ import annotations
 import base64
 import contextlib
 import io
-import json
 import os
 import tempfile
+import time
 import uuid
+from datetime import date
 
 # Reused, not re-written: one definition in this repository of what an Aadhaar
 # number, a file path and a recording's filename look like, so the two scribe
 # call sites cannot drift apart on it. See care_phc/connectors/scribe/eka.py.
 from care_phc.connectors.scribe.eka import _scrub
 
+from api import extract as extractor_module
+from api import fill as filler
+
 # The action the SDK's v2rx path takes, and the templates worth asking for.
 ACTION = "ekascribe-v2"
-TEMPLATES = [{"template_id": "eka_emr_template"},
-             {"template_id": "transcript_template"}]
+
+# The transcript and nothing else. Structure is ours: api/fill.py and
+# api/extract.py read whatever questionnaire the template names.
+TEMPLATES = [{"template_id": "transcript_template", "codification_needed": False}]
+
+# What a person picks in the bar, to what Eka is told was spoken. Hinglish is
+# two languages at once, which is how it is sent.
+LANGUAGES = {"en-IN": ["en-IN"], "hinglish": ["en-IN", "hi"], "hi": ["hi"],
+             "ta": ["ta"], "te": ["te"]}
+
+TRANSCRIPT_SECONDS = 24 * 3600
 
 # .env names api.dev.eka.care, where these credentials are refused with "pwd
 # mismatch". They work on api.eka.care, which is where the ABDM connector
@@ -153,7 +158,7 @@ def client():
     return _client
 
 
-def start(audio, *, suffix=".webm", language="en-IN", mode="consultation"):
+def start(audio, *, suffix=".webm", languages=("en-IN",), mode="consultation"):
     """Upload one recording. Returns the transaction id to poll.
 
     `audio` is bytes and stays bytes: it is written to a temporary file only
@@ -171,7 +176,7 @@ def start(audio, *, suffix=".webm", language="en-IN", mode="consultation"):
         sdk(lambda: client().v2rx.upload(
             [path], txn_id=txn, action=ACTION,
             extra_data={"mode": mode, "model_type": "pro"},
-            output_format={"input_language": [language],
+            output_format={"input_language": list(languages),
                            "output_template": TEMPLATES}))
     except ScribeError:
         raise
@@ -284,139 +289,9 @@ def failures(status):
     return said
 
 
-def _prop(item, name):
-    """One of Eka's `properties` bags, flattened to text. The keys are opaque
-    ids (`pg-1541659976`), so the property is found by its own `name`."""
-    for prop in ((item or {}).get("properties") or {}).values():
-        if str((prop or {}).get("name", "")).lower() != name.lower():
-            continue
-        parts = []
-        for sel in prop.get("selection") or []:
-            value = sel.get("value")
-            unit = sel.get("unit")
-            if value in (None, ""):
-                continue
-            parts.append("%s %s" % (value, unit) if unit else str(value))
-        if parts:
-            return ", ".join(parts)
-    return ""
-
-
-def _phrase(item):
-    """A finding as one readable clause: the name, then whatever qualified it."""
-    name = str((item or {}).get("name") or "").strip()
-    extra = [_prop(item, k) for k in ("Since", "Details", "Finding status", "Status")]
-    extra = [e for e in extra if e]
-    return "%s (%s)" % (name, ", ".join(extra)) if name and extra else name
-
-
-def _dose(med):
-    """The dose as Eka wrote it. `custom` is its own human spelling of the
-    pattern ("1-1-1", "SOS") and is preferred over rebuilding one."""
-    freq = (med or {}).get("frequency") or {}
-    duration = (med or {}).get("duration") or {}
-    parts = [freq.get("custom") or "", duration.get("custom") or "",
-             (med or {}).get("instruction") or ""]
-    return ", ".join(str(p).strip() for p in parts if str(p).strip())
-
-
-# The link_ids this module knows how to fill. A questionnaire that asks
-# anything else gets nothing for it: an unfilled field is a field a doctor
-# fills, and a guessed one is a field nobody re-reads.
-KNOWN = ("history", "examination", "assessment", "plan", "diagnosis", "medications")
-
-
-def fill(link_ids, emr):
-    """The draft values this scribe can offer one questionnaire.
-
-    `emr` is the decoded eka_emr_template JSON. Returns {link_id: value} with
-    every empty answer dropped, so an operation the recording said nothing
-    about produces no draft at all rather than a form full of blanks.
-    """
-    rx = (emr or {}).get("prescription") or {}
-    want = set(link_ids)
-    out = {}
-
-    if "history" in want:
-        out["history"] = ". ".join(
-            p for p in (_phrase(s) for s in rx.get("symptoms") or []) if p)
-
-    if "examination" in want:
-        lines = []
-        for exam in ((rx.get("medicalHistory") or {}).get("examinations") or []):
-            name = str(exam.get("name") or "").strip()
-            notes = str(exam.get("notes") or "").strip()
-            lines.append(": ".join(x for x in (name, notes) if x))
-        out["examination"] = ". ".join(x for x in lines if x)
-
-    if "assessment" in want:
-        out["assessment"] = ". ".join(
-            p for p in (_phrase(d) for d in rx.get("diagnosis") or []) if p)
-
-    if "plan" in want:
-        advices = [str(a.get("text") or a.get("parsedText") or "").strip()
-                   for a in rx.get("advices") or []]
-        follow = (rx.get("followup") or {}).get("notes") or ""
-        out["plan"] = ". ".join(x for x in advices + [str(follow).strip()] if x)
-
-    if "diagnosis" in want:
-        # Structured, per the questionnaire: one box per row, and the operation
-        # mapping reads `code` off it (catalogue/ops/phc.op.consult-document.md
-        # says `code: {item: [code, text]}`, so `code` is the one field the
-        # renderer draws and the kernel writes).
-        #
-        # Eka also linked an ICD-10 and a SNOMED code for most of these, and
-        # both are DROPPED here. The box holds one value, a doctor can read
-        # back a diagnosis and cannot read back "J06.9", and a discrete value
-        # nobody can check is exactly what the readback rule exists to stop. A
-        # questionnaire that asks for the code in its own field is what would
-        # make the code safe to offer; this one does not.
-        out["diagnosis"] = [{"code": str(d.get("name") or "")}
-                            for d in rx.get("diagnosis") or [] if d.get("name")]
-
-    if "medications" in want:
-        # Same rule: `medication` then `dosage_instruction`, which is what
-        # phc.op.rx-prescribe's mapping reads off each item. A dose is a
-        # discrete value, so it lands unconfirmed like every other one.
-        out["medications"] = [
-            {"medication": str(m.get("name") or ""), "dosage_instruction": _dose(m)}
-            for m in rx.get("medications") or [] if m.get("name")]
-
-    return {k: v for k, v in out.items() if v}
-
-
-def drafts(status, targets, *, instrument=""):
-    """One Draft per operation the instrument declaration named.
-
-    `targets` is {operation_id: [link_id, ...]}, built by the caller from the
-    declarations, so nothing here knows a bundle's words. The shape returned
-    is kernel.contracts.Draft's, as JSON: values, per field confidence, and
-    the transcript for the readback.
-
-    Confidence is 0.0 for every filled field, and that is the honest number:
-    the service reports none. The renderer draws anything under 0.9 as
-    unconfirmed, which is exactly what a scribe draft is.
-    """
+def transcript_of(status):
     text = decoded(status)
-    emr = {}
-    raw = text.get("eka_emr_template") or ""
-    if raw:
-        try:
-            emr = json.loads(raw)
-        except ValueError:
-            emr = {}
-    transcript = (text.get("transcript_template") or text.get("transcript") or "").strip()
-
-    out = []
-    for operation, link_ids in sorted(targets.items()):
-        values = fill(link_ids, emr)
-        if not values:
-            continue
-        out.append({"instrument": instrument, "operation": operation,
-                    "values": values,
-                    "confidence": {k: 0.0 for k in values},
-                    "transcript": transcript})
-    return out
+    return (text.get("transcript_template") or text.get("transcript") or "").strip()
 
 
 # ------------------------------------------------------------------- sessions
@@ -427,11 +302,11 @@ def drafts(status, targets, *, instrument=""):
 SESSIONS = {}
 
 
-def begin(thread, actor, txn, targets, instrument=""):
+def begin(thread, actor, txn, operations, instrument=""):
     session = {"id": "scr-" + uuid.uuid4().hex[:12], "thread": thread,
-               "actor": actor, "txn": txn, "targets": targets,
+               "actor": actor, "txn": txn, "operations": operations,
                "instrument": instrument, "status": "running", "reason": "",
-               "drafts": []}
+               "drafts": [], "transcript": "", "expires": None}
     SESSIONS[session["id"]] = session
     return session
 
@@ -443,13 +318,37 @@ def by_txn(txn):
     return None
 
 
-def collect(session):
-    """Ask once whether the draft is ready, and keep whatever came back.
+def expire(now=None):
+    """Drop every transcript past its 24 hours. Called on every session read,
+    so nothing needs a timer; a kernel nobody asks keeps nothing it could have
+    dropped either, because a restart empties SESSIONS."""
+    now = time.time() if now is None else now
+    for sid in [s for s, v in SESSIONS.items() if v["expires"] and v["expires"] <= now]:
+        del SESSIONS[sid]
 
-    A withdrawn session is never asked again: withdrawal means this visit's
-    audio stops being anybody's business, so the result of a job already
-    running is dropped rather than drawn.
-    """
+
+def refill(session, operations, *, extractor=None, today=None):
+    """Build drafts for these operations from the transcript already held. The
+    template switch: no re-recording, no second upload."""
+    extractor = extractor or extractor_module.extract
+    today = today or date.today()
+    session["operations"] = operations
+    session["drafts"] = []
+    for op_id, spec in sorted(operations.items()):
+        answers = extractor(filler.flatten(spec["schema"]), session["transcript"])
+        d = filler.build_draft(op_id, spec["schema"], answers, session["transcript"],
+                               instrument=session["instrument"], today=today)
+        if d:
+            session["drafts"].append(d)
+    if session["drafts"]:
+        session.update(status="ready", reason="")
+    else:
+        session.update(status="ready", reason="Nothing in the recording fills this form. "
+                       "The transcript is below. Type the note.")
+    return session
+
+
+def collect(session, *, extractor=None):
     if session["status"] in ("ready", "failed", "withdrawn"):
         return session
     try:
@@ -459,82 +358,37 @@ def collect(session):
         return session
     if running(status):
         return session
-    session["drafts"] = drafts(status, session["targets"],
-                               instrument=session["instrument"])
-    if session["drafts"]:
-        session.update(status="ready", reason="")
-    else:
+    session["transcript"] = transcript_of(status)
+    if not session["transcript"]:
         said = failures(status)
-        session.update(status="failed", reason=(
-            "The scribe returned nothing this form can use. %s Type the note."
-            % (" ".join(said) if said else
-               "It heard no symptoms, diagnosis or medicines in the recording.")))
-    return session
+        session.update(status="failed", reason="No transcript came back. %s Type the note."
+                       % " ".join(said))
+        return session
+    session["expires"] = time.time() + TRANSCRIPT_SECONDS
+    return refill(session, session["operations"], extractor=extractor)
 
 
 def withdraw(session):
-    """Consent withdrawn, or the doctor gave up on it. Nothing is fetched
-    afterwards and the draft, if one arrives at Eka, is never read."""
-    session.update(status="withdrawn", drafts=[],
+    session.update(status="withdrawn", drafts=[], transcript="",
                    reason="Withdrawn. Nothing from this recording was kept.")
     return session
 
 
 def public(session):
-    """What the browser may see. The transaction id stays here: it is the
-    handle on somebody's consultation audio and it is not the browser's."""
     return {"session": session["id"], "status": session["status"],
-            "reason": session["reason"], "drafts": session["drafts"]}
+            "reason": session["reason"], "drafts": session["drafts"],
+            "transcript": session["transcript"],
+            "operations": sorted(session["operations"])}
 
 
 # ---------------------------------------------------------------------- check
 
-SAMPLE = {"data": {
-    "created_at": "2026-09-11T05:03:14Z",
-    "audio_matrix": {"quality": 0.98},
-    "output": [{"template_id": "eka_emr_template", "status": "success",
-                "errors": [], "value": base64.b64encode(json.dumps({
-        "prescription": {
-            "symptoms": [
-                {"name": "fever", "linked": {"icd10_code": "R50.9"},
-                 "properties": {"pg-1": {"name": "Since",
-                                         "selection": [{"value": 3, "unit": "Days"}]}}},
-                {"name": "cough", "properties": {"pg-5": {
-                    "name": "Details", "selection": [{"value": "with yellow sputum"}]}}}],
-            "diagnosis": [{"name": "Acute upper respiratory tract infection",
-                           "linked": {"snomedct_code": "54398005", "icd10_code": "J06.9"},
-                           "properties": {"pg-9": {"name": "Status", "selection": [
-                               {"value": "Suspected"}]}}}],
-            "advices": [{"text": "Drink plenty of fluids"}],
-            "followup": {"notes": "Return in 3 days if fever does not settle"},
-            "medications": [
-                {"name": "Amoxicillin 500 mg",
-                 "duration": {"custom": "5 Days"},
-                 "frequency": {"custom": "1-1-1"}},
-                {"name": "Paracetamol 650 mg", "frequency": {"custom": "SOS"},
-                 "instruction": "For fever"}],
-            "medicalHistory": {"examinations": [
-                {"name": "Throat examination", "notes": "Abnormal | Inflamed"}]},
-            "vitals": [{"name": "Temperature", "value": "38.4"}],
-        }}).encode()).decode()},
-               {"template_id": "transcript_template", "status": "success", "errors": [],
-                "value": base64.b64encode(b"Good morning. Fever for three days.").decode()}],
-    "template_results": {"custom": [{"template_id": "clinical_notes_template",
-                                     "status": "failure", "value": "", "errors": [
-        {"msg": "Something went wrong", "detail": "Template not found"}]}]}}}
-
-CONSULT = ["history", "examination", "assessment", "diagnosis", "plan"]
-RX = ["medications"]
-
-
 def demo():
     """Run: python3 -m api.scribe
 
-    The sample above is the shape of a real answer from api.eka.care on
-    2026-09-11, trimmed. No network, no store, no credentials.
+    No network, no store, no credentials.
     """
     assert running({"data": {"output": [], "template_results": {}}}), "202 is still running"
-    assert not running(SAMPLE), "an answer with output is not still running"
 
     # THE PARTIAL BODY, verbatim from api.eka.care on 2026-09-11: the transcript
     # is already done and the template every field comes from is not. Before
@@ -545,8 +399,6 @@ def demo():
                             {"template_id": "transcript", "status": "success",
                              "value": base64.b64encode(b"Fever for three days.").decode()}]}}}
     assert running(PARTIAL), "a template still being built means keep waiting"
-    assert drafts(PARTIAL, {"phc.op.consult-document": CONSULT}) == [], \
-        "and nothing is drafted from the half that did arrive"
     # A template that FAILED is finished, not pending: it must not hang the wait.
     FAILED = {"data": {"output": [{"template_id": "eka_emr_template",
                                    "status": "failure", "value": "",
@@ -554,47 +406,49 @@ def demo():
     assert not running(FAILED), "a failure is an answer, not a wait"
     assert failures(FAILED) == ["Template not found"], failures(FAILED)
 
-    text = decoded(SAMPLE)
-    assert "Fever for three days" in text["transcript_template"], text
-    assert failures(SAMPLE) == ["Something went wrong Template not found"], failures(SAMPLE)
+    text = decoded(PARTIAL)
+    assert "Fever for three days" in text["transcript"], text
 
-    got = drafts(SAMPLE, {"phc.op.consult-document": CONSULT,
-                          "phc.op.rx-prescribe": RX}, instrument="phc.inst.consult-scribe")
-    by_op = {d["operation"]: d for d in got}
-    consult = by_op["phc.op.consult-document"]["values"]
-    assert consult["history"] == "fever (3 Days). cough (with yellow sputum)", consult
-    assert consult["examination"] == "Throat examination: Abnormal | Inflamed", consult
-    assert consult["assessment"].startswith("Acute upper respiratory tract infection (Suspected)"), consult
-    assert consult["plan"] == "Drink plenty of fluids. Return in 3 days if fever does not settle", consult
-    assert consult["diagnosis"] == [
-        {"code": "Acute upper respiratory tract infection"}], consult
-    assert "J06.9" not in json.dumps(consult), \
-        "a code the reader cannot check is not put in front of them as a value"
+    DONE = {"data": {"output": [], "template_results": {"transcript": [
+        {"template_id": "transcript", "status": "success",
+         "value": base64.b64encode(b"BP is 140 over 90. Fever for three days.").decode()}]}}}
+    assert transcript_of(DONE) == "BP is 140 over 90. Fever for three days."
 
-    rx = by_op["phc.op.rx-prescribe"]["values"]
-    assert rx["medications"] == [
-        {"medication": "Amoxicillin 500 mg", "dosage_instruction": "1-1-1, 5 Days"},
-        {"medication": "Paracetamol 650 mg", "dosage_instruction": "SOS, For fever"}], rx
+    vitals = {"questions": [{"link_id": "systolic", "text": "Systolic", "type": "integer"}]}
+    consult = {"questions": [{"link_id": "history", "text": "History", "type": "text"}]}
 
-    # The doctrine, asserted rather than commented: no numeric field is ever
-    # filled from a recording, and every field that is filled is unconfirmed.
-    every = {k: v for d in got for k, v in d["values"].items()}
-    assert "temperature" not in every and "systolic" not in every, every
-    for d in got:
-        assert set(d["confidence"]) == set(d["values"]), d
-        assert all(c < 0.9 for c in d["confidence"].values()), d
-        assert d["transcript"], "the readback needs the transcript"
+    def fake(fields, transcript):
+        ids = {f["link_id"] for f in fields}
+        said = {"systolic": {"value": 140, "confidence": 0.95, "evidence": "BP is 140"},
+                "history": {"value": "Fever for three days", "confidence": 0.9,
+                            "evidence": "Fever for three days"}}
+        return {k: v for k, v in said.items() if k in ids}
 
-    # An operation the recording said nothing about gets no draft at all, and
-    # a questionnaire asking something this module does not understand gets
-    # nothing for it rather than a guess.
-    assert drafts(SAMPLE, {"x.op.y": ["blood_group"]}) == []
-    silent = {"data": {"output": [{"template_id": "eka_emr_template",
-                                   "value": base64.b64encode(b"{}").decode()}]}}
-    assert drafts(silent, {"phc.op.consult-document": CONSULT}) == []
+    global poll
+    real_poll, poll = poll, lambda txn: DONE
+    try:
+        s = begin("enc-003", "user:mo", "phc-y", {"v.op": {"schema": vitals}}, instrument="i")
+        collect(s, extractor=fake)
+    finally:
+        poll = real_poll
+    assert s["status"] == "ready" and s["drafts"][0]["values"] == {"systolic": 140}, s
+    assert s["drafts"][0]["tick"] == ["systolic"]
+    assert s["expires"] - time.time() > 24 * 3600 - 5, "the transcript is kept a day"
+
+    refill(s, {"c.op": {"schema": consult}}, extractor=fake)
+    assert [d["operation"] for d in s["drafts"]] == ["c.op"], "the switch rebuilds from the transcript"
+    assert public(s)["transcript"].startswith("BP is 140")
+
+    expire(now=s["expires"] + 1)
+    assert s["id"] not in SESSIONS, "past a day the transcript is gone"
+
+    withdrawn = begin("enc-003", "user:mo", "phc-z", {}, instrument="i")
+    withdrawn["transcript"] = "something"
+    withdraw(withdrawn)
+    assert public(withdrawn)["transcript"] == "", "withdrawal drops the transcript too"
 
     # A withdrawn session is inert, whatever the service later says.
-    session = begin("enc-002", "user:demo", "phc-x", {"phc.op.consult-document": CONSULT})
+    session = begin("enc-002", "user:demo", "phc-x", {})
     withdraw(session)
     assert collect(session)["drafts"] == [], "withdrawal survives a collect"
     assert public(session)["status"] == "withdrawn"
@@ -636,7 +490,7 @@ def demo():
         _client = was
     assert said.getvalue() == "", "the SDK's print never reaches stdout: %r" % said.getvalue()
 
-    print("ok api.scribe: 30 asserts, no network")
+    print("ok api.scribe")
 
 
 if __name__ == "__main__":

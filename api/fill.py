@@ -131,6 +131,30 @@ def enabled(fields, values):
     return out
 
 
+CAP = 0.89   # under web/src/form/Form.tsx SURE, so every heard value reads as unconfirmed
+
+
+def build_draft(operation, schema, answers, transcript, *, instrument, today):
+    fields = flatten(schema)
+    by = {f["link_id"]: f for f in fields}
+    values, unfilled = {}, []
+    for link_id, a in answers.items():
+        ok, value = coerce(by[link_id], a["value"], today) if link_id in by else (False, None)
+        if ok:
+            values[link_id] = value
+        else:
+            unfilled.append(link_id)
+    kept = enabled(fields, values)
+    unfilled += [k for k in values if k not in kept]
+    if not kept:
+        return None
+    return {"instrument": instrument, "operation": operation, "values": kept,
+            "confidence": {k: min(CAP, answers[k]["confidence"]) for k in kept},
+            "evidence": {k: answers[k]["evidence"] for k in kept},
+            "tick": [k for k in kept if by[k]["type"] in TICK_TYPES],
+            "unfilled": sorted(unfilled), "transcript": transcript}
+
+
 def demo():
     schema = {"questions": [
         {"link_id": "intro", "text": "Read this", "type": "display"},
@@ -172,6 +196,18 @@ def demo():
     assert enabled(fields, {"pregnant": False, "lmp": "2026-08-01"}) == {"pregnant": False}
     assert enabled(fields, {"pregnant": True, "lmp": "2026-08-01"}) == \
         {"pregnant": True, "lmp": "2026-08-01"}
+
+    answers = {"systolic": {"value": "140", "confidence": 0.97, "evidence": "BP 140"},
+               "re_va": {"value": "6/12", "confidence": 0.9, "evidence": "six by twelve"},
+               "lmp": {"value": "15 August", "confidence": 0.9, "evidence": "15 August"},
+               "diagnosis": {"value": [{"code": "Fever"}], "confidence": 0.8, "evidence": "fever"}}
+    d = build_draft("x.op", schema, answers, "BP 140 ...", instrument="i", today=today)
+    assert d["values"] == {"systolic": 140, "diagnosis": [{"code": "Fever"}]}, d
+    assert d["unfilled"] == ["lmp", "re_va"], "off-list and disabled are heard but not filled"
+    assert d["confidence"] == {"systolic": 0.89, "diagnosis": 0.8}, "capped under SURE"
+    assert d["tick"] == ["systolic"], "numbers are ticked, structured rows are not"
+    assert d["evidence"]["systolic"] == "BP 140"
+    assert build_draft("x.op", schema, {}, "hello", instrument="i", today=today) is None
     print("ok api.fill")
 
 
