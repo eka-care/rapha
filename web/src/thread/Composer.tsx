@@ -21,12 +21,10 @@ const clamp = (n: number, len: number) => ((n % len) + len) % len;
 export type Recording = { seconds: number; onStop: () => void } | null;
 
 export function Composer({
-  about, context, actions, roles, asking, recording,
+  about, actions, roles, asking, recording, quick,
   onSay, onAction, onStartScribe, micReason,
 }: {
   about: string;
-  /** §16's context line: who and what this composer is pointed at. */
-  context?: string;
   actions: Operation[];
   roles: string[];
   asking?: boolean;
@@ -34,6 +32,10 @@ export function Composer({
   onSay: (text: string) => void;
   onAction: (op: Operation, mention?: string) => void;
   onStartScribe?: () => void;
+  /** §34's quick actions, rendered inside the composer row the way the
+   *  prototype does: the things you can do sit beside the box you say things
+   *  in, not in a toolbar at the top of the screen. */
+  quick?: React.ReactNode;
   /** Why the microphone is unavailable, if it is. An icon that does nothing
    *  and says nothing is worse than one that is absent. */
   micReason?: string;
@@ -82,33 +84,28 @@ export function Composer({
 
   if (recording) {
     return (
-      <div className="composer" data-state="recording">
-        <div className="composer__expanded">
-          <div className="composer__expanded-row">
-            <span className="composer__recording">
-              <span className="recording-dot" aria-hidden="true" />
-              Listening
-              <span className="composer__recording-time">{mmss(recording.seconds)}</span>
-            </span>
-            <button className="btn" style={{ marginLeft: "auto" }} onClick={recording.onStop}>
-              Stop
-            </button>
-          </div>
-          <div className="t-meta u-faint">The consultation is being captured.</div>
+      <div className="composer composer-wrap">
+        <div className="rec-bar">
+          <span className="rec-dot" aria-hidden="true" />
+          Listening
+          <span className="rec-t">{mmss(recording.seconds)}</span>
+          <span className="ml-auto" style={{ fontWeight: 500 }}>The consultation is being captured.</span>
         </div>
+        <button className="btn btn-b" onClick={recording.onStop}>Stop</button>
       </div>
     );
   }
 
   return (
-    <div className="composer" data-state={asking ? "generating" : "idle"}>
-      {context && <div className="composer__context">{context}</div>}
-      <div style={{ position: "relative", maxWidth: 900, margin: "0 auto" }}>
-        <Menu items={items} pick={pick} onChoose={choose} id={listId} />
-        <div className="composer__inner">
-          <textarea
+    <div className="composer-wrap">
+      {/* The questions worth asking sit in their own row above the box they
+          would be asked in. Inline beside it they strangled the input, which
+          is what happens when a chip's label is a sentence. */}
+      {quick && <div className="composer-quick">{quick}</div>}
+      <div className="composer">
+      <Menu items={items} pick={pick} onChoose={choose} id={listId} />
+      <textarea
             ref={box}
-            className="composer__input"
             rows={1}
             value={text}
             aria-label={`Message about ${about}`}
@@ -133,30 +130,28 @@ export function Composer({
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
             }}
           />
-          {onStartScribe && (
-            <button
-              type="button"
-              className="composer__mic"
-              onClick={onStartScribe}
-              disabled={!!micReason}
-              title={micReason || "Dictate"}
-              aria-label={micReason || "Dictate"}
-            >
-              <Icon name="mic" />
-            </button>
-          )}
-          <button
-            type="button"
-            className="composer__send"
-            data-ready={text.trim().length > 0 && !asking}
-            onClick={send}
-            disabled={!text.trim() || asking}
-            aria-label={asking ? "Working" : "Send"}
-            title={asking ? "Working" : "Send"}
-          >
-            <Icon name={asking ? "spark" : "send"} />
-          </button>
-        </div>
+      {onStartScribe && (
+        <button
+          type="button"
+          className="btn btn-g mic"
+          onClick={onStartScribe}
+          disabled={!!micReason}
+          title={micReason || "Dictate"}
+          aria-label={micReason || "Dictate"}
+        >
+          <Icon name="mic" className="i sm" />
+        </button>
+      )}
+      <button
+        type="button"
+        className="btn btn-b send"
+        onClick={send}
+        disabled={!text.trim() || asking}
+        aria-label={asking ? "Working" : "Send"}
+        title={asking ? "Working" : "Send"}
+      >
+        <Icon name={asking ? "spark" : "send"} className="i sm" />
+      </button>
       </div>
     </div>
   );

@@ -1,21 +1,17 @@
-/** The four declared view kinds, drawn as §54's list.
+/** The four declared view kinds. A queue is a grid of patient CARDS, which is
+ *  the prototype's shape and the right one: a queue is scanned for a person,
+ *  not read across like a spreadsheet.
  *
- *  Which columns a queue shows, which flags get which tone, and what the view
- *  is called are all the declaration's answers. This file contains no station,
- *  no flag and no view title, which is how the same component draws a health
- *  centre's line and a laboratory's bench.
+ *  Columns, badge tones and the view's title are all the declaration's.
  */
+import { initialsOf } from "../agent";
 import { Icon } from "../icons";
-import { human, title } from "../words";
-import { Empty } from "../parts";
 import type {
   MetricValue, QueueRow, SectionResult, StepStatus, TaskRow, ViewDecl, ViewResult,
 } from "../types";
+import { human, title } from "../words";
 
-/** §62's tones, from the declaration's own badge style. A style the bundle
- *  invents that we have no tone for falls through to neutral rather than
- *  being guessed at. */
-const TONE: Record<string, string> = { crit: "critical", warn: "warning", ok: "success", mute: "" };
+const TONE: Record<string, string> = { crit: "b-crit", warn: "b-warn", ok: "b-ok", mute: "b-mute" };
 
 export function View({ result, decl, onOpenThread }: {
   result: ViewResult;
@@ -28,114 +24,110 @@ export function View({ result, decl, onOpenThread }: {
   if (result.kind === "tasklist") {
     return <Tasks rows={(result.rows ?? []) as TaskRow[]} onOpenThread={onOpenThread} />;
   }
-  if (result.kind === "dashboard") {
-    return <Dashboard rows={(result.rows ?? []) as MetricValue[]} />;
-  }
+  if (result.kind === "dashboard") return <Dashboard rows={(result.rows ?? []) as MetricValue[]} />;
   return <Sections sections={(result.rows ?? []) as SectionResult[]} />;
 }
 
-// ------------------------------------------------------------------ queue
-
-/** The columns this list shows. The declaration names them; if it names none,
- *  fall back to whatever the subject carries, minus the plumbing nobody reads
- *  in a list. */
-export function columnsOf(decl: ViewDecl | undefined, rows: QueueRow[]): string[] {
-  if (decl?.columns?.length) return decl.columns;
-  const seen = new Set<string>();
-  for (const r of rows) for (const k of Object.keys(r.subject ?? {})) {
-    if (!/(^|_)id$|_date$|_by$/.test(k)) seen.add(k);
-  }
-  return [...seen].slice(0, 5);
+/** The subject fields this card shows: the declaration's columns, or whatever
+ *  the subject carries when the short form of a view omitted them. */
+function fields(decl: ViewDecl | undefined, row: QueueRow): { name: string; meta: string } {
+  const keys = (decl?.columns ?? []).length
+    ? (decl!.columns as string[])
+    : Object.keys(row.subject ?? {}).filter((k) => !/(^|_)id$|_date$|_by$/.test(k));
+  const values = keys.map((k) => row.subject?.[k]).filter((v) => v !== null && v !== undefined && v !== "");
+  const name = String(values[0] ?? row.thread);
+  return { name, meta: values.slice(1, 4).map(String).join(" · ") };
 }
-
-const show = (v: unknown) =>
-  v === null || v === undefined || v === "" ? "—" : String(v);
 
 function Queue({ rows, decl, onOpenThread }: {
   rows: QueueRow[]; decl?: ViewDecl; onOpenThread?: (t: string) => void;
 }) {
   if (!rows.length) {
-    return <Empty title="Nobody is waiting.">This list fills as people are registered.</Empty>;
+    return <div className="state-empty">Nobody is waiting. This list fills as people are registered.</div>;
   }
-  const columns = columnsOf(decl, rows);
-  // One shared track for the header and every row, so they cannot drift.
-  const track = `minmax(200px, 1.6fr) ${columns.slice(1).map(() => "minmax(120px, 1fr)").join(" ")} minmax(140px, 1fr)`;
   return (
-    <div className="patient-list" role="table">
-      <div className="patient-row patient-row--head" role="row" style={{ gridTemplateColumns: track }}>
-        {columns.map((c) => <span className="patient-cell" role="columnheader" key={c}>{title(human(c))}</span>)}
-        <span className="patient-cell" role="columnheader">Status</span>
-      </div>
-      {rows.map((r) => (
-        <button
-          type="button"
-          role="row"
-          className="patient-row"
-          style={{ gridTemplateColumns: track }}
-          key={r.thread}
-          onClick={() => onOpenThread?.(r.thread)}
-        >
-          {columns.map((c, i) => (
-            <span className="patient-cell" role="cell" key={c}>
-              <span className={i === 0 ? "patient-name" : ""}>{show(r.subject?.[c])}</span>
-              {i === 0 && r.station && <span className="patient-sub"> · {human(r.station)}</span>}
-            </span>
-          ))}
-          <span className="patient-cell patient-cell--tags" role="cell">
-            {(r.flags ?? []).length === 0 && <span className="u-faint">—</span>}
-            {(r.flags ?? []).map((f) => (
-              <span className="status" data-tone={TONE[r.badges?.[f] ?? ""] || undefined} key={f}>
-                {human(f)}
-              </span>
-            ))}
-          </span>
-        </button>
-      ))}
+    <div className="qgrid">
+      {rows.map((r) => {
+        const f = fields(decl, r);
+        const token = Object.entries(r.subject ?? {}).find(([k, v]) => /token/i.test(k) && v);
+        // A thread late in the line carries every flag it has ever raised, and
+        // all of them on a card is a wall nobody reads. The declaration already
+        // says which are worth calling out (`badges`), so those lead and the
+        // rest are a count.
+        const called = (r.flags ?? []).filter((fl) => r.badges?.[fl]);
+        const plain = (r.flags ?? []).filter((fl) => !r.badges?.[fl]);
+        const shown = [...called, ...plain].slice(0, 3);
+        const rest = (r.flags ?? []).length - shown.length;
+        return (
+          <button className="qc" key={r.thread} onClick={() => onOpenThread?.(r.thread)}>
+            <div className="qc-top">
+              <span className="avatar sm">{initialsOf(f.name)}</span>
+              <div className="qc-b">
+                <div className="qc-n">{f.name}</div>
+                {f.meta && <div className="qc-m">{f.meta}</div>}
+              </div>
+              {token && <span className="qc-tok">{String(token[1])}</span>}
+            </div>
+            <div className="qc-chips">
+              {r.station && <span className="badge b-ink">{human(r.station)}</span>}
+              {shown.map((fl) => (
+                <span className={`badge ${TONE[r.badges?.[fl] ?? ""] ?? "b-mute"}`} key={fl}>
+                  {human(fl)}
+                </span>
+              ))}
+              {rest > 0 && <span className="badge b-mute">+{rest}</span>}
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
-
-// --------------------------------------------------------------- tasklist
 
 function Tasks({ rows, onOpenThread }: { rows: TaskRow[]; onOpenThread?: (t: string) => void }) {
-  if (!rows.length) {
-    return <Empty title="You're clear.">Nothing needs your attention.</Empty>;
-  }
+  if (!rows.length) return <div className="state-empty">You're clear. Nothing needs your attention.</div>;
   return (
-    <div className="patient-list">
-      {rows.map((r) => (
-        <div className="patient-row" style={{ gridTemplateColumns: "1fr auto auto", cursor: "default" }} key={r.title}>
-          <span className="patient-cell patient-name">{r.title}</span>
-          <span className="patient-cell t-num u-mute">{r.count}</span>
-          {/* §10: a row is only actionable when the declaration gave it an
-              operation. Without one it is a worklist to open, not a button. */}
-          {r.operation && r.threads?.[0] ? (
-            <button className="btn" onClick={() => onOpenThread?.(r.threads[0])}>Open</button>
-          ) : <span />}
-        </div>
-      ))}
+    <div className="card">
+      <div className="att">
+        {rows.map((r) => (
+          <button className="at" key={r.title} onClick={() => r.threads?.[0] && onOpenThread?.(r.threads[0])}>
+            <span className={`at-ic${r.operation ? " amb" : " ink"}`}>
+              <Icon name={r.operation ? "alert" : "clip"} className="i sm" />
+            </span>
+            <span className="at-b"><span className="at-t">{r.title}</span></span>
+            <span className="badge b-mute">{r.count}</span>
+            {r.threads?.[0] && <span className="at-go">Open</span>}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
-// -------------------------------------------------------------- dashboard
-
 function Dashboard({ rows }: { rows: MetricValue[] }) {
-  if (!rows.length) return <Empty title="No measurements yet." />;
+  if (!rows.length) return <div className="state-empty">No measurements yet.</div>;
   return (
-    <div style={{ display: "grid", gap: "var(--space-4)", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+    <div className="qgrid">
       {rows.map((m) => (
-        <div className="thread-object" key={m.metric} style={{ width: "auto" }}>
-          <div className="thread-object__body">
-            <div className="t-meta u-faint">{m.title ?? human(m.metric)}</div>
-            <div className="t-display t-num" style={{ marginTop: "var(--space-2)" }}>
-              {m.unit === "percent" ? `${Math.round(m.value)}%` : m.value}
-            </div>
-            {m.denominator !== null && m.denominator !== undefined && (
-              <div className="t-meta u-faint t-num" style={{ marginTop: "var(--space-1)" }}>
-                {m.numerator} of {m.denominator}
+        <div className="card" key={m.metric}>
+          <div className="pulse">
+            <div>
+              <div className="pu-r"><span>{m.title ?? human(m.metric)}</span></div>
+              <div className="pu-v">
+                {m.unit === "percent" ? Math.round(m.value) : m.value}
+                {m.unit === "percent" && <small>%</small>}
               </div>
-            )}
+              {m.denominator !== null && m.denominator !== undefined && (
+                <>
+                  <div className="split">
+                    <i style={{ width: `${m.denominator ? (m.numerator / m.denominator) * 100 : 0}%`,
+                                background: "var(--color-accent)" }} />
+                    <i style={{ flex: 1, background: "var(--color-border-subtle)" }} />
+                  </div>
+                  <div className="leg"><span>{m.numerator} of {m.denominator}</span></div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       ))}
@@ -143,19 +135,17 @@ function Dashboard({ rows }: { rows: MetricValue[] }) {
   );
 }
 
-// ---------------------------------------------------------------- summary
-
 function Sections({ sections }: { sections: SectionResult[] }) {
-  if (!sections.length) return <Empty title="Nothing recorded yet." />;
+  if (!sections.length) return <div className="state-empty">Nothing recorded yet.</div>;
   return (
-    <div style={{ display: "grid", gap: "var(--space-4)" }}>
+    <div style={{ display: "grid", gap: 16 }}>
       {sections.map((s) => (
-        <div className="thread-object" key={s.title}>
-          <header className="thread-object__header">
-            <span>{s.title}</span>
-            <span className="thread-object__header-end t-num">{s.rows?.length ?? 0}</span>
-          </header>
-          <div className="thread-object__body">
+        <div className="card" key={s.title}>
+          <div className="card-h">
+            <div className="card-t">{s.title}</div>
+            <span className="badge b-mute ml-auto">{s.rows?.length ?? 0}</span>
+          </div>
+          <div style={{ padding: "10px 14px" }}>
             <SectionRows section={s} />
           </div>
         </div>
@@ -166,29 +156,24 @@ function Sections({ sections }: { sections: SectionResult[] }) {
 
 function SectionRows({ section }: { section: SectionResult }) {
   const rows = section.rows ?? [];
-  if (!rows.length) return <div className="t-meta u-faint">None.</div>;
+  if (!rows.length) return <div className="fl-e">None.</div>;
   if (section.show === "line") return <Line line={rows as StepStatus[]} />;
   if (section.show === "flags") {
     return (
-      <div className="quick">
-        {(rows as string[]).map((f) => <span className="status" key={f}>{human(f)}</span>)}
+      <div className="qc-chips">
+        {(rows as string[]).map((f) => <span className="badge b-mute" key={f}>{human(f)}</span>)}
       </div>
     );
   }
   return (
-    <div className="kv">
+    <>
       {(rows as Record<string, unknown>[]).map((r, i) => (
-        <div className="kv__row" key={i}>
-          <span className="kv__label">{describe(r)}</span>
-          <span className="kv__value">{when(r)}</span>
-        </div>
+        <div className="kv" key={i}><span>{describe(r)}</span><b>{when(r)}</b></div>
       ))}
-    </div>
+    </>
   );
 }
 
-/** The most useful thing a row of an unknown resource can say about itself,
- *  without this file knowing what resource it is. */
 function describe(r: Record<string, unknown>): string {
   for (const k of ["title", "text", "name", "code", "operation", "status"]) {
     if (r[k]) return String(r[k]);
@@ -198,25 +183,20 @@ function describe(r: Record<string, unknown>): string {
 }
 const when = (r: Record<string, unknown>) => {
   const k = Object.keys(r).find((x) => /_date$|^at$|_at$/.test(x));
-  return k && r[k] ? new Date(String(r[k])).toLocaleString(undefined, { day: "numeric", month: "short" }) : "";
+  return k && r[k] ? new Date(String(r[k])).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "";
 };
 
-/** A thread's declared steps. §81: where the patient is, kept separate from
- *  who owns the work and what has happened. */
+/** §81: where the subject is. The prototype's vertical numbered stepper. */
 export function Line({ line }: { line: StepStatus[] }) {
   return (
-    <div className="line">
-      {line.map((s) => (
-        <span className="line__step" data-status={s.status} key={s.station}>
-          <span className="line__dot" aria-hidden="true" />
+    <div className="states">
+      {line.map((s, i) => (
+        <div className={`st ${s.status === "done" ? "done" : s.status === "now" ? "now" : s.status === "skipped" ? "skip" : ""}`} key={s.station}>
+          <span className="n">{s.status === "done" ? "✓" : i + 1}</span>
           {human(s.label || s.station)}
-          {s.status === "done" && <span className="u-sr">done</span>}
-          {s.status === "now" && <span className="u-sr">current</span>}
-          {s.status === "skipped" && <span className="u-sr">not this visit</span>}
-        </span>
+          {s.status === "skipped" && <span className="ml-auto fl-e">not this visit</span>}
+        </div>
       ))}
     </div>
   );
 }
-
-export { Icon };

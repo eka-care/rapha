@@ -1,0 +1,97 @@
+/* The card, and the vocabulary every screen is assembled from. Ported from
+ * the prototype: a card has an eyebrow, a title and a badge, and that header
+ * is what stops a screen becoming a stack of undifferentiated rows. */
+
+.card {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: background var(--duration-slow) var(--ease-out),
+              border-color var(--duration-slow) var(--ease-out);
+}
+.card-h {
+  padding: 12px 14px; border-bottom: 1px solid var(--color-border-subtle);
+  display: flex; align-items: center; gap: 9px;
+}
+.card-t { font-size: 12.5px; font-weight: 700; }
+.eyebrow {
+  font-size: 10px; font-weight: 700; color: var(--color-eyebrow);
+  text-transform: uppercase; letter-spacing: .09em;
+}
+
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 700; padding: 3px 8px;
+  border-radius: var(--radius-pill); border: 1px solid transparent;
+  background: var(--color-bg-subtle); color: var(--color-text-tertiary);
+  border-color: var(--color-border-subtle);
+  white-space: nowrap;
+}
+.b-ok   { background: var(--color-success-soft);  color: var(--color-success);  border-color: var(--color-success-border); }
+.b-warn { background: var(--color-warning-soft);  color: var(--color-warning);  border-color: var(--color-warning-border); }
+.b-crit { background: var(--color-critical-soft); color: var(--color-critical); border-color: var(--color-critical-border); }
+.b-mute { background: var(--color-bg-subtle);     color: var(--color-text-tertiary); border-color: var(--color-border-subtle); }
+.b-ink  { background: var(--color-accent-soft);   color: var(--color-accent);   border-color: var(--color-accent-line); }
+
+/* ABDM is the one place a real blue appears, and it means national identity
+   and nothing else. */
+.id-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--color-abdm-soft); border: 1.5px solid var(--color-abdm-border);
+  border-radius: var(--radius-pill); padding: 3px 9px;
+}
+.id-lab { color: var(--color-abdm); font-weight: 700; font-size: 8.5px;
+  text-transform: uppercase; letter-spacing: .06em; }
+.id-val { color: var(--color-abdm); font-weight: 700; font-size: 10px; }
+
+.btn {
+  border: none; border-radius: var(--radius-md); padding: 9px 14px;
+  font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 7px;
+  transition: var(--duration-fast) var(--ease-out);
+}
+.btn-b { background: var(--color-accent); color: var(--color-bg-surface); }
+.btn-b:hover:not(:disabled) { background: var(--color-accent-hover); }
+.btn-g {
+  background: var(--color-bg-surface); color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-subtle);
+}
+.btn-g:hover:not(:disabled) { background: var(--color-bg-subtle); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.send { width: 36px; height: 36px; padding: 0; border-radius: 50%; justify-content: center; }
+
+.chip {
+  border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface);
+  color: var(--color-text-secondary); border-radius: var(--radius-pill);
+  padding: 6px 13px; font-size: 11.5px; font-weight: 500; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: var(--duration-fast) var(--ease-out);
+}
+.chip:hover { border-color: var(--color-accent); color: var(--color-accent); background: var(--color-accent-soft); }
+.chip[data-selected="true"] {
+  background: var(--color-accent); border-color: var(--color-accent);
+  color: var(--color-bg-surface); font-weight: 600;
+}
+
+.nudge {
+  font-size: 11px; color: var(--color-eyebrow); background: var(--color-tint-warm);
+  border-left: 3px solid var(--color-rule-warm); border-radius: var(--radius-sm);
+  padding: 8px 10px; line-height: 1.5;
+}
+.skeleton {
+  border-radius: var(--radius-sm); background: var(--color-bg-subtle);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+
+.state-empty {
+  margin: auto; text-align: center; color: var(--color-text-tertiary);
+  font-size: 12.5px; line-height: 1.6; max-width: 340px; padding: 40px 0;
+}
+.notice {
+  display: grid; gap: var(--space-2); justify-items: start;
+  padding: var(--space-4); border-radius: var(--radius-lg);
+  border: 1px solid var(--color-critical-border);
+  background: var(--color-critical-soft);
+}

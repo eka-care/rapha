@@ -144,13 +144,13 @@ export function App() {
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   if (facility.loading || cat.loading) {
-    return <div className="workspace-scroll"><Loading what="the workspace" /></div>;
+    return <div className="view scroll"><div className="wrap"><Loading what="the workspace" /></div></div>;
   }
   if (facility.error || cat.error) {
     return (
-      <div className="workspace-scroll">
+      <div className="view scroll"><div className="wrap">
         <Failed error={(facility.error ?? cat.error)!} what="reach the kernel" onRetry={() => location.reload()} />
-      </div>
+      </div></div>
     );
   }
 
@@ -191,7 +191,7 @@ export function App() {
   const title = titleFor(route, navViews);
 
   return (
-    <div className="app-shell">
+    <div className="app">
       <IconSheet />
       <Sidebar
         facility={facility.data}
@@ -215,7 +215,8 @@ export function App() {
           onTheme={flipTheme}
           onMenu={() => setDrawer((d) => !d)}
         />
-        <div className="workspace">
+        <div className={route.kind === "thread" ? "view" : "view scroll"}>
+          <div className="wrap">
           <Boundary>
             {route.kind === "thread" ? (
               <ThreadScreen
@@ -227,14 +228,19 @@ export function App() {
                 onRemember={remember}
               />
             ) : (
-              <div className="workspace-scroll">
+              <div>
                 {route.kind === "today" && (
                   <Today
                     loaded={loaded} recents={shownRecents}
+                    cat={catalogue}
+                    facilityName={facility.data?.bundle.title}
                     role={facility.data?.user.role}
                     onOpenThread={(t) => go(`#/threads/${t}`)}
                     onGoView={(v) => go(`#/views/${v}`)}
                     onAsk={(q) => {
+                      // An empty question is the hero's ask box being tapped:
+                      // that opens the command bar rather than asking nothing.
+                      if (!q) { setKhojOpen(true); return; }
                       const first = shownRecents[0]?.id ?? liveThreads[0];
                       if (first) { go(`#/threads/${first}`); onSay(first, q); }
                     }}
@@ -261,6 +267,7 @@ export function App() {
               </div>
             )}
           </Boundary>
+          </div>
         </div>
       </div>
 
@@ -318,8 +325,8 @@ function ThreadScreen({ id, cat, ctx, said, asking, nonce, onSay, onChanged, onR
   const name = data ? header(data, queueViewFor(cat as never, data.workflow)).name : id;
   useEffect(() => { if (data) onRemember({ id, name }); }, [data, id, name, onRemember]);
 
-  if (loading) return <div className="workspace-scroll"><Loading what="this encounter" /></div>;
-  if (error) return <div className="workspace-scroll"><Failed error={error} what="open this encounter" onRetry={reload} /></div>;
+  if (loading) return <Loading what="this encounter" />;
+  if (error) return <Failed error={error} what="open this encounter" onRetry={reload} />;
   return (
     <Encounter
       thread={data!}

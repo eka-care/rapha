@@ -1,25 +1,36 @@
-/** §8: the encounter workspace. Thread on the left, context on the right,
- *  composer fixed at the bottom of the thread.
+/** §8, rebuilt to the prototype: the thread on the left inside one card, and
+ *  three stacked panels on the right.
  *
- *  §99's hierarchy decides what is loud here: identity, then clinical state,
- *  then the required action, then content. The quick action row is capped at
- *  six (§33) and everything beyond it lives behind `/`, which is not a
- *  compromise -- an action row that grows without limit is a menu nobody reads.
+ *  The right rail being several CARDS rather than one list is most of the
+ *  difference between a workspace and a properties panel: each has its own
+ *  eyebrow, title and badge, and says what kind of thing it holds.
+ *
+ *  What the agent offers is a row of action cards inside its own message
+ *  (§21), ink-filled for the one that closes this station's step. Every word
+ *  on them is the operation's own declaration.
  */
 import { useMemo, useState } from "react";
+import { threadAsks } from "../agent";
 import type { Client } from "../api";
 import { OperationPanel } from "../form/Panel";
+import { questionnaire } from "../declarations";
 import { Icon } from "../icons";
-import { threadAsks } from "../agent";
-import { cue, mine, offered, weigh } from "../loops";
+import { weigh } from "../loops";
 import { agentLine, header, messages, queueViewFor, valuesOf, type Ctx, type Said } from "../messages";
 import type { Catalogue, Operation, Payload, ThreadView } from "../types";
 import { Composer } from "../thread/Composer";
 import { Stream } from "../thread/Thread";
 import { Line } from "../view/View";
 import { human, title } from "../words";
+import { initialsOf } from "../agent";
 
 const QUICK = 6;   // §33
+
+/** Which tag an action's capture instrument earns. The words are the
+ *  declaration's `instrument`, not a table of operations. */
+const TAG: Record<string, string> = {
+  scribe: "scribe", form: "form", device: "form", "constrained-voice": "form",
+};
 
 export function Encounter({
   thread, cat, ctx, client, said, asking, onSay, onChanged, onOpenSubject,
@@ -35,176 +46,175 @@ export function Encounter({
   onOpenSubject: (subjectId: string) => void;
 }) {
   const [modal, setModal] = useState<{ op: Operation; seed?: Payload } | null>(null);
-  // §2.6: scribe gets no panel of its own. Started from the composer's
-  // microphone, its draft surface opens INSIDE the thread, directly above the
-  // composer it was started from -- the same OperationPanel every other
-  // operation uses, drawn inline. Nothing about the write path changes: the
-  // recorder still hands values to fields, and a person still taps commit.
   const [dictating, setDictating] = useState<Operation | null>(null);
 
   const head = useMemo(() => header(thread, queueViewFor(cat, thread.workflow)), [thread, cat]);
   const msgs = useMemo(() => messages(thread, ctx, said), [thread, ctx, said]);
   const line = useMemo(() => agentLine(thread, ctx), [thread, ctx]);
 
-  // §33: "ordering is deterministic and auditable". weigh() is that rule, and
-  // it lives in loops.ts where loops.check.ts can prove it without a browser:
-  // the operation closing this role's step at this station leads, and
-  // everything else follows in declaration order. This file does not re-rank.
-  const { primary, overflow } = useMemo(
-    () => weigh(thread.actions, thread.closes),
-    [thread.actions, thread.closes],
-  );
-  const ranked = useMemo(
-    () => (primary ? [primary, ...overflow] : overflow),
-    [primary, overflow],
-  );
-  const quick = ranked.slice(0, QUICK);
-
-  // §2.6: the microphone is the only way in to dictation, so it appears when
-  // and only when an operation declared with a scribe instrument is on offer.
+  // §33: the declared rule in loops.ts decides the order, not this screen.
+  const { primary, overflow } = useMemo(() => weigh(thread.actions, thread.closes), [thread.actions, thread.closes]);
+  const ranked = useMemo(() => (primary ? [primary, ...overflow] : overflow), [primary, overflow]);
+  const offered = ranked.slice(0, QUICK);
   const scribeOp = ranked.find((o) => o.instrument === "scribe");
 
-  const roles = Object.keys(cat.bundles ?? {});
-
-  // The subject row is merged into thread.subject by the API, so its own `id`
-  // is the spine id. Read only when the workflow declares a spine: without
-  // that declaration this is just some resource's primary key and opening a
-  // screen on it would be a guess.
-  const spineId = cat.workflows?.[thread.workflow]?.spine
-    ? (typeof thread.subject?.id === "string" ? thread.subject.id : "")
-    : "";
+  const spine = cat.workflows?.[thread.workflow]?.spine;
+  const spineId = spine && typeof thread.subject?.id === "string" ? thread.subject.id : "";
 
   return (
-    <div className="encounter">
-      <div className="encounter__main">
-        <header className="subject">
-          <div className="subject__row">
-            {/* §2.3: the name opens the person, not just this visit. Only
-                when the workflow declared a spine and the subject row is
-                actually there -- a thread with no subject row (a laboratory's
-                accession before it is matched) links nowhere, correctly. */}
-            <h1 className="t-page" style={{ margin: 0 }}>{head.name}</h1>
-            {head.identity && (
-              <span className="status" data-tone="abdm">
-                {head.identity.label} {head.identity.value}
-              </span>
-            )}
-            {/* The way to the person behind this visit. It was the heading
-                itself, styled as a ghost button, which is to say invisible:
-                nothing on screen said the name could be opened. */}
-            {spineId && (
-              <button className="chip" data-role="button" onClick={() => onOpenSubject(spineId)}>
-                <Icon name="folder" />
-                All visits
-              </button>
-            )}
-          </div>
-          <div className="subject__meta t-meta">{head.meta.join(" · ")}</div>
-          {head.badges.length > 0 && (
-            <div className="subject__tags">
-              {head.badges.map((b) => (
-                <span className="status" data-tone={toneOf(b.style)} key={b.text}>{b.text}</span>
-              ))}
-            </div>
-          )}
-          <Line line={thread.line} />
-          {quick.length > 0 && (
-            <div className="quick" style={{ marginTop: "var(--space-4)" }}>
-              {quick.map((op, i) => (
-                <button
-                  key={op.id}
-                  className="act"
-                  data-variant={i === 0 ? "primary" : undefined}
-                  onClick={() => setModal({ op })}
-                  title={op.summary}
-                >
-                  <span className="act__t">{op.title}</span>
-                  {/* Every operation declares a summary and none of it was on
-                      screen. It is the difference between a row of verbs and
-                      an interface that says what each one does. */}
-                  {op.summary && <span className="act__s">{op.summary}</span>}
-                </button>
-              ))}
-              {ranked.length > QUICK && (
-                <span className="t-meta u-faint">
-                  {ranked.length - QUICK} more with <span className="kbd">/</span>
+    <div className="chatgrid">
+      <div className="card chatcard">
+        <header className="pt-head">
+          <span className="avatar">{initialsOf(head.name)}</span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="pt-name">{head.name}</div>
+            <div className="pt-meta">{head.meta.join(" · ")}</div>
+            <div className="pt-chips">
+              {head.identity && (
+                <span className="id-badge">
+                  <span className="id-lab">{head.identity.label}</span>
+                  <span className="id-val">{head.identity.value}</span>
                 </span>
               )}
+              {thread.station && <span className="badge b-ink">{human(thread.station)}</span>}
+              {head.badges.map((b) => (
+                <span className={`badge ${TONE[b.style] ?? "b-mute"}`} key={b.text}>{b.text}</span>
+              ))}
+              {spineId && (
+                <button className="chip" onClick={() => onOpenSubject(spineId)}>
+                  <Icon name="folder" className="i sm" />
+                  All visits
+                </button>
+              )}
             </div>
-          )}
+          </div>
         </header>
 
         <Stream
-          msgs={msgs}
-          thread={thread}
-          client={client}
-          ctx={ctx}
-          instruments={cat.instruments}
-          onDone={onChanged}
-        />
+          msgs={msgs} thread={thread} client={client} ctx={ctx}
+          instruments={cat.instruments} onDone={onChanged}
+        >
+          {/* §21: the agent's own message, and the actions it is offering. */}
+          {(line.sentences.length > 0 || offered.length > 0) && (
+            <div className="msg">
+              <div className="m-av agent" aria-hidden="true"><Icon name="spark" className="i sm" /></div>
+              <div className="m-b" style={{ width: "100%" }}>
+                <div className="m-meta">Agent · now</div>
+                <div className="bubble">
+                  {line.sentences.join(" ")}
+                  {offered.length > 0 && (
+                    <div className="props">
+                      {offered.map((op, i) => (
+                        <button
+                          className={`prop${i === 0 ? " primary" : ""}`}
+                          key={op.id}
+                          onClick={() => setModal({ op })}
+                        >
+                          <Icon name={op.irreversibility === "irreversible" ? "lock" : "refer"} className="i sm" />
+                          <span className="p-b">
+                            <span className="p-l">{op.title}</span>
+                            {op.summary && <span className="p-s">{op.summary}</span>}
+                          </span>
+                          <span className={`p-tag ${op.irreversibility === "irreversible" ? "irr" : TAG[op.instrument] ?? ""}`}>
+                            {op.irreversibility === "irreversible" ? "confirm" : human(op.instrument)}
+                          </span>
+                        </button>
+                      ))}
+                      {ranked.length > QUICK && (
+                        <div className="fl-e">
+                          {ranked.length - QUICK} more with <span className="kbd">/</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </Stream>
 
         {dictating && (
-          <div className="dictation">
+          <div style={{ padding: "0 15px 12px", maxHeight: "42vh", overflowY: "auto", flexShrink: 0 }}>
             <OperationPanel
-              op={dictating}
-              thread={thread.id}
-              client={client}
-              instruments={cat.instruments}
-              flags={thread.flags}
-              inline
+              op={dictating} thread={thread.id} client={client}
+              instruments={cat.instruments} flags={thread.flags} inline
               onDone={() => { setDictating(null); onChanged(); }}
               onCancel={() => setDictating(null)}
             />
           </div>
         )}
 
-        {/* The agent's closing line sits above the composer, because it is
-            about what to do next and the composer is where you do it. */}
-        {/* §21 and §2.7: the agent is a participant. It says what it makes of
-            the thread, and offers the questions worth asking next, where they
-            can be asked. The questions are kernel concepts, not this
-            bundle's words; agent.ts says why. */}
-        <div className="suggest">
-          {line.sentences.length > 0 && (
-            <div className="suggest__line">
-              <span className="suggest__mark" aria-hidden="true"><Icon name="spark" /></span>
-              <span>{line.sentences.join(" ")}</span>
-            </div>
-          )}
-          <div className="suggest__chips">
-            {threadAsks({ hasHistory: !!spineId, flags: thread.flags }).map((q) => (
-              <button className="chip" data-role="button" key={q} onClick={() => onSay(q)}>
-                {q}
-              </button>
-            ))}
-          </div>
-        </div>
-
         <Composer
           about={head.name}
-          context={`${head.name}${thread.station ? ` · ${human(thread.station)}` : ""}`}
           actions={ranked}
-          roles={roles}
+          roles={Object.keys(cat.bundles ?? {})}
           asking={asking}
           onSay={onSay}
           onAction={(op) => setModal({ op })}
           onStartScribe={scribeOp ? () => setDictating(scribeOp) : undefined}
           micReason={scribeOp ? undefined : "Dictation is not offered at this step"}
+          quick={
+            <>
+              {threadAsks({ hasHistory: !!spineId, flags: thread.flags }).slice(0, 2).map((q) => (
+                <button className="chip" key={q} onClick={() => onSay(q)}>{q}</button>
+              ))}
+            </>
+          }
         />
       </div>
 
-      <ContextPanel thread={thread} cat={cat} ctx={ctx} />
+      <aside className="panel" aria-label="Context">
+        <div className="card">
+          <div className="card-h">
+            <div>
+              <div className="eyebrow">Visit</div>
+              <div className="card-t" style={{ marginTop: 2 }}>Patient state</div>
+            </div>
+            <span className="badge b-mute ml-auto">
+              {thread.station ? human(thread.station) : "Complete"}
+            </span>
+          </div>
+          <Line line={thread.line} />
+          {thread.nudge && <div className="nudge" style={{ margin: "0 12px 12px" }}>{thread.nudge}</div>}
+        </div>
+
+        <Details thread={thread} cat={cat} spine={spine ?? null} />
+
+        <div className="card">
+          <div className="card-h">
+            <div className="card-t">Capabilities held</div>
+            <span className="badge b-mute ml-auto">{thread.held.length}</span>
+          </div>
+          <div className="caps">
+            {(cat.capabilities ?? []).map((c) => (
+              <span className={`cap${thread.held.includes(c) ? " on" : ""}`} key={c}>{c}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-h">
+            <div className="card-t">Audit trail</div>
+            <span className="badge b-mute ml-auto">{thread.audit.length}</span>
+          </div>
+          <div className="audit">
+            {thread.audit.length === 0 && <div className="fl-e">Nothing yet.</div>}
+            {[...thread.audit].reverse().map((a) => (
+              <div className="au" key={a.id}>
+                <b>{a.operation.split(".").pop()}</b>
+                <span className="ml-auto">{a.outcome.split(":")[0]}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </aside>
 
       {modal && (
         <>
           <div className="scrim" onClick={() => setModal(null)} />
           <OperationPanel
-            op={modal.op}
-            thread={thread.id}
-            client={client}
-            instruments={cat.instruments}
-            flags={thread.flags}
-            seed={modal.seed}
+            op={modal.op} thread={thread.id} client={client}
+            instruments={cat.instruments} flags={thread.flags} seed={modal.seed}
             onDone={() => { setModal(null); onChanged(); }}
             onCancel={() => setModal(null)}
           />
@@ -214,128 +224,59 @@ export function Encounter({
   );
 }
 
-const toneOf = (style: string) =>
-  ({ crit: "critical", warn: "warning", ok: "success" } as Record<string, string>)[style] || undefined;
+const TONE: Record<string, string> = { crit: "b-crit", warn: "b-warn", ok: "b-ok", mute: "b-mute" };
 
-/** §25. A reference panel: what is known about this subject, beside the
- *  conversation about it rather than inside it.
- *
- *  §25 names its sections -- problems, medications, allergies, vitals, labs.
- *  This renderer may not: those are a health centre's words, and the same
- *  component draws a laboratory's bench. What it can do honestly is group the
- *  values that were actually committed under the title of the operation that
- *  wrote them, which is the declaration's own word for the same thing and
- *  arrives correct for a bundle nobody here has seen.
- *
- *  What is deliberately NOT here: the capability list. `thread.held` is which
- *  permissions the caller holds, which is plumbing -- it belongs in settings,
- *  not in a panel headed with the patient's name.
- */
-function ContextPanel({ thread, cat, ctx }: { thread: ThreadView; cat: Catalogue; ctx: Ctx }) {
-  // The workflow says what continues across visits ("patient"), and that is
-  // the right heading for the subject's own details. They were appearing
-  // under "Register a new patient" -- the title of the operation that typed
-  // them -- which is correct provenance and an absurd thing to call a
-  // reference panel. Provenance belongs on the thread; this panel answers
-  // "what is known", not "who typed it".
-  const spine = cat.workflows?.[thread.workflow]?.spine ?? null;
-  const details = useMemo(() => {
+/** §25: what is known about the subject. Headed with the word the workflow
+ *  declares as its spine, never with the title of the operation that typed
+ *  the values in -- that is provenance, and provenance lives on the thread. */
+function Details({ thread, cat, spine }: { thread: ThreadView; cat: Catalogue; spine: string | null }) {
+  const rows = useMemo(() => {
     const queue = queueViewFor(cat, thread.workflow);
     const subject = thread.subject ?? {};
-    const keys = (queue?.columns ?? []).filter((k) => subject[k] !== undefined && subject[k] !== null && subject[k] !== "");
+    const keys = (queue?.columns ?? []).filter((k) => subject[k]);
     const extra = Object.keys(subject).filter(
       (k) => !keys.includes(k) && !/(^|_)id$|_date$|_by$|^status$/.test(k) && subject[k]);
     return [...keys, ...extra].map((k) => ({ label: title(human(k)), value: String(subject[k]) }));
   }, [thread.subject, thread.workflow, cat]);
 
   const recorded = useMemo(() => {
-    const out: { title: string; rows: { label: string; value: string; crit: boolean }[] }[] = [];
+    const out: { id: string; title: string; values: ReturnType<typeof valuesOf> }[] = [];
     for (const a of thread.audit) {
-      if (a.outcome !== "committed" && a.outcome !== "confirmed" && a.outcome !== "allowed") continue;
-      // §25 is a reference panel: what is KNOWN about this subject. A handover
-      // is a conversation about the work, and it is already on the thread as
-      // its own object; repeating it here as though it were a clinical finding
-      // is how a panel meant for problems and vitals fills up with chat.
-      const presents = ctx.operations[a.operation]?.presents ?? "event";
+      if (!/^(committed|confirmed|allowed)/.test(a.outcome)) continue;
+      const op = cat.operations?.[a.operation];
+      const presents = op?.presents ?? "event";
       if (presents !== "event" && presents !== "artifact") continue;
-      // The operation that wrote the subject row wrote the demographics, and
-      // those are already the panel's first section. Repeating them under its
-      // title is what produced "REGISTER A NEW PATIENT" above a name and an age.
-      if (spine && (ctx.operations[a.operation]?.writes ?? []).includes(spine)) continue;
-      const rows = valuesOf(ctx, a.operation, a.payload).map((v) => ({
-        label: v.label, value: v.value, crit: v.crit,
-      }));
-      if (!rows.length) continue;
-      out.push({ title: ctx.operations[a.operation]?.title ?? human(a.operation), rows });
+      if (spine && (op?.writes ?? []).includes(spine)) continue;
+      // The real questionnaire resolver, so a value keeps its label and unit.
+      // Passing () => null here dropped both and the panel read "Systolic 186".
+      const values = valuesOf({ operations: cat.operations ?? {}, schema: questionnaire, badges: {} },
+                              a.operation, a.payload);
+      if (values.length) out.push({ id: a.id, title: op?.title ?? human(a.operation), values });
     }
-    return out.reverse();        // most recent first, like the rest of the panel
-  }, [thread.audit, ctx]);
+    return out.reverse();
+  }, [thread.audit, cat, spine]);
 
-  const flags = thread.flags.map(human);
-
-  if (!flags.length && !recorded.length && !details.length) {
-    return (
-      <aside className="context" aria-label="Context">
-        <div className="t-meta u-faint">Nothing recorded yet.</div>
-      </aside>
-    );
-  }
-
+  if (!rows.length && !recorded.length) return null;
   return (
-    <aside className="context" aria-label="Context">
-      {details.length > 0 && (
-        <div className="context__section">
-          <div className="context__head" style={{ cursor: "default" }}>
-            {spine ? title(human(spine)) : "Details"}
+    <div className="card">
+      <div className="card-h">
+        <div className="card-t">{spine ? title(human(spine)) : "Details"}</div>
+      </div>
+      <div style={{ padding: "10px 12px", display: "grid", gap: 12 }}>
+        {rows.length > 0 && (
+          <div>{rows.map((r) => <div className="kv" key={r.label}><span>{r.label}</span><b>{r.value}</b></div>)}</div>
+        )}
+        {recorded.map((r) => (
+          <div key={r.id}>
+            <div className="eyebrow" style={{ marginBottom: 4 }}>{r.title}</div>
+            {r.values.map((v) => (
+              <div className={`kv${v.crit ? " crit" : ""}`} key={v.link_id}>
+                <span>{v.label}</span><b>{v.value}</b>
+              </div>
+            ))}
           </div>
-          <div className="context__body">
-            <div className="kv">
-              {details.map((d) => (
-                <div className="kv__row" key={d.label}>
-                  <span className="kv__label">{d.label}</span>
-                  <span className="kv__value">{d.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-      {flags.length > 0 && <Section title="State" rows={flags} />}
-      {recorded.map((r, i) => (
-        <div className="context__section" key={`${r.title}-${i}`}>
-          <div className="context__head" style={{ cursor: "default" }}>{r.title}</div>
-          <div className="context__body">
-            <div className="kv">
-              {r.rows.map((v) => (
-                <div className="kv__row" key={v.label} data-critical={v.crit}>
-                  <span className="kv__label">{v.label}</span>
-                  <span className="kv__value">{v.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      ))}
-    </aside>
-  );
-}
-
-function Section({ title, rows }: { title: string; rows: string[] }) {
-  const [open, setOpen] = useState(true);
-  return (
-    <div className="context__section">
-      <button className="context__head" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <Icon name="chev" />
-        {title}
-        <span className="thread-object__header-end t-num">{rows.length}</span>
-      </button>
-      {open && (
-        <div className="context__body">
-          {rows.map((r, i) => <div className="t-body u-mute" key={`${r}-${i}`}>{r}</div>)}
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 }
-
-export { cue, mine, offered };

@@ -1,5 +1,4 @@
-/** §52. The title of where you are, the way to search from anywhere, and the
- *  theme switch. Nothing else earns a place in a 56px strip. */
+/** §52: where you are, one way to search from anywhere, and the theme. */
 import { Icon } from "../icons";
 
 export function Topbar({ title, sub, theme, onSearch, onTheme, onMenu }: {
@@ -12,21 +11,18 @@ export function Topbar({ title, sub, theme, onSearch, onTheme, onMenu }: {
 }) {
   return (
     <header className="topbar">
-      {/* Below 768px the rail is a drawer and this is the only way to it.
-          It was inline-styled display:none with no rule to bring it back,
-          which left a phone with no navigation at all. shell.css shows it. */}
       <button className="icon-btn topbar__menu" onClick={onMenu} aria-label="Open navigation">
-        <Icon name="list" />
+        <Icon name="list" className="i sm" />
       </button>
-      <div className="topbar__title">
-        <div className="t-strong" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <div style={{ minWidth: 0 }}>
+        <div className="tb-title" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {title}
         </div>
-        {sub && <div className="t-meta u-faint">{sub}</div>}
+        {sub && <div className="tb-sub">{sub}</div>}
       </div>
-      <div className="topbar__spacer" />
-      <button className="btn" data-variant="ghost" onClick={onSearch} aria-label="Search">
-        <Icon name="search" />
+      <button className="pill ml-auto" onClick={onSearch}>
+        <Icon name="search" className="i sm" />
+        Search or ask
         <span className="kbd">⌘K</span>
       </button>
       <button
@@ -34,7 +30,7 @@ export function Topbar({ title, sub, theme, onSearch, onTheme, onMenu }: {
         onClick={onTheme}
         aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
       >
-        <Icon name={theme === "dark" ? "sun" : "moon"} />
+        <Icon name={theme === "dark" ? "sun" : "moon"} className="i sm" />
       </button>
     </header>
   );

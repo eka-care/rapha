@@ -1,69 +1,57 @@
-/* §51 CSS foundation, plus §44's type scale as named classes.
- * No colour literal may appear in this file; see tokens.css. */
+/* Reset, type and the icon sheet's geometry. Ported from the prototype's
+ * base, with the spec's §44 type scale kept as named classes. */
 
-* { box-sizing: border-box; }
-html, body { width: 100%; height: 100%; }
-#root { height: 100%; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { width: 100%; height: 100%; }
 
 body {
-  margin: 0;
+  font-family: var(--font-sans);
   background: var(--color-bg-canvas);
   color: var(--color-text-primary);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  transition: background var(--duration-slow) var(--ease-out),
+              color var(--duration-slow) var(--ease-out);
 }
 
 button, input, textarea, select { font: inherit; }
 button { color: inherit; }
+a { color: inherit; }
 
-/* §68: focus must be visible. The ring is --color-agent, which clears 3:1 on
- * every ground (SC 1.4.11); style.check.ts asserts it. */
+svg.i {
+  width: 16px; height: 16px; flex-shrink: 0;
+  stroke: currentColor; fill: none; stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+svg.i.sm { width: 13px; height: 13px; }
+svg.i.lg { width: 19px; height: 19px; }
+
 :focus-visible {
-  outline: 2px solid var(--color-agent);
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
 
-/* §70 icons: 16px default, 20px emphasis, 1.5px stroke, rounded joins, one
- * family. The sheet in icons.tsx draws paths with no presentation attributes,
- * so every one of those properties is set here -- an unsized <svg> falls back
- * to the SVG default of 300x150 and paints a shape the width of a column,
- * which is what an un-styled icon actually looks like. */
-.i {
-  width: 16px; height: 16px; flex: 0 0 auto; display: block;
-  fill: none; stroke: currentColor; stroke-width: 1.5;
-  stroke-linecap: round; stroke-linejoin: round;
-}
-.i.lg { width: 20px; height: 20px; }
-/* The brand mark is the one glyph drawn from filled paths. */
-.i use { pointer-events: none; }
+/* §44's scale, for the places that are prose rather than chrome. */
+.t-display { font-size: 27px; line-height: 1.15; font-weight: 800; letter-spacing: -.028em; }
+.t-page    { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -.02em; }
+.t-section { font-size: 17px; line-height: 24px; font-weight: 700; letter-spacing: -.01em; }
+.t-body    { font-size: 13px; line-height: 1.6; font-weight: 400; }
+.t-strong  { font-size: 13px; line-height: 1.6; font-weight: 600; }
+.t-label   { font-size: 12.5px; line-height: 18px; font-weight: 500; }
+.t-meta    { font-size: 10.5px; line-height: 15px; font-weight: 400; }
+.t-micro   { font-size: 9.5px; line-height: 14px; font-weight: 700; }
+.t-num     { font-variant-numeric: tabular-nums; }
 
-/* §44 type scale. Eight steps, and nothing outside them. */
-.t-display { font-size: 28px; line-height: 34px; font-weight: 600; letter-spacing: -.02em; }
-.t-page    { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -.01em; }
-.t-section { font-size: 17px; line-height: 24px; font-weight: 600; }
-.t-body    { font-size: 14px; line-height: 21px; font-weight: 400; }
-.t-strong  { font-size: 14px; line-height: 21px; font-weight: 550; }
-.t-label   { font-size: 13px; line-height: 18px; font-weight: 500; }
-.t-meta    { font-size: 12px; line-height: 17px; font-weight: 400; }
-.t-micro   { font-size: 11px; line-height: 15px; font-weight: 500; }
-
-/* §39: numeric fields use tabular numerals, so a column of results lines up
- * and a changing value does not make the row twitch. */
-.t-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
-
-.u-mute { color: var(--color-text-secondary); }
+.u-mute  { color: var(--color-text-secondary); }
 .u-faint { color: var(--color-text-tertiary); }
 .u-right { text-align: right; }
+.ml-auto { margin-left: auto; }
 .u-sr {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 
-/* §69: motion communicates state, and is never the only thing that does. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;

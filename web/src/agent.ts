@@ -138,3 +138,42 @@ export function threadAsks(opts: { hasHistory: boolean; flags: string[] }): stri
   asks.push("What is still outstanding?");
   return asks;
 }
+
+
+/** The line, station by station, in declaration order. One column per station
+ *  the workflow declares, whoever is standing in it, and whether it is the
+ *  thickest point. Nothing here is a station's name: the order comes from the
+ *  workflow's own steps and the labels from the rows. */
+export type Column = {
+  station: string;
+  people: { thread: string; name: string; initials: string; alert: boolean }[];
+  jam: boolean;
+};
+
+export function line(loaded: Loaded[], stations: string[], badges: Record<string, string>): Column[] {
+  const called = new Set(Object.entries(badges).filter(([, s]) => s === "crit").map(([f]) => f));
+  const at = new Map<string, Column["people"]>();
+  for (const l of queues(loaded)) {
+    for (const r of rowsOf(l)) {
+      if (!r.station) continue;
+      const cols = (l.decl.columns ?? []).length
+        ? (l.decl.columns as string[]).map((c) => r.subject?.[c])
+        : Object.values(r.subject ?? {});
+      const name = String(cols.find((v) => typeof v === "string" && String(v).trim()) ?? r.thread);
+      const list = at.get(r.station) ?? [];
+      list.push({
+        thread: r.thread, name, initials: initialsOf(name),
+        alert: (r.flags ?? []).some((f) => called.has(f)),
+      });
+      at.set(r.station, list);
+    }
+  }
+  const most = Math.max(0, ...[...at.values()].map((p) => p.length));
+  return stations.map((station) => {
+    const people = at.get(station) ?? [];
+    return { station, people, jam: people.length > 1 && people.length === most };
+  });
+}
+
+export const initialsOf = (name: string) =>
+  name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";

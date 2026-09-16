@@ -202,14 +202,22 @@ const IMPLEMENTED = [
   const base = readFileSync(join(SRC, "style", "base.css"), "utf8");
   assert.match(base, /:focus-visible\s*\{[^}]*outline:/,
     "§68: focus is visible, and not removed anywhere");
-  const removed = css.filter((f) => /outline:\s*(none|0)/.test(
-    readFileSync(f, "utf8").replace(/:focus-visible[^}]*\}/g, "")
-      .split("\n").filter((l) => !/^\s*\/\*/.test(l)).join("\n")))
-    .map(rel)
-    // An input's own outline is replaced by a :focus-visible rule beside it,
-    // which the check above already requires to exist.
-    .filter((f) => !/parts\.css|form\.css|composer\.css/.test(f));
-  assert.deepEqual(removed, [], "a stylesheet removes the focus outline: " + removed.join(", "));
+  // A file may drop the default outline ONLY if it puts one back for
+  // :focus-visible, which is the state that needs it. This used to be a list
+  // of filenames, which is an exemption that grows rather than a rule: the
+  // prototype's `outline:none` was ported into two new stylesheets and the
+  // allowlist would simply have been extended to cover them.
+  const removed = css.filter((f) => {
+    const body = readFileSync(f, "utf8")
+      .split("\n").filter((l) => !/^\s*(\/\*|\*)/.test(l)).join("\n");
+    const strips = /outline:\s*(none|0)\b/.test(body.replace(/:focus-visible[^}]*\}/g, ""));
+    if (!strips) return false;
+    const restores = /:focus-visible[^{]*\{[^}]*outline:\s*(?!none|0)/.test(body);
+    return !restores;
+  }).map(rel);
+  assert.deepEqual(removed, [],
+    "a stylesheet drops the focus outline and never puts one back for " +
+    ":focus-visible: " + removed.join(", "));
   ok("a11y: focus is visible and no stylesheet takes it away");
 }
 

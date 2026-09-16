@@ -17,9 +17,11 @@ export type IconName =
   "mark" | "mark-lg" | "search" | "home" | "moon" | "sun" | "vitals" | "mic" | "box" | "clip" | "eye" | "plus" | "folder" | "chat" | "spark" | "check" | "alert" | "lock" | "send" | "user" | "users" | "list" | "cog" | "refer" | "chev" | "id" | "doc" |
   "handle";
 
-export function Icon({ name, size }: { name: IconName; size?: "sm" | "lg" }) {
+export function Icon({ name, size, className }: {
+  name: IconName; size?: "sm" | "lg"; className?: string;
+}) {
   return (
-    <svg className={`i${size ? ` ${size}` : ""}`} aria-hidden="true">
+    <svg className={className ?? `i${size ? ` ${size}` : ""}`} aria-hidden="true">
       <use href={`#i-${name}`} />
     </svg>
   );

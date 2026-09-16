@@ -1,258 +1,76 @@
-/* §61 chips, §62 status, plus the buttons, inputs and floating surfaces the
- * rest of the interface is assembled from. */
+/* What the ported system does not already carry: the command bar, dialogs,
+ * form inputs, and a visit compacted into a dated collation. */
 
-/* ---- buttons ---------------------------------------------------------- */
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
-  min-height: 36px; padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--color-border-control);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-surface); color: var(--color-text-primary);
-  font-size: 13px; font-weight: 500; cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-out);
-}
-.btn:hover { background: var(--color-bg-hover); }
-.btn[data-variant="primary"] {
-  background: var(--color-accent); color: var(--color-bg-surface);
-  border-color: var(--color-accent);
-}
-.btn[data-variant="primary"]:hover { opacity: .9; }
-.btn[data-variant="ghost"] { border-color: transparent; background: transparent; }
-.btn[data-variant="ghost"]:hover { background: var(--color-bg-hover); }
-.btn:disabled { color: var(--color-text-disabled); border-color: var(--color-border-subtle); cursor: not-allowed; }
-
-/* §68: 44px minimum touch target. The visible box stays 32px so the interface
- * keeps its density; the target is grown with a pseudo element instead. */
-.icon-btn {
-  position: relative;
-  width: 32px; height: 32px; flex: 0 0 auto;
-  display: grid; place-items: center;
-  border: 0; border-radius: var(--radius-md);
-  background: transparent; color: var(--color-text-secondary); cursor: pointer;
-}
-.icon-btn::after { content: ""; position: absolute; inset: -6px; }
-.icon-btn:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
-
-/* ---- inputs ----------------------------------------------------------- */
 .input {
-  width: 100%; min-height: 36px; padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border-control);
-  border-radius: var(--radius-md);
+  width: 100%; min-height: 34px; padding: 8px 12px;
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md);
   background: var(--color-bg-surface); color: var(--color-text-primary);
-  outline: none;
+  font-size: 12.5px; outline: none;
 }
 .input::placeholder { color: var(--color-text-tertiary); }
-.input:focus-visible { outline: 2px solid var(--color-agent); outline-offset: 1px; }
-.input[aria-invalid="true"] { border-color: var(--color-critical); }
+.input:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 
-.field { display: grid; gap: var(--space-1); }
-.field__label { font-size: 13px; line-height: 18px; font-weight: 500; }
-.field__hint  { font-size: 12px; line-height: 17px; color: var(--color-text-tertiary); }
-/* §39: validation lives next to the field it is about, never in a summary at
- * the top that a person has to scroll back up to read. */
-.field__error { font-size: 12px; line-height: 17px; color: var(--color-critical); }
-.field__unit  { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-tertiary); }
-.field__row   { display: flex; align-items: center; gap: var(--space-2); }
+.scrim { position: fixed; inset: 0; z-index: 30; background: var(--color-accent); opacity: .28; }
 
-/* ---- chips (§61) ------------------------------------------------------ */
-.chip {
-  display: inline-flex; align-items: center; gap: var(--space-2);
-  min-height: 28px; padding: var(--space-1) 10px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-pill);
-  background: var(--color-bg-surface); color: var(--color-text-secondary);
-  font-size: 12px; font-weight: 500;
-}
-.chip[data-role="button"] { cursor: pointer; }
-.chip[data-role="button"]:hover { background: var(--color-bg-hover); }
-.chip[data-selected="true"] {
-  background: var(--color-bg-selected); border-color: var(--color-border-strong);
-  color: var(--color-text-primary); font-weight: 600;
-}
-
-/* ---- status (§62) ----------------------------------------------------- */
-/* §95: every tone carries a word. Colour is reinforcement, never the message. */
-.status {
-  display: inline-flex; align-items: center; gap: 5px;
-  min-height: 22px; padding: 2px 7px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-pill);
-  background: var(--color-bg-subtle); color: var(--color-text-secondary);
-  font-size: 11px; font-weight: 600;
-}
-.status[data-tone="success"]  { background: var(--color-success-soft);  border-color: var(--color-success-border);  color: var(--color-success); }
-.status[data-tone="warning"]  { background: var(--color-warning-soft);  border-color: var(--color-warning-border);  color: var(--color-warning); }
-.status[data-tone="critical"] { background: var(--color-critical-soft); border-color: var(--color-critical-border); color: var(--color-critical); }
-.status[data-tone="agent"]    { background: var(--color-agent-soft);    border-color: var(--color-agent-soft);      color: var(--color-agent); }
-.status[data-tone="abdm"]     { background: var(--color-abdm-soft);     border-color: var(--color-abdm-border);     color: var(--color-abdm); }
-
-/* ---- floating surfaces (§47) ------------------------------------------ */
-.sheet {
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-surface);
-  box-shadow: var(--shadow-lg);
-}
-.scrim {
-  position: fixed; inset: 0; z-index: 30;
-  background: var(--color-accent); opacity: .28;
-}
-
-/* ---- dialog (§63) ----------------------------------------------------- */
-.dialog {
-  position: fixed; z-index: 31;
-  top: 50%; left: 50%; transform: translate(-50%, -50%);
-  width: min(560px, calc(100vw - var(--space-8)));
-  max-height: calc(100vh - var(--space-16));
-  display: flex; flex-direction: column;
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-overlay);
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-subtle);
-}
-.dialog__head { padding: var(--space-5) var(--space-5) var(--space-3); }
-.dialog__body { padding: 0 var(--space-5); overflow-y: auto; flex: 1; min-height: 0; }
-.dialog__foot {
-  display: flex; justify-content: flex-end; gap: var(--space-2);
-  padding: var(--space-4) var(--space-5);
-  border-top: 1px solid var(--color-border-subtle);
-}
-
-/* ---- khoj, the command bar (§35) ---------------------------------------------------- */
 .khoj {
   position: fixed; z-index: 31; top: 12vh; left: 50%; transform: translateX(-50%);
   width: min(620px, calc(100vw - var(--space-8)));
-  max-height: 70vh; display: flex; flex-direction: column;
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-overlay);
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-subtle);
-  overflow: hidden;
+  max-height: 70vh; display: flex; flex-direction: column; overflow: hidden;
+  border-radius: var(--radius-xl); border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface); box-shadow: var(--shadow-overlay);
 }
 .khoj__input {
   width: 100%; border: 0; outline: 0; background: transparent;
-  padding: var(--space-4) var(--space-5); font-size: 16px;
-  border-bottom: 1px solid var(--color-border-subtle);
-  color: var(--color-text-primary);
+  padding: 15px 18px; font-size: 15px; color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border-subtle); font-family: inherit;
 }
 .khoj__input::placeholder { color: var(--color-text-tertiary); }
-.khoj__list { overflow-y: auto; padding: var(--space-2); }
+.khoj__list { overflow-y: auto; padding: 6px; }
 .khoj__item {
-  display: flex; align-items: center; gap: var(--space-3);
-  width: 100%; padding: 10px var(--space-3);
-  border: 0; border-radius: var(--radius-md); background: transparent;
-  text-align: left; cursor: pointer; color: inherit;
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 11px; border: 0; border-radius: var(--radius-md);
+  background: transparent; text-align: left; cursor: pointer;
+  color: inherit; font-size: 12.5px;
 }
-.khoj__item[data-active="true"] { background: var(--color-bg-hover); }
-.khoj__item-sub { margin-left: auto; font-size: 12px; color: var(--color-text-tertiary); }
-.khoj__empty { padding: var(--space-6) var(--space-5); display: grid; gap: var(--space-3); justify-items: start; }
+.khoj__item[data-active="true"] { background: var(--color-bg-subtle); }
+.khoj__item-sub { margin-left: auto; font-size: 10.5px; color: var(--color-text-tertiary); }
+.khoj__empty { padding: 22px 18px; display: grid; gap: 11px; justify-items: start; }
 
-/* ---- keyboard hint ---------------------------------------------------- */
-.kbd {
-  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
-  padding: 2px 5px; border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-subtle); color: var(--color-text-tertiary);
-}
-
-/* ---- skeleton (§73) --------------------------------------------------- */
-.skeleton {
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-subtle);
-  animation: skeleton-pulse 1.4s ease-in-out infinite;
-}
-@keyframes skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
-
-/* ---- empty and error (§72, §75) --------------------------------------- */
-.empty { display: grid; gap: var(--space-2); justify-items: start; padding: var(--space-10) 0; max-width: 46ch; }
-.notice {
-  display: grid; gap: var(--space-2); justify-items: start;
-  padding: var(--space-4); border-radius: var(--radius-lg);
-  border: 1px solid var(--color-critical-border);
-  background: var(--color-critical-soft);
+.dialog {
+  position: fixed; z-index: 31; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(560px, calc(100vw - var(--space-8)));
+  max-height: calc(100vh - var(--space-16));
+  display: flex; flex-direction: column;
+  border-radius: var(--radius-xl); border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface); box-shadow: var(--shadow-overlay);
 }
 
-/* ---- Today (§5) -------------------------------------------------------- */
-.today { display: grid; gap: var(--space-8); max-width: 880px; }
-.today__h2 { margin: 0 0 var(--space-3); }
-
-/* The agent's own block. §71: the AI reads as AI because it says something
-   the numbers do not, not because it glows. One quiet mark, one tinted
-   ground, and the agent colour used exactly where §50 allows it. */
-.brief {
-  display: flex; gap: var(--space-3); align-items: flex-start;
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--color-border-subtle);
-  border-left: 3px solid var(--color-agent);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-surface);
-}
-.brief__mark {
-  flex: 0 0 auto; width: 26px; height: 26px; display: grid; place-items: center;
-  border-radius: var(--radius-md);
-  background: var(--color-agent-soft); color: var(--color-agent);
-}
-.brief__text {
-  margin: var(--space-2) 0 0;
-  font-size: 15px; line-height: 1.6; color: var(--color-text-primary);
-}
-.brief__link {
-  color: var(--color-text-primary); font-weight: 600;
-  text-decoration: underline; text-decoration-color: var(--color-border-control);
-  text-underline-offset: 3px;
-}
-.brief__link:hover { text-decoration-color: var(--color-agent); }
-.brief__asks { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-4); }
-.brief__asks .chip { cursor: pointer; }
-.brief__asks .chip:hover { border-color: var(--color-agent); color: var(--color-agent); }
-.brief__asks .chip .i { width: 13px; height: 13px; }
-
-/* A row that is about somebody, not about a number. The count leads because
-   it is what the eye is looking for; the name follows because it is what the
-   row is actually for (§77). */
-.attention {
-  display: flex; align-items: center; gap: var(--space-4);
-  width: 100%; min-height: 58px; padding: var(--space-3) var(--space-4);
-  border: 0; border-bottom: 1px solid var(--color-border-subtle);
-  background: transparent; color: inherit; text-align: left; cursor: pointer;
-}
-.attention:last-child { border-bottom: 0; }
-.attention:hover { background: var(--color-bg-hover); }
-.attention__n {
-  flex: 0 0 auto; min-width: 28px;
-  font-size: 20px; font-weight: 600; letter-spacing: -.02em;
-  color: var(--color-text-primary);
-}
-.attention__body { display: grid; gap: 1px; min-width: 0; flex: 1; }
-
-/* ---- a visit, compacted (§2.3, §26) ------------------------------------ */
-/* Closed until somebody opens it; open, it shows what the visit actually
-   did, read from that thread rather than pre-loaded for every visit. */
+/* §2.3: "when a visit is over it gets compacted into a dated collation; on
+   click it shows all actions endured in that visit." */
 .visit {
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-surface);
-  overflow: hidden;
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-lg);
+  background: var(--color-bg-surface); overflow: hidden; box-shadow: var(--shadow-sm);
 }
 .visit[data-open="true"] { border-color: var(--color-border-strong); }
 .visit__head {
-  display: flex; align-items: center; gap: var(--space-3);
-  width: 100%; min-height: 52px; padding: var(--space-3) var(--space-4);
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  min-height: 50px; padding: 11px 14px;
   border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer;
 }
 .visit__head:hover { background: var(--color-bg-hover); }
 .visit__chev { display: grid; place-items: center; color: var(--color-text-tertiary);
   transition: transform var(--duration-fast) var(--ease-out); }
 .visit__chev[data-open="true"] { transform: rotate(180deg); }
-.visit__when { font-weight: 600; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.visit__when { font-size: 12.5px; font-weight: 700; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .visit__did {
-  flex: 1; min-width: 0; color: var(--color-text-tertiary); font-size: 12px;
+  flex: 1; min-width: 0; color: var(--color-text-tertiary); font-size: 10.5px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .visit__body {
-  display: grid; gap: var(--space-4); justify-items: start;
-  padding: var(--space-2) var(--space-4) var(--space-4);
-  border-top: 1px solid var(--color-border-subtle);
+  display: grid; gap: 14px; justify-items: start;
+  padding: 10px 14px 14px; border-top: 1px solid var(--color-border-subtle);
 }
-.visit__block { display: grid; gap: var(--space-2); width: 100%; }
-.visit__op { letter-spacing: .06em; text-transform: uppercase; }
+.visit__block { display: grid; gap: 6px; width: 100%; }
+.visit__op { letter-spacing: .07em; text-transform: uppercase; color: var(--color-eyebrow); }
+
+.tabs { display: flex; gap: 6px; margin: 4px 0 14px; flex-wrap: wrap; }

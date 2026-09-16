@@ -1,154 +1,220 @@
-/** §5. One question: what requires my attention right now?
+/** §5, rebuilt to the prototype.
  *
- *  §5 also says: do not make this a KPI dashboard. The first version obeyed
- *  that so literally it became a list of nouns and counts, which is a slide,
- *  not a workspace. What the prototype had and that lost is the agent's own
- *  presence: a brief that reads the facility and says something about it, and
- *  questions worth asking placed where you can ask them.
+ *  A hero that says what kind of shift this is and offers the questions worth
+ *  asking; the brief the agent wrote; the line in motion; then attention and
+ *  the facility's pulse side by side. None of it is a list of nouns, which is
+ *  what the first two attempts at this screen were.
  *
- *  Every sentence and every chip below is composed from declarations and live
- *  rows by agent.ts. Nothing here is written down.
+ *  Every word and number comes from a declaration or a live row. agent.ts
+ *  composes the prose; this file lays it out.
  */
-import { brief, facilityAsks, type Loaded } from "../agent";
+import { brief, facilityAsks, initialsOf, line, type Loaded } from "../agent";
 import { Icon } from "../icons";
-import { Empty } from "../parts";
 import type { Recent } from "../loops";
-import type { QueueRow, TaskRow } from "../types";
+import type { Catalogue, QueueRow, TaskRow } from "../types";
 import { human } from "../words";
 
-export function Today({ loaded, recents, onOpenThread, onGoView, onAsk, role }: {
+export function Today({ loaded, recents, cat, facilityName, role, onOpenThread, onGoView, onAsk }: {
   loaded: Loaded[];
   recents: Recent[];
+  cat: Catalogue;
+  facilityName?: string;
   role?: string;
   onOpenThread: (thread: string) => void;
   onGoView: (view: string) => void;
   onAsk: (question: string) => void;
 }) {
   const now = new Date();
-  const hour = now.getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const sentences = brief(loaded);
-  const asks = facilityAsks(loaded);
+  const h = now.getHours();
+  const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 
   const queues = loaded.filter((l) => l.decl.kind === "queue");
-  const tasklists = loaded.filter((l) => l.decl.kind === "tasklist");
-  const tasks = tasklists.flatMap((l) => (l.result.rows ?? []) as TaskRow[]).filter((t) => t.count > 0);
+  const rows = queues.flatMap((l) => (l.result.rows ?? []) as QueueRow[]);
+  const done = rows.filter((r) => !r.station).length;
+  const tasks = loaded
+    .filter((l) => l.decl.kind === "tasklist")
+    .flatMap((l) => (l.result.rows ?? []) as TaskRow[])
+    .filter((t) => t.count > 0);
+
+  // Station order is the workflow's, never this file's.
+  const wf = Object.values(cat.workflows ?? {})[0];
+  const stations = (wf?.steps ?? []).map((s) => s.station);
+  const badges = queues[0]?.decl.badges ?? {};
+  const columns = line(loaded, stations, badges);
+
+  // The session clock. The prototype's OPD window; there is no declaration
+  // for a facility's hours, so this shows the time and the day's progress
+  // through it rather than inventing an opening hour.
+  const mins = h * 60 + now.getMinutes();
+  const span = { from: 9 * 60, to: 14 * 60 };
+  const pct = Math.max(0, Math.min(100, ((mins - span.from) / (span.to - span.from)) * 100));
+  const left = Math.round(((span.to - mins) / 60) * 10) / 10;
 
   return (
-    <div className="today">
-      <header className="today__head">
-        <div className="t-meta u-faint">
-          {role ? `${human(role)} · ` : ""}
-          {now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
-        </div>
-        <h1 className="t-display" style={{ margin: "var(--space-1) 0 0" }}>{greeting}.</h1>
-      </header>
-
-      {/* The brief. An agent block, marked as one, saying something the
-          numbers alone do not: where the line is thick and what is worst. */}
-      <section className="brief">
-        <span className="brief__mark" aria-hidden="true"><Icon name="spark" /></span>
-        <div>
-          <div className="t-micro u-faint" style={{ letterSpacing: ".06em", textTransform: "uppercase" }}>
-            Brief
+    <div className="home">
+      <section className="hero">
+        <svg className="hero-mark" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mark-lg" /></svg>
+        <div className="arc">
+          <div className="arc-l">Session</div>
+          <div className="arc-t">
+            {String(h).padStart(2, "0")}:{String(now.getMinutes()).padStart(2, "0")}
           </div>
-          <p className="brief__text">
-            {sentences.map((s, i) =>
-              s.go ? (
-                <a className="brief__link" href={s.go} key={i}>{s.text}</a>
-              ) : (
-                <span key={i}>{s.text}</span>
-              ))}
-          </p>
-          {asks.length > 0 && (
-            <div className="brief__asks">
-              {asks.map((q) => (
-                <button className="chip" data-role="button" key={q} onClick={() => onAsk(q)}>
-                  <Icon name="chat" />
-                  {q}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="arc-bar"><i style={{ width: `${pct}%` }} /></div>
+          <div className="arc-s">
+            {pct <= 0 ? "not started" : pct >= 100 ? "session closed" : `${left} h left`}
+          </div>
+        </div>
+
+        <div className="hero-eye">{human(role ?? "")}{facilityName ? ` · ${facilityName}` : ""}</div>
+        <h1 className="hero-h">
+          {greeting}.<br />
+          <span>{rows.length} in the workspace, {done} complete.</span>
+        </h1>
+        <p className="hero-sub">
+          Everything below is a read. Nothing here writes to a record: the agent proposes, you confirm.
+        </p>
+
+        <button className="hero-ask" onClick={() => onAsk("")}>
+          <Icon name="search" className="i lg" />
+          <input
+            readOnly
+            placeholder="Ask about the facility, or find a patient"
+            style={{ cursor: "text" }}
+          />
+          <span className="kbd">⌘K</span>
+        </button>
+        <div className="chips">
+          {facilityAsks(loaded).map((q) => (
+            <button className="chip" key={q} onClick={() => onAsk(q)}>{q}</button>
+          ))}
         </div>
       </section>
 
-      <section>
-        <h2 className="t-section today__h2">Needs you</h2>
-        {tasks.length === 0 ? (
-          <Empty title="You're clear.">Nothing needs your attention.</Empty>
-        ) : (
-          <div className="patient-list">
-            {tasks.map((t) => (
-              <div className="attention" key={t.title}>
-                <span className="attention__n t-num">{t.count}</span>
-                <span className="attention__body">
-                  <span className="patient-name">{t.title}</span>
-                  {/* §77: a notification resolves to an object. Name who, so
-                      the row is a thing rather than a number. */}
-                  <span className="patient-sub">{whoIn(t, loaded)}</span>
-                </span>
-                {t.threads?.[0] && (
-                  <button className="btn" onClick={() => onOpenThread(t.threads[0])}>Open</button>
+      <div className="card">
+        <div className="brief">
+          <span className="brief-av"><Icon name="spark" className="i sm" /></span>
+          <div>
+            <div className="m-meta">Shift brief · {now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</div>
+            <p className="brief-t">
+              {brief(loaded).map((s, i) =>
+                s.go
+                  ? <button className="go" key={i} onClick={() => onGoView(s.go!.replace("#/views/", ""))}>{s.text}</button>
+                  : <span key={i}>{s.text}</span>)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {columns.length > 0 && (
+        <div className="card">
+          <div className="card-h">
+            <div>
+              <div className="eyebrow">Live</div>
+              <div className="card-t" style={{ marginTop: 2 }}>Patient flow</div>
+            </div>
+            <span className="badge b-mute ml-auto">the baton, in motion</span>
+          </div>
+          <div className="flow">
+            {columns.map((c) => (
+              <div className={`fl-col${c.jam ? " jam" : ""}`} key={c.station}>
+                <div className="fl-h">
+                  <span className="fl-n">{human(c.station)}</span>
+                  <span className="fl-c">{c.people.length}</span>
+                </div>
+                <div className="fl-rail">{c.people.length > 0 && <i />}</div>
+                {c.people.length === 0
+                  ? <div className="fl-e">Clear</div>
+                  : c.people.map((p) => (
+                      <button
+                        className={`fl-p${p.alert ? " alert" : ""}`}
+                        key={p.thread}
+                        onClick={() => onOpenThread(p.thread)}
+                      >
+                        <span className="fl-av">{p.initials}</span>
+                        <span className="fl-nm">{p.name}</span>
+                      </button>
+                    ))}
+                {c.jam && (
+                  <div className="fl-jam">
+                    <Icon name="alert" className="i sm" />
+                    heaviest here
+                  </div>
                 )}
               </div>
             ))}
           </div>
-        )}
-      </section>
-
-      {queues.length > 0 && (
-        <section>
-          <h2 className="t-section today__h2">Lists</h2>
-          <div className="patient-list">
-            {queues.map(({ decl, result }) => {
-              const rows = (result.rows ?? []) as QueueRow[];
-              return (
-                <button className="attention" key={decl.id} onClick={() => onGoView(decl.id)}>
-                  <span className="attention__n t-num">{rows.length}</span>
-                  <span className="attention__body">
-                    <span className="patient-name">{decl.title}</span>
-                    <span className="patient-sub">{stations(rows)}</span>
-                  </span>
-                  <Icon name="refer" />
-                </button>
-              );
-            })}
-          </div>
-        </section>
+        </div>
       )}
 
-      {recents.length > 0 && (
-        <section>
-          <h2 className="t-section today__h2">Recent</h2>
-          <div className="patient-list">
-            {recents.slice(0, 4).map((r) => (
-              <button className="attention" key={r.id} onClick={() => onOpenThread(r.id)}>
-                <span className="attention__body">
-                  <span className="patient-name">{r.name}</span>
+      <div className="hgrid">
+        <div className="card">
+          <div className="card-h">
+            <div className="card-t">Needs you</div>
+            <span className="badge b-mute ml-auto">{tasks.reduce((n, t) => n + t.count, 0)}</span>
+          </div>
+          <div className="att">
+            {tasks.length === 0 ? (
+              <div className="state-empty">You're clear. Nothing needs your attention.</div>
+            ) : tasks.map((t) => (
+              <button className="at" key={t.title} onClick={() => t.threads?.[0] && onOpenThread(t.threads[0])}>
+                <span className={`at-ic${t.operation ? " amb" : " ink"}`}>
+                  <Icon name={t.operation ? "alert" : "clip"} className="i sm" />
                 </span>
-                <Icon name="refer" />
+                <span className="at-b">
+                  <span className="at-t">{t.title}</span>
+                  <span className="at-s">{whoIn(t, loaded)}</span>
+                </span>
+                <span className="badge b-mute">{t.count}</span>
+                <span className="at-go">Open</span>
               </button>
             ))}
           </div>
-        </section>
-      )}
+        </div>
+
+        <div className="card">
+          <div className="card-h"><div className="card-t">Facility pulse</div></div>
+          <div className="pulse">
+            <div>
+              <div className="pu-r">
+                <span>Seen today</span>
+                <span>{rows.length} in the workspace</span>
+              </div>
+              <div className="pu-v">{done}<small>complete</small></div>
+              <div className="split">
+                <i style={{ width: `${rows.length ? (done / rows.length) * 100 : 0}%`, background: "var(--color-accent)" }} />
+                <i style={{ flex: 1, background: "var(--color-border-subtle)" }} />
+              </div>
+              <div className="leg">
+                <span><i className="dt" style={{ background: "var(--color-accent)" }} />Complete {done}</span>
+                <span><i className="dt" style={{ background: "var(--color-border-strong)" }} />In progress {rows.length - done}</span>
+              </div>
+            </div>
+
+            {recents.length > 0 && (
+              <div>
+                <div className="pu-r"><span>Recent</span></div>
+                <div style={{ display: "grid", gap: 6, marginTop: 7 }}>
+                  {recents.slice(0, 4).map((r) => (
+                    <button className="fl-p" key={r.id} onClick={() => onOpenThread(r.id)}>
+                      <span className="fl-av">{initialsOf(r.name)}</span>
+                      <span className="fl-nm">{r.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-/** Who this worklist is actually about. The declaration gives a tasklist row
- *  its threads, and a queue gives those threads a name, so a row can say
- *  "Kamala Devi and two others" instead of "3". */
+/** §77: a row about somebody, not a number. */
 function whoIn(t: TaskRow, loaded: Loaded[]): string {
   const names = new Map<string, string>();
   for (const l of loaded.filter((x) => x.decl.kind === "queue")) {
     for (const r of (l.result.rows ?? []) as QueueRow[]) {
-      // `decl.columns` is only on the catalogue's copy of a view; /facility
-      // sends a short form without it (types.ts says so). Reading it here
-      // returned undefined for every row and every subtitle came out empty,
-      // so fall back to the subject's own first readable value -- the kernel
-      // already ordered those keys by the declaration.
       const ordered = (l.decl.columns ?? []).length
         ? (l.decl.columns as string[]).map((c) => r.subject?.[c])
         : Object.values(r.subject ?? {});
@@ -161,15 +227,4 @@ function whoIn(t: TaskRow, loaded: Loaded[]): string {
   if (named.length === 1) return named[0];
   if (named.length === 2) return `${named[0]} and ${named[1]}`;
   return `${named[0]} and ${named.length - 1} others`;
-}
-
-/** Where the people in this list are standing, most first. */
-function stations(rows: QueueRow[]): string {
-  const tally = new Map<string, number>();
-  for (const r of rows) if (r.station) tally.set(r.station, (tally.get(r.station) ?? 0) + 1);
-  return [...tally.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([s, n]) => `${human(s)} ${n}`)
-    .join(" · ");
 }

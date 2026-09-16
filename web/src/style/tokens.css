@@ -1,202 +1,211 @@
 /* The only file in web/src permitted to name a colour.
  *
- * Spec: docs/superpowers/specs/2026-09-16-emr-ui-ux-spec-v0.3.md, §44-§51.
- * Enforced by src/style.check.ts, which fails the build if a hex, rgb(),
- * hsl() or oklch() appears in any other stylesheet. That containment is the
- * whole point: a palette change is a diff in this file and nowhere else.
+ * This is the prototype's palette (agentic-emr-prototype.html), which the
+ * owner asked the interface to be rebuilt to. It is a warm, near-monochrome
+ * system: one ink accent, colour reserved for clinical risk, and ABDM blue
+ * reserved for national identity and nothing else.
  *
- * WHERE THIS DEPARTS FROM THE SPEC, AND WHY.
+ * Four values are corrected against WCAG 2.2 AA (spec §68); the rest of the
+ * prototype's palette already clears it. Hue and saturation preserved,
+ * lightness moved, worst case measured against every ground the token lands
+ * on rather than the flattering one:
  *
- * The spec targets WCAG 2.2 AA (§68) and its own §48/§49 palettes miss it in
- * eleven places. Measured, not eyeballed; style.check.ts recomputes every one
- * on each run. Corrections preserve hue and saturation and move lightness
- * only, so the palette still reads as the spec intended.
+ *   --color-text-tertiary   #7C7263 -> #736A5C   4.02 -> 4.53
+ *   --color-eyebrow         #8A7C66 -> #756957   3.46 -> 4.56
+ *   --color-text-disabled   #A79B8A stays: it may only sit on a disabled
+ *                           control and never on text anybody must read
+ *   --color-border-control  #D2C9BB -> #9A8566   1.39 -> 3.02 (SC 1.4.11)
  *
- *   light  --color-text-tertiary  #8D8981 -> #69665F   2.75 -> 4.51
- *          --color-agent          #72798A -> #606675   3.44 -> 4.53
- *          --color-success        #74856B -> #5D6A56   3.12 -> 4.52
- *          --color-warning        #9A7B48 -> #7B623A   3.12 -> 4.53
- *          --color-critical       #A96E67 -> #8F5751   3.24 -> 4.53
- *          --color-abdm           #657FB8 -> #4A65A1   3.13 -> 4.51
- *   dark   --color-text-tertiary  #777C76 -> #949893   3.10 -> 4.51
- *
- * The ratios above are the WORST case across every ground the token lands on
- * (surface, canvas, subtle, hover, selected, and for a semantic ink its own
- * soft chip background from §62) -- not the flattering one against surface.
- * Testing only against surface is how the first pass of this file called the
- * dark palette clean when two of its tokens were failing.
- *
- * --color-border-control is NOT in the spec. The spec has subtle and strong,
- * and §58 draws the composer -- an input -- with strong. WCAG 2.2 SC 1.4.11
- * wants 3:1 for a boundary that identifies a control, and the composer's own
- * background is 1.06:1 against the canvas behind it, so the border is the
- * only thing that says "this is a field". Raising --color-border-strong to
- * 3:1 would have dragged every table rule and panel divider up with it and
- * made the whole interface heavy. A divider identifies nothing and needs
- * nothing; a control boundary does. Two jobs, two tokens.
- *
- * --color-text-disabled is below 4.5:1 by definition. It may only be used on
- * a genuinely disabled control. It may never carry text a person must read.
+ * style.check.ts recomputes all of it on every run.
  */
 
 :root {
-  /* ---- type (§44, §51) ---- */
-  --font-sans: "Geist", Inter, ui-sans-serif, system-ui, -apple-system,
+  /* ---- type (§44, §51). Inter: the prototype's, and it is a data-dense
+     interface, which is what Inter is for. ---- */
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
-    Consolas, monospace;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  /* ---- space (§45) ---- */
   --space-1: 4px;   --space-2: 8px;   --space-3: 12px;  --space-4: 16px;
   --space-5: 20px;  --space-6: 24px;  --space-8: 32px;  --space-10: 40px;
   --space-12: 48px; --space-16: 64px;
 
-  /* ---- radius (§46): 6 controls, 8 inputs, 12 panels, 16 prominent ---- */
   --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
   --radius-pill: 999px;
 
-  /* ---- motion (§69) ---- */
-  --duration-fast: 100ms; --duration-normal: 180ms; --duration-slow: 240ms;
+  --duration-fast: 140ms; --duration-normal: 180ms; --duration-slow: 250ms;
   --ease-out: cubic-bezier(.22,.61,.36,1);
 
-  /* ---- shadow (§47): floating surfaces only, never hierarchy ---- */
-  --shadow-sm: 0 1px 2px rgba(20,18,15,.05);
-  --shadow-md: 0 6px 18px rgba(20,18,15,.08);
-  --shadow-lg: 0 16px 48px rgba(20,18,15,.14);
-  --shadow-overlay: 0 24px 70px rgba(20,18,15,.20);
+  --shadow-sm: 0 1px 2px rgba(46,38,28,.05), 0 1px 3px rgba(46,38,28,.04);
+  --shadow-md: 0 10px 26px rgba(46,38,28,.10), 0 2px 6px rgba(46,38,28,.05);
+  --shadow-lg: 0 12px 34px rgba(30,24,16,.13);
+  --shadow-overlay: 0 24px 70px rgba(30,24,16,.20);
 
-  /* ---- light surfaces (§48) ---- */
-  --color-bg-canvas: #F7F5F1;
-  --color-bg-surface: #FFFDFC;
-  --color-bg-subtle: #F1EEE8;
-  --color-bg-hover: #ECE8E1;
-  --color-bg-selected: #E7E4DE;
+  /* ---- grounds ---- */
+  --color-bg-canvas: #F6F1E9;
+  --color-bg-surface: #FFFDFA;
+  --color-bg-subtle: #F1ECE4;
+  --color-bg-rail: #F2ECE2;
+  --color-bg-hover: #F7F3ED;
+  --color-bg-selected: #F1ECE3;
 
-  --color-border-subtle: #E4DFD6;
-  --color-border-strong: #D1CBC1;
-  --color-border-control: #8F816A;
+  --color-border-subtle: #E7DFD3;
+  --color-border-strong: #D2C9BB;
+  --color-border-control: #9A8566;
 
-  --color-text-primary: #1C1B19;
-  --color-text-secondary: #625F59;
-  --color-text-tertiary: #69665F;
-  --color-text-disabled: #AAA69F;
+  --color-text-primary: #1A1714;
+  --color-text-secondary: #5C5449;
+  --color-text-tertiary: #736A5C;
+  --color-text-disabled: #A79B8A;
 
-  --color-accent: #26231F;
-  --color-accent-soft: #ECE8E1;
+  /* The one accent, and it is ink. Colour means clinical risk here, so the
+     primary action is the darkest thing on the screen rather than the
+     bluest. */
+  --color-accent: #221E19;
+  --color-accent-hover: #100E0B;
+  --color-accent-soft: #F1ECE3;
+  --color-accent-line: #E2DACD;
 
-  --color-agent: #606675;
-  --color-agent-soft: #ECEEF2;
+  /* Eyebrows and the hairline over a hero: warm, quiet, and not a signal. */
+  --color-eyebrow: #756957;
+  --color-rule-warm: #C9BCA6;
+  --color-tint-warm: #F5F0E7;
 
-  --color-abdm: #4A65A1;
-  --color-abdm-soft: #EDF1F8;
-  --color-abdm-border: #D7E0F0;
+  /* The agent. Not a colour of its own in this system: the agent is ink on
+     the accent tint, because §71 says the AI should not announce itself with
+     a hue. It is still a token so the one place §50 allows it can be moved. */
+  --color-agent: #3A342C;
+  --color-agent-soft: #F1ECE3;
 
-  --color-success: #5D6A56;
-  --color-success-soft: #EFF2EC;
-  --color-success-border: #DCE3D6;
+  --color-abdm: #2B5BD7;
+  --color-abdm-soft: #EDF1FB;
+  --color-abdm-border: #D5DFF6;
 
-  --color-warning: #7B623A;
-  --color-warning-soft: #FAF3E5;
-  --color-warning-border: #EBDDC2;
+  --color-success: #5B6B4E;
+  --color-success-soft: #F1F2EC;
+  --color-success-border: #DCE0D2;
 
-  --color-critical: #8F5751;
-  --color-critical-soft: #F8ECEA;
-  --color-critical-border: #EACFCB;
+  --color-warning: #8A6524;
+  --color-warning-soft: #FAF3E4;
+  --color-warning-border: #EBDCBC;
+
+  --color-critical: #AE3A2C;
+  --color-critical-soft: #FBEEEB;
+  --color-critical-border: #F0D3CC;
+
+  /* The recording ring. A shadow carries its own alpha, so the two frames are
+     tokens rather than a literal in a keyframe: this file is the only one
+     allowed to name a colour and an animation is not an exception. */
+  --ring-rec-a: 0 0 0 0 rgba(174,58,44,.35);
+  --ring-rec-b: 0 0 0 13px rgba(174,58,44,0);
 }
 
-/* Dark (§49). Hierarchy from luminosity and border contrast, never from
- * inverting a light card (§65). */
 [data-theme="dark"] {
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.40);
-  --shadow-md: 0 6px 18px rgba(0,0,0,.50);
-  --shadow-lg: 0 16px 48px rgba(0,0,0,.60);
-  --shadow-overlay: 0 24px 70px rgba(0,0,0,.70);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.5);
+  --shadow-md: 0 10px 28px rgba(0,0,0,.6);
+  --shadow-lg: 0 12px 34px rgba(0,0,0,.65);
+  --shadow-overlay: 0 24px 70px rgba(0,0,0,.75);
 
-  --color-bg-canvas: #111210;
-  --color-bg-surface: #181A18;
-  --color-bg-subtle: #202320;
-  --color-bg-hover: #272A27;
-  --color-bg-selected: #2D312D;
+  --color-bg-canvas: #0F0D0A;
+  --color-bg-surface: #171410;
+  --color-bg-subtle: #242019;
+  --color-bg-rail: #131109;
+  --color-bg-hover: #1C1915;
+  --color-bg-selected: #26211A;
 
-  --color-border-subtle: #2C302C;
-  --color-border-strong: #3B403B;
-  --color-border-control: #717B71;
+  --color-border-subtle: #2B251D;
+  --color-border-strong: #443C31;
+  --color-border-control: #8A7B64;
 
-  --color-text-primary: #ECEDE9;
-  --color-text-secondary: #A7ABA4;
-  --color-text-tertiary: #949893;
-  --color-text-disabled: #555A55;
+  --color-text-primary: #F5EFE4;
+  --color-text-secondary: #B5A994;
+  --color-text-tertiary: #9C907C;
+  --color-text-disabled: #6E6455;
 
-  --color-accent: #F0EEE8;
-  --color-accent-soft: #2A2925;
+  --color-accent: #EDE5D8;
+  --color-accent-hover: #FFFFFF;
+  --color-accent-soft: #26211A;
+  --color-accent-line: #3A332A;
 
-  --color-agent: #A2A9BA;
-  --color-agent-soft: #292D36;
+  --color-eyebrow: #A2937C;
+  --color-rule-warm: #6B6052;
+  --color-tint-warm: #221E18;
 
-  --color-abdm: #91A8DE;
-  --color-abdm-soft: #1B2233;
-  --color-abdm-border: #303B58;
+  --color-agent: #D8CEBD;
+  --color-agent-soft: #26211A;
 
-  --color-success: #9CAF8C;
-  --color-success-soft: #1D261A;
-  --color-success-border: #33422E;
+  --color-abdm: #8AA9F0;
+  --color-abdm-soft: #1A2033;
+  --color-abdm-border: #2C3552;
 
-  --color-warning: #D4AA5C;
-  --color-warning-soft: #292216;
-  --color-warning-border: #514224;
+  --color-success: #9DB388;
+  --color-success-soft: #1B2117;
+  --color-success-border: #31402A;
 
-  --color-critical: #DA9185;
-  --color-critical-soft: #2B1B18;
-  --color-critical-border: #53302A;
+  --color-warning: #D9A94F;
+  --color-warning-soft: #2A2114;
+  --color-warning-border: #4E3E22;
+
+  --color-critical: #E08272;
+  --color-critical-soft: #2C1A16;
+  --color-critical-border: #553029;
+
+    --ring-rec-a: 0 0 0 0 rgba(224,130,114,.35);
+    --ring-rec-b: 0 0 0 13px rgba(224,130,114,0);
 }
 
-/* The viewer who never chose. No attribute is stamped on <html> until someone
- * picks a theme, so without this block a browser set to dark renders the light
- * palette. Guarded on :not([data-theme="light"]) so an explicit light choice
- * still wins. Every name under [data-theme="dark"] must appear here too;
- * style.check.ts fails if one is missing. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --shadow-sm: 0 1px 2px rgba(0,0,0,.40);
-    --shadow-md: 0 6px 18px rgba(0,0,0,.50);
-    --shadow-lg: 0 16px 48px rgba(0,0,0,.60);
-    --shadow-overlay: 0 24px 70px rgba(0,0,0,.70);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,.5);
+    --shadow-md: 0 10px 28px rgba(0,0,0,.6);
+    --shadow-lg: 0 12px 34px rgba(0,0,0,.65);
+    --shadow-overlay: 0 24px 70px rgba(0,0,0,.75);
 
-    --color-bg-canvas: #111210;
-    --color-bg-surface: #181A18;
-    --color-bg-subtle: #202320;
-    --color-bg-hover: #272A27;
-    --color-bg-selected: #2D312D;
+    --color-bg-canvas: #0F0D0A;
+    --color-bg-surface: #171410;
+    --color-bg-subtle: #242019;
+    --color-bg-rail: #131109;
+    --color-bg-hover: #1C1915;
+    --color-bg-selected: #26211A;
 
-    --color-border-subtle: #2C302C;
-    --color-border-strong: #3B403B;
-    --color-border-control: #717B71;
+    --color-border-subtle: #2B251D;
+    --color-border-strong: #443C31;
+    --color-border-control: #8A7B64;
 
-    --color-text-primary: #ECEDE9;
-    --color-text-secondary: #A7ABA4;
-    --color-text-tertiary: #949893;
-    --color-text-disabled: #555A55;
+    --color-text-primary: #F5EFE4;
+    --color-text-secondary: #B5A994;
+    --color-text-tertiary: #9C907C;
+    --color-text-disabled: #6E6455;
 
-    --color-accent: #F0EEE8;
-    --color-accent-soft: #2A2925;
+    --color-accent: #EDE5D8;
+    --color-accent-hover: #FFFFFF;
+    --color-accent-soft: #26211A;
+    --color-accent-line: #3A332A;
 
-    --color-agent: #A2A9BA;
-    --color-agent-soft: #292D36;
+    --color-eyebrow: #A2937C;
+    --color-rule-warm: #6B6052;
+    --color-tint-warm: #221E18;
 
-    --color-abdm: #91A8DE;
-    --color-abdm-soft: #1B2233;
-    --color-abdm-border: #303B58;
+    --color-agent: #D8CEBD;
+    --color-agent-soft: #26211A;
 
-    --color-success: #9CAF8C;
-    --color-success-soft: #1D261A;
-    --color-success-border: #33422E;
+    --color-abdm: #8AA9F0;
+    --color-abdm-soft: #1A2033;
+    --color-abdm-border: #2C3552;
 
-    --color-warning: #D4AA5C;
-    --color-warning-soft: #292216;
-    --color-warning-border: #514224;
+    --color-success: #9DB388;
+    --color-success-soft: #1B2117;
+    --color-success-border: #31402A;
 
-    --color-critical: #DA9185;
-    --color-critical-soft: #2B1B18;
-    --color-critical-border: #53302A;
+    --color-warning: #D9A94F;
+    --color-warning-soft: #2A2114;
+    --color-warning-border: #4E3E22;
+
+    --color-critical: #E08272;
+    --color-critical-soft: #2C1A16;
+    --color-critical-border: #553029;
+
+    --ring-rec-a: 0 0 0 0 rgba(224,130,114,.35);
+    --ring-rec-b: 0 0 0 13px rgba(224,130,114,0);
   }
 }

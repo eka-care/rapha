@@ -1,0 +1,2193 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agentic EMR — Workspace Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* one accent: ink. blue is reserved for ABDM identity only. colour = clinical risk. */
+  --eka-blue:#221E19; --eka-blue-bg:#F1ECE3; --eka-blue-100:#E2DACD;
+  --eka-blue-600:#100E0B; --eka-blue-700:#3A342C;
+  --abdm:#2B5BD7; --abdm-bg:#EDF1FB; --abdm-bd:#D5DFF6;
+  --grad-rose:linear-gradient(140deg,#3A342C 0%,#221E19 55%,#100E0B 100%);
+  --grad-rose-line:linear-gradient(90deg,#C9BCA6,#8A7C66,#C9BCA6);
+  --rose-ink:#8A7C66; --rose-tint:#F5F0E7; --pink-accent:#C0AE92;
+  --sh-rose:0 6px 18px rgba(34,30,25,.22);
+  --success:#5B6B4E; --success-bg:#F1F2EC; --success-border:#DCE0D2;
+  --warning:#8A6524; --warning-bg:#FAF3E4; --warning-border:#EBDCBC;
+  --destructive:#AE3A2C; --destructive-bg:#FBEEEB; --destructive-border:#F0D3CC;
+  --teal-500:#5F6B62; --teal-bg:#EFF2F0; --teal-border:#DBE1DC;
+  --violet-500:#6B6257; --violet-bg:#F3F0EA; --violet-border:#E3DCD0;
+  --amber-500:#8A6524; --amber-bg:#FAF3E4;
+  --gray-50:#F7F3ED; --gray-100:#F1ECE4; --gray-200:#E5DED3; --gray-300:#D2C9BB;
+  --gray-400:#A79B8A; --gray-500:#7C7263; --gray-600:#5C5449; --gray-700:#423C34;
+  --gray-800:#2C2823; --gray-900:#1A1714;
+  --surface:#FFFDFA; --canvas:#F6F1E9; --sb:#F2ECE2; --border:#E7DFD3;
+  --ink:#1A1714; --ink-2:#5C5449; --ink-3:#7C7263;
+  --r-sm:6px; --r-md:8px; --r-lg:12px; --r-xl:16px; --r-pill:999px;
+  --sh-card:0 1px 2px rgba(46,38,28,.05),0 1px 3px rgba(46,38,28,.04);
+  --sh-hover:0 10px 26px rgba(46,38,28,.10),0 2px 6px rgba(46,38,28,.05);
+  --sh-overlay:0 24px 70px rgba(30,24,16,.20);
+  --sh-pop:0 12px 34px rgba(30,24,16,.13);
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+[data-theme="dark"]{
+  --eka-blue:#EDE5D8; --eka-blue-bg:#26211A; --eka-blue-100:#3A332A;
+  --eka-blue-600:#FFFFFF; --eka-blue-700:#D8CEBD;
+  --abdm:#8AA9F0; --abdm-bg:#1A2033; --abdm-bd:#2C3552;
+  --grad-rose:linear-gradient(140deg,#EDE5D8 0%,#D8CEBD 55%,#BFB3A0 100%);
+  --grad-rose-line:linear-gradient(90deg,#6B6052,#A2937C,#6B6052);
+  --rose-ink:#A2937C; --rose-tint:#221E18; --pink-accent:#6B6052;
+  --sh-rose:0 6px 18px rgba(0,0,0,.5);
+  --success:#9DB388; --success-bg:#1B2117; --success-border:#31402A;
+  --warning:#D9A94F; --warning-bg:#2A2114; --warning-border:#54432420;
+  --warning-border:#4E3E22;
+  --destructive:#E08272; --destructive-bg:#2C1A16; --destructive-border:#553029;
+  --teal-500:#9AAA9E; --teal-bg:#1A201C; --teal-border:#2F3A33;
+  --violet-500:#B0A492; --violet-bg:#221E19; --violet-border:#3C352C;
+  --amber-500:#D9A94F; --amber-bg:#2A2114;
+  --gray-50:#1C1915; --gray-100:#242019; --gray-200:#302A22; --gray-300:#443C31;
+  --gray-400:#6E6455; --gray-500:#948875; --gray-600:#B5A994; --gray-700:#D0C5B1;
+  --gray-800:#E3DACA; --gray-900:#F5EFE4;
+  --surface:#171410; --canvas:#0F0D0A; --sb:#131109; --border:#2B251D;
+  --ink:#F5EFE4; --ink-2:#B5A994; --ink-3:#948875;
+  --sh-card:0 1px 3px rgba(0,0,0,.5); --sh-hover:0 10px 28px rgba(0,0,0,.6);
+  --sh-overlay:0 24px 70px rgba(0,0,0,.75); --sh-pop:0 12px 34px rgba(0,0,0,.65);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,sans-serif;background:var(--canvas);color:var(--ink);
+  -webkit-font-smoothing:antialiased;transition:background .25s var(--ease),color .25s var(--ease)}
+svg.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+svg.i.sm{width:13px;height:13px}svg.i.lg{width:19px;height:19px}
+.app{display:flex;height:100vh;width:100vw;overflow:hidden}
+.ml-auto{margin-left:auto}
+
+/* ---------- sidebar (Claude-style) ---------- */
+.sb{width:248px;background:var(--sb);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;flex-shrink:0;transition:background .25s var(--ease)}
+.sb-top{padding:14px 14px 8px;display:flex;align-items:center;gap:9px}
+.brand-mark{width:30px;height:30px;border-radius:9px;background:var(--surface);
+  border:1px solid var(--border);display:grid;place-items:center;color:var(--ink);
+  box-shadow:var(--sh-card)}
+.brand-mark svg{stroke-width:1.1}
+.brand-n{font-size:13px;font-weight:700;letter-spacing:-.01em}
+.brand-s{font-size:9.5px;color:var(--ink-3);margin-top:1px}
+.sb-pad{padding:6px 10px}
+.sb-btn{display:flex;align-items:center;gap:9px;width:100%;border:1px solid var(--border);
+  background:var(--surface);color:var(--ink);border-radius:var(--r-md);padding:9px 11px;
+  font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:.14s var(--ease)}
+.sb-btn:hover{background:var(--gray-100);border-color:var(--gray-300)}
+.sb-btn.ghost{border-color:transparent;background:none;color:var(--ink-3);font-weight:500}
+.sb-btn.ghost:hover{background:var(--gray-100);color:var(--ink-2)}
+.sb-nav{padding:6px 10px 4px;display:flex;flex-direction:column;gap:2px}
+.nv{display:flex;align-items:center;gap:10px;width:100%;border:none;background:none;
+  color:var(--ink-2);border-radius:var(--r-md);padding:8px 11px;font:inherit;font-size:12.5px;
+  font-weight:500;cursor:pointer;transition:.14s var(--ease);text-align:left}
+.nv:hover{background:var(--gray-100)}
+.nv.on{background:var(--eka-blue-bg);color:var(--eka-blue);font-weight:600}
+.nv .ct{margin-left:auto;font-size:10px;font-weight:700;background:var(--gray-200);
+  color:var(--ink-3);border-radius:var(--r-pill);padding:1px 7px}
+.nv.on .ct{background:var(--ink);color:var(--surface)}
+.sb-sec{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--gray-400);padding:14px 14px 6px}
+.sb-list{flex:1;overflow-y:auto;padding:0 10px 10px;display:flex;flex-direction:column;gap:1px}
+.th{display:flex;align-items:center;gap:9px;border:none;background:none;color:var(--ink-2);
+  border-radius:var(--r-md);padding:7px 10px;font:inherit;font-size:12px;cursor:pointer;
+  transition:.14s var(--ease);text-align:left;width:100%}
+.th:hover{background:var(--gray-100)}
+.th.on{background:var(--gray-100);color:var(--ink);font-weight:600}
+.th-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.th-t{font-size:9.5px;color:var(--gray-400);flex-shrink:0}
+.sb-foot{border-top:1px solid var(--border);padding:9px 10px;position:relative}
+.rolebtn{display:flex;align-items:center;gap:9px;width:100%;border:1px solid var(--border);
+  background:var(--surface);border-radius:var(--r-md);padding:8px 10px;cursor:pointer;
+  font:inherit;color:var(--ink);transition:.14s var(--ease)}
+.rolebtn:hover{background:var(--gray-100)}
+.rb-av{width:26px;height:26px;border-radius:var(--r-sm);background:var(--eka-blue-bg);
+  color:var(--eka-blue);display:grid;place-items:center;flex-shrink:0}
+.rb-n{font-size:12px;font-weight:600;line-height:1.2}
+.rb-s{font-size:9.5px;color:var(--ink-3);margin-top:1px}
+.menu{position:absolute;bottom:calc(100% + 6px);left:10px;width:252px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-pop);
+  padding:5px;z-index:40;display:none;animation:pop .14s var(--ease)}
+.menu.show{display:block}
+.mi{display:flex;align-items:center;gap:9px;width:100%;border:none;background:none;
+  color:var(--ink-2);border-radius:var(--r-sm);padding:8px 9px;font:inherit;font-size:12px;
+  cursor:pointer;text-align:left;transition:.12s var(--ease)}
+.mi:hover{background:var(--gray-100)}
+.mi.on{background:var(--eka-blue-bg);color:var(--eka-blue);font-weight:600}
+.mi-l{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.mi-c{flex-shrink:0;font-size:9.5px;color:var(--gray-400);font-family:ui-monospace,monospace;
+  background:none;border:none;padding:0}
+
+/* ---------- main ---------- */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:56px;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:11px;padding:0 18px;flex-shrink:0;transition:background .25s var(--ease)}
+.tb-title{font-size:14.5px;font-weight:700;letter-spacing:-.01em}
+.tb-sub{font-size:10.5px;color:var(--ink-3);margin-top:1px}
+.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);
+  background:var(--surface);color:var(--ink-2);border-radius:var(--r-pill);
+  padding:6px 12px;font:inherit;font-size:11.5px;font-weight:600;cursor:pointer;transition:.15s var(--ease)}
+.pill:hover{border-color:var(--gray-300)}
+.kbd{font-size:9.5px;font-weight:700;background:var(--gray-100);border:1px solid var(--border);
+  border-radius:4px;padding:2px 5px;color:var(--ink-3);font-family:inherit}
+.icon-btn{width:32px;height:32px;border-radius:var(--r-md);border:1px solid var(--border);
+  background:var(--surface);cursor:pointer;color:var(--ink-2);display:grid;place-items:center;transition:.15s var(--ease)}
+.icon-btn:hover{background:var(--gray-100)}
+.view{flex:1;overflow:hidden;display:flex;justify-content:center;padding:16px 20px}
+.view.scroll{overflow-y:auto}
+.wrap{max-width:1280px;width:100%;height:100%}
+
+/* ---------- cards ---------- */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-card);transition:background .25s var(--ease),border-color .25s var(--ease)}
+.card-h{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px}
+.card-t{font-size:12.5px;font-weight:700}
+.eyebrow{font-size:10px;font-weight:700;color:var(--rose-ink);text-transform:uppercase;letter-spacing:.09em}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;
+  padding:3px 8px;border-radius:var(--r-pill);border:1px solid transparent}
+.b-warn{background:var(--warning-bg);color:var(--warning);border-color:var(--warning-border)}
+.b-ok{background:var(--success-bg);color:var(--success);border-color:var(--success-border)}
+.b-crit{background:var(--destructive-bg);color:var(--destructive);border-color:var(--destructive-border)}
+.b-mute{background:var(--gray-100);color:var(--ink-3);border-color:var(--border)}
+.b-vio{background:var(--violet-bg);color:var(--violet-500);border-color:var(--violet-border)}
+.b-blue{background:var(--eka-blue-bg);color:var(--eka-blue-700);border-color:var(--eka-blue-100)}
+
+/* ---------- chat view ---------- */
+.chatgrid{display:grid;grid-template-columns:1fr 300px;gap:16px;height:100%;align-items:start}
+.chatcard{display:flex;flex-direction:column;height:100%}
+.pt-head{padding:13px 15px;display:flex;align-items:flex-start;gap:11px;border-bottom:1px solid var(--border);flex-shrink:0}
+.avatar{width:38px;height:38px;border-radius:var(--r-md);background:var(--gray-100);color:var(--ink-2);
+  display:grid;place-items:center;font-weight:700;font-size:12.5px;flex-shrink:0}
+.pt-name{font-size:14px;font-weight:700;letter-spacing:-.01em}
+.pt-meta{font-size:10.5px;color:var(--ink-3);margin-top:2px}
+.id-badge{display:inline-flex;align-items:center;gap:5px;background:var(--abdm-bg);
+  border:1.5px solid var(--abdm-bd);border-radius:var(--r-pill);padding:3px 9px}
+.id-lab{color:var(--abdm);font-weight:700;font-size:8.5px;text-transform:uppercase;letter-spacing:.06em}
+.id-val{color:var(--abdm);font-weight:700;font-size:10px}
+.b-blue{background:var(--abdm-bg)!important;color:var(--abdm)!important;border-color:var(--abdm-bd)!important}
+.sdk{border-color:var(--abdm-bd)!important;background:linear-gradient(150deg,var(--abdm-bg),var(--surface) 70%)!important}
+.sdk-h{color:var(--abdm)!important}
+.sdk-tab.on{background:var(--abdm)!important}
+.thread{flex:1;overflow-y:auto;padding:15px;display:flex;flex-direction:column;gap:15px}
+.msg{display:flex;gap:10px;max-width:92%}
+.msg.right{margin-left:auto;flex-direction:row-reverse}
+.m-av{width:25px;height:25px;border-radius:var(--r-sm);display:grid;place-items:center;
+  flex-shrink:0;background:var(--gray-100);color:var(--ink-3);margin-top:2px}
+.m-av.agent{background:var(--eka-blue-bg);color:var(--eka-blue)}
+.m-b{min-width:0}
+.m-meta{font-size:9.5px;color:var(--gray-400);font-weight:600;margin-bottom:5px;
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.bubble{background:var(--gray-50);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:11px 13px;font-size:12.5px;line-height:1.55;color:var(--ink-2)}
+.msg.right .bubble{background:var(--eka-blue-bg);border-color:var(--eka-blue-100);color:var(--eka-blue-700)}
+.bubble b{color:var(--ink);font-weight:600}
+.bubble .t{font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:4px;
+  display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.kvbox{margin-top:9px;border:1px solid var(--border);border-radius:var(--r-md);padding:8px 10px;background:var(--surface)}
+.kv{display:flex;justify-content:space-between;gap:12px;font-size:11.5px;padding:3px 0;color:var(--ink-3)}
+.kv b{color:var(--eka-blue);font-weight:700}
+.kv.crit b{color:var(--destructive)}
+.quote{border-left:2px solid var(--violet-border);padding-left:10px;font-style:italic;
+  color:var(--ink-3);font-size:12px;line-height:1.55;margin-top:7px}
+.props{margin-top:11px;display:flex;flex-direction:column;gap:6px}
+.prop{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  border:1px solid var(--border);background:var(--surface);border-radius:var(--r-md);
+  padding:9px 11px;cursor:pointer;font:inherit;color:var(--ink);transition:.15s var(--ease)}
+.prop:hover:not(:disabled){border-color:var(--eka-blue);background:var(--eka-blue-bg);transform:translateX(2px)}
+.prop:disabled{opacity:.45;cursor:not-allowed}
+.prop.primary{border-color:var(--ink);background:var(--ink);color:var(--surface)}
+.prop.primary:hover{background:var(--eka-blue-600)}
+.prop.primary .p-s{color:rgba(255,255,255,.72)}
+.prop.primary .p-tag{background:rgba(255,255,255,.16);color:#fff;border-color:transparent}
+.p-l{font-size:12.5px;font-weight:600;line-height:1.25}
+.p-s{font-size:10.5px;color:var(--ink-3);margin-top:2px;line-height:1.3}
+.p-tag{margin-left:auto;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+  padding:3px 6px;border-radius:4px;background:var(--gray-100);color:var(--ink-3);
+  border:1px solid var(--border);white-space:nowrap}
+.p-tag.scribe{background:var(--violet-bg);color:var(--violet-500);border-color:var(--violet-border)}
+.p-tag.form{background:var(--teal-bg);color:var(--teal-500);border-color:var(--teal-border)}
+.p-tag.irr{background:var(--destructive-bg);color:var(--destructive);border-color:var(--destructive-border)}
+.p-tag.hand{background:var(--eka-blue-bg);color:var(--eka-blue-700);border-color:var(--eka-blue-100)}
+.empty{margin:auto;text-align:center;color:var(--ink-3);font-size:12.5px;line-height:1.6;max-width:340px}
+.composer{border-top:1px solid var(--border);padding:11px 14px;display:flex;gap:8px;align-items:center;flex-shrink:0}
+.composer input{flex:1;border:1px solid var(--border);background:var(--gray-50);color:var(--ink);
+  border-radius:var(--r-pill);padding:10px 15px;font:inherit;font-size:12.5px;outline:none}
+.composer input:focus{border-color:var(--eka-blue);background:var(--surface)}
+.btn{border:none;border-radius:var(--r-md);padding:9px 14px;font:inherit;font-size:12.5px;
+  font-weight:600;cursor:pointer;transition:.15s var(--ease);white-space:nowrap;
+  display:inline-flex;align-items:center;gap:7px}
+.btn-b{background:var(--ink);color:var(--surface)}.btn-b:hover{background:var(--eka-blue-600)}
+.btn-g{background:var(--surface);color:var(--ink-2);border:1px solid var(--border)}
+.btn-g:hover{background:var(--gray-100)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.send{width:36px;height:36px;padding:0;border-radius:50%;justify-content:center}
+.panel{display:flex;flex-direction:column;gap:13px;height:100%;overflow-y:auto}
+.states{padding:9px 12px}
+.st{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:11.5px;color:var(--gray-400)}
+.st .n{width:17px;height:17px;border-radius:50%;border:1.5px solid var(--gray-300);
+  display:grid;place-items:center;flex-shrink:0;font-size:9px;font-weight:700}
+.st.done{color:var(--ink-2)}.st.done .n{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.st.now{color:var(--eka-blue);font-weight:700}
+.st.now .n{border-color:var(--eka-blue);background:var(--eka-blue-bg);color:var(--eka-blue)}
+.caps{padding:10px 12px;display:flex;flex-wrap:wrap;gap:4px}
+.cap{font-size:9px;font-weight:600;font-family:ui-monospace,monospace;padding:3px 6px;
+  border-radius:4px;background:var(--gray-100);color:var(--gray-400);border:1px solid var(--border)}
+.cap.on{background:var(--eka-blue-bg);color:var(--eka-blue-700);border-color:var(--eka-blue-100)}
+.audit{padding:8px 12px;max-height:150px;overflow-y:auto}
+.au{display:flex;gap:8px;font-size:10px;padding:5px 0;border-bottom:1px dashed var(--border);color:var(--gray-400)}
+.au:last-child{border:none}
+.au b{color:var(--ink-2);font-weight:600;font-family:ui-monospace,monospace;font-size:9.5px}
+.nudge{font-size:11px;color:var(--rose-ink);background:var(--rose-tint);
+  border-left:3px solid var(--pink-accent);border-radius:var(--r-sm);padding:8px 10px;margin:0 12px 12px;line-height:1.5}
+
+/* ---------- queue ---------- */
+.qtabs{display:flex;gap:5px;background:var(--gray-100);padding:4px;border-radius:var(--r-md);margin-bottom:14px;flex-wrap:wrap}
+.qtab{border:none;background:none;padding:7px 13px;border-radius:var(--r-sm);font:inherit;
+  font-size:11.5px;font-weight:600;color:var(--ink-3);cursor:pointer;transition:.14s var(--ease);
+  display:flex;align-items:center;gap:7px}
+.qtab.on{background:var(--surface);color:var(--ink);box-shadow:var(--sh-card)}
+.qtab .n{font-size:9.5px;font-weight:700;background:var(--gray-200);color:var(--ink-3);
+  border-radius:var(--r-pill);padding:1px 6px}
+.qtab.on .n{background:var(--ink);color:var(--surface)}
+.qgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:12px}
+.qc{padding:13px;cursor:pointer;transition:.15s var(--ease)}
+.qc:hover{transform:translateY(-1px);box-shadow:var(--sh-hover);border-color:var(--eka-blue-100)}
+.qc-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.qc-n{font-size:13px;font-weight:700}
+.qc-m{font-size:10.5px;color:var(--ink-3);margin-top:1px}
+.qc-tok{margin-left:auto;font-size:10px;font-weight:700;color:var(--ink-3);
+  background:var(--gray-100);border:1px solid var(--border);border-radius:var(--r-sm);padding:3px 7px}
+.qc-chips{display:flex;gap:5px;flex-wrap:wrap}
+
+/* ---------- directory ---------- */
+.dir-bar{display:flex;gap:9px;align-items:center;margin-bottom:13px;flex-wrap:wrap}
+.dir-in{flex:1;min-width:190px;border:1px solid var(--border);background:var(--surface);color:var(--ink);
+  border-radius:var(--r-md);padding:9px 12px;font:inherit;font-size:12.5px;outline:none}
+.dir-in:focus{border-color:var(--eka-blue)}
+.f-chip{border:1px solid var(--border);background:var(--surface);color:var(--ink-3);
+  border-radius:var(--r-pill);padding:7px 14px;font:inherit;font-size:11.5px;font-weight:600;cursor:pointer;transition:.14s var(--ease)}
+.f-chip.on{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+table{width:100%;border-collapse:collapse}
+th{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--gray-400);
+  text-align:left;padding:10px 13px;border-bottom:1px solid var(--border)}
+td{font-size:12px;padding:11px 13px;border-bottom:1px solid var(--border);color:var(--ink-2)}
+tr:last-child td{border-bottom:none}
+tbody tr{cursor:pointer;transition:.12s var(--ease)}
+tbody tr:hover{background:var(--gray-50)}
+td.n{font-weight:600;color:var(--ink)}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+
+/* ---------- admin ---------- */
+.agrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.arow{display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--border)}
+.arow:last-child{border-bottom:none}
+.ar-n{font-size:12px;font-weight:600}
+.ar-s{font-size:10px;color:var(--ink-3);margin-top:1px;font-family:ui-monospace,monospace}
+.sw{width:34px;height:19px;border-radius:var(--r-pill);background:var(--gray-300);position:relative;
+  cursor:pointer;border:none;flex-shrink:0;transition:.16s var(--ease)}
+.sw::after{content:'';position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;
+  background:#fff;transition:.16s var(--ease)}
+.sw.on{background:var(--ink)}.sw.on::after{transform:translateX(15px)}
+.ai-box{padding:13px;border-top:1px solid var(--border);background:var(--gray-50)}
+.ai-in{display:flex;gap:8px}
+.ai-in input{flex:1;border:1px solid var(--border);background:var(--surface);color:var(--ink);
+  border-radius:var(--r-md);padding:9px 12px;font:inherit;font-size:12px;outline:none}
+.ai-in input:focus{border-color:var(--eka-blue)}
+.prop-card{margin-top:11px;border:1px solid var(--violet-border);background:var(--violet-bg);
+  border-radius:var(--r-md);padding:12px 13px}
+.pc-h{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--violet-500);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.pc-r{display:flex;justify-content:space-between;gap:12px;font-size:11.5px;padding:3px 0;color:var(--ink-3)}
+.pc-r b{color:var(--ink-2);font-weight:600;font-family:ui-monospace,monospace;font-size:11px;text-align:right}
+
+/* ---------- scribe session ---------- */
+.scbtn{display:inline-flex;align-items:center;gap:8px;border:none;border-radius:var(--r-pill);
+  padding:8px 15px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;
+  background:var(--ink);color:var(--surface);box-shadow:var(--sh-card);transition:.15s var(--ease)}
+.scbtn:hover{transform:translateY(-1px)}
+.scbtn.live{background:var(--destructive);color:#fff;box-shadow:0 0 0 0 rgba(220,38,38,.5);animation:live 1.5s infinite}
+@keyframes live{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.45)}50%{box-shadow:0 0 0 9px rgba(220,38,38,0)}}
+.scbtn .t{font-variant-numeric:tabular-nums;opacity:.85}
+.sheet{position:fixed;top:0;right:0;bottom:0;width:min(500px,94vw);background:var(--surface);
+  border-left:1px solid var(--border);box-shadow:var(--sh-overlay);z-index:70;
+  display:none;flex-direction:column;animation:slide .22s var(--ease)}
+.sheet.show{display:flex}
+@keyframes slide{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+.sh-h{padding:15px 17px;border-bottom:1px solid var(--border)}
+.sh-t{font-size:15px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:9px}
+.sh-s{font-size:11px;color:var(--ink-3);margin-top:3px}
+.lang{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+.lp{display:flex;align-items:center;gap:7px;border:1px solid var(--border);background:var(--gray-50);
+  border-radius:var(--r-md);padding:5px 9px}
+.lp-l{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--gray-400)}
+.lp select{border:none;background:none;font:inherit;font-size:11.5px;font-weight:600;
+  color:var(--ink);outline:none;cursor:pointer}
+.sh-tabs{display:flex;gap:3px;padding:9px 17px 0}
+.sh-tab{border:none;background:none;padding:8px 12px;border-radius:var(--r-sm) var(--r-sm) 0 0;
+  font:inherit;font-size:12px;font-weight:600;color:var(--ink-3);cursor:pointer;
+  border-bottom:2px solid transparent;transition:.14s var(--ease)}
+.sh-tab.on{color:var(--eka-blue);border-bottom-color:var(--eka-blue)}
+.sh-tab .dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--destructive);
+  margin-left:5px;vertical-align:middle;animation:live 1.5s infinite}
+.sh-b{flex:1;overflow-y:auto;padding:15px 17px;border-top:1px solid var(--border)}
+.sh-f{padding:12px 17px;border-top:1px solid var(--border);display:flex;gap:9px;align-items:center}
+.tl{padding:9px 0;border-bottom:1px dashed var(--border)}
+.tl:last-child{border:none}
+.tl-w{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--gray-400);margin-bottom:4px}
+.tl-o{font-size:13px;color:var(--ink);line-height:1.6}
+.tl-g{font-size:11.5px;color:var(--ink-3);line-height:1.5;margin-top:3px;font-style:italic}
+.tl.new{animation:fade .4s var(--ease)}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.wave{display:flex;align-items:center;gap:2px;height:16px}
+.wave i{width:2.5px;background:var(--destructive);border-radius:2px;animation:wv .9s ease-in-out infinite}
+.wave i:nth-child(2){animation-delay:.1s}.wave i:nth-child(3){animation-delay:.2s}
+.wave i:nth-child(4){animation-delay:.3s}.wave i:nth-child(5){animation-delay:.15s}
+@keyframes wv{0%,100%{height:4px}50%{height:15px}}
+.sc-hero{border:1.5px dashed var(--border);border-radius:var(--r-lg);padding:22px 18px;text-align:center;
+  margin-bottom:11px;transition:.16s var(--ease);cursor:pointer;background:var(--gray-50)}
+.sc-hero:hover{border-color:var(--pink-accent);background:var(--rose-tint)}
+.sc-hero .mic{margin-bottom:11px}
+.sc-hero b{font-size:13.5px;font-weight:700;display:block}
+.sc-hero span{font-size:11.5px;color:var(--ink-3);display:block;margin-top:4px;line-height:1.5}
+.outbox{border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:11px;overflow:hidden}
+.out-h{display:flex;align-items:center;gap:7px;padding:9px 12px;background:var(--gray-50);
+  border-bottom:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.07em;color:var(--ink-3)}
+.out-b{padding:12px;font-size:12.5px;line-height:1.65;color:var(--ink-2);white-space:pre-line}
+.out-b.te{font-size:13.5px;line-height:1.75;color:var(--ink)}
+
+/* ---------- abha sdk & composer actions ---------- */
+.sdk{border:1.5px solid var(--eka-blue-100);background:linear-gradient(150deg,var(--eka-blue-bg),var(--surface) 70%);
+  border-radius:var(--r-lg);padding:13px 14px;margin-bottom:13px}
+.sdk-h{display:flex;align-items:center;gap:7px;font-size:9.5px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.08em;color:var(--eka-blue-700)}
+.sdk-tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-md);padding:3px;margin-top:11px}
+.sdk-tab{flex:1;border:none;background:none;padding:7px 6px;border-radius:var(--r-sm);font:inherit;
+  font-size:11px;font-weight:600;color:var(--ink-3);cursor:pointer;transition:.14s var(--ease)}
+.sdk-tab.on{background:var(--eka-blue);color:#fff}
+.sdk-note{display:flex;gap:7px;align-items:flex-start;font-size:10.5px;color:var(--ink-3);
+  line-height:1.5;margin-top:11px}
+.skip{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;border:1px dashed var(--border);
+  background:none;border-radius:var(--r-md);padding:11px 12px;cursor:pointer;font:inherit;
+  color:var(--ink-2);margin-top:4px;transition:.14s var(--ease)}
+.skip:hover{border-color:var(--eka-blue);background:var(--gray-50)}
+.skip b{font-size:12px;font-weight:600;color:var(--ink)}
+.verified{border:1.5px solid var(--success-border);background:var(--success-bg);
+  border-radius:var(--r-md);padding:12px 13px;margin-bottom:13px}
+.v-h{display:flex;align-items:center;gap:6px;font-size:9.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.08em;color:var(--success);margin-bottom:8px}
+.verified .pc-r b{color:var(--ink)}
+.cbar{display:flex;gap:6px;padding:0 0 9px;overflow-x:auto}
+.cq{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface);
+  color:var(--ink-2);border-radius:var(--r-pill);padding:6px 12px;font:inherit;font-size:11.5px;
+  font-weight:600;cursor:pointer;white-space:nowrap;transition:.14s var(--ease)}
+.cq:hover:not(:disabled){border-color:var(--eka-blue);color:var(--eka-blue);background:var(--eka-blue-bg)}
+.cq:disabled{opacity:.4;cursor:not-allowed}
+.cq.rose{border-color:transparent;background:var(--ink);color:var(--surface);box-shadow:var(--sh-card)}
+.cq.rose:hover{transform:translateY(-1px);color:var(--surface);background:var(--gray-800)}
+.crow{display:flex;gap:8px;align-items:center}
+
+/* ---------- analytics ---------- */
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:13px;margin-bottom:16px}
+.mc{padding:14px 15px;position:relative;overflow:hidden}
+.mc-l{font-size:10.5px;font-weight:600;color:var(--ink-3);display:flex;align-items:center;gap:6px}
+.mc-v{font-size:30px;font-weight:800;letter-spacing:-.03em;margin-top:9px;font-variant-numeric:tabular-nums}
+.mc-v small{font-size:13px;font-weight:700;color:var(--ink-3);margin-left:2px}
+.mc-d{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;
+  padding:2px 7px;border-radius:var(--r-pill);margin-top:8px}
+.mc-d.up{background:var(--success-bg);color:var(--success)}
+.mc-d.dn{background:var(--destructive-bg);color:var(--destructive)}
+.mc-d.fl{background:var(--gray-100);color:var(--ink-3)}
+.mc-id{font-size:9px;font-family:ui-monospace,monospace;color:var(--gray-400);margin-top:9px}
+.spark{display:flex;align-items:flex-end;gap:2px;height:34px;margin-top:11px}
+.spark i{flex:1;background:var(--eka-blue-100);border-radius:2px 2px 0 0;min-height:2px;transition:.2s var(--ease)}
+.spark i.hi{background:var(--eka-blue)}
+.chart{padding:16px}
+.bars{display:flex;align-items:flex-end;gap:6px;height:170px;padding-bottom:6px}
+.bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;height:100%}
+.bar i{width:100%;border-radius:4px 4px 0 0;background:linear-gradient(180deg,var(--gray-700),var(--ink));
+  min-height:3px;transition:.3s var(--ease)}
+.bar i.mut{background:var(--gray-300)}
+.bar span{font-size:9.5px;color:var(--gray-400);white-space:nowrap}
+.bar b{font-size:10px;font-weight:700;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.ln{width:100%;height:180px}
+.ln path.area{fill:url(#lg);stroke:none}
+.ln path.line{fill:none;stroke:var(--eka-blue);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.ln circle{fill:var(--surface);stroke:var(--eka-blue);stroke-width:2}
+.ln line{stroke:var(--border);stroke-width:1}
+.ln text{font-size:9.5px;fill:var(--gray-400);font-family:Inter,sans-serif}
+.mr{display:flex;align-items:center;gap:11px;padding:11px 15px;border-bottom:1px solid var(--border)}
+.mr:last-child{border-bottom:none}
+.mr-n{font-size:12px;font-weight:600}
+.mr-d{font-size:10.5px;color:var(--ink-3);margin-top:2px;line-height:1.45}
+.mr-v{font-size:9px;font-family:ui-monospace,monospace;color:var(--gray-400);
+  border:1px solid var(--border);border-radius:4px;padding:2px 5px;flex-shrink:0}
+.deny{border:1px solid var(--warning-border);background:var(--warning-bg);border-radius:var(--r-md);
+  padding:13px 14px;margin-top:12px}
+.deny-h{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--warning);margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.used{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
+.used span{font-size:9.5px;font-family:ui-monospace,monospace;background:var(--eka-blue-bg);
+  color:var(--eka-blue-700);border:1px solid var(--eka-blue-100);border-radius:4px;padding:3px 7px}
+
+/* ---------- home ---------- */
+.home{display:flex;flex-direction:column;gap:16px;padding-bottom:20px}
+.hero{position:relative;overflow:hidden;border-radius:var(--r-xl);border:1px solid var(--border);
+  background:linear-gradient(122deg,var(--surface) 0%,var(--gray-50) 58%,var(--rose-tint) 128%);
+  padding:26px 26px 22px;box-shadow:var(--sh-card)}
+.hero::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--grad-rose-line)}
+.hero-mark{position:absolute;top:-62px;right:-52px;width:290px;height:290px;color:var(--ink);
+  opacity:.052;pointer-events:none;stroke-width:.35;fill:none;stroke:currentColor;
+  stroke-linecap:round;stroke-linejoin:round}
+[data-theme="dark"] .hero-mark{opacity:.075}
+.hero-eye{font-size:10.5px;font-weight:700;color:var(--rose-ink);text-transform:uppercase;letter-spacing:.1em}
+.hero-h{font-size:27px;font-weight:800;letter-spacing:-.028em;margin-top:7px;line-height:1.15}
+.hero-h span{color:var(--ink-3);font-weight:600}
+.hero-sub{font-size:12.5px;color:var(--ink-3);margin-top:7px;line-height:1.55;max-width:560px}
+.hero-ask{display:flex;align-items:center;gap:11px;background:var(--surface);border:1.5px solid var(--border);
+  border-radius:var(--r-pill);padding:12px 18px;margin-top:20px;max-width:640px;cursor:text;
+  transition:.16s var(--ease);position:relative;z-index:1}
+.hero-ask:hover{border-color:var(--eka-blue);box-shadow:0 6px 20px rgba(33,95,255,.10)}
+.hero-ask input{flex:1;border:none;background:none;font:inherit;font-size:14px;color:var(--ink);outline:none}
+.hero-ask input::placeholder{color:var(--gray-400)}
+.chips{display:flex;gap:7px;margin-top:13px;flex-wrap:wrap;position:relative;z-index:1}
+.chip{border:1px solid var(--border);background:var(--surface);color:var(--ink-2);border-radius:var(--r-pill);
+  padding:6px 13px;font:inherit;font-size:11.5px;font-weight:500;cursor:pointer;transition:.14s var(--ease)}
+.chip:hover{border-color:var(--eka-blue);color:var(--eka-blue);background:var(--eka-blue-bg)}
+.arc{position:absolute;top:24px;right:26px;text-align:right;z-index:1}
+.arc-l{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--gray-400)}
+.arc-t{font-size:19px;font-weight:800;letter-spacing:-.02em;margin-top:3px;font-variant-numeric:tabular-nums}
+.arc-bar{width:132px;height:5px;border-radius:999px;background:var(--gray-200);margin-top:8px;overflow:hidden}
+.arc-bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--gray-600),var(--ink))}
+.arc-s{font-size:10px;color:var(--ink-3);margin-top:5px}
+
+.brief{display:flex;gap:12px;padding:15px 16px}
+.brief-av{width:30px;height:30px;border-radius:var(--r-sm);background:var(--eka-blue-bg);color:var(--eka-blue);
+  display:grid;place-items:center;flex-shrink:0}
+.brief-t{font-size:13px;line-height:1.65;color:var(--ink-2)}
+.brief-t b{color:var(--ink);font-weight:600}
+.brief-t em{font-style:normal;color:var(--eka-blue);font-weight:600;cursor:pointer;
+  border-bottom:1px dashed var(--eka-blue-100)}
+.brief-t em:hover{border-bottom-style:solid}
+
+.flow{display:flex;gap:0;padding:16px 14px;overflow-x:auto}
+.fl-col{min-width:132px;flex:1;position:relative;padding:0 7px}
+.fl-h{display:flex;align-items:center;gap:6px;margin-bottom:9px}
+.fl-n{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)}
+.fl-c{margin-left:auto;font-size:11px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.fl-rail{height:4px;border-radius:999px;background:var(--gray-200);margin-bottom:11px;overflow:hidden;position:relative}
+.fl-rail i{position:absolute;inset:0;border-radius:999px;
+  background:linear-gradient(90deg,transparent,var(--ink),transparent);
+  background-size:60% 100%;background-repeat:no-repeat;animation:flow 2.4s linear infinite}
+@keyframes flow{from{background-position:-60% 0}to{background-position:160% 0}}
+.fl-col.jam .fl-rail{background:var(--warning-border)}
+.fl-col.jam .fl-rail i{background:linear-gradient(90deg,transparent,var(--warning),transparent);
+  background-size:60% 100%;background-repeat:no-repeat}
+.fl-p{display:flex;align-items:center;gap:7px;padding:7px 8px;border:1px solid var(--border);
+  background:var(--surface);border-radius:var(--r-sm);margin-bottom:5px;cursor:pointer;
+  font-size:11px;transition:.14s var(--ease)}
+.fl-p:hover{border-color:var(--eka-blue);background:var(--eka-blue-bg);transform:translateX(2px)}
+.fl-av{width:20px;height:20px;border-radius:4px;background:var(--gray-100);color:var(--ink-2);
+  display:grid;place-items:center;font-size:8.5px;font-weight:700;flex-shrink:0}
+.fl-p.alert{border-color:var(--destructive-border);background:var(--destructive-bg)}
+.fl-p.alert .fl-av{background:var(--destructive);color:var(--surface)}
+.fl-e{font-size:10.5px;color:var(--gray-400);padding:6px 2px}
+.fl-jam{font-size:9.5px;font-weight:700;color:var(--warning);margin-top:7px;
+  display:flex;align-items:center;gap:4px}
+
+.hgrid{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;align-items:start}
+.att{padding:6px 0}
+.at{display:flex;align-items:center;gap:11px;padding:11px 15px;border-bottom:1px solid var(--border);
+  cursor:pointer;transition:.14s var(--ease)}
+.at:last-child{border-bottom:none}
+.at:hover{background:var(--gray-50)}
+.at-ic{width:28px;height:28px;border-radius:var(--r-sm);display:grid;place-items:center;flex-shrink:0;
+  background:var(--gray-100);color:var(--ink-3)}
+.at-ic.red{background:var(--destructive-bg);color:var(--destructive)}
+.at-ic.amb{background:var(--warning-bg);color:var(--warning)}
+.at-ic.blue{background:var(--eka-blue-bg);color:var(--eka-blue)}
+.at-t{font-size:12.5px;font-weight:600}
+.at-s{font-size:10.5px;color:var(--ink-3);margin-top:2px}
+.at-go{font-size:10.5px;font-weight:700;color:var(--eka-blue);opacity:0;transition:.14s var(--ease)}
+.at:hover .at-go{opacity:1}
+.pulse{padding:14px 15px;display:flex;flex-direction:column;gap:15px}
+.pu-r{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:var(--ink-3)}
+.pu-v{font-size:22px;font-weight:800;letter-spacing:-.025em;color:var(--ink);font-variant-numeric:tabular-nums}
+.pu-v small{font-size:11px;font-weight:600;color:var(--ink-3);margin-left:3px}
+.split{display:flex;height:7px;border-radius:999px;overflow:hidden;margin-top:7px;background:var(--gray-200)}
+.split i{display:block;height:100%}
+.leg{display:flex;gap:14px;margin-top:7px;font-size:10.5px;color:var(--ink-3)}
+.leg span{display:flex;align-items:center;gap:5px}
+.dt{width:7px;height:7px;border-radius:50%}
+.cont{display:flex;gap:9px;overflow-x:auto;padding:13px 15px}
+.cn{min-width:170px;border:1px solid var(--border);border-radius:var(--r-md);padding:10px 11px;
+  cursor:pointer;transition:.14s var(--ease);background:var(--surface)}
+.cn:hover{border-color:var(--eka-blue);transform:translateY(-1px);box-shadow:var(--sh-hover)}
+.cn-n{font-size:12px;font-weight:600}
+.cn-s{font-size:10.5px;color:var(--ink-3);margin-top:3px}
+@media(max-width:1000px){.hgrid{grid-template-columns:1fr}.arc{position:static;text-align:left;margin-top:16px}}
+
+/* ---------- organisation ---------- */
+.orggrid{display:grid;grid-template-columns:330px 1fr;gap:16px;align-items:start}
+.tree{padding:8px}
+.tn{display:flex;align-items:center;gap:8px;width:100%;border:none;background:none;color:var(--ink-2);
+  border-radius:var(--r-sm);padding:7px 9px;font:inherit;font-size:12px;cursor:pointer;
+  text-align:left;transition:.12s var(--ease)}
+.tn:hover{background:var(--gray-100)}
+.tn.on{background:var(--eka-blue-bg);color:var(--eka-blue);font-weight:600}
+.tn .tk{margin-left:auto;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--gray-400);background:var(--gray-100);border:1px solid var(--border);border-radius:4px;padding:2px 5px}
+.tn.on .tk{background:var(--ink);color:var(--surface);border-color:transparent}
+.tn .warn{color:var(--warning)}
+.spine{border-left:1px dashed var(--border);margin-left:16px;padding-left:6px}
+.det-h{padding:15px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:12px}
+.det-av{width:42px;height:42px;border-radius:var(--r-md);background:var(--eka-blue-bg);color:var(--eka-blue);
+  display:grid;place-items:center;flex-shrink:0}
+.det-n{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.det-s{font-size:11px;color:var(--ink-3);margin-top:2px}
+.drow{display:flex;justify-content:space-between;gap:16px;padding:9px 15px;
+  border-bottom:1px solid var(--border);font-size:11.5px;color:var(--ink-3)}
+.drow:last-child{border-bottom:none}
+.drow b{color:var(--ink-2);font-weight:600;text-align:right}
+.drow.miss b{color:var(--warning)}
+.drow code{font-family:ui-monospace,monospace;font-size:11px}
+.sec-lab{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--gray-400);padding:13px 15px 7px;border-bottom:1px solid var(--border);background:var(--gray-50)}
+.prow{display:flex;align-items:center;gap:10px;padding:10px 15px;border-bottom:1px solid var(--border)}
+.prow:last-child{border-bottom:none}
+.p-av{width:28px;height:28px;border-radius:var(--r-sm);background:var(--gray-100);color:var(--ink-2);
+  display:grid;place-items:center;font-size:10.5px;font-weight:700;flex-shrink:0}
+.team{padding:10px 12px}
+.tm{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:11.5px;color:var(--ink-2)}
+.tm .r{margin-left:auto;font-size:9.5px;color:var(--gray-400)}
+
+/* ---------- spotlight ---------- */
+.ov{position:fixed;inset:0;background:rgba(10,13,20,.42);backdrop-filter:blur(6px) saturate(1.1);
+  display:none;z-index:60;align-items:flex-start;justify-content:center;padding-top:10vh}
+.ov.show{display:flex}
+.spot{width:min(780px,95vw);background:var(--surface);border:1px solid var(--border);
+  border-radius:18px;box-shadow:var(--sh-overlay);overflow:hidden;animation:pop .17s var(--ease)}
+@keyframes pop{from{transform:scale(.975);opacity:0}to{transform:scale(1);opacity:1}}
+.spot-in{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border)}
+.spot-in svg{width:19px;height:19px;color:var(--gray-400)}
+.spot-in input{flex:1;border:none;background:none;font:inherit;font-size:19px;
+  font-weight:500;color:var(--ink);outline:none;letter-spacing:-.01em}
+.spot-in input::placeholder{color:var(--gray-400);font-weight:400}
+.spot-body{display:flex;height:356px}
+.spot-list{width:296px;border-right:1px solid var(--border);overflow-y:auto;padding:7px}
+.spot-sec{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--gray-400);padding:9px 9px 5px}
+.sr{display:flex;align-items:center;gap:10px;padding:8px 9px;border-radius:var(--r-md);cursor:pointer}
+.sr.sel{background:var(--ink);color:var(--surface)}
+.sr.sel .sr-m,.sr.sel .sr-ic{color:rgba(255,255,255,.78)}
+.sr-ic{color:var(--ink-3);display:grid;place-items:center}
+.sr-n{font-size:12.5px;font-weight:600}
+.sr-m{font-size:10.5px;color:var(--ink-3);margin-top:1px}
+.spot-prev{flex:1;padding:19px;overflow-y:auto;background:var(--gray-50)}
+.pv-top{display:flex;align-items:center;gap:13px;margin-bottom:15px}
+.pv-av{width:50px;height:50px;border-radius:var(--r-lg);background:var(--surface);
+  border:1px solid var(--border);display:grid;place-items:center;font-size:16px;font-weight:700;color:var(--ink-2)}
+.pv-n{font-size:15.5px;font-weight:700;letter-spacing:-.015em}
+.pv-s{font-size:11.5px;color:var(--ink-3);margin-top:3px;line-height:1.5}
+.pv-rows{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:9px 12px;margin-bottom:15px}
+.pv-r{display:flex;justify-content:space-between;gap:14px;font-size:11.5px;padding:4px 0;color:var(--ink-3)}
+.pv-r b{color:var(--ink-2);font-weight:600;text-align:right}
+.pv-lab{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--gray-400);margin-bottom:8px}
+.qa-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.qa-b{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--border);
+  background:var(--surface);border-radius:var(--r-md);cursor:pointer;font:inherit;
+  font-size:11.5px;font-weight:600;color:var(--ink-2);transition:.14s var(--ease);text-align:left}
+.qa-b:hover:not(:disabled){border-color:var(--eka-blue);color:var(--eka-blue);background:var(--eka-blue-bg)}
+.qa-b:disabled{opacity:.4;cursor:not-allowed}
+.spot-foot{padding:9px 16px;border-top:1px solid var(--border);font-size:10.5px;color:var(--gray-400);
+  display:flex;gap:15px;align-items:center;background:var(--surface)}
+.hint{font-size:10.5px;color:var(--ink-3);margin-top:4px;line-height:1.45}
+
+/* ---------- modal ---------- */
+.mod{width:min(520px,94vw);background:var(--surface);border-radius:var(--r-xl);
+  box-shadow:var(--sh-overlay);overflow:hidden;animation:pop .16s var(--ease);
+  max-height:86vh;display:flex;flex-direction:column}
+.mod-bar{height:3px;background:var(--grad-rose-line)}
+.mod-h{padding:16px 18px 13px;border-bottom:1px solid var(--border)}
+.mod-t{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.mod-s{font-size:11.5px;color:var(--ink-3);margin-top:3px;line-height:1.45}
+.mod-b{padding:16px 18px;overflow-y:auto;flex:1}
+.mod-f{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:9px;align-items:center}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11px;font-weight:600;color:var(--ink-2);margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;border:1px solid var(--border);
+  background:var(--gray-50);color:var(--ink);border-radius:var(--r-sm);padding:9px 11px;
+  font:inherit;font-size:12.5px;outline:none}
+.field input:focus,.field textarea:focus{border-color:var(--eka-blue);background:var(--surface)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.draft{border:1px solid var(--violet-border);background:var(--violet-bg);border-radius:var(--r-md);
+  padding:11px 13px;margin-bottom:14px}
+.draft-h{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--violet-500);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.draft-t{font-size:12px;color:var(--ink-2);line-height:1.55;font-style:italic}
+.warn-box,.crit-box{border-radius:var(--r-md);padding:10px 12px;font-size:11.5px;
+  line-height:1.5;margin-bottom:13px;display:flex;gap:8px;align-items:flex-start}
+.warn-box{border:1px solid var(--warning-border);background:var(--warning-bg);color:var(--warning);font-weight:500}
+.crit-box{border:1px solid var(--destructive-border);background:var(--destructive-bg);color:var(--destructive)}
+.chk{display:flex;gap:9px;align-items:flex-start;font-size:11.5px;color:var(--ink-2);
+  padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-md);cursor:pointer;line-height:1.45}
+.chk input{margin-top:2px;accent-color:var(--eka-blue);width:15px;height:15px;flex-shrink:0}
+.readback{border:1.5px solid var(--eka-blue);background:var(--eka-blue-bg);border-radius:var(--r-md);
+  padding:12px 14px;margin-bottom:13px}
+.rb-l{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--eka-blue-700);margin-bottom:7px}
+.rb-v{font-size:22px;font-weight:800;color:var(--eka-blue);letter-spacing:-.025em}
+.mic{width:50px;height:50px;border-radius:50%;background:var(--ink);color:var(--surface);border:none;
+  cursor:pointer;box-shadow:var(--sh-card);display:grid;place-items:center;margin:0 auto 10px}
+.mic svg{width:19px;height:19px}
+.mic.rec{animation:pulse 1.1s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(34,30,25,.35)}50%{box-shadow:0 0 0 13px rgba(34,30,25,0)}}
+.dest{display:flex;align-items:center;gap:10px;width:100%;border:1px solid var(--border);
+  background:var(--surface);border-radius:var(--r-md);padding:11px 12px;cursor:pointer;
+  font:inherit;color:var(--ink);margin-bottom:7px;transition:.14s var(--ease);text-align:left}
+.dest:hover{border-color:var(--eka-blue);background:var(--eka-blue-bg)}
+.dest.sel{border-color:var(--eka-blue);background:var(--eka-blue-bg)}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(12px);
+  background:#1A1714;color:#F5EFE4;border-radius:var(--r-md);padding:11px 17px;
+  display:flex;align-items:center;gap:9px;opacity:0;transition:.2s var(--ease);
+  z-index:90;font-size:12.5px;font-weight:500;pointer-events:none;box-shadow:var(--sh-overlay)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast .dot{width:8px;height:8px;border-radius:50%;background:#C9BCA6;
+  box-shadow:0 0 0 4px rgba(201,188,166,.22);flex-shrink:0}
+
+@media(max-width:1100px){.chatgrid{grid-template-columns:1fr}.panel{display:none}.agrid{grid-template-columns:1fr}}
+@media(max-width:900px){.sb{display:none}.spot-body{flex-direction:column;height:auto}
+  .spot-list{width:100%;border-right:none;border-bottom:1px solid var(--border);max-height:150px}}
+</style>
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true">
+ <style>
+  #i-mark path,#i-mark circle,#i-mark-lg path,#i-mark-lg circle{fill:none;stroke:currentColor;
+   vector-effect:non-scaling-stroke}
+  .hero-mark use{stroke:currentColor}
+ </style>
+ <symbol id="i-mark" viewBox="0 0 24 24"><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(0 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(45 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(90 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(135 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(180 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(225 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(270 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(315 12 12)"/><circle cx="12" cy="12" r="1.7"/>
+  <circle cx="12" cy="12" r="6.2" opacity=".35"/>
+  <circle cx="3.1" cy="3.1" r=".7"/><circle cx="20.9" cy="3.1" r=".7"/>
+  <circle cx="3.1" cy="20.9" r=".7"/><circle cx="20.9" cy="20.9" r=".7"/></symbol>
+ <symbol id="i-mark-lg" viewBox="0 0 24 24"><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(0 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(45 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(90 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(135 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(180 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(225 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(270 12 12)"/><path d="M12 12C12 8.6 9.6 6.9 12 3.4C14.4 6.9 12 8.6 12 12Z" transform="rotate(315 12 12)"/><circle cx="12" cy="12" r="1.7"/>
+  <circle cx="12" cy="12" r="6.2" opacity=".3"/><circle cx="12" cy="12" r="9.4" opacity=".16"/></symbol>
+ <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+ <symbol id="i-desk" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="11" rx="2"/><path d="M3 19h18M8 15v4M16 15v4"/></symbol>
+ <symbol id="i-nurse" viewBox="0 0 24 24"><path d="M3 11h4l2-5 3 10 2.5-6 1.5 3h5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
+ <symbol id="i-doc" viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.4"/><path d="M5 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M12 15.5v3M10.5 17h3"/></symbol>
+ <symbol id="i-lab" viewBox="0 0 24 24"><path d="M9 3v6.5L4.6 18a2 2 0 0 0 1.8 3h11.2a2 2 0 0 0 1.8-3L15 9.5V3"/><path d="M8 3h8M7 14h10"/></symbol>
+ <symbol id="i-pill" viewBox="0 0 24 24"><rect x="2.6" y="8.5" width="18.8" height="7" rx="3.5" transform="rotate(-45 12 12)"/><path d="M8.8 8.8 15.2 15.2"/></symbol>
+ <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/></symbol>
+ <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></symbol>
+ <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+ <symbol id="i-id" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><circle cx="8.5" cy="11" r="2.2"/><path d="M5.2 16.2c.8-1.4 2-2 3.3-2s2.5.6 3.3 2M15 10h4M15 14h3"/></symbol>
+ <symbol id="i-vitals" viewBox="0 0 24 24"><path d="M2.5 12h4l2-5 3.5 10 2.5-7 1.5 2h5.5"/></symbol>
+ <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M9 21.5h6"/></symbol>
+ <symbol id="i-flask" viewBox="0 0 24 24"><path d="M10 3v6l-5 9a1.8 1.8 0 0 0 1.6 2.7h10.8A1.8 1.8 0 0 0 19 18l-5-9V3"/><path d="M9 3h6"/></symbol>
+ <symbol id="i-box" viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></symbol>
+ <symbol id="i-clip" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5a3 3 0 0 1 6 0"/><path d="M9 11h6M9 15h4"/></symbol>
+ <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+ <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+ <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+ <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+ <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H8l-5 2 1.5-4.2A8 8 0 1 1 21 12z"/></symbol>
+ <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3.5 13.8 9l5.7 1.8-5.7 1.8L12 18.2l-1.8-5.6-5.7-1.8L10.2 9z"/></symbol>
+ <symbol id="i-check" viewBox="0 0 24 24"><path d="m4 12.5 5 5L20 6.5"/></symbol>
+ <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5 22 20H2z"/><path d="M12 10v4M12 17h.01"/></symbol>
+ <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10" width="15" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+ <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 10.5 13.5M21 3l-6.8 18-3.7-7.5L3 9.8z"/></symbol>
+ <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol>
+ <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.5a3.2 3.2 0 0 1 0 6M17.5 14.5a6 6 0 0 1 4 5.5"/></symbol>
+ <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
+ <symbol id="i-cog" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7.9 19.4l-.1.1A2 2 0 1 1 5 16.7l.1-.1A1.6 1.6 0 0 0 3.9 14H3.8a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.1-2.7L5 7.2A2 2 0 1 1 7.8 4.4l.1.1A1.6 1.6 0 0 0 10.6 3.4V3.3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1A2 2 0 1 1 20.2 7.2l-.1.1a1.6 1.6 0 0 0 1.1 2.7h.1a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></symbol>
+ <symbol id="i-refer" viewBox="0 0 24 24"><path d="M4 12h13M12 6l6 6-6 6"/></symbol>
+ <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+ <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L20 8a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M14.5 5.5 18.5 9.5"/></symbol>
+</svg>
+
+<div class="app">
+  <aside class="sb">
+    <div class="sb-top"><div class="brand-mark"><svg class="i lg"><use href="#i-mark"/></svg></div>
+      <div><div class="brand-n">PHC Yadiki</div><div class="brand-s">Anantapur · Workspace</div></div></div>
+    <div class="sb-pad"><button class="sb-btn" onclick="newChat()">
+      <svg class="i sm"><use href="#i-plus"/></svg>New chat</button></div>
+    <div class="sb-pad" style="padding-top:0"><button class="sb-btn ghost" onclick="openSpot()">
+      <svg class="i sm"><use href="#i-search"/></svg>Search<span class="kbd ml-auto">⌘K</span></button></div>
+    <div class="sb-nav" id="nav"></div>
+    <div class="sb-sec">Recents</div>
+    <div class="sb-list" id="threads"></div>
+    <div class="sb-foot">
+      <div class="menu" id="roleMenu"></div>
+      <button class="rolebtn" onclick="toggleRoleMenu(event)">
+        <span class="rb-av" id="rbAv"></span>
+        <span style="flex:1;min-width:0;text-align:left"><span class="rb-n" id="rbN"></span>
+          <div class="rb-s" id="rbS"></div></span>
+        <svg class="i sm" style="color:var(--ink-3)"><use href="#i-chev"/></svg></button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div><div class="tb-title" id="tbTitle"></div><div class="tb-sub" id="tbSub"></div></div>
+      <div class="ml-auto"></div>
+      <div id="scCtl"></div>
+      <button class="pill" onclick="openSpot()"><svg class="i sm"><use href="#i-search"/></svg>
+        Search or ask<span class="kbd">⌘K</span></button>
+      <button class="icon-btn" onclick="toggleTheme()" id="themeBtn"><svg class="i"><use href="#i-moon"/></svg></button>
+    </div>
+    <div class="view" id="view"><div class="wrap" id="wrap"></div></div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet"></div>
+
+<div class="ov" id="spotOv" onclick="if(event.target===this)closeSpot()">
+  <div class="spot">
+    <div class="spot-in"><svg><use href="#i-search"/></svg>
+      <input id="spotIn" placeholder="Search patients, jump to a view, or ask the agent" oninput="sel=0;renderSpot()"></div>
+    <div class="spot-body" id="spotBody"></div>
+    <div class="spot-foot"><span><span class="kbd">↑↓</span> navigate</span><span><span class="kbd">↵</span> run</span>
+      <span><span class="kbd">esc</span> dismiss</span>
+      <span class="ml-auto" style="color:var(--rose-ink);font-weight:600">Find first · create only on miss</span></div>
+  </div>
+</div>
+<div class="ov" id="modOv" onclick="if(event.target===this)closeModal()"><div class="mod" id="mod"></div></div>
+<div class="toast" id="toast"><span class="dot"></span><span id="toastMsg"></span></div>
+
+<script>
+const svg=(n,c='i')=>`<svg class="${c}"><use href="#i-${n}"/></svg>`;
+const now=()=>new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+
+/* ========== model ========== */
+const CAPS=['patient.find','patient.register','abha.link','vitals.record','assessment.record',
+ 'encounter.document','rx.prescribe','lab.order','lab.result.enter','lab.result.validate',
+ 'pharmacy.dispense','visit.household','appointment.book','handover','facility.admin'];
+
+const ROLES={
+ frontdesk:{ic:'desk',label:'Front desk',sub:'Registration & ABHA',node:'f1',
+  caps:['patient.find','patient.register','abha.link','appointment.book','handover']},
+ nurse:{ic:'nurse',label:'Nurse',sub:'Vitals & triage',node:'d2',
+  caps:['patient.find','patient.register','abha.link','appointment.book','vitals.record','assessment.record','handover']},
+ mo:{ic:'doc',label:'Medical officer',sub:'Consultation & prescribing',node:'d1',
+  caps:['patient.find','encounter.document','rx.prescribe','lab.order','assessment.record','handover']},
+ lab:{ic:'lab',label:'Lab technician',sub:'Result entry',node:'d4',
+  caps:['patient.find','lab.result.enter','handover']},
+ pharm:{ic:'pill',label:'Pharmacist',sub:'Dispense & stock',node:'d5',
+  caps:['patient.find','pharmacy.dispense','handover']},
+ flw:{ic:'home',label:'Frontline worker',sub:'Household visits & assessments',node:'d2',
+  caps:['patient.find','patient.register','abha.link','visit.household','assessment.record','appointment.book']},
+ admin:{ic:'cog',label:'Facility admin',sub:'Configuration & reporting',node:'f1',
+  caps:['patient.find','facility.admin','appointment.book']}
+};
+
+const STATIONS={reception:'Reception',nurse:'Vitals',doctor:'Doctor',lab:'Lab',pharmacy:'Pharmacy',done:'Complete'};
+
+const V=()=>({abha:false,vitals:false,vitalsFlag:false,consult:false,rx:false,labOrder:false,
+ labResult:false,dispensed:false,followup:false,station:'reception',audit:[],team:[]});
+
+let PATIENTS=[
+ {id:'p1',name:'Lakshmi Devi',init:'LD',age:52,sex:'F',village:'Yadiki',phone:'98•••• 4471',
+  abha:'12-3456-7890-1234',last:'12 Mar 2026',token:24,cat:'NCD',dx:'Hypertension · 4 yrs',
+  meds:'Amlodipine 5 mg (irregular)',alerts:'No known allergies',today:true,v:V()},
+ {id:'p2',name:'Lakshmamma G',init:'LG',age:61,sex:'F',village:'Tadipatri',phone:'98•••• 4471',
+  abha:null,last:'04 Jan 2026',token:25,cat:'General',dx:'Osteoarthritis',
+  meds:'None current',alerts:'Shares household phone',today:true,v:V()},
+ {id:'p3',name:'Lakshman Rao',init:'LR',age:38,sex:'M',village:'Yadiki',phone:'90•••• 2210',
+  abha:'54-9911-2233-0001',last:'22 Aug 2026',token:26,cat:'NCD',dx:'Type 2 diabetes',
+  meds:'Metformin 500 mg BD',alerts:'Sulfa allergy',today:true,v:V()},
+ {id:'p4',name:'Sarojamma K',init:'SK',age:29,sex:'F',village:'Peddavadugur',phone:'87•••• 3390',
+  abha:'21-7788-1122-9090',last:'01 Sep 2026',token:27,cat:'ANC',dx:'Pregnancy · 26 weeks',
+  meds:'Iron folic acid',alerts:'Anaemia, Hb 9.1',today:true,v:V()},
+ {id:'p5',name:'Ramesh Naidu',init:'RN',age:44,sex:'M',village:'Yadiki',phone:'99•••• 5512',
+  abha:null,last:'18 Jul 2026',token:null,cat:'TB',dx:'Pulmonary TB · on treatment',
+  meds:'ATT category 1',alerts:'Month 3 of 6',today:false,v:V()},
+ {id:'p6',name:'Padmavathi S',init:'PS',age:67,sex:'F',village:'Tadipatri',phone:'80•••• 7741',
+  abha:'33-4455-6677-8899',last:'29 Aug 2026',token:null,cat:'NCD',dx:'Hypertension, CKD stage 3',
+  meds:'Telmisartan 40 mg',alerts:'eGFR 42 — dose caution',today:false,v:V()}
+];
+PATIENTS[1].v.station='nurse';PATIENTS[1].v.abha=false;
+PATIENTS[2].v.station='doctor';PATIENTS[2].v.abha=true;PATIENTS[2].v.vitals=true;
+PATIENTS[3].v.station='lab';PATIENTS[3].v.abha=true;PATIENTS[3].v.vitals=true;
+PATIENTS[3].v.consult=true;PATIENTS[3].v.labOrder=true;
+PATIENTS[1].v.team=[['u3','Vitals']];
+PATIENTS[2].v.team=[['u3','Vitals'],['u1','Treating doctor']];
+PATIENTS[3].v.team=[['u3','Vitals'],['u1','Treating doctor'],['u4','Lab'],['u7','Community follow-up']];
+
+/* ---- entity specs: what each level must carry ---- */
+const ESPEC={
+ facility:{ic:'home',label:'Facility',lvl:'1 · mandatory',reg:'HFR',
+  fields:[['hfr','HFR ID',1],['ftype','Facility type',1],['ownership','Ownership',1],
+   ['address','Address',1],['district','District',1],['state','State',1],
+   ['beds','Sanctioned beds',0],['systems','Systems of medicine',0]]},
+ department:{ic:'clip',label:'Department / clinic',lvl:'2 · optional',reg:'local only',
+  fields:[['code','Local code',1],['speciality','Speciality',1],['head','Department head',1],
+   ['days','Operating days',0],['hours','Hours',0],['tariff','Tariff group',0]]},
+ room:{ic:'desk',label:'Room / location',lvl:'3 · optional',reg:'local only',
+  fields:[['loc','Physical location',1],['cap','Capacity',1],['equip','Equipment',0],['bookable','Bookable',0]]},
+ team:{ic:'users',label:'Team',lvl:'3b · optional',reg:'local only',
+  fields:[['lead','Team lead',1],['roster','Roster pattern',0],['oncall','On-call cover',0]]},
+ person:{ic:'user',label:'Person',lvl:'5–7',reg:'HPR (clinical only)',
+  fields:[['hpr','HPR ID',1],['qual','Qualification',1],['council','Council registration',1],
+   ['phone','Mobile',1],['joined','Joined',0]]}
+};
+
+let ORG={id:'f1',type:'facility',name:'PHC Yadiki',
+ f:{hfr:'IN0410001234',ftype:'Primary Health Centre',ownership:'Government · NHM',
+    address:'Main Road, Yadiki',district:'Anantapur',state:'Andhra Pradesh',beds:6,systems:'Allopathy'},
+ kids:[
+  {id:'d1',type:'department',name:'General OPD',
+   f:{code:'GOPD',speciality:'General medicine',head:'Dr Anitha R',days:'Mon–Sat',hours:'09:00–14:00',tariff:'Free'},
+   kids:[{id:'r1',type:'room',name:'Consult room 1',
+     f:{loc:'Ground floor, east wing',cap:'1 clinician',equip:'BP monitor, examination couch, weighing scale',bookable:'Yes'},kids:[]},
+    {id:'r2',type:'room',name:'Consult room 2',
+     f:{loc:'Ground floor, east wing',cap:'1 clinician',equip:'BP monitor, examination couch',bookable:'Yes'},kids:[]}]},
+  {id:'d2',type:'department',name:'NCD clinic',
+   f:{code:'NCD',speciality:'Non-communicable disease',head:'Dr Anitha R',days:'Tue, Thu',hours:'09:00–13:00',tariff:'Free'},
+   kids:[{id:'t1',type:'team',name:'NCD screening team',
+     f:{lead:'Suneetha M (ANM)',roster:'Tue/Thu rotation',oncall:'—'},kids:[]}]},
+  {id:'d3',type:'department',name:'Maternal health',
+   f:{code:'MCH',speciality:'Obstetrics · ANC',head:'',days:'Mon, Wed, Fri',hours:'09:00–13:00',tariff:'Free'},kids:[]},
+  {id:'d4',type:'department',name:'Laboratory',
+   f:{code:'LAB',speciality:'Pathology',head:'Kiran Kumar P',days:'Mon–Sat',hours:'08:30–13:00',tariff:'Free'},kids:[]},
+  {id:'d5',type:'department',name:'Pharmacy',
+   f:{code:'PHR',speciality:'Dispensing',head:'Venkatesh B',days:'Mon–Sat',hours:'09:00–16:00',tariff:'Free'},kids:[]}
+ ]};
+
+let PEOPLE=[
+ {id:'u1',name:'Dr Anitha R',init:'AR',kind:'Doctor',bundle:'mo',
+  f:{hpr:'71-2233-4455-6677',qual:'MBBS, MD (General Medicine)',council:'APMC/2011/34210',phone:'94•••• 1120',joined:'Jun 2021'},
+  asg:[['d1','Medical officer','Primary'],['d2','Medical officer','Sessional']]},
+ {id:'u2',name:'Dr Harsha V',init:'HV',kind:'Doctor',bundle:'mo',
+  f:{hpr:'',qual:'MBBS',council:'APMC/2019/58811',phone:'99•••• 3345',joined:'Feb 2026'},
+  asg:[['d1','Medical officer','Visiting']]},
+ {id:'u3',name:'Suneetha M',init:'SM',kind:'Nurse',bundle:'nurse',
+  f:{hpr:'71-9090-1212-3434',qual:'ANM',council:'APNC/2015/9921',phone:'80•••• 7788',joined:'Mar 2019'},
+  asg:[['d2','Team lead','Primary'],['t1','Team lead','Primary'],['d3','Staff nurse','Shared']]},
+ {id:'u4',name:'Kiran Kumar P',init:'KP',kind:'Staff',bundle:'lab',
+  f:{hpr:'',qual:'DMLT',council:'—',phone:'70•••• 4412',joined:'Aug 2022'},
+  asg:[['d4','Lab technician','Primary']]},
+ {id:'u5',name:'Venkatesh B',init:'VB',kind:'Staff',bundle:'pharm',
+  f:{hpr:'',qual:'D.Pharm',council:'APPC/2017/2231',phone:'86•••• 9903',joined:'Jan 2020'},
+  asg:[['d5','Pharmacist','Primary']]},
+ {id:'u6',name:'Lalitha G',init:'LG',kind:'Staff',bundle:'frontdesk',
+  f:{hpr:'—',qual:'—',council:'—',phone:'93•••• 5501',joined:'Nov 2023'},
+  asg:[['f1','Front desk','Primary']]},
+ {id:'u7',name:'Bhagya S',init:'BS',kind:'Frontline',bundle:'flw',
+  f:{hpr:'71-5566-7788-9900',qual:'ASHA',council:'—',phone:'91•••• 2277',joined:'Jul 2018'},
+  asg:[['d2','ASHA','Catchment: Yadiki']]}
+];
+
+function nodes(n=ORG,out=[]){out.push(n);(n.kids||[]).forEach(k=>nodes(k,out));return out;}
+function findNode(id){return nodes().find(n=>n.id===id);}
+function nodeName(id){const n=findNode(id);return n?n.name:id;}
+function peopleAt(id){return PEOPLE.filter(p=>p.asg.some(a=>a[0]===id));}
+function missing(n){const s=ESPEC[n.type];return s.fields.filter(f=>f[2]&&!n.f[f[0]]).length;}
+function missingP(p){return ESPEC.person.fields.filter(f=>f[2]&&!p.f[f[0]]&&p.f[f[0]]!=='—').length;}
+
+let FIELDS=[
+ {k:'name',l:'Full name',t:'text',req:true,core:true},
+ {k:'age',l:'Age',t:'number',req:true,core:true},
+ {k:'sex',l:'Sex',t:'select',opts:'Female, Male, Other',req:true,core:true},
+ {k:'phone',l:'Mobile',t:'phone',req:true,core:true},
+ {k:'village',l:'Village',t:'text',req:true,core:true},
+ {k:'cat',l:'Patient category',t:'select',opts:'General, ANC, NCD, TB',req:false,core:false}
+];
+let STOCK=[{n:'Amlodipine 5 mg',q:420,r:100},{n:'Metformin 500 mg',q:40,r:200},
+ {n:'Telmisartan 40 mg',q:180,r:80},{n:'Iron folic acid',q:960,r:300}];
+
+let S={role:'frontdesk',view:'chat',theme:'light',threads:[],active:null,qtab:'all',dirQ:'',dirCat:'all'};
+let sel=0,pendingField=null;
+
+const P=()=>{const t=S.threads.find(x=>x.id===S.active);
+ return t&&t.pid?PATIENTS.find(p=>p.id===t.pid):null;};
+const T=()=>S.threads.find(x=>x.id===S.active);
+
+/* ========== actions ========== */
+function actions(){
+ const p=P();if(!p)return[];
+ const v=p.v,c=ROLES[S.role].caps,a=[],has=k=>c.includes(k);
+ if(has('abha.link')&&!v.abha&&!p.abha)a.push({k:'abha',ic:'id',l:'Link ABHA',s:'Patient is at the counter',tag:'irreversible',tc:'irr',p:S.role==='frontdesk'?9:4});
+ if(has('vitals.record')&&!v.vitals)a.push({k:'vitals',ic:'vitals',l:'Record vitals',s:'Form or connected device',tag:'form',tc:'form',p:10});
+ if(has('encounter.document')&&v.vitalsFlag&&!v.consult)a.push({k:'reviewv',ic:'eye',l:'Review flagged vitals',s:'BP 158/96 — stage 2',tag:'read',tc:'',p:10});
+ if(has('encounter.document')&&!v.consult)a.push({k:'scribe',ic:'mic',l:'Start consultation',s:'Ambient scribe → draft note',tag:'scribe',tc:'scribe',p:9});
+ if(has('rx.prescribe'))a.push({k:'rx',ic:'pill',l:'Write prescription',s:'Pre-filled from the scribe draft',tag:'form',tc:'form',p:8,off:!v.consult||v.rx,why:v.rx?'Already confirmed':'Blocked — needs a consultation first'});
+ if(has('lab.order')&&v.consult&&!v.labOrder)a.push({k:'lab',ic:'flask',l:'Order investigation',s:'HbA1c, lipid profile',tag:'form',tc:'form',p:6});
+ if(has('lab.result.enter'))a.push({k:'result',ic:'flask',l:'Enter lab result',s:'Manual bench entry',tag:'form',tc:'form',p:10,off:!v.labOrder||v.labResult,why:v.labResult?'Already committed':'Blocked — no pending order'});
+ if(has('pharmacy.dispense'))a.push({k:'disp',ic:'box',l:'Dispense',s:'Against a confirmed prescription',tag:'form',tc:'form',p:10,off:!v.rx||v.dispensed,why:v.dispensed?'Already dispensed':'Blocked — awaiting a confirmed Rx'});
+ if(has('visit.household'))a.push({k:'visit',ic:'home',l:'Record household visit',s:'Narrative capture, offline-first',tag:'scribe',tc:'scribe',p:9});
+ if(has('assessment.record'))a.push({k:'cbac',ic:'clip',l:'CBAC assessment',s:'Deterministic scoring',tag:'form',tc:'form',p:S.role==='flw'?8:3});
+ if(has('handover'))a.push({k:'hand',ic:'refer',l:'Hand over',s:handSuggest(),tag:'handover',tc:'hand',p:handPri()});
+ if(has('appointment.book'))a.push({k:'appt',ic:'cal',l:'Book appointment',s:v.dispensed?'Follow-up due in 4 weeks':'PHC OPD slot',tag:'form',tc:'form',p:v.dispensed?9:2});
+ return a.sort((x,y)=>y.p-x.p).slice(0,5);
+}
+function handSuggest(){const v=P().v;
+ if(v.dispensed)return'Close the visit';
+ if(v.rx)return'Suggested: Pharmacy';
+ if(v.labOrder&&!v.labResult)return'Suggested: Lab';
+ if(v.consult)return'Suggested: Pharmacy';
+ if(v.vitals)return'Suggested: Doctor';
+ return'Suggested: Vitals';}
+function handPri(){const v=P().v;
+ return (v.rx&&!v.dispensed)||(v.vitals&&!v.consult)||(v.labOrder&&!v.labResult)?9.5:5;}
+
+const STEPS=[['reg','Registered'],['vit','Vitals'],['con','Consultation'],['lab','Investigation'],
+ ['rx','Prescription'],['dis','Dispensed'],['fu','Follow-up']];
+function stepDone(k){const v=P().v;
+ return{reg:true,vit:v.vitals,con:v.consult,lab:v.labResult,rx:v.rx,dis:v.dispensed,fu:v.followup}[k];}
+function currentStep(){for(const[k]of STEPS)if(!stepDone(k))return k;return null;}
+function stateLabel(p){const v=(p||P()).v;
+ if(v.followup)return'Closed';if(v.dispensed)return'Dispensed';if(v.rx)return'Rx confirmed';
+ if(v.labResult)return'Result ready';if(v.labOrder)return'Lab ordered';
+ if(v.consult)return'Consult done';if(v.vitalsFlag)return'Vitals abnormal';
+ if(v.vitals)return'Vitals recorded';return'Registered';}
+
+const NUDGES={
+ frontdesk:'Search is the default surface. ABHA creation is irreversible — an explicit, un-prefilled confirm, never automatic on chat open.',
+ nurse:'Vitals are discrete values. Unedited ASR shows ~7.4% error, deletions and substitutions dominating. Form or device, never ambient scribe.',
+ mo:'Read scope is the widest of any cadre; write is confined to documentation, Rx, orders and referral. No master access.',
+ lab:'Manual entry uses per-analyte range validation. Out-of-range blocks commit and requires an override with reason.',
+ pharm:'Dispense stays blocked until a prescription is confirmed. The precondition lives in the operation registry, not the UI.',
+ flw:'Narrative goes to scribe; assessment items go to a form. Scoring is computed by rule, never model-generated.',
+ admin:'Configuration changes version the operation, they do not mutate it. Existing records keep the schema they were written against.'};
+
+function agentLine(){
+ const m={'Registered':'Patient opened. Nothing recorded for this visit yet.',
+  'Vitals recorded':'Vitals are in and within range.',
+  'Vitals abnormal':'Vitals are in. BP is flagged, so I have moved the review to the top for the MO.',
+  'Consult done':'Note confirmed. Prescribing is now unblocked.',
+  'Lab ordered':'HbA1c is on the lab worklist. Until a result exists, the lab station stays blocked for this patient.',
+  'Result ready':'Result committed and the ordering MO has been notified.',
+  'Rx confirmed':'Prescription confirmed with a five-minute undo window. Pharmacy is unblocked.',
+  'Dispensed':'Dispensed with a shortfall recorded. Follow-up booking is now the priority.',
+  'Closed':'Visit closed. The thread stays open as this patient\'s record.'}[stateLabel()]||'';
+ return m+' Currently at <b>'+STATIONS[P().v.station]+'</b>. Here is what you can do as '+ROLES[S.role].label.toLowerCase()+'.';}
+
+/* ========== threads ========== */
+function openPatient(id){
+ const p=PATIENTS.find(x=>x.id===id);
+ let t=S.threads.find(x=>x.pid===id);
+ if(!t){t={id:'t'+Date.now()+Math.random().toString(36).slice(2,5),pid:id,title:p.name,msgs:[],up:Date.now()};
+  S.threads.unshift(t);
+  t.msgs.push({who:'sys',ic:'folder',title:'Patient thread opened',time:now(),actor:ROLES[S.role].label,
+   text:`Scoped to <b>${p.name}</b>. Reads are agentic and broad; writes are proposed, validated, confirmed.`});
+  p.v.audit.push({t:now(),op:'patient.find',by:ROLES[S.role].label});}
+ t.up=Date.now();S.active=t.id;S.view='chat';closeSpot();render();}
+function newChat(){
+ const t={id:'t'+Date.now(),pid:null,title:'Workspace',msgs:[],up:Date.now()};
+ S.threads.unshift(t);S.active=t.id;S.view='chat';render();}
+function openThread(id){S.active=id;S.view='chat';render();}
+
+/* ========== render shell ========== */
+const NAV=[['home','spark','Home'],['queue','list','Queue'],['directory','users','Patient directory'],
+ ['analytics','vitals','Analytics'],['org','home','Organisation'],['admin','cog','Control panel']];
+function renderNav(){
+ const q=PATIENTS.filter(p=>p.today&&p.v.station!=='done').length;
+ document.getElementById('nav').innerHTML=NAV.map(([k,i,l])=>
+  `<button class="nv ${S.view===k?'on':''}" onclick="go('${k}')">${svg(i,'i sm')}${l}
+   ${k==='queue'?`<span class="ct">${q}</span>`:''}
+   ${k==='directory'?`<span class="ct">${PATIENTS.length}</span>`:''}</button>`).join('');}
+function renderThreads(){
+ const el=document.getElementById('threads');
+ const list=S.threads.slice(0,10);
+ el.innerHTML=list.length?list.map(t=>
+  `<button class="th ${S.active===t.id&&S.view==='chat'?'on':''}" onclick="openThread('${t.id}')">
+   ${svg(t.pid?'chat':'spark','i sm')}<span class="th-n">${t.title}</span></button>`).join('')
+  :`<div style="padding:8px 12px;font-size:11px;color:var(--gray-400);line-height:1.5">No chats yet. Open a patient or start a workspace chat.</div>`;}
+function renderRole(){
+ const r=ROLES[S.role];
+ document.getElementById('rbAv').innerHTML=svg(r.ic,'i sm');
+ document.getElementById('rbN').textContent=r.label;
+ document.getElementById('rbS').textContent=r.caps.length+' capabilities';
+ document.getElementById('roleMenu').innerHTML=Object.entries(ROLES).map(([k,v])=>
+  `<button class="mi ${S.role===k?'on':''}" onclick="setRole('${k}')">${svg(v.ic,'i sm')}
+   <span class="mi-l">${v.label}</span>
+   <span class="mi-c">${v.caps.length}</span></button>`).join('');}
+function toggleRoleMenu(e){e.stopPropagation();document.getElementById('roleMenu').classList.toggle('show');}
+document.addEventListener('click',()=>document.getElementById('roleMenu').classList.remove('show'));
+function setRole(k){S.role=k;document.getElementById('roleMenu').classList.remove('show');
+ if(k==='admin'&&S.view==='chat')S.view='admin';render();toast(ROLES[k].label+' — capabilities and proposals updated');}
+function go(v){S.view=v;render();}
+
+const TITLES={home:['Today','Your shift at a glance'],
+ chat:['Chat','Patient-scoped thread'],queue:['Queue','Patients registered or booked today'],
+ directory:['Patient directory','All patients in this facility'],
+ analytics:['Analytics','Composed from certified metric definitions'],
+ org:['Organisation','Facility structure, teams and people'],
+ admin:['Control panel','Facility configuration']};
+function render(){
+ renderNav();renderThreads();renderRole();
+ const t=TITLES[S.view];
+ document.getElementById('tbTitle').textContent=S.view==='chat'&&P()?P().name:t[0];
+ document.getElementById('tbSub').textContent=S.view==='chat'&&P()
+  ?`${STATIONS[P().v.station]} · ${stateLabel()}`:t[1];
+ document.getElementById('view').className='view'+(S.view==='chat'?'':' scroll');
+ ({home:vHome,chat:vChat,queue:vQueue,directory:vDir,analytics:vAna,org:vOrg,admin:vAdmin})[S.view]();
+ scCtl();}
+
+/* ========== chat view ========== */
+function vChat(){
+ const w=document.getElementById('wrap'),t=T();
+ if(!t){w.innerHTML=`<div class="card" style="height:100%;display:flex"><div class="empty">${svg('chat','i lg')}<br><br>
+   No chat open.<br>Open a patient from the queue or directory, or start a workspace chat.</div></div>`;return;}
+ const p=P();
+ w.innerHTML=`<div class="chatgrid">
+  <div class="card chatcard">
+   <div class="pt-head">${p?`<div class="avatar">${p.init}</div><div style="flex:1;min-width:0">
+     <div class="pt-name">${p.name}</div>
+     <div class="pt-meta">${p.age}${p.sex} · ${p.village} · ${p.phone} · ${p.cat}</div>
+     <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap">
+      ${(p.abha||p.v.abha)?`<span class="id-badge"><span class="id-lab">ABHA</span><span class="id-val">${p.abha||'46-1122-3344-5566'}</span></span>`
+        :`<span class="badge b-warn">${svg('alert','i sm')}ABHA pending</span>`}
+      <span class="badge b-blue">${STATIONS[p.v.station]}</span>
+      ${p.token?`<span class="badge b-mute">Token ${p.token}</span>`:''}
+      ${p.v.vitalsFlag?`<span class="badge b-crit">BP 158/96</span>`:''}
+      ${p.v.labResult?`<span class="badge b-crit">HbA1c 9.4%</span>`:''}</div></div>`
+    :`<div class="avatar">${svg('spark')}</div><div style="flex:1">
+      <div class="pt-name">Workspace chat</div>
+      <div class="pt-meta">Not scoped to a patient — facility-level questions and cohorts</div></div>`}</div>
+   <div class="thread" id="thread"></div>
+   <div class="composer">
+    <div class="cbar">${cbar()}</div>
+    <div class="crow"><input id="ask" placeholder="${p?'Ask about this patient':'Ask about the facility — queue, stock, pending ABHA, cohorts'}"
+      onkeydown="if(event.key==='Enter')askAgent()">
+     <button class="btn btn-b send" onclick="askAgent()">${svg('send')}</button></div></div></div>
+  ${p?`<div class="panel">
+   <div class="card"><div class="card-h"><div><div class="eyebrow">Visit</div>
+     <div class="card-t" style="margin-top:2px">Patient state</div></div>
+     <span class="badge b-mute ml-auto">${stateLabel()}</span></div>
+    <div class="states">${STEPS.map(([k,l],i)=>{const d=stepDone(k),n=k===currentStep();
+     return`<div class="st ${d?'done':''} ${n?'now':''}"><span class="n">${d?'✓':i+1}</span>${l}</div>`;}).join('')}</div>
+    <div class="nudge">${NUDGES[S.role]}</div></div>
+   <div class="card"><div class="card-h"><div><div class="eyebrow">Level 4 · per patient</div>
+     <div class="card-t" style="margin-top:2px">Care unit</div></div>
+     <span class="badge b-mute ml-auto">${p.v.team.length}</span></div>
+    <div class="team">${p.v.team.length?p.v.team.map(([id,r])=>{const u=PEOPLE.find(x=>x.id===id);
+      return`<div class="tm"><span class="p-av" style="width:22px;height:22px;font-size:9px">${u.init}</span>
+       ${u.name}<span class="r">${r}</span></div>`;}).join('')
+      :`<div style="font-size:11.5px;color:var(--ink-3);padding:4px 0">Nobody joined yet. Members accrue as stations touch the patient.</div>`}
+     <button class="qa-b" style="width:100%;margin-top:9px;justify-content:center" onclick="joinTeam()">
+      ${svg('plus','i sm')}Join care unit</button></div>
+    <div class="nudge" style="margin:0 12px 12px">The care unit is time-bound to this episode and crosses departments. It is not a node in the facility tree.</div></div>
+   <div class="card"><div class="card-h">${svg('lock','i sm')}<div class="card-t">Capabilities held</div>
+     <span class="badge b-mute ml-auto">at ${nodeName(ROLES[S.role].node||'f1')}</span></div>
+    <div class="caps">${CAPS.map(c=>`<span class="cap ${ROLES[S.role].caps.includes(c)?'on':''}">${c}</span>`).join('')}</div></div>
+   <div class="card"><div class="card-h"><div class="card-t">Audit trail</div>
+     <span class="badge b-mute ml-auto">${p.v.audit.length}</span></div>
+    <div class="audit">${p.v.audit.length?p.v.audit.map(a=>
+     `<div class="au"><span>${a.t}</span><b>${a.op}</b><span class="ml-auto">${a.by}</span></div>`).reverse().join('')
+     :'<div style="padding:10px 2px;font-size:11px;color:var(--gray-400)">No operations posted.</div>'}</div></div>
+   </div>`:''}</div>`;
+ renderThread();}
+
+function renderThread(){
+ const el=document.getElementById('thread'),t=T(),p=P();if(!el)return;
+ let h=t.msgs.map(m=>{
+  if(m.who==='user')return`<div class="msg right"><div class="m-av">${svg('user','i sm')}</div>
+   <div class="m-b"><div class="m-meta" style="justify-content:flex-end">${m.actor} · ${m.time}</div>
+   <div class="bubble">${m.text}</div></div></div>`;
+  return`<div class="msg"><div class="m-av ${m.who==='agent'?'agent':''}">${svg(m.who==='agent'?'spark':(m.ic||'check'),'i sm')}</div>
+   <div class="m-b"><div class="m-meta">${m.who==='agent'?'Agent':'System'} · ${m.time}
+    ${m.actor?`<span class="badge b-mute">${m.actor}</span>`:''}
+    ${m.tag?`<span class="badge ${m.tagc||'b-mute'}">${m.tag}</span>`:''}</div>
+   <div class="bubble">${m.title?`<div class="t">${m.title}</div>`:''}${m.text||''}
+    ${m.quote?`<div class="quote">${m.quote}</div>`:''}
+    ${m.kvs?`<div class="kvbox">${m.kvs.map(k=>`<div class="kv ${k[2]||''}"><span>${k[0]}</span><b>${k[1]}</b></div>`).join('')}</div>`:''}
+   </div></div></div>`;}).join('');
+ if(p){const acts=actions();
+  h+=`<div class="msg" style="max-width:97%"><div class="m-av agent">${svg('spark','i sm')}</div>
+   <div class="m-b" style="flex:1"><div class="m-meta">Agent · now</div>
+   <div class="bubble">${agentLine()}
+   <div class="props">${acts.map((a,i)=>
+     `<button class="prop ${i===0&&!a.off?'primary':''}" ${a.off?'disabled':''} onclick="act('${a.k}')">
+      ${svg(a.ic)}<span style="flex:1;min-width:0"><span class="p-l">${a.l}</span>
+      <div class="p-s">${a.off?a.why:a.s}</div></span>
+      <span class="p-tag ${a.tc||''}">${a.tag}</span></button>`).join('')}</div></div></div></div>`;}
+ el.innerHTML=h;el.scrollTop=el.scrollHeight;}
+
+/* ========== queue ========== */
+const QT=[['all','All'],['reception','Reception'],['nurse','Vitals'],['doctor','Doctor'],
+ ['lab','Lab'],['pharmacy','Pharmacy'],['done','Complete']];
+function vQueue(){
+ const w=document.getElementById('wrap');
+ const today=PATIENTS.filter(p=>p.today);
+ const list=S.qtab==='all'?today:today.filter(p=>p.v.station===S.qtab);
+ w.innerHTML=`<div class="qtabs">${QT.map(([k,l])=>{
+   const n=k==='all'?today.length:today.filter(p=>p.v.station===k).length;
+   return`<button class="qtab ${S.qtab===k?'on':''}" onclick="S.qtab='${k}';render()">${l}<span class="n">${n}</span></button>`;}).join('')}</div>
+  ${list.length?`<div class="qgrid">${list.map(p=>`
+   <div class="card qc" onclick="openPatient('${p.id}')">
+    <div class="qc-top"><div class="avatar" style="width:34px;height:34px;font-size:11.5px">${p.init}</div>
+     <div><div class="qc-n">${p.name}</div><div class="qc-m">${p.age}${p.sex} · ${p.village}</div></div>
+     ${p.token?`<span class="qc-tok">T${p.token}</span>`:''}</div>
+    <div class="qc-chips"><span class="badge b-blue">${STATIONS[p.v.station]}</span>
+     <span class="badge b-mute">${stateLabel(p)}</span>
+     <span class="badge b-mute">${p.cat}</span>
+     ${(!p.abha&&!p.v.abha)?`<span class="badge b-warn">ABHA pending</span>`:''}
+     ${p.v.vitalsFlag?`<span class="badge b-crit">BP flagged</span>`:''}</div></div>`).join('')}</div>`
+  :`<div class="card" style="padding:40px;text-align:center;color:var(--ink-3);font-size:12.5px">Nobody at this station right now.</div>`}`;}
+
+/* ========== directory ========== */
+function vDir(){
+ const w=document.getElementById('wrap');
+ const cats=['all','General','ANC','NCD','TB'];
+ const q=S.dirQ.toLowerCase();
+ const list=PATIENTS.filter(p=>(S.dirCat==='all'||p.cat===S.dirCat)&&
+  (!q||p.name.toLowerCase().includes(q)||p.village.toLowerCase().includes(q)||p.phone.includes(q)||(p.abha||'').includes(q)));
+ w.innerHTML=`<div class="dir-bar">
+   <input class="dir-in" placeholder="Search name, village, phone or ABHA" value="${S.dirQ}"
+    oninput="S.dirQ=this.value;vDir();this.focus()">
+   ${cats.map(c=>`<button class="f-chip ${S.dirCat===c?'on':''}" onclick="S.dirCat='${c}';render()">${c==='all'?'All':c}</button>`).join('')}</div>
+  <div class="card"><table><thead><tr><th>Patient</th><th>Category</th><th>Village</th>
+   <th>ABHA</th><th>Active problem</th><th class="num">Last visit</th></tr></thead>
+   <tbody>${list.map(p=>`<tr onclick="openPatient('${p.id}')">
+    <td class="n">${p.name}<div style="font-size:10.5px;color:var(--ink-3);font-weight:400;margin-top:2px">${p.age}${p.sex} · ${p.phone}</div></td>
+    <td><span class="badge b-mute">${p.cat}</span></td><td>${p.village}</td>
+    <td>${p.abha?`<span style="font-family:ui-monospace,monospace;font-size:11px">${p.abha}</span>`:`<span class="badge b-warn">Pending</span>`}</td>
+    <td>${p.dx}</td><td class="num">${p.last}</td></tr>`).join('')}</tbody></table>
+   ${!list.length?'<div style="padding:34px;text-align:center;color:var(--ink-3);font-size:12.5px">No patients match.</div>':''}</div>`;}
+
+/* ========== home ========== */
+const ASKS={
+ frontdesk:['How many patients have no ABHA?','Who is still waiting at reception?','What is in the queue?'],
+ nurse:['Who is waiting for vitals?','Show the NCD cohort','How many pending ABHA?'],
+ mo:['Who has a critical result pending review?','Show the NCD cohort','What is in the queue?'],
+ lab:['Which samples are pending?','What is in the queue?','Show today\'s orders'],
+ pharm:['What stock is below reorder?','Who is waiting to be dispensed?','Show today\'s prescriptions'],
+ flw:['Who in my catchment is overdue?','Show the NCD cohort','How many pending ABHA?'],
+ admin:['What stock is below reorder?','How many pending ABHA?','What is in the queue?']};
+
+function attention(){
+ const c=ROLES[S.role].caps,td=PATIENTS.filter(p=>p.today),a=[];
+ const crit=td.filter(p=>p.v.labResult&&!p.v.dispensed);
+ const flagged=td.filter(p=>p.v.vitalsFlag&&!p.v.consult);
+ const toDisp=td.filter(p=>p.v.rx&&!p.v.dispensed);
+ const toLab=td.filter(p=>p.v.labOrder&&!p.v.labResult);
+ const noAbha=PATIENTS.filter(p=>!p.abha&&!p.v.abha);
+ const low=STOCK.filter(s=>s.q<s.r);
+ const gaps=nodes().filter(n=>missing(n)).length+PEOPLE.filter(p=>missingP(p)).length;
+ if(c.includes('encounter.document')){
+  crit.forEach(p=>a.push({t:'red',ic:'alert',n:`Critical result — ${p.name}`,s:'HbA1c 9.4% committed, not yet reviewed',go:()=>openPatient(p.id)}));
+  flagged.forEach(p=>a.push({t:'amb',ic:'vitals',n:`BP flagged — ${p.name}`,s:'158/96, stage 2, waiting for consultation',go:()=>openPatient(p.id)}));}
+ if(c.includes('lab.result.enter'))
+  toLab.forEach(p=>a.push({t:'blue',ic:'flask',n:`Sample pending — ${p.name}`,s:'HbA1c ordered, no result entered',go:()=>openPatient(p.id)}));
+ if(c.includes('pharmacy.dispense')){
+  toDisp.forEach(p=>a.push({t:'blue',ic:'box',n:`Ready to dispense — ${p.name}`,s:'Prescription confirmed',go:()=>openPatient(p.id)}));
+  low.forEach(s=>a.push({t:'red',ic:'box',n:`${s.n} below reorder`,s:`${s.q} on hand against a reorder level of ${s.r}`,go:()=>go('admin')}));}
+ if(c.includes('abha.link')&&noAbha.length)
+  a.push({t:'amb',ic:'id',n:`${noAbha.length} patients without ABHA`,s:'On the unlinked worklist — surface at next contact',go:()=>{S.dirQ='';go('directory');}});
+ if(c.includes('facility.admin')){
+  low.forEach(s=>a.push({t:'red',ic:'box',n:`${s.n} below reorder`,s:`${s.q} on hand against ${s.r}`,go:()=>go('admin')}));
+  if(gaps)a.push({t:'amb',ic:'home',n:`${gaps} org records incomplete`,s:'Required details missing before go-live',go:()=>go('org')});}
+ if(c.includes('visit.household'))
+  a.push({t:'blue',ic:'home',n:'2 households overdue in Yadiki',s:'NCD follow-up more than 30 days since last contact',go:()=>go('directory')});
+ return a.slice(0,6);}
+
+function brief(){
+ const td=PATIENTS.filter(p=>p.today),wait=td.filter(p=>p.v.station!=='done').length;
+ const noAbha=PATIENTS.filter(p=>!p.abha&&!p.v.abha).length;
+ const low=STOCK.filter(s=>s.q<s.r);
+ const jam=Object.keys(STATIONS).filter(k=>k!=='done')
+  .map(k=>[k,td.filter(p=>p.v.station===k).length]).sort((a,b)=>b[1]-a[1])[0];
+ const bits={
+  mo:`${td.filter(p=>p.v.vitalsFlag&&!p.v.consult).length} with flagged vitals waiting on you, and <em onclick="openPatient('p4')">one critical HbA1c</em> that nobody has reviewed.`,
+  nurse:`${td.filter(p=>!p.v.vitals).length} still need vitals. ${noAbha} patients across the facility have no ABHA — worth catching while they are in front of you.`,
+  frontdesk:`${noAbha} patients have no ABHA linked. Nobody is blocked by it; the worklist picks them up at next contact.`,
+  lab:`${td.filter(p=>p.v.labOrder&&!p.v.labResult).length} sample pending. Results entered here notify the ordering doctor immediately.`,
+  pharm:`${td.filter(p=>p.v.rx&&!p.v.dispensed).length} waiting to be dispensed${low.length?`, and <em onclick="go('admin')">${low[0].n} is below reorder</em> — expect a partial`:''}.`,
+  flw:`2 households in your catchment are overdue for NCD follow-up. Visits queue offline and sync when you are back in range.`,
+  admin:`${nodes().filter(n=>missing(n)).length+PEOPLE.filter(p=>missingP(p)).length} organisation records are missing required details${low.length?`, and ${low.length} drug is below reorder`:''}.`}[S.role];
+ return `<b>${wait} patients</b> are in the facility right now, heaviest at <em onclick="S.qtab='${jam[0]}';go('queue')">${STATIONS[jam[0]]}</em>. ${bits}`;}
+
+function vHome(){
+ const w=document.getElementById('wrap'),h=new Date().getHours();
+ const greet=h<12?'Good morning':h<17?'Good afternoon':'Good evening';
+ const td=PATIENTS.filter(p=>p.today);
+ const done=td.filter(p=>p.v.station==='done').length;
+ const linked=PATIENTS.filter(p=>p.abha||p.v.abha).length;
+ const mins=Math.max(0,Math.min(300,(h-9)*60+new Date().getMinutes()));
+ const pct=Math.round(mins/300*100);
+ const cols=Object.entries(STATIONS).filter(([k])=>k!=='done');
+ const counts=cols.map(([k])=>td.filter(p=>p.v.station===k).length);
+ const max=Math.max(...counts);
+ const att=attention();
+ w.innerHTML=`<div class="home">
+  <div class="hero">
+   <svg class="hero-mark" viewBox="0 0 24 24"><use href="#i-mark-lg"/></svg>
+   <div class="arc"><div class="arc-l">OPD session</div>
+    <div class="arc-t">${String(h).padStart(2,'0')}:${String(new Date().getMinutes()).padStart(2,'0')}</div>
+    <div class="arc-bar"><i style="width:${pct}%"></i></div>
+    <div class="arc-s">09:00 – 14:00 · ${pct<100?`${Math.round((300-mins)/60*10)/10} h left`:'session closed'}</div></div>
+   <div class="hero-eye">${ROLES[S.role].label} · PHC Yadiki</div>
+   <div class="hero-h">${greet}.<br><span>${td.length} patients today, ${done} complete.</span></div>
+   <div class="hero-sub">Everything below is a read. Nothing here writes to a record — the agent proposes, you confirm.</div>
+   <div class="hero-ask" onclick="openSpot()">${svg('search','i lg')}
+    <input placeholder="Ask about the facility, or find a patient" readonly>
+    <span class="kbd">⌘K</span></div>
+   <div class="chips">${ASKS[S.role].map(q=>`<button class="chip" onclick="workspaceAsk('${q.replace(/'/g,"\\'")}')">${q}</button>`).join('')}</div>
+  </div>
+
+  <div class="card"><div class="brief"><div class="brief-av">${svg('spark','i sm')}</div>
+   <div><div class="m-meta" style="margin-bottom:4px">Shift brief · ${now()}</div>
+    <div class="brief-t">${brief()}</div></div></div></div>
+
+  <div class="card"><div class="card-h"><div><div class="eyebrow">Live</div>
+    <div class="card-t" style="margin-top:2px">Patient flow</div></div>
+    <span class="badge b-mute ml-auto">the baton, in motion</span></div>
+   <div class="flow">${cols.map(([k,l],i)=>{
+     const list=td.filter(p=>p.v.station===k),jam=counts[i]===max&&max>1;
+     return`<div class="fl-col ${jam?'jam':''}">
+      <div class="fl-h"><div class="fl-n">${l}</div><div class="fl-c">${list.length}</div></div>
+      <div class="fl-rail"><i></i></div>
+      ${list.length?list.map(p=>`<div class="fl-p ${p.v.vitalsFlag&&!p.v.consult||p.v.labResult?'alert':''}" onclick="openPatient('${p.id}')">
+        <span class="fl-av">${p.init}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></div>`).join('')
+       :`<div class="fl-e">—</div>`}
+      ${jam?`<div class="fl-jam">${svg('alert','i sm')}Heaviest</div>`:''}</div>`;}).join('')}</div></div>
+
+  <div class="hgrid">
+   <div class="card"><div class="card-h"><div class="card-t">Needs you</div>
+     <span class="badge ${att.length?'b-warn':'b-ok'} ml-auto">${att.length||'clear'}</span></div>
+    <div class="att">${att.length?att.map((a,i)=>`<div class="at" onclick="ATT[${i}].go()">
+      <span class="at-ic ${a.t}">${svg(a.ic,'i sm')}</span>
+      <span style="flex:1;min-width:0"><div class="at-t">${a.n}</div><div class="at-s">${a.s}</div></span>
+      <span class="at-go">Open →</span></div>`).join('')
+     :`<div style="padding:30px 15px;text-align:center;color:var(--ink-3);font-size:12.5px">Nothing needs you right now.<br>Items appear here filtered by the capabilities in your bundle.</div>`}</div></div>
+
+   <div style="display:flex;flex-direction:column;gap:16px">
+    <div class="card"><div class="card-h"><div class="card-t">Facility pulse</div></div>
+     <div class="pulse">
+      <div><div class="pu-r"><span>Seen today</span><span>${td.length} registered</span></div>
+       <div class="pu-v">${done}<small>complete</small></div>
+       <div class="split"><i style="width:${done/td.length*100}%;background:var(--success)"></i>
+        <i style="width:${(td.length-done)/td.length*100}%;background:var(--eka-blue)"></i></div>
+       <div class="leg"><span><i class="dt" style="background:var(--success)"></i>Complete ${done}</span>
+        <span><i class="dt" style="background:var(--eka-blue)"></i>In progress ${td.length-done}</span></div></div>
+      <div><div class="pu-r"><span>ABHA linkage</span><span>${PATIENTS.length} patients</span></div>
+       <div class="pu-v">${Math.round(linked/PATIENTS.length*100)}<small>%</small></div>
+       <div class="split"><i style="width:${linked/PATIENTS.length*100}%;background:var(--eka-blue)"></i>
+        <i style="width:${(PATIENTS.length-linked)/PATIENTS.length*100}%;background:var(--gray-300)"></i></div>
+       <div class="leg"><span><i class="dt" style="background:var(--eka-blue)"></i>Linked ${linked}</span>
+        <span><i class="dt" style="background:var(--gray-300)"></i>Pending ${PATIENTS.length-linked}</span></div></div>
+     </div></div>
+
+    ${S.threads.length?`<div class="card"><div class="card-h"><div class="card-t">Pick up where you left off</div></div>
+     <div class="cont">${S.threads.slice(0,4).map(t=>{const p=t.pid?PATIENTS.find(x=>x.id===t.pid):null;
+       return`<div class="cn" onclick="openThread('${t.id}')"><div class="cn-n">${t.title}</div>
+        <div class="cn-s">${p?`${STATIONS[p.v.station]} · ${stateLabel(p)}`:'Workspace chat'}</div></div>`;}).join('')}</div></div>`:''}
+   </div></div></div>`;
+ ATT=att;}
+let ATT=[];
+
+/* ========== analytics ========== */
+const DAYS=['26 Aug','27','28','29','30','31','01 Sep','02','03','04','05','06','07','08'];
+const METRICS={
+ 'm.opd.footfall':{n:'OPD footfall',u:'',own:'NHM AP · Service delivery',v:'2026.1',
+  def:'Distinct patients with a completed OPD encounter, counted at facility scope, deduplicated on ABHA where linked and on local ID otherwise.',
+  src:'encounter.document',s:[38,41,36,44,39,12,47,52,43,49,45,41,48,6],k:['footfall','opd','volume','patients seen','how many patients']},
+ 'm.abha.rate':{n:'ABHA linkage rate',u:'%',own:'NHA · ABDM adoption',v:'2026.2',
+  def:'Patients with a verified ABHA link divided by all registered patients at the facility. Excludes patients who declined, so a declining rate reflects failed linkage and not patient choice.',
+  src:'abha.link',s:[54,55,57,58,60,60,62,63,65,66,66,68,69,67],k:['abha','linkage','linked','adoption','abdm']},
+ 'm.ncd.followup':{n:'NCD follow-up adherence',u:'%',own:'NHM AP · NCD division',v:'2026.1',
+  def:'Registered NCD patients with a recorded contact within the last 90 days, divided by the NCD cohort. Contact includes a household visit by an ASHA.',
+  src:'assessment.record',s:[61,61,63,62,64,64,66,65,67,68,68,70,71,71],k:['ncd','follow','adherence','diabetes','hypertension','cohort']},
+ 'm.rx.fill':{n:'Prescription fill rate',u:'%',own:'NHM AP · Drug logistics',v:'2026.3',
+  def:'Units dispensed divided by units prescribed. Partial dispenses count at the fraction actually handed over, which is what makes stockouts visible instead of hidden.',
+  src:'pharmacy.dispense',s:[92,90,88,85,84,84,79,76,74,71,70,68,66,63],k:['fill','dispense','stock','pharmacy','shortfall','drug']},
+ 'm.doc.complete':{n:'Documentation completeness',u:'%',own:'Facility · quality',v:'2026.1',
+  def:'Encounters with a confirmed note, a diagnosis and at least one vital recorded, divided by all encounters.',
+  src:'encounter.document',s:[70,72,71,74,76,76,78,79,81,80,82,83,84,85],k:['documentation','completeness','notes','quality','records']},
+ 'm.cbac.coverage':{n:'CBAC screening coverage',u:'%',own:'NHM AP · NCD division',v:'2026.1',
+  def:'Population aged 30 and over with a CBAC recorded in the current financial year, divided by the estimated eligible population from the sub-centre register.',
+  src:'assessment.record',s:[22,23,24,26,27,27,29,31,33,34,36,37,39,41],k:['cbac','screening','coverage','30','eligible']}
+};
+const UNCERTIFIED=[['readmission','no certified definition of a readmission window at PHC level'],
+ ['wait time','station dwell is not yet instrumented — handover timestamps exist but the definition is unratified'],
+ ['satisfaction','no patient-reported outcome is collected at this facility'],
+ ['mortality','not reportable at PHC scope'],['revenue','this facility does not bill'],
+ ['staff productivity','no ratified definition; per-clinician counts would be misused for ranking']];
+
+function delta(s){const a=s[s.length-2],b=s[s.length-5];const d=Math.round((a-b)/b*100);
+ return{d,c:d>1?'up':d<-1?'dn':'fl',t:d>0?'+'+d+'%':d+'%'};}
+
+function mCard(id){const m=METRICS[id],last=m.s[m.s.length-2],dl=delta(m.s),mx=Math.max(...m.s);
+ return`<div class="card mc"><div class="mc-l">${svg('vitals','i sm')}${m.n}</div>
+  <div class="mc-v">${last}<small>${m.u}</small></div>
+  <div class="mc-d ${dl.c}">${dl.t} vs last week</div>
+  <div class="spark">${m.s.slice(0,-1).map((x,i)=>`<i class="${i===m.s.length-2?'hi':''}" style="height:${x/mx*100}%"></i>`).join('')}</div>
+  <div class="mc-id">${id} · v${m.v}</div></div>`;}
+
+function lineChart(id){const m=METRICS[id],s=m.s.slice(0,-1),n=s.length;
+ const mx=Math.max(...s)*1.12,mn=Math.min(...s)*0.85;
+ const X=i=>40+i*(560/(n-1)),Y=v=>150-((v-mn)/(mx-mn))*118;
+ const pts=s.map((v,i)=>`${X(i)},${Y(v)}`).join(' ');
+ return`<svg class="ln" viewBox="0 0 610 180" preserveAspectRatio="none">
+  <defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1">
+   <stop offset="0%" stop-color="var(--eka-blue)" stop-opacity=".22"/>
+   <stop offset="100%" stop-color="var(--eka-blue)" stop-opacity="0"/></linearGradient></defs>
+  ${[0,.5,1].map(f=>`<line x1="40" x2="600" y1="${32+f*118}" y2="${32+f*118}"/>`).join('')}
+  <path class="area" d="M ${pts.split(' ').join(' L ')} L 600,150 L 40,150 Z"/>
+  <path class="line" d="M ${pts.split(' ').join(' L ')}"/>
+  <circle cx="${X(n-1)}" cy="${Y(s[n-1])}" r="4"/>
+  <text x="4" y="${Y(s[n-1])+4}">${s[n-1]}${m.u}</text>
+  <text x="40" y="172">${DAYS[0]}</text><text x="560" y="172">${DAYS[n-1]}</text></svg>`;}
+
+function barChart(id){const m=METRICS[id],s=m.s.slice(-8,-1),mx=Math.max(...s);
+ const lb=DAYS.slice(-8,-1);
+ return`<div class="bars">${s.map((v,i)=>`<div class="bar"><b>${v}</b>
+   <i class="${v===Math.min(...s)?'mut':''}" style="height:${v/mx*100}%"></i>
+   <span>${lb[i]}</span></div>`).join('')}</div>`;}
+
+function compose(q){
+ const lo=q.toLowerCase();
+ const un=UNCERTIFIED.find(([k])=>lo.includes(k));
+ if(un)return{deny:un};
+ const hit=Object.entries(METRICS).filter(([id,m])=>m.k.some(k=>lo.includes(k)));
+ if(!hit.length)return{deny:['that',"no certified metric in the registry matches this question"]};
+ return{ids:hit.slice(0,3).map(h=>h[0])};}
+
+function runAna(){
+ const q=document.getElementById('anaQ').value.trim();if(!q)return;
+ S.ana=q;render();}
+
+function vAna(){
+ const w=document.getElementById('wrap');
+ const r=S.ana?compose(S.ana):null;
+ const ids=r&&r.ids?r.ids:['m.opd.footfall','m.abha.rate','m.ncd.followup','m.rx.fill'];
+ const lead=ids[0];
+ w.innerHTML=`<div class="card" style="margin-bottom:16px">
+   <div class="card-h"><div><div class="eyebrow">Composed, not queried</div>
+     <div class="card-t" style="margin-top:2px">Ask for a view</div></div>
+     <span class="badge b-mute ml-auto">scope: PHC Yadiki</span></div>
+   <div class="ai-box" style="border-top:none;background:none">
+    <div class="ai-in"><input id="anaQ" value="${S.ana||''}"
+      placeholder="e.g. how is ABHA linkage trending, or show me prescription fill"
+      onkeydown="if(event.key==='Enter')runAna()">
+     <button class="btn btn-b" onclick="runAna()">${svg('spark','i sm')}Compose</button>
+     ${S.ana?`<button class="btn btn-g" onclick="S.ana=null;render()">Clear</button>`:''}</div>
+    ${r&&r.deny?`<div class="deny"><div class="deny-h">${svg('alert','i sm')}No certified metric — nothing composed</div>
+      <div style="font-size:12px;color:var(--ink-2);line-height:1.6">The agent will not answer this from free-form SQL. There is ${r.deny[1]}.
+       Two facilities improvising the same indicator is how a district review ends up acting on a discrepancy rather than a difference.</div>
+      <button class="btn btn-g" style="margin-top:11px" onclick="reqMetric()">${svg('plus','i sm')}Request a metric definition</button></div>`
+     :S.ana?`<div class="used">Composed from ${ids.map(i=>`<span>${i}</span>`).join('')}</div>`:''}
+   </div></div>
+
+  ${r&&r.deny?'':`<div class="mgrid">${ids.map(mCard).join('')}</div>
+
+  <div class="hgrid" style="margin-bottom:16px">
+   <div class="card"><div class="card-h"><div class="card-t">${METRICS[lead].n} · 13 days</div>
+     <span class="badge b-mute ml-auto">${METRICS[lead].u==='%'?'percentage':'count'}</span></div>
+    <div class="chart">${lineChart(lead)}</div>
+    <div class="ai-box" style="font-size:11px;color:var(--ink-3);line-height:1.55">
+     ${METRICS[lead].def}</div></div>
+   <div class="card"><div class="card-h"><div class="card-t">${METRICS[ids[1]||lead].n} · last 7</div></div>
+    <div class="chart">${barChart(ids[1]||lead)}</div>
+    <div class="ai-box" style="font-size:11px;color:var(--ink-3);line-height:1.55">
+     Owner: ${METRICS[ids[1]||lead].own} · definition v${METRICS[ids[1]||lead].v}. Changing a definition versions it; historical points keep the version they were computed under.</div></div>
+  </div>`}
+
+  <div class="card"><div class="card-h"><div><div class="eyebrow">The guardrail</div>
+    <div class="card-t" style="margin-top:2px">Certified metric registry</div></div>
+    <span class="badge b-mute ml-auto">${Object.keys(METRICS).length} definitions</span></div>
+   ${Object.entries(METRICS).map(([id,m])=>`<div class="mr">${svg('lock','i sm')}
+     <span style="flex:1;min-width:0"><div class="mr-n">${m.n}</div>
+      <div class="mr-d">${m.def}</div>
+      <div class="mr-d" style="color:var(--gray-400);margin-top:4px">Owner: ${m.own} · source operation: <code style="font-family:ui-monospace,monospace">${m.src}</code></div></span>
+     <span class="mr-v">${id}<br>v${m.v}</span></div>`).join('')}
+   <div class="ai-box" style="font-size:11.5px;color:var(--ink-3);line-height:1.6">
+    The agent composes dashboards <b>from this registry only</b>. It cannot write SQL against the warehouse, and it cannot invent an indicator to satisfy a question. That constraint is the point: it is what makes two facilities compute the same number the same way, and what makes a district comparison mean something.</div></div>`;}
+
+function reqMetric(){
+ modal({title:'Request a metric definition',
+  sub:'Definitions are ratified by an owner, not created in a dashboard. This opens a request, it does not create the metric.',
+  body:`<div class="field"><label>Question you were trying to answer</label>
+    <textarea rows="2">${S.ana||''}</textarea></div>
+   <div class="field"><label>Proposed owner</label><select>
+    <option>NHM AP · NCD division</option><option>NHM AP · Service delivery</option>
+    <option>NHA · ABDM adoption</option><option>Facility · quality</option></select></div>
+   <div class="warn-box">${svg('alert','i sm')}<span>Until it is ratified and versioned, no dashboard will render it — including for the person who requested it.</span></div>`,
+  ok:'Submit request',
+  run:()=>{toast('Request submitted to the metric owner');}});}
+
+/* ========== organisation ========== */
+function vOrg(){
+ const w=document.getElementById('wrap');
+ if(!S.node)S.node='f1';
+ const branch=(n,d=0)=>`<button class="tn ${S.node===n.id?'on':''}" onclick="S.node='${n.id}';render()">
+   ${svg(ESPEC[n.type].ic,'i sm')}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.name}</span>
+   ${missing(n)?`<span class="warn" title="${missing(n)} required detail missing">${svg('alert','i sm')}</span>`:''}
+   <span class="tk">${n.type==='team'?'team':n.type.slice(0,4)}</span></button>
+  ${(n.kids||[]).length?`<div class="spine">${n.kids.map(k=>branch(k,d+1)).join('')}</div>`:''}`;
+ const n=findNode(S.node),spec=ESPEC[n.type],at=peopleAt(n.id);
+ w.innerHTML=`<div class="orggrid">
+  <div style="display:flex;flex-direction:column;gap:16px">
+   <div class="card"><div class="card-h"><div><div class="eyebrow">Levels 1–3</div>
+     <div class="card-t" style="margin-top:2px">Facility structure</div></div>
+     <span class="badge b-mute ml-auto">${nodes().length} nodes</span></div>
+    <div class="tree">${branch(ORG)}</div></div>
+   <div class="card"><div class="card-h"><div class="card-t">People</div>
+     <span class="badge b-mute ml-auto">${PEOPLE.length}</span></div>
+    ${PEOPLE.map(p=>`<div class="prow" style="cursor:pointer" onclick="S.node='P:${p.id}';render()">
+      <span class="p-av">${p.init}</span><span style="flex:1;min-width:0">
+      <span class="ar-n">${p.name}</span>
+      <div class="ar-s">${p.kind} · ${p.asg.length} assignment${p.asg.length>1?'s':''}</div></span>
+      ${missingP(p)?`<span class="badge b-warn">${missingP(p)} missing</span>`:`<span class="badge b-ok">complete</span>`}</div>`).join('')}
+    <div class="ai-box" style="font-size:11px;color:var(--ink-3);line-height:1.5">
+     A person is one record. Where they work is an <b>assignment</b>, not a position in the tree — which is how Dr Anitha sits in two departments without being duplicated.</div></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:16px">${S.node.startsWith('P:')?pDetail():nDetail(n,spec,at)}</div>
+ </div>`;}
+
+function nDetail(n,spec,at){
+ return `<div class="card">
+   <div class="det-h"><div class="det-av">${svg(spec.ic,'i lg')}</div>
+    <div style="flex:1"><div class="det-n">${n.name}</div>
+     <div class="det-s">${spec.label} · level ${spec.lvl}</div>
+     <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+      <span class="badge b-blue">${spec.reg}</span>
+      ${missing(n)?`<span class="badge b-warn">${missing(n)} required detail missing</span>`:`<span class="badge b-ok">details complete</span>`}
+      <span class="badge b-mute">${at.length} people</span></div></div></div>
+   <div class="sec-lab">Required details</div>
+   ${spec.fields.map(([k,l,r])=>`<div class="drow ${r&&!n.f[k]?'miss':''}">
+     <span>${l}${r?' *':''}</span><b>${n.f[k]||(r?'Not set':'—')}</b></div>`).join('')}
+   <div class="sec-lab">Assigned here</div>
+   ${at.length?at.map(p=>{const a=p.asg.find(x=>x[0]===n.id);
+     return`<div class="prow"><span class="p-av">${p.init}</span>
+      <span style="flex:1"><span class="ar-n">${p.name}</span>
+      <div class="ar-s">${a[1]} · ${a[2]}</div></span>
+      <span class="badge b-mute">${p.kind}</span></div>`;}).join('')
+    :`<div style="padding:20px 15px;font-size:12px;color:var(--ink-3)">Nobody assigned to this node.</div>`}
+  </div>
+  ${n.type==='room'?`<div class="card" style="padding:13px;font-size:11.5px;color:var(--ink-3);line-height:1.55">
+    ${svg('alert','i sm')} A room is a <b>location</b>, not a team. Booking, equipment and capacity live here; who works together lives on a team node. Merging them breaks the moment two clinicians share a room or one team moves between rooms.</div>`:''}
+  ${n.type==='team'?`<div class="card" style="padding:13px;font-size:11.5px;color:var(--ink-3);line-height:1.55">
+    ${svg('alert','i sm')} A team is a <b>standing</b> group of staff. It is not the same as a care unit, which is per-patient and time-bound — see the care team on any patient thread.</div>`:''}`;}
+
+function pDetail(){
+ const p=PEOPLE.find(x=>x.id===S.node.slice(2)),spec=ESPEC.person;
+ return `<div class="card">
+   <div class="det-h"><div class="det-av" style="background:var(--gray-100);color:var(--ink-2);font-weight:700;font-size:14px">${p.init}</div>
+    <div style="flex:1"><div class="det-n">${p.name}</div>
+     <div class="det-s">${p.kind} · bundle: ${ROLES[p.bundle].label}</div>
+     <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+      ${p.f.hpr&&p.f.hpr!=='—'?`<span class="id-badge"><span class="id-lab">HPR</span><span class="id-val">${p.f.hpr}</span></span>`
+       :p.f.hpr==='—'?`<span class="badge b-mute">Non-clinical · no HPR</span>`:`<span class="badge b-warn">HPR not linked</span>`}
+      <span class="badge b-mute">${p.asg.length} assignments</span></div></div></div>
+   <div class="sec-lab">Required details</div>
+   ${spec.fields.map(([k,l,r])=>`<div class="drow ${r&&!p.f[k]?'miss':''}">
+     <span>${l}${r?' *':''}</span><b>${p.f[k]||'Not set'}</b></div>`).join('')}
+   <div class="sec-lab">Assignments — person × node × role</div>
+   ${p.asg.map(a=>`<div class="prow">${svg(ESPEC[findNode(a[0]).type].ic,'i sm')}
+     <span style="flex:1"><span class="ar-n">${nodeName(a[0])}</span>
+     <div class="ar-s">${a[1]}</div></span><span class="badge b-mute">${a[2]}</span></div>`).join('')}
+   <div class="ai-box" style="font-size:11px;color:var(--ink-3);line-height:1.55">
+    Capabilities are granted <b>at a node</b>, not globally. ${p.name.split(' ').slice(0,2).join(' ')} holds
+    <code style="font-family:ui-monospace,monospace">${ROLES[p.bundle].caps[1]||'patient.find'}</code> in
+    ${p.asg.map(a=>nodeName(a[0])).join(' and ')} — nowhere else in the facility.</div>
+  </div>`;}
+
+/* ========== control panel ========== */
+function vAdmin(){
+ const w=document.getElementById('wrap');
+ const isAdmin=ROLES[S.role].caps.includes('facility.admin');
+ w.innerHTML=`${!isAdmin?`<div class="card" style="padding:14px;margin-bottom:16px;display:flex;gap:10px;align-items:center;
+    border-color:var(--warning-border);background:var(--warning-bg);color:var(--warning);font-size:12px;font-weight:500">
+    ${svg('lock','i sm')}Read-only. <code style="font-family:ui-monospace,monospace">facility.admin</code> is not in your bundle — switch to Facility admin to make changes.</div>`:''}
+  <div class="agrid">
+   <div class="card">
+    <div class="card-h"><div><div class="eyebrow">Operation registry</div>
+      <div class="card-t" style="margin-top:2px">Patient registration form</div></div>
+      <span class="badge b-mute ml-auto">v${FIELDS.length-5}.${FIELDS.length}</span></div>
+    ${FIELDS.map((f,i)=>`<div class="arow">${svg(f.core?'lock':'edit','i sm')}
+      <div style="flex:1"><div class="ar-n">${f.l}</div>
+       <div class="ar-s">patient.${f.k} · ${f.t}${f.opts?' · '+f.opts:''}</div></div>
+      ${f.core?'<span class="badge b-mute">core</span>':
+        `<span class="badge b-vio">custom</span>
+         <button class="sw ${f.req?'on':''}" title="Required" onclick="toggleReq(${i})"></button>`}</div>`).join('')}
+    <div class="ai-box">
+     <div class="pv-lab">Ask for a field</div>
+     <div class="ai-in"><input id="fldQ" placeholder="e.g. add occupation as a category for NCD risk"
+       onkeydown="if(event.key==='Enter')proposeField()" ${isAdmin?'':'disabled'}>
+      <button class="btn btn-b" onclick="proposeField()" ${isAdmin?'':'disabled'}>${svg('spark','i sm')}Propose</button></div>
+     <div id="fldProp"></div></div></div>
+
+   <div style="display:flex;flex-direction:column;gap:16px">
+    <div class="card"><div class="card-h"><div class="card-t">Capability bundles</div>
+      <span class="badge b-mute ml-auto">${Object.keys(ROLES).length} bundles</span></div>
+     ${Object.entries(ROLES).map(([k,r])=>`<div class="arow">${svg(r.ic,'i sm')}
+       <div style="flex:1"><div class="ar-n">${r.label}</div>
+        <div class="ar-s">${r.caps.length} capabilities · ${r.caps.includes('handover')?'can hand over':'no handover'}</div></div>
+       <button class="btn btn-g" style="padding:5px 10px;font-size:11px" onclick="setRole('${k}')">Preview</button></div>`).join('')}
+     <div class="ai-box" style="font-size:11px;color:var(--ink-3);line-height:1.5">
+      One person may hold several bundles. Editing a bundle versions it — people already assigned keep the version they were granted until re-issued.</div></div>
+
+    <div class="card"><div class="card-h"><div class="card-t">Pharmacy stock</div>
+      <span class="badge b-crit ml-auto">1 below reorder</span></div>
+     ${STOCK.map(s=>`<div class="arow">${svg('box','i sm')}
+       <div style="flex:1"><div class="ar-n">${s.n}</div><div class="ar-s">reorder at ${s.r}</div></div>
+       <b style="font-size:14px;font-weight:800;color:${s.q<s.r?'var(--destructive)':'var(--eka-blue)'}">${s.q}</b></div>`).join('')}
+     <div class="ai-box" style="font-size:11px;color:var(--ink-3);line-height:1.5">
+      Stock feeds the prescribing surface — an out-of-stock drug is visible at the point of prescribing, not discovered at the counter.</div></div>
+   </div></div>`;}
+
+function toggleReq(i){if(!ROLES[S.role].caps.includes('facility.admin')){toast('Needs facility.admin');return;}
+ FIELDS[i].req=!FIELDS[i].req;render();toast('Field updated — operation versioned');}
+
+function proposeField(){
+ const q=document.getElementById('fldQ').value.trim();if(!q)return;
+ const lo=q.toLowerCase();
+ let t='text',opts='';
+ if(/categor|type|group|status|select|option/.test(lo)){t='select';
+  opts=/occupation/.test(lo)?'Agriculture, Daily wage, Household, Salaried, Other'
+   :/educat/.test(lo)?'None, Primary, Secondary, Graduate'
+   :/income/.test(lo)?'Below poverty line, Above poverty line':'Option A, Option B, Other';}
+ else if(/date|dob|lmp|when/.test(lo))t='date';
+ else if(/number|count|weight|height|score|age/.test(lo))t='number';
+ else if(/phone|mobile|contact/.test(lo))t='phone';
+ const label=(q.match(/(?:add|need|want|create)?\s*(?:an?\s+)?([a-z ]{3,24}?)(?:\s+(?:as|for|field|category|attribute|to)\b|$)/i)||[,'New field'])[1]
+   .trim().replace(/^./,c=>c.toUpperCase());
+ const key=label.toLowerCase().replace(/[^a-z]+/g,'_');
+ pendingField={k:key,l:label,t,opts,req:false,core:false};
+ document.getElementById('fldProp').innerHTML=`<div class="prop-card">
+  <div class="pc-h">${svg('spark','i sm')}Proposed schema — unconfirmed</div>
+  <div class="pc-r"><span>Label</span><b>${label}</b></div>
+  <div class="pc-r"><span>Key</span><b>patient.${key}</b></div>
+  <div class="pc-r"><span>Type</span><b>${t}</b></div>
+  ${opts?`<div class="pc-r"><span>Options</span><b>${opts}</b></div>`:''}
+  <div class="pc-r"><span>Required</span><b>false</b></div>
+  <div class="pc-r"><span>Registry effect</span><b>patient.register v→ new</b></div>
+  <div style="font-size:10.5px;color:var(--ink-3);line-height:1.5;margin:9px 0 11px">
+   Adding a field creates a new version of the operation. Existing records keep the schema they were written against, so no back-fill and no silent nulls. The field appears in the rendered form and in the agent's tool surface simultaneously.</div>
+  <div style="display:flex;gap:8px"><button class="btn btn-b" onclick="addField()">${svg('check','i sm')}Add to form</button>
+   <button class="btn btn-g" onclick="document.getElementById('fldProp').innerHTML=''">Discard</button></div></div>`;}
+function addField(){
+ if(!pendingField)return;FIELDS.push(pendingField);pendingField=null;
+ render();toast('Field added — patient.register versioned');}
+
+/* ========== spotlight ========== */
+const CMDS=[{k:'queue',ic:'list',n:'Go to Queue',m:'Patients today by station'},
+ {k:'directory',ic:'users',n:'Go to Patient directory',m:'All patients in this facility'},
+ {k:'admin',ic:'cog',n:'Go to Control panel',m:'Registration form, bundles, stock'},
+ {k:'newchat',ic:'spark',n:'New workspace chat',m:'Ask facility-level questions'}];
+function isAsk(q){return /\?|^(how|what|which|who|when|why|show|list|count|find all|any )/i.test(q)&&q.length>4;}
+function openSpot(){document.getElementById('spotOv').classList.add('show');
+ const i=document.getElementById('spotIn');i.value='';sel=0;renderSpot();setTimeout(()=>i.focus(),40);}
+function closeSpot(){document.getElementById('spotOv').classList.remove('show');}
+function rows(){
+ const q=(document.getElementById('spotIn')?.value||'').trim(),lo=q.toLowerCase(),r=[];
+ if(q&&isAsk(q))r.push({type:'ask',ic:'spark',n:q,m:'Ask the agent — workspace scope'});
+ const ps=q?PATIENTS.filter(p=>p.name.toLowerCase().includes(lo)||p.phone.includes(lo)
+   ||(p.abha||'').includes(lo)||p.village.toLowerCase().includes(lo)||String(p.token||'')===lo)
+  :PATIENTS.filter(p=>p.today);
+ ps.forEach(p=>r.push({type:'patient',p,ic:'user',n:p.name,m:`${p.age}${p.sex} · ${p.village} · ${STATIONS[p.v.station]}`}));
+ CMDS.filter(c=>!q||c.n.toLowerCase().includes(lo)).forEach(c=>r.push({type:'cmd',...c}));
+ return r;}
+function renderSpot(){
+ const q=document.getElementById('spotIn').value.trim(),R=rows(),el=document.getElementById('spotBody');
+ if(q&&!R.length){el.innerHTML=`<div style="padding:38px 22px;text-align:center;width:100%;color:var(--ink-3)">
+   ${svg('search','i lg')}<p style="font-size:12.5px;margin:12px 0 14px;line-height:1.6">
+   No patient matches “<b>${q}</b>”.<br>Registering creates a permanent record that cannot be undone, only deprecated.</p>
+   <button class="btn btn-b" style="margin:0 auto" onclick="registerNew()">${svg('plus','i sm')}Register new patient</button></div>`;return;}
+ if(sel>=R.length)sel=0;
+ const cur=R[sel];
+ let groups='',last='';
+ R.forEach((r,i)=>{const g=r.type==='ask'?'Ask the agent':r.type==='patient'?(q?'Patients':"Today's queue"):'Go to';
+  if(g!==last){groups+=`<div class="spot-sec">${g}</div>`;last=g;}
+  groups+=`<div class="sr ${i===sel?'sel':''}" onmouseenter="sel=${i};renderSpot()" onclick="runRow(${i})">
+   <span class="sr-ic">${svg(r.ic,'i sm')}</span><span style="flex:1;min-width:0">
+   <div class="sr-n" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.n}</div>
+   <div class="sr-m">${r.m}</div></span></div>`;});
+ el.innerHTML=`<div class="spot-list">${groups}
+   ${q?`<div style="padding:8px 9px;margin-top:4px;border-top:1px solid var(--border)">
+    <button class="qa-b" style="width:100%" onclick="registerNew()">${svg('plus','i sm')}Register new patient</button></div>`:''}</div>
+  <div class="spot-prev">${prev(cur)}</div>`;}
+function prev(r){
+ if(!r)return'';
+ if(r.type==='patient'){const p=r.p,c=ROLES[S.role].caps;
+  return`<div class="pv-top"><div class="pv-av">${p.init}</div><div><div class="pv-n">${p.name}</div>
+   <div class="pv-s">${p.age}${p.sex} · ${p.village} · ${p.phone}</div></div></div>
+   <div class="pv-rows">
+    <div class="pv-r"><span>Station</span><b>${STATIONS[p.v.station]} · ${stateLabel(p)}</b></div>
+    <div class="pv-r"><span>ABHA</span><b>${p.abha||(p.v.abha?'Linked this visit':'Not linked')}</b></div>
+    <div class="pv-r"><span>Category</span><b>${p.cat}</b></div>
+    <div class="pv-r"><span>Active problem</span><b>${p.dx}</b></div>
+    <div class="pv-r"><span>Current meds</span><b>${p.meds}</b></div>
+    <div class="pv-r"><span>Alerts</span><b>${p.alerts}</b></div></div>
+   <div class="pv-lab">Quick actions</div>
+   <div class="qa-grid">
+    <button class="qa-b" onclick="openPatient('${p.id}')">${svg('folder','i sm')}Open thread</button>
+    <button class="qa-b" onclick="pickThen('${p.id}','vitals')" ${c.includes('vitals.record')?'':'disabled'}>${svg('vitals','i sm')}Record vitals</button>
+    <button class="qa-b" onclick="pickThen('${p.id}','scribe')" ${c.includes('encounter.document')?'':'disabled'}>${svg('mic','i sm')}Start consult</button>
+    <button class="qa-b" onclick="pickThen('${p.id}','hand')" ${c.includes('handover')?'':'disabled'}>${svg('refer','i sm')}Hand over</button></div>
+   <div class="hint" style="margin-top:12px">Filtered by your bundle (${ROLES[S.role].label.toLowerCase()}).</div>`;}
+ if(r.type==='ask')return`<div class="pv-top"><div class="pv-av">${svg('spark','i lg')}</div>
+   <div><div class="pv-n">Ask the agent</div><div class="pv-s">Workspace scope — not tied to one patient</div></div></div>
+   <div class="pv-rows"><div class="pv-r"><span>Question</span><b style="max-width:200px">${r.n}</b></div>
+    <div class="pv-r"><span>Scope</span><b>Facility · read only</b></div>
+    <div class="pv-r"><span>Writes</span><b>None</b></div></div>
+   <div class="hint">Opens a workspace chat. Reads run across the registry; anything the agent proposes from there is still rendered for confirmation.</div>`;
+ return`<div class="pv-top"><div class="pv-av">${svg(r.ic,'i lg')}</div>
+   <div><div class="pv-n">${r.n}</div><div class="pv-s">${r.m}</div></div></div>
+   <div class="hint">Press <span class="kbd">↵</span> to go.</div>`;}
+function runRow(i){const r=rows()[i];if(!r)return;
+ if(r.type==='patient')return openPatient(r.p.id);
+ if(r.type==='ask'){closeSpot();workspaceAsk(r.n);return;}
+ closeSpot();
+ if(r.k==='newchat')return newChat();
+ go(r.k);}
+function pickThen(id,k){openPatient(id);setTimeout(()=>act(k),140);}
+
+/* ========== agent ========== */
+function workspaceAsk(q){
+ let t=S.threads.find(x=>!x.pid);
+ if(!t){t={id:'t'+Date.now(),pid:null,title:'Workspace',msgs:[],up:Date.now()};S.threads.unshift(t);}
+ t.up=Date.now();S.active=t.id;S.view='chat';
+ t.msgs.push({who:'user',text:q,actor:ROLES[S.role].label,time:now()});
+ render();setTimeout(()=>{t.msgs.push({who:'agent',...wsAnswer(q),time:now()});render();},450);}
+function wsAnswer(q){
+ const lo=q.toLowerCase(),today=PATIENTS.filter(p=>p.today);
+ if(/queue|waiting|station|today/.test(lo))
+  return{text:'Facility read across the registry. No writes performed.',
+   kvs:Object.entries(STATIONS).filter(([k])=>k!=='done')
+    .map(([k,l])=>[l,String(today.filter(p=>p.v.station===k).length)])};
+ if(/abha|pending|unlinked/.test(lo)){const n=PATIENTS.filter(p=>!p.abha&&!p.v.abha);
+  return{text:`<b>${n.length} patients</b> have no linked ABHA. They sit on the unlinked worklist and the agent surfaces the link at their next contact rather than blocking the queue.`,
+   kvs:n.map(p=>[p.name,p.village])};}
+ if(/stock|drug|medicine|metformin|reorder/.test(lo))
+  return{text:'Pharmacy stock. Anything below reorder is surfaced at the point of prescribing, not at the counter.',
+   kvs:STOCK.map(s=>[s.n,String(s.q),s.q<s.r?'crit':''])};
+ if(/ncd|diabet|hypertens|cohort|overdue|follow/.test(lo)){const n=PATIENTS.filter(p=>p.cat==='NCD');
+  return{text:`<b>${n.length} patients</b> in the NCD cohort at this facility. This is a read from certified metric definitions, not free-form SQL — two facilities computing this indicator get the same number.`,
+   kvs:n.map(p=>[p.name,p.dx])};}
+ return{text:`Read performed across the facility registry: ${PATIENTS.length} patients, ${today.length} in today's queue, ${S.threads.length} open threads. Reads are agentic and broad, so this produced no write. Try asking about the queue, pending ABHA, stock, or the NCD cohort.`};}
+
+function askAgent(){
+ const i=document.getElementById('ask'),q=i.value.trim();if(!q)return;i.value='';
+ const t=T(),p=P();
+ t.msgs.push({who:'user',text:q,actor:ROLES[S.role].label,time:now()});t.up=Date.now();render();
+ if(p)p.v.audit.push({t:now(),op:'agent.read',by:ROLES[S.role].label});
+ setTimeout(()=>{t.msgs.push(p
+   ?{who:'agent',text:'Read performed across this patient\'s record: prior encounters, lab results, current medications. Reads are agentic and broad, so this produced no write. Anything I propose from here is rendered as an editable payload for you to confirm.',time:now()}
+   :{who:'agent',...wsAnswer(q),time:now()});render();},450);}
+
+/* ========== operations ========== */
+function post(m,op){const t=T(),p=P();
+ t.msgs.push({who:'sys',...m,time:now(),actor:ROLES[S.role].label});t.up=Date.now();
+ if(op&&p)p.v.audit.push({t:now(),op,by:ROLES[S.role].label});render();}
+function toast(m){const t=document.getElementById('toast');
+ document.getElementById('toastMsg').textContent=m;t.classList.add('show');
+ clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),2600);}
+function toggleTheme(){S.theme=S.theme==='light'?'dark':'light';
+ document.documentElement.setAttribute('data-theme',S.theme);
+ document.getElementById('themeBtn').innerHTML=svg(S.theme==='light'?'moon':'sun');}
+
+function act(k){({abha:aABHA,vitals:aVitals,reviewv:aReview,scribe:aScribe,rx:aRx,lab:aLab,
+ result:aResult,disp:aDisp,visit:aVisit,cbac:aCBAC,appt:aAppt,hand:aHand})[k]();}
+
+let handTo=null;
+function aHand(){
+ const v=P().v;
+ const opts=[['nurse','Vitals','Nurse station'],['doctor','Doctor','Medical officer OPD'],
+  ['lab','Lab','Sample collection and results'],['pharmacy','Pharmacy','Dispensing counter'],
+  ['done','Complete','Close the visit']].filter(o=>o[0]!==v.station);
+ handTo=(v.rx&&!v.dispensed)?'pharmacy':(v.labOrder&&!v.labResult)?'lab':v.vitals&&!v.consult?'doctor':v.dispensed?'done':'nurse';
+ modal({title:'Hand over',
+  sub:`Moves the patient to the next station and transfers the baton. The receiving station sees the thread with full context.`,
+  body:`<div id="destList">${opts.map(o=>`<button class="dest ${handTo===o[0]?'sel':''}" onclick="handTo='${o[0]}';aHand2()">
+    ${svg(o[0]==='done'?'check':o[0]==='doctor'?'doc':o[0]==='lab'?'flask':o[0]==='pharmacy'?'pill':'vitals')}
+    <span style="flex:1"><span class="p-l">${o[1]}</span><div class="p-s">${o[2]}</div></span>
+    ${handTo===o[0]?`<span class="badge b-blue">suggested</span>`:''}</button>`).join('')}</div>
+   <div class="field" style="margin-top:6px"><label>Note to the receiving station (optional)</label>
+    <textarea rows="2" placeholder="e.g. BP flagged, please review before prescribing"></textarea></div>`,
+  ok:'Confirm handover',
+  run:()=>{const p=P();p.v.station=handTo;
+   post({title:`Handed over to ${STATIONS[handTo]}`,ic:'refer',tag:'baton moved',tagc:'b-blue',
+    text:`Patient state travels with the thread. The receiving station opens to the same conversation, with proposals reordered for their bundle.`},'handover');
+   toast(`Moved to ${STATIONS[handTo]} — visible in the queue`);}});}
+const ROLE_USER={frontdesk:'u6',nurse:'u3',mo:'u1',lab:'u4',pharm:'u5',flw:'u7',admin:'u6'};
+function cbar(){
+ const p=P(),c=ROLES[S.role].caps;
+ if(!p)return[['q1','list','Queue today',"what's in the queue"],['q2','id','Pending ABHA','how many pending abha'],
+  ['q3','box','Stock','what stock is below reorder'],['q4','vitals','NCD cohort','show the ncd cohort']]
+  .map(([k,i,l,q])=>`<button class="cq" onclick="workspaceAsk('${q}')">${svg(i,'i sm')}${l}</button>`).join('');
+ const b=[];
+ if(c.includes('encounter.document'))b.push(`<button class="cq rose" onclick="act('scribe')">${svg('mic','i sm')}Scribe</button>`);
+ if(c.includes('visit.household'))b.push(`<button class="cq rose" onclick="act('visit')">${svg('mic','i sm')}Scribe visit</button>`);
+ b.push(`<button class="cq" onclick="docAssist()">${svg('spark','i sm')}Doc assist</button>`);
+ if(c.includes('vitals.record'))b.push(`<button class="cq" onclick="act('vitals')" ${p.v.vitals?'disabled':''}>${svg('vitals','i sm')}Vitals</button>`);
+ if(c.includes('rx.prescribe'))b.push(`<button class="cq" onclick="act('rx')" ${!p.v.consult||p.v.rx?'disabled':''}>${svg('pill','i sm')}Rx</button>`);
+ if(c.includes('lab.order'))b.push(`<button class="cq" onclick="act('lab')" ${!p.v.consult||p.v.labOrder?'disabled':''}>${svg('flask','i sm')}Order</button>`);
+ if(c.includes('lab.result.enter'))b.push(`<button class="cq" onclick="act('result')" ${!p.v.labOrder||p.v.labResult?'disabled':''}>${svg('flask','i sm')}Result</button>`);
+ if(c.includes('pharmacy.dispense'))b.push(`<button class="cq" onclick="act('disp')" ${!p.v.rx||p.v.dispensed?'disabled':''}>${svg('box','i sm')}Dispense</button>`);
+ if(c.includes('assessment.record'))b.push(`<button class="cq" onclick="act('cbac')">${svg('clip','i sm')}CBAC</button>`);
+ if(c.includes('handover'))b.push(`<button class="cq" onclick="act('hand')">${svg('refer','i sm')}Hand over</button>`);
+ b.push(`<button class="cq" onclick="timeline()">${svg('eye','i sm')}Timeline</button>`);
+ return b.join('');}
+
+function docAssist(){
+ const p=P();
+ modal({title:'Doc assist',
+  sub:'Read-only. Protocol-bound references with a visible source. It does not draft a clinical decision and it cannot write.',
+  body:`<div class="draft"><div class="draft-h">${svg('spark','i sm')}Context read — no write performed</div>
+    <div class="draft-t">${p.name}, ${p.age}${p.sex}. ${p.dx}. Current: ${p.meds}. ${p.alerts}.</div></div>
+   <div class="sec-lab" style="border:none;background:none;padding:4px 0 8px">Relevant protocol</div>
+   <div class="mr" style="border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:8px">
+    ${svg('clip','i sm')}<span style="flex:1"><div class="mr-n">NPCDCS · hypertension, uncontrolled</div>
+    <div class="mr-d">If BP remains above 140/90 on a single agent, add a second agent from a different class before escalating dose. Confirm adherence first.</div>
+    <div class="mr-d" style="color:var(--gray-400);margin-top:4px">Source: approved content library v2026.1</div></span></div>
+   <div class="mr" style="border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:8px">
+    ${svg('alert','i sm')}<span style="flex:1"><div class="mr-n">Interaction check</div>
+    <div class="mr-d">No interaction between amlodipine and metformin. ${p.alerts.includes('allerg')&&!p.alerts.includes('No known')?'<b>Allergy on file — check before prescribing.</b>':'No allergy conflict on file.'}</div></span></div>
+   <div class="mr" style="border:1px solid var(--border);border-radius:var(--r-md)">
+    ${svg('box','i sm')}<span style="flex:1"><div class="mr-n">Formulary and stock</div>
+    <div class="mr-d">Metformin 500 mg — 40 on hand, below reorder. Amlodipine 5 mg — 420 on hand.</div></span></div>
+   <div class="warn-box" style="margin:13px 0 0">${svg('lock','i sm')}<span>Guidance only. Nothing here has been written to the record — to act on it, use Rx or Order, which render an editable payload for you to confirm.</span></div>`,
+  ok:'Close',run:()=>{
+   post({title:'Doc assist consulted',ic:'spark',tag:'read only',tagc:'b-mute',
+    text:'Protocol reference and interaction check, sourced from the approved content library. No write performed.'},'assist.read');}});}
+
+function timeline(){
+ const p=P();
+ modal({title:`${p.name} · record timeline`,
+  sub:'Full read across encounters, ABDM-fetched external records and this visit. The widest read scope of any surface.',
+  body:`<div class="mr" style="border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:8px">
+    ${svg('folder','i sm')}<span style="flex:1"><div class="mr-n">This visit · ${now()}</div>
+    <div class="mr-d">${p.v.audit.length} operations posted. Currently at ${STATIONS[p.v.station]}.</div></span></div>
+   <div class="mr" style="border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:8px">
+    ${svg('doc','i sm')}<span style="flex:1"><div class="mr-n">${p.last} · OPD, this facility</div>
+    <div class="mr-d">${p.dx}. Prescribed ${p.meds}.</div></span></div>
+   <div class="mr" style="border:1px solid var(--eka-blue-100);background:var(--eka-blue-bg);border-radius:var(--r-md)">
+    ${svg('id','i sm')}<span style="flex:1"><div class="mr-n">External · fetched via ABDM consent</div>
+    <div class="mr-d">${p.abha?'2 records available from other facilities. Fetching requires a consent request the patient approves on their own device.':'No ABHA linked — external records cannot be discovered for this patient.'}</div></span></div>`,
+  ok:'Close',run:()=>{}});}
+
+/* ========== scribe session ========== */
+const LANGS={te:'తెలుగు Telugu',hi:'हिन्दी Hindi',en:'English',multi:'Multi-language (auto)'};
+const SCRIPTS={
+ consult:[['Clinician','ఏమైంది? ఎన్ని రోజులుగా ఇలా ఉంది?','What is the problem? How long has it been like this?'],
+  ['Patient','రెండు వారాలుగా తలనొప్పి, తల తిరుగుతోంది.','Headache and giddiness for two weeks.'],
+  ['Clinician','బీపీ మాత్రలు క్రమం తప్పకుండా వేసుకుంటున్నారా?','Are you taking the BP tablets regularly?'],
+  ['Patient','లేదు, పది రోజులుగా మాత్రలు అయిపోయాయి.','No, the tablets ran out ten days ago.'],
+  ['Clinician','ఛాతీ నొప్పి ఉందా? ఊపిరి ఆడకపోవడం?','Any chest pain? Breathlessness?'],
+  ['Patient','లేదు, అవేమీ లేవు.','No, none of that.'],
+  ['Clinician','మీ అమ్మగారికి షుగర్ ఉందా?','Does your mother have diabetes?'],
+  ['Patient','అవును, ఆమెకు షుగర్ ఉంది.','Yes, she has diabetes.']],
+ visit:[['ASHA','మాత్రలు ఇంకా ఉన్నాయా?','Do you still have tablets left?'],
+  ['Patient','లేదు, పది రోజుల క్రితమే అయిపోయాయి.','No, they ran out ten days ago.'],
+  ['ASHA','ఏమైనా ఇబ్బంది ఉందా?','Any trouble?'],
+  ['Patient','తల తిరుగుతోంది, నీరసంగా ఉంది.','Giddiness, and I feel weak.'],
+  ['ASHA','రేపు పీహెచ్‌సీకి వెళ్ళండి, నేను గుర్తు చేస్తాను.','Go to the PHC tomorrow, I will remind you.']]};
+
+let SC={open:false,live:false,t:0,i:0,tab:'transcript',kind:'consult',
+ inLang:'te',outLang:'en',pxLang:'te',tpl:'SOAP',lines:[],ctx:'',note:null,timer:null,stream:null};
+
+function scRender(){
+ const el=document.getElementById('sheet');
+ if(!SC.open){el.classList.remove('show');return;}
+ el.classList.add('show');
+ const p=P(),mm=String(Math.floor(SC.t/60)).padStart(2,'0'),ss=String(SC.t%60).padStart(2,'0');
+ const isVisit=SC.kind==='visit';
+ el.innerHTML=`<div class="sh-h">
+   <div class="sh-t">${svg('mic')}${isVisit?'Household visit':'Consultation'}
+    ${SC.live?`<span class="wave">${'<i></i>'.repeat(5)}</span>`:''}
+    <button class="icon-btn ml-auto" onclick="scClose()">${svg('plus','i sm')}</button></div>
+   <div class="sh-s">${p?p.name+' · '+p.age+p.sex:'—'} · ${SC.live?`recording ${mm}:${ss}`:SC.lines.length?`stopped at ${mm}:${ss}`:'not started'}</div>
+   <div class="lang">
+    <div class="lp"><span class="lp-l">Spoken</span>
+     <select onchange="SC.inLang=this.value;scRender()">
+      ${Object.entries(LANGS).map(([k,v])=>`<option value="${k}" ${SC.inLang===k?'selected':''}>${v}</option>`).join('')}</select></div>
+    ${svg('refer','i sm')}
+    <div class="lp"><span class="lp-l">Note</span>
+     <select onchange="SC.outLang=this.value;scRender()">
+      ${['en','te','hi'].map(k=>`<option value="${k}" ${SC.outLang===k?'selected':''}>${LANGS[k]}</option>`).join('')}</select></div>
+    <div class="lp"><span class="lp-l">Handout</span>
+     <select onchange="SC.pxLang=this.value;scRender()">
+      ${['te','hi','en'].map(k=>`<option value="${k}" ${SC.pxLang===k?'selected':''}>${LANGS[k]}</option>`).join('')}</select></div>
+   </div></div>
+  <div class="sh-tabs">
+   ${[['transcript','Transcript'],['context','Context'],['note','Output']].map(([k,l])=>
+    `<button class="sh-tab ${SC.tab===k?'on':''}" onclick="SC.tab='${k}';scRender()">${l}
+     ${k==='transcript'&&SC.live?'<span class="dot"></span>':''}
+     ${k==='context'&&SC.ctx?' •':''}</button>`).join('')}</div>
+  <div class="sh-b">${scBody()}</div>
+  <div class="sh-f">${scFoot()}</div>`;
+ const b=el.querySelector('.sh-b');if(SC.tab==='transcript'&&b)b.scrollTop=b.scrollHeight;}
+
+function scBody(){
+ if(SC.tab==='context')return`<div class="field"><label>Information that was not spoken aloud</label>
+   <textarea rows="7" placeholder="Prior history, what you observed, anything the microphone could not hear."
+    oninput="SC.ctx=this.value">${SC.ctx}</textarea>
+   <div class="hint">The scribe only hears the room. Anything you know but did not say belongs here, or it will not reach the note.</div></div>
+  <div class="warn-box" style="margin-top:13px">${svg('alert','i sm')}<span>Mark pasted history as history. If it reads as something said in the room, it will be written into today's encounter.</span></div>`;
+
+ if(SC.tab==='note'){
+  if(!SC.note)return`<div style="text-align:center;padding:36px 12px;color:var(--ink-3);font-size:12.5px;line-height:1.6">
+    ${svg('spark','i lg')}<br><br>Stop the recording to generate the note.<br>Output is a draft payload, never a commit.</div>`;
+  return`<div class="outbox"><div class="out-h">${svg('doc','i sm')}Clinical note · ${LANGS[SC.outLang].split(' ').pop()} · ${SC.tpl}
+    <span class="badge b-vio ml-auto">unconfirmed</span></div>
+   <div class="out-b ${SC.outLang!=='en'?'te':''}">${SC.note.note[SC.outLang]}</div></div>
+  <div class="outbox"><div class="out-h">${svg('users','i sm')}Patient handout · ${LANGS[SC.pxLang].split(' ').pop()}
+    <span class="badge b-mute ml-auto">given to patient</span></div>
+   <div class="out-b ${SC.pxLang!=='en'?'te':''}">${SC.note.px[SC.pxLang]}</div></div>
+  <div class="outbox"><div class="out-h">${svg('clip','i sm')}Structured payload</div>
+   <div style="padding:4px 12px 8px">${SC.note.kv.map(k=>`<div class="pc-r"><span>${k[0]}</span><b>${k[1]}</b></div>`).join('')}</div></div>
+  <div class="warn-box">${svg('alert','i sm')}<span>Written in ${LANGS[SC.outLang].split(' ').pop()} from a consultation spoken in ${LANGS[SC.inLang].split(' ').pop()}. The transcript is retained alongside so the translation can be checked.</span></div>`;}
+
+ if(!SC.lines.length)return`<div class="sc-hero" onclick="scStart()">
+   <button class="mic">${svg('mic')}</button><b>Start the consultation</b>
+   <span>Speak ${LANGS[SC.inLang].split(' ').pop()}. The note comes back in ${LANGS[SC.outLang].split(' ').pop()}.</span></div>
+  <div class="sdk-note" style="margin-top:4px">${svg('lock','i sm')}<span>Single visit-scoped consent was taken at registration. Declining does not block care — every station falls back to form entry.</span></div>`;
+
+ return SC.lines.map((l,i)=>`<div class="tl ${i===SC.lines.length-1&&SC.live?'new':''}">
+   <div class="tl-w">${l[0]}</div>
+   <div class="tl-o">${SC.inLang==='en'?l[2]:l[1]}</div>
+   ${SC.inLang!=='en'?`<div class="tl-g">${l[2]}</div>`:''}</div>`).join('')
+  +(SC.live?`<div class="tl"><span class="wave">${'<i></i>'.repeat(5)}</span></div>`:'');}
+
+function scFoot(){
+ if(SC.live)return`<span style="font-size:10.5px;color:var(--ink-3);flex:1;line-height:1.4">Audio is deleted once the payload is confirmed.</span>
+  <button class="btn btn-g" onclick="scStop()">${svg('check','i sm')}Stop &amp; generate</button>`;
+ if(SC.note)return`<span style="font-size:10.5px;color:var(--gray-400);flex:1;line-height:1.4">Draft. Nothing is in the record yet.</span>
+  <button class="btn btn-g" onclick="scStart()">Resume</button>
+  <button class="btn btn-b" onclick="scConfirm()">${svg('check','i sm')}Confirm &amp; post</button>`;
+ if(SC.lines.length)return`<span style="flex:1"></span>
+  <button class="btn btn-g" onclick="scStart()">Resume</button>
+  <button class="btn btn-b" onclick="scStop()">Generate</button>`;
+ return`<span style="font-size:10.5px;color:var(--gray-400);flex:1;line-height:1.4">Narrative only. Numbers go to a form.</span>
+  <button class="btn btn-b" onclick="scStart()">${svg('mic','i sm')}Start</button>`;}
+
+function openScribe(kind){
+ const p=P();if(!p){toast('Open a patient first');return;}
+ SC={...SC,open:true,live:false,tab:'transcript',kind,lines:[],note:null,t:0,i:0,
+  tpl:kind==='visit'?'Household visit':'SOAP'};
+ scRender();scCtl();}
+function scClose(){SC.open=false;clearInterval(SC.timer);clearInterval(SC.stream);SC.live=false;scRender();scCtl();}
+function scStart(){
+ SC.live=true;SC.tab='transcript';SC.note=null;
+ SC.timer=setInterval(()=>{SC.t++;scCtl();if(SC.open&&SC.tab==='transcript')
+   document.querySelector('.sh-s').textContent=`${P().name} · recording ${String(Math.floor(SC.t/60)).padStart(2,'0')}:${String(SC.t%60).padStart(2,'0')}`;},1000);
+ SC.stream=setInterval(()=>{
+  const s=SCRIPTS[SC.kind];
+  if(SC.i>=s.length){clearInterval(SC.stream);return;}
+  SC.lines.push(s[SC.i++]);scRender();},1700);
+ scRender();scCtl();}
+function scStop(){
+ clearInterval(SC.timer);clearInterval(SC.stream);SC.live=false;
+ SC.note=genNote();SC.tab='note';scRender();scCtl();}
+
+function genNote(){
+ if(SC.kind==='visit')return{
+  note:{en:`Household visit, ${P().name}.\n\nMedication exhausted ten days ago; not taking BP tablets. Reports giddiness and weakness. No chest pain reported.\n\nAdvised to attend the PHC tomorrow. Referral raised for medication refill and BP check.`,
+   te:`గృహ సందర్శన, ${P().name}.\n\nపది రోజుల క్రితం మాత్రలు అయిపోయాయి; బీపీ మాత్రలు వేసుకోవడం లేదు. తల తిరగడం, నీరసం ఉన్నాయి.\n\nరేపు పీహెచ్‌సీకి రావాలని సూచించాం.`,
+   hi:`गृह भ्रमण, ${P().name}.\n\nदस दिन पहले दवाइयाँ ख़त्म हो गईं; बीपी की गोलियाँ नहीं ले रहे हैं। चक्कर और कमज़ोरी।\n\nकल पीएचसी आने की सलाह दी गई।`},
+  px:{te:`రేపు పీహెచ్‌సీకి రండి.\nమీ పాత మాత్రల చీటీ తీసుకురండి.\nఖాళీ కడుపుతో రావాల్సిన అవసరం లేదు.`,
+   hi:`कल पीएचसी आइए।\nअपनी पुरानी पर्ची साथ लाइए।`,
+   en:`Come to the PHC tomorrow.\nBring your old prescription.\nYou do not need to come fasting.`},
+  kv:[['Outcome','Referred to PHC'],['Adherence','Lapsed 10 days'],['Sync','Queued offline']]};
+ return{
+  note:{en:`S: Headache and giddiness for two weeks. Known hypertensive, tablets exhausted ten days ago. Denies chest pain and breathlessness. Mother is diabetic.\n\nO: Recorded at the vitals station this visit.\n\nA: Essential hypertension, uncontrolled — adherence lapse. Family history of diabetes; screening indicated.\n\nP: Restart antihypertensive, adherence counselling, HbA1c, review in four weeks.`,
+   te:`S: రెండు వారాలుగా తలనొప్పి, తల తిరగడం. బీపీ ఉన్నట్టు తెలుసు, పది రోజులుగా మాత్రలు లేవు. ఛాతీ నొప్పి లేదు. తల్లికి షుగర్ ఉంది.\n\nA: అదుపులో లేని రక్తపోటు — మాత్రలు ఆగిపోయాయి.\n\nP: మాత్రలు మళ్ళీ ప్రారంభించాలి, HbA1c పరీక్ష, నాలుగు వారాల్లో మళ్ళీ చూపించాలి.`,
+   hi:`S: दो हफ़्ते से सिरदर्द और चक्कर। ज्ञात उच्च रक्तचाप, दस दिन से गोलियाँ नहीं। सीने में दर्द नहीं। माँ को मधुमेह।\n\nA: अनियंत्रित उच्च रक्तचाप — दवा में चूक।\n\nP: दवा पुनः शुरू, HbA1c, चार सप्ताह में समीक्षा।`},
+  px:{te:`మాత్రలు ప్రతిరోజూ ఉదయం వేసుకోండి.\nమాత్రలు అయిపోయేలోపు పీహెచ్‌సీకి రండి.\nనాలుగు వారాల తర్వాత బీపీ చూపించండి.\nతల తిరిగితే వెంటనే రండి.`,
+   hi:`गोली रोज़ सुबह लें।\nदवा ख़त्म होने से पहले पीएचसी आएँ।\nचार सप्ताह बाद बीपी दिखाएँ।`,
+   en:`Take the tablet every morning.\nCome to the PHC before your tablets run out.\nHave your BP checked in four weeks.\nCome immediately if the giddiness returns.`},
+  kv:[['Diagnosis','Essential hypertension, uncontrolled'],['Investigation','HbA1c'],
+   ['Follow-up','4 weeks'],['Adherence','Lapsed 10 days']]};}
+
+function scConfirm(){
+ const p=P();
+ if(SC.kind==='visit'){
+  post({title:'Household visit recorded',ic:'home',tag:'queued offline',tagc:'b-warn',
+   text:`Spoken in ${LANGS[SC.inLang].split(' ').pop()}, written in ${LANGS[SC.outLang].split(' ').pop()}, handout given in ${LANGS[SC.pxLang].split(' ').pop()}. Transcript retained so the translation can be checked.`,
+   quote:SC.lines[1]?SC.lines[1][2]:''},'visit.household');
+  toast('Visit confirmed — queued for sync');}
+ else{
+  p.v.consult=true;
+  post({title:'Consultation documented',ic:'mic',tag:'draft → confirmed',tagc:'b-vio',
+   kvs:SC.note.kv,
+   text:`Spoken in ${LANGS[SC.inLang].split(' ').pop()}, note written in ${LANGS[SC.outLang].split(' ').pop()}, handout printed in ${LANGS[SC.pxLang].split(' ').pop()}. Only the confirmed payload entered the record; audio is now discarded.`,
+   quote:'రెండు వారాలుగా తలనొప్పి, తల తిరుగుతోంది. — Headache and giddiness for two weeks.'},'encounter.document');
+  toast('Note confirmed — prescribing unlocked');}
+ scClose();}
+
+function scCtl(){
+ const el=document.getElementById('scCtl'),p=P(),c=ROLES[S.role].caps;
+ const can=p&&(c.includes('encounter.document')||c.includes('visit.household'));
+ if(!can){el.innerHTML='';return;}
+ const mm=String(Math.floor(SC.t/60)).padStart(2,'0'),ss=String(SC.t%60).padStart(2,'0');
+ el.innerHTML=SC.live
+  ?`<button class="scbtn live" onclick="SC.open=true;scRender()">${svg('mic','i sm')}Transcribing<span class="t">${mm}:${ss}</span></button>`
+  :SC.lines.length&&SC.open===false
+   ?`<button class="scbtn" onclick="SC.open=true;scRender()">${svg('mic','i sm')}Resume session<span class="t">${mm}:${ss}</span></button>`
+   :`<button class="scbtn" onclick="openScribe('${c.includes('visit.household')?'visit':'consult'}')">${svg('mic','i sm')}Start scribe</button>`;}
+
+function joinTeam(){
+ const p=P(),uid=ROLE_USER[S.role],u=PEOPLE.find(x=>x.id===uid);
+ if(p.v.team.some(t=>t[0]===uid)){toast(`${u.name} is already in this care unit`);return;}
+ const label={frontdesk:'Registration',nurse:'Vitals',mo:'Treating doctor',lab:'Lab',
+  pharm:'Pharmacy',flw:'Community follow-up',admin:'Administration'}[S.role];
+ modal({title:'Join care unit',
+  sub:'The care unit is scoped to this episode, not to the facility tree. Membership is what grants visibility of this thread.',
+  body:`<div class="warn-box">${svg('lock','i sm')}<span>Joining grants <b>${u.name}</b> read access to this patient's thread for the duration of the episode. It is logged and it expires when the episode closes.</span></div>
+   <div class="field"><label>Person</label><input value="${u.name} · ${u.kind}" disabled></div>
+   <div class="field"><label>Role in this episode</label><input value="${label}"></div>
+   <div class="field"><label>Reason</label><select><option>Direct care</option><option>Second opinion</option><option>Handover cover</option></select></div>`,
+  ok:'Join',
+  run:()=>{p.v.team.push([uid,label]);
+   post({title:`${u.name} joined the care unit`,ic:'users',tag:'access granted',tagc:'b-blue',
+    text:`Role: ${label}. Care-unit membership is what makes this thread visible to them — not workspace membership, and not their department.`},'careunit.join');
+   toast('Joined — access logged and episode-scoped');}});}
+function aHand2(){const b=document.querySelectorAll('#destList .dest');
+ b.forEach(x=>x.classList.remove('sel'));event.currentTarget.classList.add('sel');}
+
+function aABHA(){modal({title:'Create / link ABHA',
+ sub:'Irreversible. Creation and care-context linking cannot be undone once pushed to ABDM.',
+ body:`<div class="crit-box">${svg('lock','i sm')}<span><b>Irreversibility class.</b> This confirm is deliberately un-prefilled. Declining does not block care — the patient is seen and the link returns to the worklist.</span></div>
+  <div class="field"><label>Aadhaar-linked mobile</label><input value="98•••• 4471"></div>
+  <div class="field"><label>OTP</label><input placeholder="6-digit OTP from ABDM"></div>
+  <label class="chk"><input type="checkbox" id="cf"><span>Patient consented verbally in their own language and understands the record will be linked to ABDM.</span></label>`,
+ ok:'Confirm &amp; link',gate:'cf',
+ run:()=>{P().v.abha=true;
+  post({title:'ABHA linked',ic:'id',tag:'irreversible',tagc:'b-crit',
+   text:'Care context linked. Removed from the unlinked-patient worklist.'},'abha.link');
+  toast('ABHA linked — irreversible operation logged');}});}
+
+function aVitals(){modal({title:'Record vitals',
+ sub:'Discrete numeric capture. Form or connected device — not ambient scribe.',
+ body:`<div style="text-align:center;margin-bottom:8px"><button class="mic" onclick="cVoice(this)">${svg('mic')}</button>
+   <div class="hint" style="text-align:center">Constrained voice — bounded grammar, mandatory readback, fails closed to the keypad</div></div>
+  <div id="rbSlot"></div>
+  <div class="row2"><div class="field"><label>Systolic (mmHg)</label><input value="158"></div>
+  <div class="field"><label>Diastolic (mmHg)</label><input value="96"></div></div>
+  <div class="row2"><div class="field"><label>Pulse (bpm)</label><input value="88"></div>
+  <div class="field"><label>SpO₂ (%)</label><input value="97"></div></div>
+  <div class="warn-box">${svg('alert','i sm')}<span>Range check: systolic 158 is stage 2 hypertension. In range for commit, but flagged to the MO.</span></div>`,
+ ok:'Commit vitals',
+ run:()=>{const v=P().v;v.vitals=true;v.vitalsFlag=true;
+  post({title:'Vitals recorded',ic:'vitals',tag:'flagged',tagc:'b-crit',
+   kvs:[['Blood pressure','158 / 96 mmHg','crit'],['Pulse','88 bpm'],['SpO₂','97 %']]},'vitals.record');
+  toast('Vitals committed — handover to Doctor suggested');}});}
+function cVoice(b){b.classList.add('rec');
+ setTimeout(()=>{b.classList.remove('rec');document.getElementById('rbSlot').innerHTML=
+  `<div class="readback"><div class="rb-l">Parsed — confirm before commit</div><div class="rb-v">158 / 96 mmHg</div>
+   <div class="hint" style="margin-top:6px">Heard: “systolic one fifty eight, diastolic ninety six”. Tap a field to correct.</div></div>`;},1300);}
+
+function aReview(){post({title:'Flagged vitals reviewed',ic:'eye',tag:'read only',tagc:'b-mute',
+ text:'MO read scope is the widest of any cadre. No write performed — correcting the nurse\'s entry would go through an amendment request, never a silent overwrite.'},'encounter.read');
+ toast('Read performed — no write');}
+
+function aScribe(){openScribe('consult');}
+function _aScribeOld(){modal({title:'Consultation — ambient scribe',
+ sub:'Narrative capture. The output is a draft payload, never a commit.',
+ body:`<div style="text-align:center"><button class="mic rec">${svg('mic')}</button>
+   <div class="hint" style="text-align:center;margin-bottom:14px">Recording · single visit-scoped consent captured at registration</div></div>
+  <div class="draft"><div class="draft-h">${svg('mic','i sm')}Scribe draft — unconfirmed</div>
+   <div class="draft-t">“Headache and giddiness for two weeks. Known hypertensive, irregular with amlodipine. No chest pain, no breathlessness. Mother diabetic. Advised to continue medication and check sugar.”</div></div>
+  <div class="field"><label>Diagnosis</label><input value="Essential hypertension, uncontrolled"></div>
+  <div class="field"><label>Notes</label><textarea rows="3">Adherence counselling given. Suspect undiagnosed diabetes — family history plus symptoms.</textarea></div>`,
+ ok:'Confirm note',
+ run:()=>{P().v.consult=true;
+  post({title:'Consultation documented',ic:'mic',tag:'draft → confirmed',tagc:'b-vio',
+   text:'Scribe produced a draft; the clinician edited and confirmed. Only the confirmed payload entered the record.',
+   quote:'Headache and giddiness for two weeks. Known hypertensive, irregular with amlodipine…'},'encounter.document');
+  toast('Note confirmed — prescribing unlocked');}});}
+
+function aRx(){modal({title:'Prescription',
+ sub:'Pre-filled from the scribe draft. Proposed, validated, confirmed, reversible within the undo window.',
+ body:`<div class="draft"><div class="draft-h">${svg('spark','i sm')}Proposed from the consultation</div>
+   <div class="draft-t">Amlodipine 5 mg once daily · Metformin 500 mg twice daily · review in 4 weeks</div></div>
+  <div class="field"><label>Drug 1</label><input value="Amlodipine 5 mg — 1-0-0 × 30 days"></div>
+  <div class="field"><label>Drug 2</label><input value="Metformin 500 mg — 1-0-1 × 30 days"></div>
+  <div class="warn-box">${svg('box','i sm')}<span>Stock signal from pharmacy: Metformin 500 mg — 40 tablets on hand against 60 needed. Partial dispense likely.</span></div>`,
+ ok:'Confirm prescription',
+ run:()=>{P().v.rx=true;
+  post({title:'Prescription confirmed',ic:'pill',tag:'undo 5 min',tagc:'b-ok',
+   kvs:[['Amlodipine 5 mg','1-0-0 × 30 d'],['Metformin 500 mg','1-0-1 × 30 d']],
+   text:'Dispense is now available at the pharmacy station once the patient is handed over.'},'rx.prescribe');
+  toast('Rx confirmed — handover to Pharmacy suggested');}});}
+
+function aLab(){modal({title:'Order investigation',sub:'Routes to the lab worklist for this patient.',
+ body:`<div class="field"><label>Investigation</label><select><option>HbA1c</option><option>Lipid profile</option><option>Serum creatinine</option></select></div>
+  <div class="field"><label>Priority</label><select><option>Routine</option><option>Urgent</option></select></div>`,
+ ok:'Confirm order',
+ run:()=>{P().v.labOrder=true;
+  post({title:'HbA1c ordered',ic:'flask',text:'Appears in the lab technician\'s worklist. Until then their entry action stays blocked.'},'lab.order');
+  toast('Ordered — handover to Lab suggested');}});}
+
+function aResult(){modal({title:'Enter lab result',
+ sub:'Manual bench entry with per-analyte range validation. Analyser feed where hardware exists.',
+ body:`<div class="field"><label>HbA1c (%)</label><input value="9.4"></div>
+  <div class="crit-box">${svg('alert','i sm')}<span><b>Critical value.</b> 9.4% exceeds the critical threshold of 9.0%. Commit requires acknowledgement and notifies the ordering MO immediately.</span></div>
+  <label class="chk"><input type="checkbox" id="cf"><span>I have re-read the value from the analyser printout and confirm it is correct.</span></label>`,
+ ok:'Commit result',gate:'cf',
+ run:()=>{P().v.labResult=true;
+  post({title:'HbA1c result committed',ic:'flask',tag:'critical',tagc:'b-crit',
+   kvs:[['HbA1c','9.4 %','crit'],['Reference','< 5.7 %']],
+   text:'Re-keying is the error source this readback guards against.'},'lab.result.enter');
+  toast('Critical result — MO notified');}});}
+
+function aDisp(){modal({title:'Dispense against prescription',
+ sub:'Partial dispense is first-class — the record shows what the patient actually received.',
+ body:`<div class="field"><label>Amlodipine 5 mg</label><input value="30 of 30 tablets"></div>
+  <div class="field"><label>Metformin 500 mg</label><input value="40 of 60 tablets"></div>
+  <div class="warn-box">${svg('alert','i sm')}<span>Partial dispense. Stock on hand 40. The shortfall is recorded and the prescribing MO is notified in the thread.</span></div>`,
+ ok:'Confirm dispense',
+ run:()=>{P().v.dispensed=true;STOCK[1].q=0;
+  post({title:'Dispensed (partial)',ic:'box',tag:'stock decremented',tagc:'b-ok',
+   kvs:[['Amlodipine 5 mg','30 / 30'],['Metformin 500 mg','40 / 60','crit']],
+   text:'Shortfall recorded against the prescription.'},'pharmacy.dispense');
+  toast('Dispensed — shortfall logged');}});}
+
+function aVisit(){openScribe('visit');}
+function _aVisitOld(){modal({title:'Household visit',
+ sub:'Narrative to scribe; structured items to the form. Offline-first.',
+ body:`<div style="text-align:center"><button class="mic rec">${svg('mic')}</button>
+   <div class="hint" style="text-align:center;margin-bottom:14px">Recording · consent taken at the door, separate from facility visit consent</div></div>
+  <div class="draft"><div class="draft-h">${svg('mic','i sm')}Scribe draft — unconfirmed</div>
+   <div class="draft-t">“Visited household. Taking medicines irregularly, tablets ran out ten days ago. Complains of giddiness. Advised to come to the PHC.”</div></div>
+  <div class="field"><label>Outcome</label><select><option>Referred to PHC</option><option>Counselled</option><option>Not at home</option></select></div>`,
+ ok:'Confirm visit',
+ run:()=>{post({title:'Household visit recorded',ic:'home',tag:'queued offline',tagc:'b-warn',
+   text:'Queued locally with a visible pending state. Syncs with deterministic conflict resolution when connectivity returns.'},'visit.household');
+  toast('Visit queued — will sync when online');}});}
+
+function aCBAC(){modal({title:'CBAC assessment',
+ sub:'Community Based Assessment Checklist. Scoring is computed by rule, never model-generated.',
+ body:`<div class="field"><label>Age band</label><select><option>50–59 (2 points)</option></select></div>
+  <div class="field"><label>Tobacco use</label><select><option>Never (0)</option><option>Daily (2)</option></select></div>
+  <div class="field"><label>Family history of diabetes</label><select><option selected>Yes (2)</option><option>No (0)</option></select></div>
+  <div class="readback"><div class="rb-l">Computed score — deterministic</div><div class="rb-v">4 / 10 · Screen</div>
+   <div class="hint" style="margin-top:6px">Threshold ≥ 4 triggers referral. Rule from the approved content library, version 2026.1.</div></div>`,
+ ok:'Confirm assessment',
+ run:()=>{post({title:'CBAC recorded',ic:'clip',tag:'score 4 — refer',tagc:'b-warn',
+   kvs:[['CBAC score','4 / 10'],['Action','Refer for screening']],
+   text:'Maps to the NCD programme instrument for write-back.'},'assessment.record');
+  toast('CBAC scored — referral triggered');}});}
+
+function aAppt(){modal({title:'Book appointment',sub:'Books into a real PHC slot, not a request.',
+ body:`<div class="field"><label>Date</label><input value="07 Oct 2026 · NCD clinic"></div>
+  <div class="field"><label>Purpose</label><input value="BP and HbA1c review, medication refill"></div>`,
+ ok:'Confirm booking',
+ run:()=>{P().v.followup=true;
+  post({title:'Follow-up booked',ic:'cal',kvs:[['Date','07 Oct 2026'],['Clinic','NCD']],
+   text:'Closes the loop. The reminder is owned by the FLW whose catchment the patient falls in.'},'appointment.book');
+  toast('Follow-up booked');}});}
+
+let REG={step:'abha',mode:'aadhaar'};
+function registerNew(){closeSpot();REG={step:'abha',mode:'aadhaar'};regModal();}
+function regSet(k,v){REG[k]=v;regModal();}
+
+function regModal(){
+ if(REG.step==='abha')return modal({title:'Register patient',
+  sub:'ABHA is the default path. Demographics come back verified from ABDM, which removes the transcription errors that create duplicates.',
+  body:`<div class="sdk"><div class="sdk-h">${svg('id','i sm')}ABHA SDK · Eka ABDM Connect
+     <span class="badge b-blue ml-auto">M1</span></div>
+    <div class="sdk-tabs">
+     ${[['aadhaar','Aadhaar OTP'],['mobile','Mobile OTP'],['existing','Existing ABHA']].map(([k,l])=>
+      `<button class="sdk-tab ${REG.mode===k?'on':''}" onclick="regSet('mode','${k}')">${l}</button>`).join('')}</div>
+    <div class="field" style="margin-top:13px"><label>${REG.mode==='existing'?'ABHA number or address':REG.mode==='mobile'?'Mobile number':'Aadhaar number'}</label>
+     <input value="${REG.mode==='existing'?'':REG.mode==='mobile'?'98•••• 1102':'XXXX XXXX 4471'}"
+      placeholder="${REG.mode==='existing'?'12-3456-7890-1234 or name@abdm':''}"></div>
+    <div class="sdk-note">${svg('lock','i sm')}<span>Consent is taken inside the SDK in the patient's language. Eka never sees the Aadhaar number — only the ABHA token that comes back.</span></div></div>
+   <button class="skip" onclick="regSet('step','manual')">
+    ${svg('refer','i sm')}<span style="flex:1"><b>Register without ABHA</b>
+    <div class="p-s">Patient declined, no mobile with them, or the counter is backed up. They are seen normally and the link returns to the worklist.</div></span></button>`,
+  ok:'Send OTP',run:()=>regSet('step','otp')});
+
+ if(REG.step==='otp')return modal({title:'Verify',
+  sub:'One-time password sent to the Aadhaar-linked mobile ending 4471.',
+  body:`<div class="sdk"><div class="sdk-h">${svg('id','i sm')}ABHA SDK · verification</div>
+    <div class="field" style="margin-top:11px"><label>Enter OTP</label>
+     <input value="••••••" style="letter-spacing:.4em;font-size:16px;text-align:center"></div>
+    <div class="sdk-note">${svg('alert','i sm')}<span>If the patient cannot receive the OTP, do not hold the queue — fall back to registering without ABHA.</span></div></div>
+   <button class="skip" onclick="regSet('step','manual')">${svg('refer','i sm')}
+    <span style="flex:1"><b>OTP not arriving — register without ABHA</b>
+    <div class="p-s">Link at next contact instead of blocking care.</div></span></button>`,
+  ok:'Verify &amp; fetch',run:()=>regSet('step','confirm')});
+
+ if(REG.step==='confirm')return modal({title:'Confirm registration',
+  sub:'Demographics returned verified from ABDM. Fields from ABHA are locked; anything the facility needs on top is editable.',
+  body:`<div class="verified"><div class="v-h">${svg('check','i sm')}Verified from ABHA — not typed</div>
+    <div class="pc-r"><span>Name</span><b>Kotamma Bandi</b></div>
+    <div class="pc-r"><span>ABHA</span><b>46-1122-3344-5566</b></div>
+    <div class="pc-r"><span>Age / sex</span><b>47 · Female</b></div>
+    <div class="pc-r"><span>Mobile</span><b>98•••• 1102</b></div>
+    <div class="pc-r"><span>Address</span><b>Yadiki, Anantapur</b></div></div>
+   <div class="warn-box">${svg('alert','i sm')}<span>ABHA address is the Aadhaar address and is often not current residence. Confirm the village with the patient before it drives ASHA attribution.</span></div>
+   ${FIELDS.filter(f=>!['name','age','sex','phone'].includes(f.k)).map(f=>`<div class="field">
+     <label>${f.l}${f.req?' *':''}</label>
+     ${f.t==='select'?`<select>${(f.opts||'').split(',').map(o=>`<option>${o.trim()}</option>`).join('')}</select>`
+      :`<input value="${f.k==='village'?'Yadiki':''}" placeholder="${f.l}">`}</div>`).join('')}
+   <label class="chk"><input type="checkbox" id="cf"><span>Village confirmed with the patient, and they consent to this facility linking care contexts to their ABHA.</span></label>`,
+  ok:'Confirm &amp; register',gate:'cf',
+  run:()=>{const p={id:'pN'+PATIENTS.length,name:'Kotamma Bandi',init:'KB',age:47,sex:'F',village:'Yadiki',
+    phone:'98•••• 1102',abha:'46-1122-3344-5566',last:'—',token:28,cat:'General',dx:'None recorded',
+    meds:'None',alerts:'New registration',today:true,v:V()};
+   p.v.abha=true;PATIENTS.push(p);openPatient(p.id);
+   post({title:'Patient registered with ABHA',ic:'id',tag:'irreversible',tagc:'b-crit',
+    text:'Demographics verified from ABDM rather than typed. Care context linked in the same step, so this patient never enters the unlinked worklist.'},'patient.register');
+   toast('Registered · ABHA linked');}});
+
+ modal({title:'Register without ABHA',
+  sub:'Explicit fallback. The record is permanent and the confirm is un-prefilled.',
+  body:`<div class="warn-box">${svg('alert','i sm')}<span><b>Irreversibility class.</b> A duplicate cannot be undone, only deprecated. Typed demographics are the main source of duplicates, which is why ABHA is the default path.</span></div>
+   ${FIELDS.map(f=>`<div class="field"><label>${f.l}${f.req?' *':''}</label>
+     ${f.t==='select'?`<select>${(f.opts||'').split(',').map(o=>`<option>${o.trim()}</option>`).join('')}</select>`
+      :`<input value="${{name:'Kotamma B',age:'47',phone:'98•••• 1102',village:'Yadiki'}[f.k]||''}" placeholder="${f.l}">`}</div>`).join('')}
+   <button class="skip" onclick="regSet('step','abha')">${svg('id','i sm')}
+    <span style="flex:1"><b>Go back and try ABHA</b>
+    <div class="p-s">Verified demographics, no transcription risk, no worklist follow-up.</div></span></button>
+   <label class="chk"><input type="checkbox" id="cf"><span>I have searched and confirmed no existing record matches this patient.</span></label>`,
+  ok:'Confirm &amp; register',gate:'cf',
+  run:()=>{const p={id:'pN'+PATIENTS.length,name:'Kotamma B',init:'KB',age:47,sex:'F',village:'Yadiki',
+    phone:'98•••• 1102',abha:null,last:'—',token:28,cat:'General',dx:'None recorded',
+    meds:'None',alerts:'New registration',today:true,v:V()};
+   PATIENTS.push(p);openPatient(p.id);
+   post({title:'Patient registered',ic:'plus',tag:'ABHA pending',tagc:'b-warn',
+    text:'Registered without ABHA. Added to the unlinked worklist — the agent surfaces the link at next contact rather than blocking the queue.'},'patient.register');
+   toast('Registered · ABHA deferred to worklist');}});}
+
+/* ========== modal ========== */
+let _run=null;
+function modal({title,sub,body,ok,gate,run}){
+ _run=run;
+ document.getElementById('mod').innerHTML=`<div class="mod-bar"></div>
+  <div class="mod-h"><div class="mod-t">${title}</div><div class="mod-s">${sub}</div></div>
+  <div class="mod-b">${body}</div>
+  <div class="mod-f"><span style="font-size:10.5px;color:var(--gray-400);flex:1;line-height:1.4">Actor, surface, payload and outcome are written to the audit log.</span>
+   <button class="btn btn-g" onclick="closeModal()">Cancel</button>
+   <button class="btn btn-b" id="okBtn" ${gate?'disabled':''} onclick="commit()">${ok}</button></div>`;
+ if(gate)document.getElementById(gate).addEventListener('change',e=>{
+  document.getElementById('okBtn').disabled=!e.target.checked;});
+ document.getElementById('modOv').classList.add('show');}
+function closeModal(){document.getElementById('modOv').classList.remove('show');_run=null;}
+function commit(){const r=_run;closeModal();if(r)r();}
+
+document.addEventListener('keydown',e=>{
+ const sp=document.getElementById('spotOv').classList.contains('show');
+ if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openSpot();return;}
+ if(e.key==='Escape'){closeSpot();closeModal();if(SC.open&&!SC.live)scClose();return;}
+ if(!sp)return;
+ const R=rows();if(!R.length)return;
+ if(e.key==='ArrowDown'){e.preventDefault();sel=(sel+1)%R.length;renderSpot();}
+ if(e.key==='ArrowUp'){e.preventDefault();sel=(sel-1+R.length)%R.length;renderSpot();}
+ if(e.key==='Enter'){e.preventDefault();runRow(sel);}});
+
+S.view='home';render();
+setTimeout(()=>toast('⌘K to search or ask · switch role at the bottom of the sidebar'),700);
+</script>
+</body>
+</html>

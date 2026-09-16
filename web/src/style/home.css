@@ -1,0 +1,163 @@
+/* §5, as the prototype draws it: a hero that says what kind of shift this is,
+ * a brief the agent wrote, the line in motion, and two columns under it.
+ * The thing that stops this reading as a slide is that none of it is a list. */
+
+.home { display: flex; flex-direction: column; gap: 16px; padding-bottom: 20px; }
+
+.hero {
+  position: relative; overflow: hidden;
+  border-radius: var(--radius-xl); border: 1px solid var(--color-border-subtle);
+  background: linear-gradient(122deg,
+    var(--color-bg-surface) 0%, var(--color-bg-hover) 58%, var(--color-tint-warm) 128%);
+  padding: 26px 26px 22px; box-shadow: var(--shadow-sm);
+}
+.hero::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--color-rule-warm), var(--color-eyebrow), var(--color-rule-warm));
+}
+.hero-mark {
+  position: absolute; top: -62px; right: -52px; width: 290px; height: 290px;
+  color: var(--color-text-primary); opacity: .052; pointer-events: none;
+  stroke-width: .35; fill: none; stroke: currentColor;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+[data-theme="dark"] .hero-mark { opacity: .075; }
+.hero-eye {
+  font-size: 10.5px; font-weight: 700; color: var(--color-eyebrow);
+  text-transform: uppercase; letter-spacing: .1em;
+}
+.hero-h { font-size: 27px; font-weight: 800; letter-spacing: -.028em; margin-top: 7px; line-height: 1.15; }
+.hero-h span { color: var(--color-text-tertiary); font-weight: 600; }
+.hero-sub { font-size: 12.5px; color: var(--color-text-tertiary); margin-top: 7px; line-height: 1.55; max-width: 560px; }
+.hero-ask {
+  display: flex; align-items: center; gap: 11px;
+  background: var(--color-bg-surface); border: 1.5px solid var(--color-border-subtle);
+  border-radius: var(--radius-pill); padding: 12px 18px; margin-top: 20px;
+  max-width: 640px; cursor: text; position: relative; z-index: 1; width: 100%;
+  transition: var(--duration-normal) var(--ease-out);
+}
+.hero-ask:hover { border-color: var(--color-accent); box-shadow: var(--shadow-md); }
+.hero-ask input { flex: 1; border: none; background: none; font-size: 14px;
+  color: var(--color-text-primary); outline: none; }
+.hero-ask input::placeholder { color: var(--color-text-tertiary); }
+.hero-ask:focus-visible, .hero-ask input:focus-visible {
+  outline: 2px solid var(--color-accent); outline-offset: 2px;
+}
+.chips { display: flex; gap: 7px; margin-top: 13px; flex-wrap: wrap; position: relative; z-index: 1; }
+
+/* The session clock. It is the one number on the screen that moves on its
+   own, which is most of why the hero reads as live. */
+.arc { position: absolute; top: 24px; right: 26px; text-align: right; z-index: 1; }
+.arc-l { font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .09em; color: var(--color-text-tertiary); }
+.arc-t { font-size: 19px; font-weight: 800; letter-spacing: -.02em; margin-top: 3px;
+  font-variant-numeric: tabular-nums; }
+.arc-bar { width: 132px; height: 5px; border-radius: 999px;
+  background: var(--color-border-subtle); margin-top: 8px; overflow: hidden; }
+.arc-bar i { display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-text-secondary), var(--color-text-primary)); }
+.arc-s { font-size: 10px; color: var(--color-text-tertiary); margin-top: 5px; }
+
+.brief { display: flex; gap: 12px; padding: 15px 16px; }
+.brief-av {
+  width: 30px; height: 30px; border-radius: var(--radius-sm);
+  background: var(--color-accent-soft); color: var(--color-accent);
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.brief-t { font-size: 13px; line-height: 1.65; color: var(--color-text-secondary); }
+.brief-t b { color: var(--color-text-primary); font-weight: 600; }
+.brief-t .go {
+  font-style: normal; color: var(--color-accent); font-weight: 600; cursor: pointer;
+  background: none; border: none; padding: 0; font-size: inherit; font-family: inherit;
+  border-bottom: 1px dashed var(--color-accent-line);
+}
+.brief-t .go:hover { border-bottom-style: solid; }
+
+/* The line, in motion. One column per declared station, a rail that animates
+   while anybody is standing in it, and the people themselves as chips. */
+.flow { display: flex; gap: 0; padding: 16px 14px; overflow-x: auto; }
+.fl-col { min-width: 132px; flex: 1; position: relative; padding: 0 7px; }
+.fl-h { display: flex; align-items: center; gap: 6px; margin-bottom: 9px; }
+.fl-n { font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--color-text-tertiary); }
+.fl-c { margin-left: auto; font-size: 11px; font-weight: 800;
+  color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+.fl-rail {
+  height: 4px; border-radius: 999px; background: var(--color-border-subtle);
+  margin-bottom: 11px; overflow: hidden; position: relative;
+}
+.fl-rail i {
+  position: absolute; inset: 0; border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--color-text-primary), transparent);
+  background-size: 60% 100%; background-repeat: no-repeat;
+  animation: flow 2.4s linear infinite;
+}
+@keyframes flow { from { background-position: -60% 0; } to { background-position: 160% 0; } }
+.fl-col.jam .fl-rail { background: var(--color-warning-border); }
+.fl-col.jam .fl-rail i {
+  background: linear-gradient(90deg, transparent, var(--color-warning), transparent);
+  background-size: 60% 100%; background-repeat: no-repeat;
+}
+.fl-p {
+  display: flex; align-items: center; gap: 7px; padding: 7px 8px;
+  border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface);
+  border-radius: var(--radius-sm); margin-bottom: 5px; cursor: pointer;
+  font-size: 11px; width: 100%; text-align: left;
+  transition: var(--duration-fast) var(--ease-out);
+}
+.fl-p:hover { border-color: var(--color-accent); background: var(--color-accent-soft); transform: translateX(2px); }
+.fl-av {
+  width: 20px; height: 20px; border-radius: 4px;
+  background: var(--color-bg-subtle); color: var(--color-text-secondary);
+  display: grid; place-items: center; font-size: 8.5px; font-weight: 700; flex-shrink: 0;
+}
+.fl-p.alert { border-color: var(--color-critical-border); background: var(--color-critical-soft); }
+.fl-p.alert .fl-av { background: var(--color-critical); color: var(--color-bg-surface); }
+.fl-nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fl-e { font-size: 10.5px; color: var(--color-text-tertiary); padding: 6px 2px; }
+.fl-jam { font-size: 9.5px; font-weight: 700; color: var(--color-warning);
+  margin-top: 7px; display: flex; align-items: center; gap: 4px; }
+
+.hgrid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 16px; align-items: start; }
+
+.att { padding: 6px 0; }
+.at {
+  display: flex; align-items: center; gap: 11px; padding: 11px 15px;
+  border: 0; border-bottom: 1px solid var(--color-border-subtle);
+  background: none; width: 100%; text-align: left; cursor: pointer;
+  transition: var(--duration-fast) var(--ease-out);
+}
+.at:last-child { border-bottom: none; }
+.at:hover { background: var(--color-bg-hover); }
+.at-ic {
+  width: 28px; height: 28px; border-radius: var(--radius-sm);
+  display: grid; place-items: center; flex-shrink: 0;
+  background: var(--color-bg-subtle); color: var(--color-text-tertiary);
+}
+.at-ic.red { background: var(--color-critical-soft); color: var(--color-critical); }
+.at-ic.amb { background: var(--color-warning-soft); color: var(--color-warning); }
+.at-ic.ink { background: var(--color-accent-soft); color: var(--color-accent); }
+.at-b { min-width: 0; flex: 1; display: grid; }
+.at-t { font-size: 12.5px; font-weight: 600; }
+.at-s { font-size: 10.5px; color: var(--color-text-tertiary); margin-top: 2px; }
+.at-go { font-size: 10.5px; font-weight: 700; color: var(--color-accent);
+  opacity: 0; transition: var(--duration-fast) var(--ease-out); }
+.at:hover .at-go { opacity: 1; }
+
+.pulse { padding: 14px 15px; display: flex; flex-direction: column; gap: 15px; }
+.pu-r { display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 11.5px; color: var(--color-text-tertiary); }
+.pu-v { font-size: 22px; font-weight: 800; letter-spacing: -.025em;
+  color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+.pu-v small { font-size: 11px; font-weight: 600; color: var(--color-text-tertiary); margin-left: 3px; }
+.split { display: flex; height: 7px; border-radius: 999px; overflow: hidden;
+  margin-top: 7px; background: var(--color-border-subtle); }
+.split i { display: block; height: 100%; }
+.leg { display: flex; gap: 14px; margin-top: 7px; font-size: 10.5px; color: var(--color-text-tertiary); }
+.leg span { display: flex; align-items: center; gap: 5px; }
+.dt { width: 7px; height: 7px; border-radius: 50%; }
+
+@media (max-width: 1000px) {
+  .hgrid { grid-template-columns: 1fr; }
+  .arc { position: static; text-align: left; margin-top: 16px; }
+}

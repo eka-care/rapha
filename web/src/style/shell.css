@@ -1,109 +1,144 @@
-/* §52 app shell, §53 sidebar. */
+/* The app frame: a Claude-style rail, a 56px topbar, and a centred view.
+ * Ported from the prototype (.app/.sb/.main/.topbar/.view/.wrap). */
 
-.app-shell {
-  display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
-  height: 100%;
-  overflow: hidden;
-}
+.app { display: flex; height: 100%; width: 100%; overflow: hidden; }
 
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  background: var(--color-bg-subtle);
+.sb {
+  width: 248px; flex-shrink: 0;
+  background: var(--color-bg-rail);
   border-right: 1px solid var(--color-border-subtle);
-  overflow: hidden;
+  display: flex; flex-direction: column;
+  transition: background var(--duration-slow) var(--ease-out);
 }
-
-.sidebar-head {
-  display: flex; align-items: center; gap: var(--space-2);
-  height: 56px; padding: 0 var(--space-4); flex: 0 0 auto;
+.sb-top { padding: 14px 14px 8px; display: flex; align-items: center; gap: 9px; }
+.brand-mark {
+  width: 30px; height: 30px; border-radius: 9px;
+  background: var(--color-bg-surface); border: 1px solid var(--color-border-subtle);
+  display: grid; place-items: center; color: var(--color-text-primary);
+  box-shadow: var(--shadow-sm); flex-shrink: 0;
 }
-.sidebar-brand { font-size: 13px; font-weight: 600; min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brand-mark svg { stroke-width: 1.1; }
+.brand-n { font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
+.brand-s { font-size: 9.5px; color: var(--color-text-tertiary); margin-top: 1px; }
 
-.sidebar-scroll { flex: 1; min-height: 0; overflow-y: auto; }
-
-.sidebar-nav { display: flex; flex-direction: column; gap: 2px; padding: var(--space-2); }
-
-.nav-item {
-  display: flex; align-items: center; gap: 10px;
-  width: 100%; min-height: 36px; padding: var(--space-2) 10px;
-  border: 0; border-radius: var(--radius-md);
-  background: transparent; color: var(--color-text-secondary);
-  font-size: 13px; font-weight: 500; text-align: left; cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-out);
+.sb-pad { padding: 6px 10px; }
+.sb-btn {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface); color: var(--color-text-primary);
+  border-radius: var(--radius-md); padding: 9px 11px;
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+  transition: var(--duration-fast) var(--ease-out);
 }
-.nav-item:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
-.nav-item[data-active="true"] {
-  background: var(--color-bg-selected); color: var(--color-text-primary); font-weight: 600;
+.sb-btn:hover { background: var(--color-bg-subtle); border-color: var(--color-border-strong); }
+.sb-btn.ghost { border-color: transparent; background: none; color: var(--color-text-tertiary); font-weight: 500; }
+.sb-btn.ghost:hover { background: var(--color-bg-subtle); color: var(--color-text-secondary); }
+.sb-btn .ml-auto { font-size: 9.5px; }
+
+.sb-nav { padding: 6px 10px 4px; display: flex; flex-direction: column; gap: 2px; }
+.nv {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  border: none; background: none; color: var(--color-text-secondary);
+  border-radius: var(--radius-md); padding: 8px 11px;
+  font-size: 12.5px; font-weight: 500; cursor: pointer; text-align: left;
+  transition: var(--duration-fast) var(--ease-out);
 }
-.nav-item__count {
-  margin-left: auto; font-size: 11px; font-weight: 600;
-  font-variant-numeric: tabular-nums; color: var(--color-text-tertiary);
+.nv:hover { background: var(--color-bg-subtle); }
+.nv.on { background: var(--color-accent-soft); color: var(--color-accent); font-weight: 600; }
+.nv .ct {
+  margin-left: auto; font-size: 10px; font-weight: 700;
+  background: var(--color-border-subtle); color: var(--color-text-tertiary);
+  border-radius: var(--radius-pill); padding: 1px 7px;
 }
-.nav-item__icon { flex: 0 0 auto; display: grid; place-items: center; }
+.nv.on .ct { background: var(--color-accent); color: var(--color-bg-surface); }
 
-.sidebar-group {
-  padding: var(--space-4) 18px var(--space-1);
-  font-size: 10px; font-weight: 700; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--color-text-tertiary);
+.sb-sec {
+  font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .09em; color: var(--color-text-tertiary);
+  padding: 14px 14px 6px;
 }
+.sb-list { flex: 1; overflow-y: auto; padding: 0 10px 10px; display: flex; flex-direction: column; gap: 1px; }
+.th-row {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  border: none; background: none; color: var(--color-text-secondary);
+  border-radius: var(--radius-md); padding: 7px 10px;
+  font-size: 12px; cursor: pointer; text-align: left;
+  transition: var(--duration-fast) var(--ease-out);
+}
+.th-row:hover { background: var(--color-bg-subtle); }
+.th-row.on { background: var(--color-bg-subtle); color: var(--color-text-primary); font-weight: 600; }
+.th-n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.th-t { font-size: 9.5px; color: var(--color-text-tertiary); flex-shrink: 0; }
+.sb-empty { font-size: 10.5px; color: var(--color-text-tertiary); padding: 2px 14px; line-height: 1.5; }
 
-.sidebar-foot { flex: 0 0 auto; border-top: 1px solid var(--color-border-subtle); padding: var(--space-2); }
+.sb-foot { border-top: 1px solid var(--color-border-subtle); padding: 9px 10px; position: relative; }
+.rolebtn {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface); border-radius: var(--radius-md);
+  padding: 8px 10px; cursor: pointer; color: var(--color-text-primary);
+  transition: var(--duration-fast) var(--ease-out);
+}
+.rolebtn:hover { background: var(--color-bg-subtle); }
+.rb-av {
+  width: 26px; height: 26px; border-radius: var(--radius-sm);
+  background: var(--color-accent-soft); color: var(--color-accent);
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.rb-n { font-size: 12px; font-weight: 600; line-height: 1.2; }
+.rb-s { font-size: 9.5px; color: var(--color-text-tertiary); margin-top: 1px; }
 
-.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .topbar {
-  height: 56px; flex: 0 0 auto;
-  display: flex; align-items: center; gap: var(--space-3);
-  padding: 0 var(--space-5);
+  height: 56px; flex-shrink: 0;
   background: var(--color-bg-surface);
   border-bottom: 1px solid var(--color-border-subtle);
+  display: flex; align-items: center; gap: 11px; padding: 0 18px;
+  transition: background var(--duration-slow) var(--ease-out);
 }
-.topbar__title { min-width: 0; overflow: hidden; }
-/* Only where the rail is a drawer. Above that the rail is on screen and a
-   button to reveal it would open nothing. */
+.tb-title { font-size: 14.5px; font-weight: 700; letter-spacing: -.01em; }
+.tb-sub { font-size: 10.5px; color: var(--color-text-tertiary); margin-top: 1px; }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface); color: var(--color-text-secondary);
+  border-radius: var(--radius-pill); padding: 6px 12px;
+  font-size: 11.5px; font-weight: 600; cursor: pointer;
+  transition: var(--duration-fast) var(--ease-out);
+}
+.pill:hover { border-color: var(--color-border-strong); }
+.kbd {
+  font-size: 9.5px; font-weight: 700; background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-subtle); border-radius: 4px;
+  padding: 2px 5px; color: var(--color-text-tertiary);
+}
+.icon-btn {
+  width: 32px; height: 32px; border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface);
+  cursor: pointer; color: var(--color-text-secondary);
+  display: grid; place-items: center; position: relative;
+  transition: var(--duration-fast) var(--ease-out);
+}
+.icon-btn::after { content: ""; position: absolute; inset: -6px; }
+.icon-btn:hover { background: var(--color-bg-subtle); }
+
+.view { flex: 1; overflow: hidden; display: flex; justify-content: center; padding: 16px 20px; }
+.view.scroll { overflow-y: auto; }
+.wrap { max-width: 1280px; width: 100%; height: 100%; }
+
 .topbar__menu { display: none; }
-
-/* Tapping away closes the drawer; without it the only way out is the control
-   the drawer now covers.
-   position and display are declared HERE, outside the media query, on purpose.
-   Inside it, this element was position:static above 768px -- an ordinary grid
-   item that took column two and pushed .main onto a second row, collapsing the
-   whole app to a 64px strip. A fixed overlay must be taken out of flow
-   everywhere it can exist, not only where it is visible. */
-.drawer-scrim {
-  display: none;
-  position: fixed; inset: 0; z-index: 39;
-  background: var(--color-accent); opacity: .28;
-}
-.topbar__spacer { margin-left: auto; }
-
-.workspace { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
-.workspace-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-8); }
-
-/* §66. Below 1000px the rail becomes a 64px icon strip; below 768px it is a
- * drawer and the workspace is the whole screen. */
-@media (max-width: 1000px) {
-  .app-shell { grid-template-columns: 64px minmax(0, 1fr); }
-  .sidebar-brand, .nav-item span:not(.nav-item__count), .sidebar-group { display: none; }
-  .nav-item { justify-content: center; padding: var(--space-2); }
-  .workspace-scroll { padding: var(--space-5) var(--space-5); }
-}
-@media (max-width: 768px) {
-  .app-shell { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 900px) {
   .topbar__menu { display: grid; }
-  .sidebar { display: none; }
-  .sidebar[data-open="true"] {
-    display: flex; position: fixed; inset: 0 auto 0 0; width: 248px; z-index: 40;
+  .sb { display: none; }
+  .sb[data-open="true"] {
+    display: flex; position: fixed; inset: 0 auto 0 0; z-index: 40;
     box-shadow: var(--shadow-lg);
   }
-  .sidebar[data-open="true"] .sidebar-brand,
-  .sidebar[data-open="true"] .nav-item span,
-  .sidebar[data-open="true"] .sidebar-group { display: initial; }
-  .sidebar[data-open="true"] .nav-item { justify-content: flex-start; padding: var(--space-2) 10px; }
-  .drawer-scrim { display: block; }
-  .workspace-scroll { padding: var(--space-4); }
+  .view { padding: 12px; }
 }
+.drawer-scrim {
+  display: none; position: fixed; inset: 0; z-index: 39;
+  background: var(--color-accent); opacity: .3;
+}
+@media (max-width: 900px) { .drawer-scrim { display: block; } }

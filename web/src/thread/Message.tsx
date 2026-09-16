@@ -1,42 +1,30 @@
-/** §9.1, §9.2: an open message block. No bubble, no tail, no alignment games.
- *  Actor, time, content -- and mentions picked out so a person can see at a
- *  glance that they were named.
- */
+/** §9.1: an open message block. The prototype's shape: a small square avatar,
+ *  a meta line, and a bubble. A person's own message sits right and tinted. */
 import { Icon } from "../icons";
+import { initialsOf } from "../agent";
 
-/** §13. A mention is rendered from the text itself; there is no people
- *  directory to resolve it against yet, so it is highlighted, not linked.
- *  Linking it would promise a profile that does not exist. */
-function withMentions(text: string) {
+/** §13. Mentions are picked out of the text; there is no people directory to
+ *  link them to yet, so they are highlighted rather than linked. */
+export function withMentions(text: string) {
   return text.split(/(@[\w.-]+)/g).map((part, i) =>
     part.startsWith("@")
       ? <span className="mention" key={i}>{part}</span>
-      : <span key={i}>{part}</span>,
-  );
+      : <span key={i}>{part}</span>);
 }
 
 export function Message({ who, actor, at, text }: {
-  who: "user" | "agent";
-  actor: string;
-  at: string;
-  text: string;
+  who: "user" | "agent"; actor: string; at: string; text: string;
 }) {
+  const mine = who === "user";
   return (
-    <div className="message">
-      <div className="avatar" data-who={who} aria-hidden="true">
-        {who === "agent" ? <Icon name="spark" /> : initials(actor)}
+    <div className={`msg${mine ? " right" : ""}`}>
+      <div className={`m-av${who === "agent" ? " agent" : ""}`} aria-hidden="true">
+        {who === "agent" ? <Icon name="spark" className="i sm" /> : initialsOf(actor)}
       </div>
-      <div className="message__content">
-        <div className="message__meta">
-          <strong style={{ color: "var(--color-text-secondary)" }}>{actor}</strong>
-          <span aria-hidden="true">·</span>
-          <time>{at}</time>
-        </div>
-        <div className="message__body">{withMentions(text)}</div>
+      <div className="m-b">
+        <div className="m-meta">{actor} · {at}</div>
+        <div className="bubble">{withMentions(text)}</div>
       </div>
     </div>
   );
 }
-
-const initials = (name: string) =>
-  name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";

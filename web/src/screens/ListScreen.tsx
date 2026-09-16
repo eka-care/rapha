@@ -1,8 +1,6 @@
-/** §6.2: a declared view as a working surface.
- *
- *  §88 asks that returning to a list restores it. Filter, sort and search are
- *  held per view id, so walking into a thread and coming back lands where you
- *  left rather than at the top of an unsorted list.
+/** §6.2: a declared view as a working surface, with the prototype's filter
+ *  tabs across the top. §88 asks that returning to a list restores it, so the
+ *  filter, sort and search are held per view for the session.
  */
 import { useMemo, useState } from "react";
 import { filterOptions, filterRows, sortOptions, sortRows, type Filter, type SortKey } from "../loops";
@@ -10,9 +8,6 @@ import type { QueueRow, ViewDecl, ViewResult } from "../types";
 import { View } from "../view/View";
 import { human } from "../words";
 
-/** Per view id, for this session. Deliberately module state and not
- *  localStorage: a filter is where you were a minute ago, not a preference,
- *  and one that outlives the browser tab surprises people. */
 const memory: Record<string, { q: string; sort: SortKey; filter: Filter }> = {};
 
 export function ListScreen({ result, decl, onOpenThread }: {
@@ -30,15 +25,20 @@ export function ListScreen({ result, decl, onOpenThread }: {
 
   const isQueue = result.kind === "queue";
   const rows = (result.rows ?? []) as QueueRow[];
-
   const sorts = useMemo(() => sortOptions(decl), [decl]);
-  const filters = useMemo(() => {
-    if (!isQueue) return [] as { label: string; filter: Filter }[];
+
+  /** One tab per declared badge and per station present, each with the count
+   *  it would show. A tab that would be empty still appears with a 0, because
+   *  "pharmacy 0" is information. */
+  const tabs = useMemo(() => {
+    if (!isQueue) return [];
     const { flags, stations } = filterOptions(decl, rows);
-    return [
-      ...flags.map((f) => ({ label: human(f), filter: { flag: f } as Filter })),
-      ...stations.map((s) => ({ label: human(s), filter: { station: s } as Filter })),
+    const made: { label: string; filter: Filter; n: number }[] = [
+      { label: "All", filter: null, n: rows.length },
     ];
+    for (const s of stations) made.push({ label: human(s), filter: { station: s }, n: rows.filter((r) => r.station === s).length });
+    for (const f of flags) made.push({ label: human(f), filter: { flag: f }, n: rows.filter((r) => r.flags.includes(f)).length });
+    return made;
   }, [rows, decl, isQueue]);
 
   const shown = useMemo(() => {
@@ -46,67 +46,47 @@ export function ListScreen({ result, decl, onOpenThread }: {
     let out = filterRows(rows, state.filter);
     const q = state.q.trim().toLowerCase();
     if (q) {
-      out = out.filter((r) =>
-        Object.values(r.subject ?? {}).some((v) => String(v ?? "").toLowerCase().includes(q)));
+      out = out.filter((r) => Object.values(r.subject ?? {}).some((v) => String(v ?? "").toLowerCase().includes(q)));
     }
     return { ...result, rows: sortRows(out, state.sort, decl) };
   }, [result, rows, state, decl, isQueue]);
 
-  const count = ((shown.rows ?? []) as unknown[]).length;
-
   return (
-    <>
-      <div className="list-head">
-        <h1 className="t-page" style={{ margin: 0 }}>{result.title ?? decl?.title ?? human(result.view)}</h1>
-        <span className="list-count t-meta">{count === 1 ? "1 record" : `${count} records`}</span>
-      </div>
-
+    <div style={{ paddingBottom: 20 }}>
       {isQueue && rows.length > 0 && (
-        <div className="list-tools">
-          <input
-            className="input list-tools__search"
-            type="search"
-            value={state.q}
-            placeholder="Search this list"
-            aria-label="Search this list"
-            onChange={(e) => set({ q: e.target.value })}
-          />
-          {filters.length > 0 && (
-            <>
+        <>
+          <div className="qtabs">
+            {tabs.map((t) => (
               <button
-                className="chip" data-role="button" data-selected={state.filter === null}
-                onClick={() => set({ filter: null })}
+                key={t.label}
+                className={`qtab${JSON.stringify(state.filter) === JSON.stringify(t.filter) ? " on" : ""}`}
+                onClick={() => set({ filter: t.filter })}
               >
-                All
+                {t.label}
+                <span className="n">{t.n}</span>
               </button>
-              {filters.map((f) => (
-                <button
-                  key={f.label}
-                  className="chip" data-role="button"
-                  data-selected={JSON.stringify(state.filter) === JSON.stringify(f.filter)}
-                  onClick={() => set({ filter: f.filter })}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </>
-          )}
-          {sorts.length > 1 && (
-            <label className="t-meta u-faint" style={{ marginLeft: "auto", display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
-              Sort
+            ))}
+          </div>
+          <div className="tabs">
+            <input
+              className="input" type="search" value={state.q}
+              placeholder="Search this list" aria-label="Search this list"
+              style={{ maxWidth: 280 }}
+              onChange={(e) => set({ q: e.target.value })}
+            />
+            {sorts.length > 1 && (
               <select
-                className="input" style={{ width: "auto", minHeight: 32 }}
-                value={state.sort}
+                className="input" style={{ width: "auto" }}
+                value={state.sort} aria-label="Sort"
                 onChange={(e) => set({ sort: e.target.value as SortKey })}
               >
                 {sorts.map((s) => <option value={s.key} key={s.key}>{s.label}</option>)}
               </select>
-            </label>
-          )}
-        </div>
+            )}
+          </div>
+        </>
       )}
-
       <View result={shown} decl={decl} onOpenThread={onOpenThread} />
-    </>
+    </div>
   );
 }
