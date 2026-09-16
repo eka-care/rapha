@@ -146,15 +146,18 @@
       "id": "phc.inst.consult-scribe",
       "kind": "scribe",
       "operations": [
+        "phc.op.patient-register",
+        "phc.op.vitals-record",
         "phc.op.consult-document",
-        "phc.op.rx-prescribe"
+        "phc.op.rx-prescribe",
+        "phc.op.household-visit"
       ],
       "readback": "required",
       "requires": "capture.consented",
       "says": null,
       "spoken": true,
-      "summary": "Transcribes the consultation into a draft note and prescription.",
-      "title": "Ambient scribe",
+      "summary": "Transcribes a recording into the station's template.",
+      "title": "Scribe",
       "type": "instrument",
       "types": []
     },
@@ -1422,6 +1425,33 @@
       "writes": [
         "observation"
       ]
+    }
+  },
+  "scribe": {
+    "community": {
+      "choose": [
+        "phc.op.household-visit"
+      ],
+      "default": null
+    },
+    "doctor": {
+      "choose": [
+        "phc.op.consult-document",
+        "phc.op.rx-prescribe"
+      ],
+      "default": "phc.op.consult-document"
+    },
+    "nurse": {
+      "choose": [
+        "phc.op.vitals-record"
+      ],
+      "default": "phc.op.vitals-record"
+    },
+    "reception": {
+      "choose": [
+        "phc.op.patient-register"
+      ],
+      "default": "phc.op.patient-register"
     }
   },
   "states": [

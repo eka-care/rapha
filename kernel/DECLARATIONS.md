@@ -379,9 +379,11 @@ Lint rules that encode the product's speech rule:
 - `readback: required` and `commit: tap` are the only accepted values. This
   is the "one forty over ninety" rule: a misheard discrete value is silent,
   plausible and unrecoverable, so it is always shown and always tapped.
-- A `scribe` instrument may not list an operation whose default
-  `instrument` is `device`. Ambient recognition is worst at short numeric
-  utterances, so vitals get constrained voice or nothing.
+- A `scribe` instrument may list any operation. Every non-text value it fills
+  (integer, decimal, quantity, date, choice, boolean) is shown with the words
+  it came from, and the renderer will not commit until each one is ticked.
+  Station defaults live in `bundle.yaml` under `scribe:` and must name
+  operations a scribe instrument lists.
 - A `scribe` instrument is offered only when `capture.consented` is in the
   thread's flags. The renderer checks; the guard does not know about
   instruments and should not.

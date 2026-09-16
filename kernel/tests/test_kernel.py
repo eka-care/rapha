@@ -600,10 +600,6 @@ def test_lint_refuses_an_instrument_that_commits_without_a_tap():
                for b in _lint_with("phc.inst.vitals-voice", commit="auto"))
     assert any("readback must be 'required'" in b
                for b in _lint_with("phc.inst.vitals-voice", readback="optional"))
-    assert any("scribe may not be offered" in b
-               for b in _lint_with("phc.inst.consult-scribe",
-                                   operations=["phc.op.vitals-record"])), \
-        "a scribe was allowed onto the numeric station"
 
 
 def test_lint_refuses_a_dangling_or_misspelt_reference():
@@ -774,6 +770,15 @@ def test_thread_view_carries_what_closes_this_station():
     view = state.thread_view(store, ref, WF, OPS, caps=caps)
     assert view.station == "reception"
     assert view.closes == "phc.op.patient-register"
+
+
+def test_scribe_station_config_is_linted():
+    from kernel import declarations
+    bundle = declarations.load("phc")
+    assert bundle.scribe["nurse"]["default"] == "phc.op.vitals-record"
+    manifest_bad = {"scribe": {"nurse": {"default": "phc.op.nope", "choose": []}}}
+    problems = declarations._lint_scribe(manifest_bad, bundle.instruments_raw)
+    assert any("phc.op.nope" in p for p in problems), problems
 
 
 if __name__ == "__main__":

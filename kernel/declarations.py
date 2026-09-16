@@ -63,6 +63,8 @@ class Bundle:
     instruments: dict
     metrics: dict
     seed: list = dataclasses.field(default_factory=list)
+    scribe: dict = dataclasses.field(default_factory=dict)
+    instruments_raw: list = dataclasses.field(default_factory=list)
 
     def workflow(self, wid: Optional[str] = None) -> c.Workflow:
         if wid is None:
@@ -275,9 +277,6 @@ def _lint_instrument(fm, ops, fail, voc):
         if oid not in ops:
             fail(f"names operation '{oid}' which does not exist")
             continue
-        if fm["kind"] == "scribe" and ops[oid]["instrument"] == "device":
-            fail(f"a scribe may not be offered on '{oid}': ambient recognition is "
-                 "worst at short numeric utterances")
         link_ids |= {f["link_id"] for f in ops[oid]["fields"]}
     for field in fm.get("fields") or []:
         if field not in link_ids:
@@ -285,6 +284,25 @@ def _lint_instrument(fm, ops, fail, voc):
     for qtype in fm.get("types") or []:
         if qtype not in validate.TYPES:
             fail(f"question type '{qtype}' is not a CARE type")
+
+
+def _lint_scribe(manifest, instruments):
+    """Every station default and choice is an operation a scribe may fill."""
+    allowed = {oid for fm in instruments if fm.get("kind") == "scribe"
+               for oid in fm.get("operations") or []}
+    stations = set(manifest.get("stations") or [])
+    bad = []
+    for station, cfg in (manifest.get("scribe") or {}).items():
+        if stations and station not in stations:
+            bad.append(f"bundle.yaml scribe: '{station}' is not a station")
+        choose = list(cfg.get("choose") or [])
+        for oid in choose + ([cfg["default"]] if cfg.get("default") else []):
+            if oid not in allowed:
+                bad.append(f"bundle.yaml scribe.{station}: '{oid}' is not in a scribe "
+                           "instrument's operations")
+        if cfg.get("default") and cfg["default"] not in choose:
+            bad.append(f"bundle.yaml scribe.{station}: default must be one of choose")
+    return bad
 
 
 def _lint_metric(fm, fail):
@@ -514,6 +532,8 @@ def load(bundle_id="phc", catalogue=None):
     seed = load_seed(path)
     mappings, bad_mappings = mapping.load()
     bad = lint(manifest, decls, ops, seed) + bad_mappings
+    raw_instruments = [fm for fm, _ in decls.values() if fm.get("type") == "instrument"]
+    bad += _lint_scribe(manifest, raw_instruments)
     if bad:
         raise DeclarationError("\n".join(bad))
 
@@ -537,7 +557,7 @@ def load(bundle_id="phc", catalogue=None):
         operations={oid: dict(ops[oid], mapping=mappings.get(oid, []))
                     for oid in manifest["operations"]},
         workflows=workflows, views=views, instruments=instruments, metrics=metrics,
-        seed=seed)
+        seed=seed, scribe=dict(manifest.get("scribe") or {}), instruments_raw=raw_instruments)
 
 
 def compile_json(bundle):
@@ -549,6 +569,7 @@ def compile_json(bundle):
         "views": {k: dataclasses.asdict(v) for k, v in bundle.views.items()},
         "instruments": {k: dataclasses.asdict(v) for k, v in bundle.instruments.items()},
         "metrics": {k: dataclasses.asdict(v) for k, v in bundle.metrics.items()},
+        "scribe": bundle.scribe,
     }
 
 

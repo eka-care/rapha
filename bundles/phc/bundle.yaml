@@ -44,6 +44,18 @@ metrics:
 # primary health centre's.
 stations: [reception, nurse, doctor, lab, pharmacy, community]
 
+# Which template a recording fills at each station. A template is an operation:
+# its questionnaire is the form, and its mapping is the only way anything
+# heard reaches a row. `choose` is what the bar's switcher offers; every id
+# must be in the scribe instrument's operations. `default: null` means the
+# person picks, which is the community worker's case: several surveys, none
+# of them obviously first.
+scribe:
+  reception: {default: phc.op.patient-register, choose: [phc.op.patient-register]}
+  nurse:     {default: phc.op.vitals-record,    choose: [phc.op.vitals-record]}
+  doctor:    {default: phc.op.consult-document, choose: [phc.op.consult-document, phc.op.rx-prescribe]}
+  community: {default: null,                    choose: [phc.op.household-visit]}
+
 # Thread state flags. Derived from CARE resources where CARE knows the answer;
 # stored on the thread only where it does not. phc.wf.outpatient must declare a
 # rule for every one of these and for nothing else.
