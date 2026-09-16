@@ -81,6 +81,11 @@ if [ -d web/node_modules ]; then
   # bugs it exists to catch (a flattened palette, a 1.3:1 banner, 240 dangling
   # references) all shipped on this branch.
   (cd web && node --experimental-strip-types src/style.check.ts)
+  # The renderer's own rules: it types none of this bundle's 63 declared words
+  # (checked against the compiled catalogue, so it grows when a bundle does),
+  # the / and @ menus are sourced from declarations rather than written down,
+  # the quick action row is capped and says what it hid, and the §68 basics.
+  (cd web && node --experimental-strip-types src/ui.check.ts)
   echo "ok   web renderer typechecks and builds"
 else
   echo "warn web: run (cd web && npm install) to check the renderer"

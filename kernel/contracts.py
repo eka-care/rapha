@@ -250,6 +250,11 @@ class Instrument:
     fallback: str = "keypad"        # keypad | form | text
     says: Optional[str] = None      # spoken-prompt only: the exact line spoken
     spoken: bool = True             # spoken-prompt only: a facility's off switch
+    # A thread flag this instrument may not run without. The scribe's atom
+    # said "only where capture.consented is set" in English and the renderer
+    # hard-coded that flag, which meant a bundle whose consent flag is spelled
+    # differently got no gate at all. One of this bundle's own states, or None.
+    requires: Optional[str] = None
     type: str = "instrument"
 
 

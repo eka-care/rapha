@@ -243,9 +243,14 @@ def _lint_view(fm, refs, fail, voc, ops):
                    resources=vocab.CARE_RESOURCES, allow_window=False)
 
 
-def _lint_instrument(fm, ops, fail):
+def _lint_instrument(fm, ops, fail, voc):
     if fm["kind"] not in c.INSTRUMENT_KINDS:
         fail(f"kind must be one of {c.INSTRUMENT_KINDS}")
+    # The gate, if there is one, is this bundle's own flag. A typo here would
+    # otherwise be a gate that never opens, which looks exactly like an
+    # instrument that is simply never offered.
+    if fm.get("requires") is not None and fm["requires"] not in voc.states:
+        fail(f"requires '{fm['requires']}' is not one of this bundle's states")
     # The ambient speech rule, made unwritable. See kernel/DECLARATIONS.md 4.
     if fm["readback"] != "required":
         fail("readback must be 'required': a captured value is always shown back")
@@ -451,7 +456,7 @@ def lint(manifest, decls, ops, seed=()):
         elif kind == "view":
             _lint_view(fm, refs, fail, voc, ops)
         elif kind == "instrument":
-            _lint_instrument(fm, ops, fail)
+            _lint_instrument(fm, ops, fail, voc)
         elif kind == "metric":
             _lint_metric(fm, fail)
 

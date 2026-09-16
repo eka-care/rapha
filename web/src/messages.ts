@@ -244,8 +244,6 @@ export const clock = (at: string | undefined): string =>
   at && /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(at) ? at.slice(11, 16) : (at ?? "");
 
 /** The flag every scribe declaration gates on. It is a product rule and not a
- *  bundle's word: no capture happens anywhere without it. */
-export const CONSENT = "capture.consented";
 
 /** A summary view belongs to a thread, not to the nav. One that names a
  *  workflow belongs only to that workflow's threads. */

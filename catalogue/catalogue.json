@@ -130,6 +130,7 @@
         "phc.op.patient-register"
       ],
       "readback": "required",
+      "requires": null,
       "says": "May we record this visit to write your notes? You can say no, or stop it any time.",
       "spoken": true,
       "summary": "The agent asks; the clerk taps what the patient answered.",
@@ -149,6 +150,7 @@
         "phc.op.rx-prescribe"
       ],
       "readback": "required",
+      "requires": "capture.consented",
       "says": null,
       "spoken": true,
       "summary": "Transcribes the consultation into a draft note and prescription.",
@@ -172,6 +174,7 @@
         "phc.op.vitals-record"
       ],
       "readback": "required",
+      "requires": null,
       "says": null,
       "spoken": true,
       "summary": "A paired cuff or oximeter fills the field.",
@@ -197,6 +200,7 @@
         "phc.op.vitals-record"
       ],
       "readback": "required",
+      "requires": null,
       "says": null,
       "spoken": true,
       "summary": "Say one number into one field.",

@@ -31,9 +31,17 @@ type Decl = {
   fallback?: string;
   says?: string;
   spoken?: boolean;
+  requires?: string | null;
 };
 
-type Common = { id: string; title: string; summary: string; fallback: string };
+type Common = {
+  id: string; title: string; summary: string; fallback: string;
+  /** The thread flag this instrument may not run without, from the
+   *  declaration's own `requires:`. Undefined means no gate. The renderer used
+   *  to hard-code the health centre's consent flag here, so a bundle spelling
+   *  its own differently got no gate at all. */
+  requires?: string;
+};
 
 export type Mount =
   | (Common & {
@@ -63,6 +71,7 @@ export function mountsFor(
       title: d.title,
       summary: d.summary ?? "",
       fallback: d.fallback ?? "keypad",
+      requires: d.requires ?? undefined,
     };
     // An empty fields list in a declaration means "every field this kind can
     // take", not "no fields": the scribe declares none and takes the prose.

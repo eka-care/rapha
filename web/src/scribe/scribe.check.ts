@@ -118,8 +118,23 @@ const panel = read("web/src/form/Panel.tsx");
 for (const call of ["client.commit(", "client.confirm("])
   ok(panel.split(call).length === 2, `${call} still appears exactly once in the panel`);
 ok(panel.includes("<Recorder"), "the panel draws the recorder");
-ok(/flags \?\? \[\]\)\.includes\(CONSENT\)/.test(panel),
-   "the recorder is behind the consent flag, and the reason is drawn when it is missing");
+// The gate is the instrument's own `requires:`, read off the mount. It used
+// to be a constant in messages.ts holding this bundle's consent flag, which
+// gated nothing at all in a bundle that spells its consent differently -- and
+// the atom's prose was the only place the rule was actually written down.
+ok(/\(!m\.requires \|\| \(flags \?\? \[\]\)\.includes\(m\.requires\)\)/.test(panel),
+   "the recorder is behind whatever flag its declaration requires, and the reason is drawn when it is missing");
+ok(!/CONSENT/.test(panel) && !/capture\.consented/.test(panel),
+   "and the panel does not name the flag itself");
+{
+  const declared = JSON.parse(read("catalogue/catalogue.json"));
+  const scribe = Object.values(declared.instruments ?? {})
+    .find((i: any) => i.kind === "scribe") as any;
+  ok(!!scribe?.requires,
+     "the shipped scribe instrument actually declares a gate: " + String(scribe?.requires));
+  ok((declared.states ?? []).includes(scribe.requires),
+     "and the flag it names is one this bundle really has");
+}
 ok(/onValues=\{fromInstrument\}/.test(panel.slice(panel.indexOf("<Recorder"))),
    "a draft lands through the same path a spoken value does: editable fields, then a tap");
 

@@ -25,7 +25,7 @@ import { ApiError, type Client } from "../api";
 import { Form, labelled, validate } from "./Form";
 import { walk } from "../validate";
 import { questionnaire } from "../declarations";
-import { CONSENT, fmt } from "../messages";
+import { fmt } from "../messages";
 import type { Operation, Payload, Proposal } from "../types";
 import { Failed } from "../parts";
 import { human } from "../words";
@@ -275,11 +275,15 @@ export function OperationPanel({
         {/* The scribe, which is a recording and not a microphone in this
             browser, so it is drawn by its own component with its own bar. It
             appears only where the declaration allows it AND the visit carries
-            capture consent; without the consent the reason is said in words and
-            the keyboard below is the whole of the fallback. The kernel refuses
-            it a second time besides, which is the check that counts. */}
+            whatever flag that declaration REQUIRES; without it the reason is
+            said in words and the keyboard below is the whole of the fallback.
+            The flag is `requires:` on the instrument, not a constant in this
+            renderer: the health centre's consent flag used to be written here,
+            which gated nothing in a bundle that spells its own differently.
+            The kernel refuses it a second time besides, which is the check
+            that counts. */}
         {mounts.filter((m) => m.kind === "scribe").map((m) =>
-          (flags ?? []).includes(CONSENT) ? (
+          (!m.requires || (flags ?? []).includes(m.requires)) ? (
             <Recorder
               key={m.id}
               mount={m as Extract<typeof m, { kind: "scribe" }>}
