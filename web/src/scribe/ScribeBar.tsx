@@ -115,7 +115,9 @@ export function ScribeBar({ thread, station, onDrafts, onClose }: {
     setTemplate(op);
     chosen.current.template = op;
     rememberTemplate(currentRole(), station, op);
-    if (phase === "idle") return void begin();
+    // A recording that failed or was withdrawn is over; choosing a template
+    // starts the next one rather than leaving the bar stuck until it is closed.
+    if (phase === "idle" || phase === "failed" || phase === "withdrawn") return void begin();
     if (session && phase === "ready") {
       try {
         const next = await refill(session.session, [op]);
@@ -247,6 +249,18 @@ export function ScribeBar({ thread, station, onDrafts, onClose }: {
     }
   };
 
+  /** Closing the bar ends the recording's life: the mic stops, and a session
+   *  the kernel still holds is told to keep nothing. Drafts already handed up
+   *  stay in their panels, because those are the encounter's now. */
+  const close = () => {
+    const id = session?.session;
+    halt();
+    if (id) void dropSession(id).catch(() => {});
+    onClose();
+  };
+
+  const over = phase === "failed" || phase === "withdrawn";
+
   const said =
     phase === "recording" ? `Recording ${mmss(seconds)}`
     : phase === "uploading" || phase === "waiting" ? "Transcribing"
@@ -265,18 +279,19 @@ export function ScribeBar({ thread, station, onDrafts, onClose }: {
         {menu?.choose.map((c) => <option key={c.operation} value={c.operation}>{c.title}</option>)}
       </select>
       <select aria-label="Language" value={language} onChange={(e) => setLanguage(e.target.value)}
-              disabled={phase !== "idle" && phase !== "recording"}>
+              disabled={phase !== "idle" && phase !== "recording" && !over}>
         {(menu?.languages ?? ["en-IN"]).map((l) => <option key={l} value={l}>{LANGUAGE_NAMES[l] ?? l}</option>)}
       </select>
       {phase === "recording" && <button className="cq" onClick={stop}>Stop</button>}
-      {(phase === "recording" || phase === "uploading" || phase === "waiting") && (
+      {over && template && <button className="cq" onClick={() => void begin()}>Record again</button>}
+      {(phase === "recording" || phase === "uploading" || phase === "waiting" || phase === "ready") && (
         <button className="cq" onClick={() => void withdraw()}>Discard</button>
       )}
       {phase === "ready" && session && session.drafts.length === 0 && (
         <details><summary>Nothing to fill. Transcript</summary><p>{session.transcript}</p></details>
       )}
       {hint && <span className="f-hint">{hint}</span>}
-      <button className="cq" onClick={() => { halt(); onClose(); }} aria-label="Close scribe">×</button>
+      <button className="cq" onClick={close} aria-label="Close scribe">×</button>
     </div>
   );
 }
