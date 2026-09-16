@@ -348,3 +348,61 @@ reported as not reached — no stub that looks finished.
   deliberately broken implementations on this branch. Every check written here
   is mutation-proved in its own step — break it, confirm FAIL, revert, confirm
   PASS — because on this codebase that is the only evidence that has ever held.
+
+---
+
+## What was actually built (2026-09-16)
+
+Gate green and unskipped at every commit below. Verified in a browser at
+1440, 980, 900 and 375px, in both themes.
+
+| Pass | State |
+|---|---|
+| 1 — foundation, tokens, shell, rail, Khoj | **done** |
+| 2 — view kinds, list, thread, composer, forms | **done** |
+| 3 — scribe into the composer | **done** |
+| 4 — the patient spine | **done**, kernel + route + screen + seed |
+| 5.1 — handover states (§12) | **done** |
+| 5.2 — comments (§11) | not started |
+| 5.3 — tasks as objects (§28, §29) | not started |
+| 5.4 — people, so `@Priya` resolves (§13) | not started |
+| 5.5 — patient list CRUD (§6.1, §6.4) | not started |
+| 5.6 — offline and sync (§41, §42) | not started |
+
+### Deliberate deviations from the spec, all stated in the code
+
+1. **Eleven contrast corrections** to §48/§49. The spec misses the WCAG 2.2 AA
+   target it sets in §68; worst case was §62's status chips at 3.50:1 for 11px
+   text. Hue and saturation preserved.
+2. **`--color-border-control`**, which the spec does not have. §58 draws the
+   composer with `border-strong`, and SC 1.4.11 wants 3:1 for a boundary that
+   identifies a control; raising `border-strong` would have dragged every
+   divider up with it.
+3. **`.handover` keeps a neutral border.** §57 uses the agent colour, which
+   §50 reserves for AI. A nurse's note should not read as model output.
+4. **Lucide inlined**, not added as a dependency.
+
+### What the spec asks for that the kernel still cannot back
+
+- §12.1 **reassign**, and two concurrent handovers on one visit. A reply
+  carries no reference to which handover it answers, so they share one
+  conversation. Stated in `phc.op.handover-reply.md` itself.
+- §11 **comments on an arbitrary object** — same missing reference.
+- §13 **`@Priya`**. Only roles exist; `caller()` reads a header and is
+  explicitly not a security boundary. A people directory must not be built in
+  a way that gets mistaken for authentication.
+- §29 **a task screen with owner, due date and status.** `TaskRow` is a
+  worklist: `{title, count, threads}`.
+- §41/§42 **offline**. Nothing.
+
+### New declaration vocabulary added this session
+
+- `spine:` on a workflow — the field on the subject resource naming what
+  continues across threads. Optional; the laboratory declares none.
+- `presents:` on an operation — which of §10's objects its record is drawn as.
+  Closed vocabulary (`event artifact handover task comment`), default `event`.
+- `requires:` on an instrument — a thread flag it may not run without. This
+  one closed a real consent hole: the scribe's gate lived in the atom's prose
+  and was hard-coded in the renderer, so any other bundle got no gate at all.
+- `same_patient_as` in a seed thread — a returning patient, not a second
+  registration.
