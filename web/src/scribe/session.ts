@@ -52,6 +52,26 @@ export type ScribeSession = {
 
 // ----------------------------------------------------------------- the pure half
 
+/** A draft open in a panel, with the key that panel is mounted under. */
+export type Opened = { draft: ScribeDraft; key: string; n: number };
+
+/** Fold a ready session's drafts into the panels already open. A draft
+ *  replaces only the panel for its own operation, under a new key so that
+ *  panel remounts with fresh payload and ticks rather than keeping the old
+ *  values and reading the new ones as typed. Panels for other operations,
+ *  possibly half edited, stay exactly as they are. */
+export function mergeDrafts(current: Opened[], incoming: ScribeDraft[], session: string): Opened[] {
+  const out = [...current];
+  for (const draft of incoming) {
+    const i = out.findIndex((o) => o.draft.operation === draft.operation);
+    const n = i < 0 ? 0 : out[i].n + 1;
+    const next = { draft, n, key: `${session}:${draft.operation}:${n}` };
+    if (i < 0) out.push(next);
+    else out[i] = next;
+  }
+  return out;
+}
+
 export const draftFor = (s: ScribeSession | null, operation: string): ScribeDraft | null =>
   s?.drafts.find((d) => d.operation === operation) ?? null;
 

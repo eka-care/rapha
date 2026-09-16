@@ -20,7 +20,7 @@ import { agentLine, header, messages, queueViewFor, valuesOf, type Ctx, type Sai
 import type { Catalogue, Operation, Payload, ThreadView } from "../types";
 import { Composer } from "../thread/Composer";
 import { ScribeBar } from "../scribe/ScribeBar";
-import type { ScribeDraft } from "../scribe/session";
+import { mergeDrafts, type Opened } from "../scribe/session";
 import { Stream } from "../thread/Thread";
 import { Line } from "../view/View";
 import { human, title } from "../words";
@@ -49,7 +49,7 @@ export function Encounter({
 }) {
   const [modal, setModal] = useState<{ op: Operation; seed?: Payload } | null>(null);
   const [scribing, setScribing] = useState(false);
-  const [drafts, setDrafts] = useState<ScribeDraft[]>([]);
+  const [drafts, setDrafts] = useState<Opened[]>([]);
   // The microphone is gated on the scribe instrument's own `requires:`, not a
   // flag named here: a bundle that spells its consent differently is gated by
   // its own spelling. The kernel refuses without it besides.
@@ -146,17 +146,17 @@ export function Encounter({
             badge draws; a thread past its last station has none. */}
         {scribing && (
           <ScribeBar thread={thread.id} station={thread.station ?? ""}
-                     onDrafts={(s) => setDrafts(s.drafts)}
+                     onDrafts={(s) => setDrafts((all) => mergeDrafts(all, s.drafts, s.session))}
                      onClose={() => { setScribing(false); setDrafts([]); }} />
         )}
-        {drafts.map((d) => {
+        {drafts.map(({ draft: d, key }) => {
           const op = cat.operations[d.operation];
           return op ? (
-            <div key={d.operation} style={{ padding: "0 15px 12px", maxHeight: "42vh", overflowY: "auto", flexShrink: 0 }}>
+            <div key={key} style={{ padding: "0 15px 12px", maxHeight: "42vh", overflowY: "auto", flexShrink: 0 }}>
               <OperationPanel op={op} thread={thread.id} client={client} draft={d}
                 instruments={cat.instruments} flags={thread.flags} inline
-                onDone={() => { setDrafts((all) => all.filter((x) => x.operation !== d.operation)); onChanged(); }}
-                onCancel={() => setDrafts((all) => all.filter((x) => x.operation !== d.operation))} />
+                onDone={() => { setDrafts((all) => all.filter((x) => x.draft.operation !== d.operation)); onChanged(); }}
+                onCancel={() => setDrafts((all) => all.filter((x) => x.draft.operation !== d.operation))} />
             </div>
           ) : null;
         })}

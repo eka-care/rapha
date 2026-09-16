@@ -188,6 +188,7 @@ export function OperationPanel({
   const send = async () => {
     setTried(true);
     if (problems.length) return;
+    if (unticked.length) return;      // every path to commit, Enter included, waits on the ticks
     if (irreversible && !confirmed) {
       setStage("confirm");
       return;

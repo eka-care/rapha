@@ -18,7 +18,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  apply, draftFor, elsewhere, mustTick, pickMime, preview, reasonFor, sentence,
+  apply, draftFor, elsewhere, mergeDrafts, mustTick, pickMime, preview, reasonFor, sentence,
   type ScribeSession,
 } from "./session.ts";
 import type { Questionnaire } from "../types";
@@ -222,6 +222,26 @@ ok(!/mic-live/.test(rec) && !/Microphone live/.test(rec),
   assert.ok(!panel.includes("<Recorder"), "the form no longer starts recordings");
   assert.ok(/disabled=\{[^}]*unticked\.length/.test(panel), "Commit waits on the ticks");
   assert.throws(() => read("web/src/scribe/Recorder.tsx"));
+  // The button is not the only way to commit: Enter calls send() directly.
+  const send = panel.slice(panel.indexOf("const send = async"), panel.indexOf("const reject = async"));
+  assert.ok(/if \(unticked\.length\) return;/.test(send), "send() itself refuses while a tick is owed");
+  checks += 6;
+}
+
+// 6. A new session replaces only the panels for its own operations, and a replaced one remounts.
+{
+  const d = (operation: string, v: number) => ({
+    instrument: "i", operation, values: { v }, confidence: {}, evidence: {}, tick: [], unfilled: [], transcript: "",
+  });
+  const first = mergeDrafts([], [d("a", 1), d("b", 1)], "s1");
+  const second = mergeDrafts(first, [d("a", 2)], "s1");
+  assert.equal(second.length, 2);
+  assert.equal(second[1], first[1], "the other operation's panel is untouched");
+  assert.deepEqual(second[0].draft.values, { v: 2 });
+  assert.notEqual(second[0].key, first[0].key, "a replaced draft gets a new key, so its panel remounts clean");
+  const enc = read("web/src/screens/Encounter.tsx");
+  assert.ok(/mergeDrafts\(all, s\.drafts, s\.session\)/.test(enc) && /key=\{key\}/.test(enc),
+    "the encounter merges drafts and keys panels by generation");
   checks += 5;
 }
 
