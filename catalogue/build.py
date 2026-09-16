@@ -72,6 +72,8 @@ def lint(atoms):
             fail(f"kind must be one of {vocab.KINDS}")
         if fm["station"] not in known.stations:
             fail(f"unknown station '{fm['station']}'")
+        if fm.get("presents") is not None and fm["presents"] not in vocab.THREAD_OBJECTS:
+            fail(f"presents must be one of {vocab.THREAD_OBJECTS}")
         if fm["instrument"] not in vocab.INSTRUMENTS:
             fail(f"unknown instrument '{fm['instrument']}'")
         if fm["irreversibility"] not in vocab.IRREVERSIBILITY:
@@ -149,6 +151,10 @@ def compile_catalogue(atoms):
         ops[fm["id"]] = {
             **{k: fm[k] for k in REQUIRED if k != "verified"},
             "scope_qualifier": fm.get("scope_qualifier"),
+            # §10. How this operation's record is drawn in the thread. The
+            # renderer cannot work it out: a handover and a vitals reading are
+            # both "an operation committed a row".
+            "presents": fm.get("presents") or "event",
             "verified": fm["verified"]["status"],
             "tool": tool_name(fm),
             "description": plain,

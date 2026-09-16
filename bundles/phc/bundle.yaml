@@ -22,6 +22,7 @@ operations:
   - phc.op.pharmacy-dispense
   - phc.op.household-visit
   - phc.op.handover
+  - phc.op.handover-reply
 workflows:
   - phc.wf.outpatient
 views:
@@ -57,6 +58,7 @@ states:
   - vitals.recorded
   - vitals.flagged
   - consult.documented
+  - handover.raised
   - rx.confirmed
   - lab.ordered
   - lab.resulted

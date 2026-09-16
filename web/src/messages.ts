@@ -52,7 +52,26 @@ export type Msg =
        *  would refuse this if it were confirmed. Say so before they tap. */
       stale: boolean;
     }
-  | { kind: "said"; id: string; at: string; who: "user" | "agent"; text: string; actor: string };
+  | { kind: "said"; id: string; at: string; who: "user" | "agent"; text: string; actor: string }
+  /** §12: a handover is a conversation, not a delivery. One object carrying
+   *  what was asked, every reply to it, and the state the last reply left it
+   *  in. Built from operations whose atom declares `presents: handover`; this
+   *  module never names one. */
+  | {
+      kind: "handover"; id: string; at: string; title: string;
+      from: string; to: string; note: string; priority: string;
+      state: HandoverState;
+      replies: { id: string; at: string; actor: string; comment: string; state: string }[];
+    };
+
+/** §12.1. `draft` and `reassigned` are not here: nothing writes a draft, and
+ *  reassignment would need a reply to name a new addressee, which no
+ *  declaration does yet. Naming a state the product cannot reach would be a
+ *  picture of a workflow rather than a workflow. */
+export type HandoverState = "open" | "acknowledged" | "in_progress" | "resolved" | "reopened";
+const HANDOVER_STATES: HandoverState[] = ["open", "acknowledged", "in_progress", "resolved", "reopened"];
+
+const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 
 export type Ctx = {
   operations: Record<string, Operation>;
@@ -186,7 +205,49 @@ export function messages(thread: ThreadView, ctx: Ctx, said: Said[] = []): Msg[]
 
   for (const s of said) out.push({ kind: "said", ...s });
 
-  return out.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  return collapseHandovers(out, ctx).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+}
+
+/** §12.2 and §12.3. Every committed record from an operation declaring
+ *  `presents: handover` becomes one object: the first is what was asked, the
+ *  rest are replies, and the state is the last one anybody set.
+ *
+ *  THE HONEST LIMIT, and it is in the atom too. The kernel stores a reply as a
+ *  questionnaire response with no reference to WHICH handover it answers, so
+ *  two concurrent handovers on one visit would share one conversation. One at
+ *  a time is what this supports. Threading them needs the reply to carry the
+ *  id of what it answers, which is a declaration change, not a render change.
+ */
+function collapseHandovers(msgs: Msg[], ctx: Ctx): Msg[] {
+  const isHandover = (op: string) => ctx.operations[op]?.presents === "handover";
+  const parts = msgs.filter(
+    (m): m is Extract<Msg, { kind: "posted" }> => m.kind === "posted" && isHandover(m.operation));
+  if (!parts.length) return msgs;
+
+  parts.sort((a, b) => (a.at < b.at ? -1 : 1));
+  const [first, ...rest] = parts;
+  const answer = (m: Extract<Msg, { kind: "posted" }>, link: string) =>
+    str(m.values.find((v) => v.link_id === link)?.value);
+
+  const replies = rest.map((m) => ({
+    id: m.id, at: m.at, actor: m.actor,
+    comment: answer(m, "comment") || answer(m, "note"),
+    state: answer(m, "state"),
+  }));
+  // The last reply that actually named a state. A reply that only commented
+  // leaves the state where it was rather than silently reopening it.
+  const named = [...replies].reverse().find((r) => HANDOVER_STATES.includes(r.state as HandoverState));
+  const state: HandoverState =
+    (named?.state as HandoverState) ?? (replies.length ? "in_progress" : "open");
+
+  const object: Msg = {
+    kind: "handover", id: first.id, at: first.at, title: first.title,
+    from: first.actor, to: answer(first, "to"), note: answer(first, "note"),
+    priority: answer(first, "priority") || "normal",
+    state, replies,
+  };
+  const folded = new Set(parts.map((m) => m.id));
+  return [...msgs.filter((m) => !folded.has(m.id)), object];
 }
 
 // ----------------------------------------------------------- the agent line

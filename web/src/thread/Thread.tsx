@@ -21,6 +21,7 @@ import type { Client } from "../api";
 import { OperationPanel } from "../form/Panel";
 import { clock, type Ctx, type Msg, type Said } from "../messages";
 import type { Operation, Proposal, ThreadView } from "../types";
+import { human } from "../words";
 import { Message } from "./Message";
 import { ThreadObject, Values } from "./ThreadObject";
 
@@ -67,6 +68,8 @@ function Entry({ m, thread, client, ctx, instruments, onDone }: {
   if (m.kind === "said") {
     return <Message who={m.who} actor={m.actor} at={clock(m.at)} text={m.text} />;
   }
+
+  if (m.kind === "handover") return <Handover m={m} />;
 
   if (m.kind === "posted") {
     return (
@@ -144,6 +147,64 @@ function ProposalCard({ m, thread, client, ctx, instruments, onDone }: {
     />
   );
 }
+
+/** §12.2 and §12.3: what was asked, who of, every reply, and the state the
+ *  last reply left it in. The border stays neutral: §57 draws it in the agent
+ *  colour, which §50 reserves for AI, and a nurse's note is not model output.
+ */
+function Handover({ m }: { m: Extract<Msg, { kind: "handover" }> }) {
+  return (
+    <ThreadObject
+      className="handover"
+      label={m.title}
+      end={clock(m.at)}
+      footer={
+        <>
+          {/* §95: the state is a word first. The tone only reinforces it. */}
+          <span className="status" data-tone={TONE[m.state]}>{human(m.state)}</span>
+          {m.priority !== "normal" && (
+            <span className="status" data-tone="warning">{human(m.priority)}</span>
+          )}
+          <span className="handover__state">
+            {m.replies.length === 0
+              ? "No reply yet"
+              : m.replies.length === 1 ? "1 reply" : `${m.replies.length} replies`}
+          </span>
+        </>
+      }
+    >
+      <div className="handover__route">
+        <span>{m.from}</span>
+        <span aria-hidden="true">&rarr;</span>
+        <span className="mention">@{human(m.to)}</span>
+      </div>
+      <div className="handover__message">{m.note}</div>
+      {m.replies.length > 0 && (
+        <div className="handover__replies">
+          {m.replies.map((r) => (
+            <div className="handover__reply" key={r.id}>
+              <div className="message__meta">
+                <strong style={{ color: "var(--color-text-secondary)" }}>{r.actor}</strong>
+                <span aria-hidden="true">&middot;</span>
+                <time>{clock(r.at)}</time>
+                {r.state && <span className="u-faint">set to {human(r.state)}</span>}
+              </div>
+              <div className="message__body">{r.comment}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </ThreadObject>
+  );
+}
+
+/** §12.1's states, and the only tone each one earns. Resolved is the single
+ *  success in this product's whole vocabulary; open and reopened are waiting
+ *  on somebody, which is attention, not alarm. */
+const TONE: Record<string, string | undefined> = {
+  open: "warning", reopened: "warning", acknowledged: undefined,
+  in_progress: undefined, resolved: "success",
+};
 
 /** The operation a proposal is for. A proposal the catalogue has no
  *  declaration for is a kernel bug, not something to paper over with a blank

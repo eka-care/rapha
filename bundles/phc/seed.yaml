@@ -55,10 +55,29 @@ threads:
       - {resource: observation, category: vital-signs, code: systolic, value: 186, unit: "mm[Hg]"}
       - {resource: observation, category: vital-signs, code: diastolic, value: 112, unit: "mm[Hg]"}
       - {resource: observation, category: vital-signs, code: pulse, value: 92, unit: "/min"}
+      # What the handover and its reply wrote. handover.raised is derived from
+      # the first of these, which is what puts Reply on the doctor's screen.
+      - resource: questionnaire_response
+        questionnaire: phc.schema.handover-v1
+        created_by: "user:nurse"
+        payload: {to: mo, note: "BP 190/125 on two readings, headache since morning. Please see before the queue.", priority: urgent}
+      - resource: questionnaire_response
+        questionnaire: phc.schema.handover-reply-v1
+        created_by: "user:mo"
+        payload: {comment: "Coming now. Keep her in the side room.", state: acknowledged}
     # Agreed to the recording at the desk, so the scribe is offerable at the
     # doctor. capture.consented is composed from this, not stored.
     flags: [vitals.flagged, capture.agreed]
+    # A handover conversation, so the demo day has one (§12.3). The rows are
+    # what the operations write; the audit entries are what the thread draws
+    # from. Both, or the flag is raised with nothing on screen to explain it.
     audit:
+      - operation: phc.op.handover
+        actor: "user:nurse"
+        payload: {to: mo, note: "BP 190/125 on two readings, headache since morning. Please see before the queue.", priority: urgent}
+      - operation: phc.op.handover-reply
+        actor: "user:mo"
+        payload: {comment: "Coming now. Keep her in the side room.", state: acknowledged}
       - operation: phc.op.patient-register
         actor: "user:frontdesk"
         payload: {name: Ramesh Kumar, age: 61, sex: male, phone: "9800000003",

@@ -15,7 +15,7 @@ steps:
   - station: doctor
     done_when: consult.documented
     operations: [phc.op.consult-document, phc.op.rx-prescribe, phc.op.lab-order,
-                 phc.op.capture-withdraw, phc.op.handover]
+                 phc.op.capture-withdraw, phc.op.handover, phc.op.handover-reply]
   - station: lab
     done_when: lab.resulted
     applies_when: lab.ordered
@@ -35,6 +35,13 @@ states:
     exists: {resource: observation, where: {category: vital-signs}}
   consult.documented:
     exists: {resource: notes}
+  # A handover has been raised on this visit. Derived from the handover's own
+  # questionnaire response, so it is true exactly when one exists and no flag
+  # has to be stored. The filter on `questionnaire` is what keeps a REPLY --
+  # which writes the same resource under a different slug -- from raising it.
+  handover.raised:
+    exists: {resource: questionnaire_response,
+             where: {questionnaire: phc.schema.handover-v1}}
   rx.confirmed:
     exists: {resource: medication_request, where: {status: active}}
   lab.ordered:

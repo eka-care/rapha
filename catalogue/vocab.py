@@ -56,6 +56,17 @@ CARE_RESOURCES = frozenset({
     "token_booking",
 })
 
+# §10 of the UI/UX spec: the first-class objects a thread can contain. An
+# operation's record is drawn as one of these, and which one is the atom's own
+# answer (`presents:`), because a renderer cannot derive it -- a handover and a
+# clinical event are both "an operation committed a row", and nothing about
+# the row says which. Defaults to "event".
+#
+# Closed on purpose, exactly like INSTRUMENT_KINDS: the renderer implements
+# these and a bundle cannot invent a sixth without renderer code, so a
+# declaration naming one is a promise the screen can keep.
+THREAD_OBJECTS = ("event", "artifact", "handover", "task", "comment")
+
 # Records the kernel keeps that CARE does not: the stored thread flags. A
 # declaration may count them (a metric) but no operation may write them. The
 # kernel's own table, so the kernel's own list.

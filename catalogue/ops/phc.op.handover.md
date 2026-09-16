@@ -9,6 +9,7 @@ capability: handover
 scope_qualifier: null
 station: doctor
 instrument: form
+presents: handover
 preconditions:
   - registered
 irreversibility: correctable

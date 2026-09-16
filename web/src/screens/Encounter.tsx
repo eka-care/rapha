@@ -217,6 +217,12 @@ function ContextPanel({ thread, ctx }: { thread: ThreadView; ctx: Ctx }) {
     const out: { title: string; rows: { label: string; value: string; crit: boolean }[] }[] = [];
     for (const a of thread.audit) {
       if (a.outcome !== "committed" && a.outcome !== "confirmed" && a.outcome !== "allowed") continue;
+      // §25 is a reference panel: what is KNOWN about this subject. A handover
+      // is a conversation about the work, and it is already on the thread as
+      // its own object; repeating it here as though it were a clinical finding
+      // is how a panel meant for problems and vitals fills up with chat.
+      const presents = ctx.operations[a.operation]?.presents ?? "event";
+      if (presents !== "event" && presents !== "artifact") continue;
       const rows = valuesOf(ctx, a.operation, a.payload).map((v) => ({
         label: v.label, value: v.value, crit: v.crit,
       }));

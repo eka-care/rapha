@@ -79,8 +79,37 @@ function vocabulary(): { word: string; kind: string }[] {
   return out;
 }
 
+/** The renderer's OWN closed vocabularies: the kernel/renderer contract, not
+ *  any bundle's words. `presents: handover` and `kind: scribe` are promises a
+ *  declaration makes to this renderer, so the renderer has to be able to name
+ *  them -- the same way it names "queue" or "summary".
+ *
+ *  This is an exemption, so it is kept honest two ways. It is small and
+ *  written out, and every word in it must be genuinely implemented somewhere
+ *  in the renderer: an exemption for a word nothing implements is a hole
+ *  somebody widened to get a bundle's word through.
+ *
+ *  It collides with this bundle by accident today -- "handover" is also a PHC
+ *  capability -- which is exactly why the collision is resolved here and
+ *  stated, rather than by quietly dropping the word from the check. The cost
+ *  is real and worth naming: the renderer could now type "handover" meaning
+ *  the capability and this would not catch it. */
+const IMPLEMENTED = [
+  "event", "artifact", "handover", "task", "comment",          // THREAD_OBJECTS
+  "scribe", "device", "constrained-voice", "spoken-prompt",    // INSTRUMENT_KINDS
+  "queue", "summary", "dashboard", "tasklist",                 // view kinds
+];
+
 {
-  const vocab = vocabulary();
+  const all = TSX.map((f) => readFileSync(f, "utf8")).join("\n");
+  const dead = IMPLEMENTED.filter((w) => !new RegExp(`["'\`]${w}["'\`]`).test(all));
+  assert.deepEqual(dead, [],
+    "an exemption for a word the renderer does not implement is a hole: " + dead.join(", "));
+  ok(`vocabulary: all ${IMPLEMENTED.length} exempted words are really implemented`);
+}
+
+{
+  const vocab = vocabulary().filter((v) => !IMPLEMENTED.includes(v.word));
   assert.ok(vocab.length >= 20, `the vocabulary check has something to check: ${vocab.length}`);
   const offenders: string[] = [];
   for (const file of TSX) {

@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "slug": "phc.schema.handover-reply-v1",
+  "title": "Reply to a handover",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.handover-reply"
+    }
+  },
+  "questions": [
+    {
+      "link_id": "comment",
+      "text": "Comment",
+      "type": "text",
+      "required": true
+    },
+    {
+      "link_id": "state",
+      "text": "Set the handover to",
+      "type": "choice",
+      "required": true,
+      "description": "Acknowledged means you have it. Resolved closes it. Reopened brings it back.",
+      "answer_option": [
+        {
+          "value": "acknowledged"
+        },
+        {
+          "value": "in_progress"
+        },
+        {
+          "value": "resolved"
+        },
+        {
+          "value": "reopened"
+        }
+      ]
+    }
+  ]
+}

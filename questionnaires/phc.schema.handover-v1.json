@@ -4,8 +4,67 @@
   "title": "Hand over",
   "status": "active",
   "subject_type": "encounter",
-  "styling_metadata": { "phc": { "operation": "phc.op.handover" } },
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.handover"
+    }
+  },
   "questions": [
-    { "link_id": "note", "text": "Note", "type": "text", "required": true }
+    {
+      "link_id": "to",
+      "text": "To",
+      "type": "choice",
+      "required": true,
+      "description": "Whoever should pick this up. The roles this facility has.",
+      "answer_option": [
+        {
+          "value": "frontdesk"
+        },
+        {
+          "value": "nurse"
+        },
+        {
+          "value": "mo"
+        },
+        {
+          "value": "lab"
+        },
+        {
+          "value": "lab_incharge"
+        },
+        {
+          "value": "pharmacist"
+        },
+        {
+          "value": "asha"
+        },
+        {
+          "value": "anm"
+        },
+        {
+          "value": "cho"
+        }
+      ]
+    },
+    {
+      "link_id": "note",
+      "text": "Note",
+      "type": "text",
+      "required": true
+    },
+    {
+      "link_id": "priority",
+      "text": "Priority",
+      "type": "choice",
+      "required": false,
+      "answer_option": [
+        {
+          "value": "normal"
+        },
+        {
+          "value": "urgent"
+        }
+      ]
+    }
   ]
 }

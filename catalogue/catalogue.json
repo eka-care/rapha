@@ -241,7 +241,8 @@
       "phc.op.lab-result-enter",
       "phc.op.pharmacy-dispense",
       "phc.op.household-visit",
-      "phc.op.handover"
+      "phc.op.handover",
+      "phc.op.handover-reply"
     ],
     "title": "Primary health centre",
     "version": "2026.09.10",
@@ -400,6 +401,7 @@
       "preconditions": [
         "not order.accessioned"
       ],
+      "presents": "event",
       "scope_qualifier": null,
       "short": "Accession",
       "station": "accession",
@@ -460,6 +462,7 @@
         "result.verified",
         "not report.released"
       ],
+      "presents": "event",
       "scope_qualifier": null,
       "short": "Release",
       "station": "release",
@@ -560,6 +563,7 @@
         "specimen.collected",
         "not result.entered"
       ],
+      "presents": "event",
       "scope_qualifier": null,
       "short": "Result",
       "station": "processing",
@@ -613,6 +617,7 @@
         "not result.verified",
         "not actor of lab.op.result-enter"
       ],
+      "presents": "event",
       "scope_qualifier": null,
       "short": "Verify",
       "station": "verification",
@@ -672,6 +677,7 @@
         "order.accessioned",
         "not specimen.collected"
       ],
+      "presents": "event",
       "scope_qualifier": null,
       "short": "Collect",
       "station": "phlebotomy",
@@ -729,6 +735,7 @@
         "registered",
         "not abha.linked"
       ],
+      "presents": "event",
       "scope_qualifier": null,
       "short": "Link ABHA",
       "station": "reception",
@@ -768,6 +775,7 @@
       "preconditions": [
         "capture.consented"
       ],
+      "presents": "event",
       "scope_qualifier": null,
       "short": "Stop recording",
       "station": "doctor",
@@ -835,6 +843,7 @@
       "preconditions": [
         "registered"
       ],
+      "presents": "event",
       "scope_qualifier": null,
       "short": "Consult",
       "station": "doctor",
@@ -859,11 +868,38 @@
       "emits": [],
       "fields": [
         {
+          "link_id": "to",
+          "options": [
+            "frontdesk",
+            "nurse",
+            "mo",
+            "lab",
+            "lab_incharge",
+            "pharmacist",
+            "asha",
+            "anm",
+            "cho"
+          ],
+          "required": true,
+          "text": "To",
+          "type": "choice"
+        },
+        {
           "link_id": "note",
           "options": null,
           "required": true,
           "text": "Note",
           "type": "text"
+        },
+        {
+          "link_id": "priority",
+          "options": [
+            "normal",
+            "urgent"
+          ],
+          "required": false,
+          "text": "Priority",
+          "type": "choice"
         }
       ],
       "id": "phc.op.handover",
@@ -874,6 +910,7 @@
       "preconditions": [
         "registered"
       ],
+      "presents": "handover",
       "scope_qualifier": null,
       "short": "Hand over",
       "station": "doctor",
@@ -884,6 +921,56 @@
       ],
       "title": "Hand over",
       "tool": "propose_handover",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "questionnaire_response"
+      ]
+    },
+    "phc.op.handover-reply": {
+      "capability": "handover",
+      "description": "A handover is a conversation, not a delivery. Somebody asked for something;\nthis is the answer, and it carries the state the asker needs to see: that it\nhas been picked up, that it is being worked on, that it is done, or that it\nhas come back.\n\nIt writes a comment and a state and nothing clinical. A repeat blood pressure\nis recorded by the operation that records blood pressure; saying \"done, 154/94\"\nhere is a message about work, not a reading, and nothing downstream will treat\nit as one.",
+      "emits": [],
+      "fields": [
+        {
+          "link_id": "comment",
+          "options": null,
+          "required": true,
+          "text": "Comment",
+          "type": "text"
+        },
+        {
+          "link_id": "state",
+          "options": [
+            "acknowledged",
+            "in_progress",
+            "resolved",
+            "reopened"
+          ],
+          "required": true,
+          "text": "Set the handover to",
+          "type": "choice"
+        }
+      ],
+      "id": "phc.op.handover-reply",
+      "input": "phc.schema.handover-reply-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "handover.raised"
+      ],
+      "presents": "handover",
+      "scope_qualifier": null,
+      "short": "Reply",
+      "station": "doctor",
+      "summary": "A comment on the handover, and the state it leaves it in.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Reply to a handover",
+      "tool": "propose_handover_reply",
       "type": "operation",
       "verified": "unverified",
       "writes": [
@@ -940,6 +1027,7 @@
       "preconditions": [
         "registered"
       ],
+      "presents": "event",
       "scope_qualifier": null,
       "short": "Scribe visit",
       "station": "community",
@@ -980,6 +1068,7 @@
       "preconditions": [
         "consult.documented"
       ],
+      "presents": "event",
       "scope_qualifier": null,
       "short": "Order",
       "station": "doctor",
@@ -1042,6 +1131,7 @@
         "lab.ordered",
         "not lab.resulted"
       ],
+      "presents": "event",
       "scope_qualifier": null,
       "short": "Result",
       "station": "lab",
@@ -1141,6 +1231,7 @@
       "preconditions": [
         "not registered"
       ],
+      "presents": "event",
       "scope_qualifier": null,
       "short": "Register",
       "station": "reception",
@@ -1196,6 +1287,7 @@
         "rx.confirmed",
         "not dispensed.complete"
       ],
+      "presents": "event",
       "scope_qualifier": null,
       "short": "Dispense",
       "station": "pharmacy",
@@ -1237,6 +1329,7 @@
         "consult.documented",
         "not rx.confirmed"
       ],
+      "presents": "event",
       "scope_qualifier": null,
       "short": "Rx",
       "station": "doctor",
@@ -1313,6 +1406,7 @@
         "registered",
         "not vitals.recorded"
       ],
+      "presents": "event",
       "scope_qualifier": null,
       "short": "Vitals",
       "station": "nurse",
@@ -1341,6 +1435,7 @@
     "dispensed.complete",
     "dispensed.partial",
     "followup.booked",
+    "handover.raised",
     "lab.critical",
     "lab.ordered",
     "lab.resulted",
@@ -1637,6 +1732,14 @@
             }
           }
         },
+        "handover.raised": {
+          "exists": {
+            "resource": "questionnaire_response",
+            "where": {
+              "questionnaire": "phc.schema.handover-v1"
+            }
+          }
+        },
         "lab.critical": {
           "stored": true
         },
@@ -1709,7 +1812,8 @@
             "phc.op.rx-prescribe",
             "phc.op.lab-order",
             "phc.op.capture-withdraw",
-            "phc.op.handover"
+            "phc.op.handover",
+            "phc.op.handover-reply"
           ],
           "station": "doctor"
         },

@@ -75,6 +75,11 @@ export type Operation = {
   writes: string[];
   emits: string[];
   verified: string;
+  /** §10: which of the thread's first-class objects this operation's record is
+   *  drawn as. From the atom's own `presents:`; "event" when it declares none.
+   *  The renderer cannot derive this -- a handover and a vitals reading are
+   *  both "an operation committed a row". */
+  presents?: "event" | "artifact" | "handover" | "task" | "comment";
   tool: string;
   description: string;
   /** How this operation's payload becomes rows, from the atom's own

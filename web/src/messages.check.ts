@@ -374,4 +374,77 @@ assert.equal(actorOf("agent:mo"), "agent", "a machine's card says a machine aske
 console.log("ok   thread messages, agent line, summary views, header and palette rows");
 console.log("ok   a structured answer's fields come from the operation's own mapping");
 console.log("ok   the agent narrates nothing already on screen");
+
+// -- §12: a handover is a conversation, not a delivery ----------------------
+//
+// Every record from an operation declaring `presents: handover` folds into ONE
+// object: what was asked, every reply, and the state the last reply set. The
+// mutation that matters is the fold itself -- three separate cards would look
+// perfectly reasonable on screen and would be the old behaviour, so this
+// asserts the count went DOWN and that the pieces are inside the object.
+{
+  const ops = cat.operations as Record<string, { presents?: string }>;
+  const handoverOps = Object.keys(ops).filter((id) => ops[id].presents === "handover");
+  assert.ok(handoverOps.length >= 2,
+    "the bundle declares a handover and a reply, or this check is checking nothing");
+  const [raise, reply] = [handoverOps.find((id) => /reply/.test(id)) ? handoverOps.filter((id) => !/reply/.test(id))[0] : handoverOps[0],
+                          handoverOps.find((id) => /reply/.test(id))!];
+
+  const audit = (id: string, op: string, at: string, actor: string, payload: object) => ({
+    id, thread: "enc-1", operation: op, actor, surface: "rendered",
+    payload, outcome: "committed", at,
+  });
+  const conversation = {
+    ...thread,
+    proposals: [],
+    audit: [
+      audit("h1", raise, "2026-09-16T09:00:00Z", "user:nurse",
+            { to: "mo", note: "BP 190/125 twice.", priority: "urgent" }),
+      audit("h2", reply, "2026-09-16T09:05:00Z", "user:mo",
+            { comment: "On my way.", state: "acknowledged" }),
+      audit("h3", reply, "2026-09-16T09:40:00Z", "user:mo",
+            { comment: "Seen and started on amlodipine.", state: "resolved" }),
+    ],
+  } as unknown as Parameters<typeof messages>[0];
+
+  const out = messages(conversation, ctx, []);
+  const objects = out.filter((m) => m.kind === "handover");
+  assert.equal(objects.length, 1, `three records fold into one object, got ${objects.length}`);
+  assert.equal(out.filter((m) => m.kind === "posted").length, 0,
+    "and none of them is left drawn as a separate card");
+
+  const h = objects[0] as Extract<typeof objects[0], { kind: "handover" }>;
+  assert.equal(h.to, "mo", "the addressee comes from the answer, not from the actor");
+  assert.equal(h.note, "BP 190/125 twice.");
+  assert.equal(h.priority, "urgent");
+  assert.equal(h.replies.length, 2, "both replies are inside the object");
+  assert.equal(h.state, "resolved", "the state is the last one anybody set");
+  console.log("ok   a handover and its replies are one object in the state the last reply set");
+
+  // A reply that only comments leaves the state alone. Without this, a plain
+  // "thanks" would silently reopen a resolved handover.
+  const chat = {
+    ...conversation,
+    audit: [...conversation.audit, audit("h4", reply, "2026-09-16T10:00:00Z", "user:nurse",
+                                         { comment: "Thanks." })],
+  } as typeof conversation;
+  const after = (messages(chat, ctx, []).find((m) => m.kind === "handover")) as typeof h;
+  assert.equal(after.state, "resolved",
+    "a reply with no state leaves the handover where it was");
+  assert.equal(after.replies.length, 3, "but it is still a reply");
+  console.log("ok   a comment with no state does not silently reopen a resolved handover");
+
+  // An operation that declares nothing still draws as an ordinary card.
+  const plain = {
+    ...conversation,
+    audit: [audit("p1", "phc.op.vitals-record", "2026-09-16T08:00:00Z", "user:nurse",
+                  { systolic: 120, diastolic: 80 })],
+  } as typeof conversation;
+  const plainOut = messages(plain, ctx, []);
+  assert.equal(plainOut.filter((m) => m.kind === "handover").length, 0,
+    "an operation declaring no handover is not folded into one");
+  assert.equal(plainOut.filter((m) => m.kind === "posted").length, 1);
+  console.log("ok   only an operation declaring presents: handover becomes one");
+}
+
 console.log("ok   a posted card names who did it; the renderer never decides attribution");
