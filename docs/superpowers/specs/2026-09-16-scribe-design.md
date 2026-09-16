@@ -218,3 +218,27 @@ marking it `active`; until then `status: draft`.
    (§7) cover each language for at least `rx-general-v1` and `phc-vitals-v1`.
    Extraction works on the native-script transcript directly; field values are
    written in English except free-text fields, which keep the spoken language.
+4. **Numbers may be filled by a recording, behind a per-field tick.** This
+   reverses the "a recording never fills a number" rule
+   (`web/src/scribe/session.ts narrative()`, `kernel/DECLARATIONS.md` §4, the
+   `_lint_instrument` device rule). Every non-text value a recording fills
+   (integer, decimal, quantity, date, choice, boolean) opens with the words it
+   came from beside it, and Commit stays disabled until the person ticks each
+   one. Text and structured rows keep today's treatment (unconfirmed highlight,
+   no tick). `readback: required` and `commit: tap` are unchanged.
+5. **A template is an operation.** A template is named by operation id, and
+   the questionnaire it fills is that operation's `input`, because only an
+   operation's mapping can write. Station config (§4.2) therefore lists
+   operation ids (e.g. `phc.op.vitals-record`), not questionnaire slugs. The
+   instrument's `operations` list is the allowlist of what a recording may fill.
+   Specialty templates (Plan 2) each get an operation whose mapping writes
+   their structured findings. Custom forms (Plan 2) get one generic operation
+   that stores a questionnaire response.
+6. **The last template a user chose is remembered in the browser**, keyed by
+   role, until the kernel has real users (today it has an `X-PHC-Role`
+   header, not accounts). §4.2's server-side preference waits for that.
+7. **Delivery is split.** Plan 1 is the engine on the forms that exist today:
+   decoupled mic, station defaults and switcher, flatten/extract/coerce,
+   re-extract, 24h transcript, languages, number ticks. Plan 2 is the §5
+   templates, their operations and mappings, and the generic custom-form
+   operation.
