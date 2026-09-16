@@ -569,30 +569,51 @@ def abha_config():
 CONSENT = "capture.consented"
 
 
-def scribe_targets(user):
-    """({operation_id: [link_id]}, instrument_id) for this caller.
-
-    Declaration driven twice over: which operations at all is the scribe
-    instrument's own `operations` list, and which of those this person may
-    document is the operation's capability. Nothing here names a bundle's
-    words, so a bundle with no scribe declaration gets an empty answer and the
-    route refuses.
-    """
+def scribe_allowed(user):
+    """{operation_id: {"schema": questionnaire}} a recording may fill for this caller:
+    on a scribe instrument's list, and within the caller's capabilities."""
     caps = set(user["capabilities"])
-    targets, instrument = {}, ""
+    out, instrument = {}, ""
     for decl in BUNDLE.instruments.values():
         if decl.kind != "scribe" or decl.commit != "tap" or decl.readback != "required":
             continue
         instrument = instrument or decl.id
         for op_id in decl.operations:
             op = BUNDLE.operations.get(op_id)
-            if not op or op["capability"] not in caps:
-                continue
-            schema = validate.load(op["input"])
-            named = set(decl.fields or [])
-            targets[op_id] = [q["link_id"] for q in validate.walk(schema["questions"])
-                              if not named or q["link_id"] in named]
-    return targets, instrument
+            if op and op["capability"] in caps:
+                out[op_id] = {"schema": validate.load(op["input"])}
+    return out, instrument
+
+
+def scribe_pick(user, names):
+    """The operations a recording will fill this time: named by the caller, at
+    most two, and each one this caller may fill. A refill picks again from the
+    transcript already held; a start picks before a byte leaves this machine."""
+    allowed, instrument = scribe_allowed(user)
+    wanted = [n for n in (names or []) if n]
+    if not wanted or len(wanted) > 2:
+        raise HTTPException(400, "Name one or two templates to fill.")
+    missing = [n for n in wanted if n not in allowed]
+    if missing:
+        raise HTTPException(403, "A recording may not fill %s for you. Type the note."
+                            % ", ".join(missing))
+    return {n: allowed[n] for n in wanted}, instrument
+
+
+@router.get("/scribe/templates")
+def scribe_templates(request: Request, station: str = ""):
+    """What a recording may fill at this station, for this caller: the
+    station's own default and switcher from `BUNDLE.scribe`, narrowed to what
+    this person's capabilities allow, plus the languages a recording may be
+    made in."""
+    user = caller(request)
+    allowed, _ = scribe_allowed(user)
+    cfg = BUNDLE.scribe.get(station) or {}
+    choose = [o for o in cfg.get("choose") or [] if o in allowed]
+    default = cfg.get("default") if cfg.get("default") in choose else None
+    return {"default": default,
+            "choose": [{"operation": o, "title": BUNDLE.operations[o]["title"]} for o in choose],
+            "languages": list(scribe.LANGUAGES)}
 
 
 def collect_if_consent_stands(session):
@@ -611,6 +632,7 @@ def collect_if_consent_stands(session):
 
 
 def scribe_or_404(session_id):
+    scribe.expire()
     session = scribe.SESSIONS.get(session_id)
     if not session:
         raise HTTPException(404, "no such scribe session %r. Nothing was kept."
@@ -619,13 +641,15 @@ def scribe_or_404(session_id):
 
 
 @router.post("/scribe/sessions")
-async def scribe_start(request: Request, thread: str = None, format: str = None):
+async def scribe_start(request: Request, thread: str = None, format: str = None,
+                       operations: str = "", language: str = "en-IN"):
     """The browser posts one recording here, as the raw body.
 
-    Three refusals before a byte leaves this machine, in this order: consent,
-    capability, and a connector that can be reached. Addendum E.3 is the first
-    of them: a visit without `capture.consented` is not recorded, and the
-    answer says so in words a receptionist could read to the patient.
+    Four refusals before a byte leaves this machine, in this order: consent,
+    the named templates, the language, and a connector that can be reached.
+    Addendum E.3 is the first of them: a visit without `capture.consented` is
+    not recorded, and the answer says so in words a receptionist could read to
+    the patient.
 
     The audio is bytes in this process and one temporary file in scribe.start,
     deleted in its `finally`. It is never written under this repository, never
@@ -638,17 +662,17 @@ async def scribe_start(request: Request, thread: str = None, format: str = None)
         raise HTTPException(403, "Capture consent is not recorded on this visit, so "
                                  "nothing may be recorded. Ask, record the consent, "
                                  "or type the note: the record is the same either way.")
-    targets, instrument = scribe_targets(user)
-    if not targets:
-        raise HTTPException(403, "No operation open to you here is declared for a "
-                                 "scribe. Type the note.")
+    if language not in scribe.LANGUAGES:
+        raise HTTPException(400, "Unknown language %r." % language)
+    picked, instrument = scribe_pick(user, operations.split(","))
     audio = await request.body()
     try:
         txn = await run_in_threadpool(
-            scribe.start, audio, suffix=_suffix(format or request.headers.get("content-type")))
+            scribe.start, audio, suffix=_suffix(format or request.headers.get("content-type")),
+            languages=scribe.LANGUAGES[language])
     except scribe.ScribeError as broke:
         raise HTTPException(503, str(broke))
-    session = scribe.begin(thread_id, user["id"], txn, targets, instrument=instrument)
+    session = scribe.begin(thread_id, user["id"], txn, picked, instrument=instrument)
     return scribe.public(session)
 
 
@@ -687,6 +711,19 @@ def scribe_withdraw(session_id: str, request: Request):
     this never touched them."""
     caller(request)
     return scribe.public(scribe.withdraw(scribe_or_404(session_id)))
+
+
+@router.post("/scribe/sessions/{session_id}/extract")
+async def scribe_extract(session_id: str, request: Request):
+    """The template switch. Rebuilds drafts from the transcript this kernel
+    already holds; nothing is uploaded and nothing is recorded again."""
+    user = caller(request)
+    session = scribe_or_404(session_id)
+    if session["status"] != "ready":
+        raise HTTPException(409, "There is no transcript to fill from yet.")
+    body = await request.json()
+    picked, _ = scribe_pick(user, body.get("operations") or [])
+    return scribe.public(await run_in_threadpool(scribe.refill, session, picked))
 
 
 @router.post("/scribe/webhook")

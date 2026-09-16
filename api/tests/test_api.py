@@ -368,6 +368,14 @@ def test_the_planner_only_answers_questions_the_operation_asks():
 # The connector is faked at the SDK boundary, not at api/scribe's own, so what
 # runs below is the real upload path: the real temporary file, the real
 # deletion, the real reading of a response recorded live on 2026-09-11.
+#
+# Eka is asked for a transcript only now (api/scribe.py, Task 3): there is no
+# more EMR-shaped answer to fake. A test that needs a draft fakes the
+# transcript here and monkeypatches api.extract's extract() to say what was
+# "heard" in it, same as api/scribe.py's own demo() does.
+
+import base64  # noqa: E402
+import importlib  # noqa: E402
 
 from api import scribe  # noqa: E402
 
@@ -407,9 +415,25 @@ def fake_scribe(*answers):
 RUNNING = {"data": {"output": [], "template_results": {}}}
 AUDIO = b"RIFFfake-consultation-audio"
 
+TRANSCRIPT = {"data": {"output": [], "template_results": {"transcript": [
+    {"template_id": "transcript", "status": "success",
+     "value": base64.b64encode(b"BP is 140 over 90").decode()}]}}}
+
+
+def fake_extract(fields, transcript):
+    ids = {f["link_id"] for f in fields}
+    return {"systolic": {"value": 140, "confidence": 0.95, "evidence": "BP is 140"}} \
+        if "systolic" in ids else {}
+
+
+def consented_thread():
+    """enc-003 stands at the doctor and already carries capture.agreed in the
+    seed, which composes to capture.consented (bundles/phc/seed.yaml)."""
+    return "enc-003"
+
 
 def test_a_visit_without_capture_consent_is_never_recorded():
-    fake = fake_scribe(scribe.SAMPLE)
+    fake = fake_scribe(TRANSCRIPT)
     # enc-002 stands at the nurse and nobody asked it for consent.
     reply = client.post("/api/scribe/sessions?thread=enc-002", content=AUDIO,
                         headers={"Content-Type": "audio/webm"})
@@ -421,55 +445,65 @@ def test_a_visit_without_capture_consent_is_never_recorded():
 
 
 def test_a_role_the_scribe_is_not_declared_for_is_refused():
-    fake = fake_scribe(scribe.SAMPLE)
-    reply = client.post("/api/scribe/sessions?thread=enc-003&role=pharmacist",
-                        content=AUDIO, headers={"Content-Type": "audio/webm"})
+    fake = fake_scribe(TRANSCRIPT)
+    thread = consented_thread()
+    reply = client.post(
+        f"/api/scribe/sessions?thread={thread}&role=pharmacist&operations=phc.op.vitals-record",
+        content=AUDIO, headers={"Content-Type": "audio/webm"})
     assert reply.status_code == 403
     assert fake.v2rx.uploads == []
 
 
 def test_the_recording_reaches_the_service_and_the_file_does_not_outlive_it():
-    fake = fake_scribe(RUNNING, scribe.SAMPLE)
-    reply = client.post("/api/scribe/sessions?thread=enc-003", content=AUDIO,
-                        headers={"Content-Type": "audio/webm"})
-    assert reply.status_code == 200, reply.text
-    body = reply.json()
-    assert body["status"] == "running"
-    assert "txn" not in body and "transaction_id" not in body, \
-        "the handle on somebody's consultation audio is not the browser's"
+    reset()
+    fake = fake_scribe(RUNNING, TRANSCRIPT)
+    scribe.extractor_module.extract = fake_extract
+    try:
+        thread = consented_thread()
+        reply = client.post(
+            f"/api/scribe/sessions?thread={thread}&role=nurse&operations=phc.op.vitals-record",
+            content=AUDIO, headers={"Content-Type": "audio/webm"})
+        assert reply.status_code == 200, reply.text
+        body = reply.json()
+        assert body["status"] == "running"
+        assert "txn" not in body and "transaction_id" not in body, \
+            "the handle on somebody's consultation audio is not the browser's"
 
-    sent = fake.v2rx.uploads[0]
-    assert sent["bytes"] == AUDIO
-    assert sent["path"].endswith(".webm"), "the browser said webm, so the file is webm"
-    assert not os.path.exists(sent["path"]), "the one copy is deleted in start()'s finally"
-    assert not sent["path"].startswith(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__)))), "nothing under this repository ever held it"
+        sent = fake.v2rx.uploads[0]
+        assert sent["bytes"] == AUDIO
+        assert sent["path"].endswith(".webm"), "the browser said webm, so the file is webm"
+        assert not os.path.exists(sent["path"]), "the one copy is deleted in start()'s finally"
+        assert not sent["path"].startswith(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)))), "nothing under this repository ever held it"
 
-    # The browser polls. The first answer is Eka's 202 with an empty output
-    # list, which is not a failure and must not be drawn as one.
-    waiting = client.get("/api/scribe/sessions/%s" % body["session"]).json()
-    assert waiting["status"] == "running" and waiting["drafts"] == []
-    got = client.get("/api/scribe/sessions/%s" % body["session"]).json()
-    assert got["status"] == "ready", got
-    values = {d["operation"]: d["values"] for d in got["drafts"]}
-    assert values["phc.op.consult-document"]["assessment"]
-    assert values["phc.op.rx-prescribe"]["medications"][0]["medication"] == "Amoxicillin 500 mg"
-    every = {k: v for d in got["drafts"] for k, v in d["values"].items()}
-    assert "temperature" not in every, "a recording never fills a number"
-    for d in got["drafts"]:
-        assert all(c < 0.9 for c in d["confidence"].values()), \
-            "every drafted value arrives unconfirmed"
+        # The browser polls. The first answer is Eka's 202 with an empty output
+        # list, which is not a failure and must not be drawn as one.
+        waiting = client.get(f"/api/scribe/sessions/{body['session']}?role=nurse").json()
+        assert waiting["status"] == "running" and waiting["drafts"] == []
+        got = client.get(f"/api/scribe/sessions/{body['session']}?role=nurse").json()
+        assert got["status"] == "ready", got
+        values = {d["operation"]: d["values"] for d in got["drafts"]}
+        assert values["phc.op.vitals-record"] == {"systolic": 140}
+        for d in got["drafts"]:
+            assert d["tick"] == ["systolic"], \
+                "a number filled by a recording is ticked, not silently trusted"
+            assert all(c <= 0.89 for c in d["confidence"].values()), \
+                "confidence sent to the renderer is capped at 0.89"
+    finally:
+        importlib.reload(scribe.extractor_module)
 
 
 def test_withdrawal_stops_the_fetching_and_drops_the_draft():
     fake = fake_scribe(RUNNING)
-    started = client.post("/api/scribe/sessions?thread=enc-003", content=AUDIO,
-                          headers={"Content-Type": "audio/webm"}).json()
+    thread = consented_thread()
+    started = client.post(
+        f"/api/scribe/sessions?thread={thread}&role=mo&operations=phc.op.consult-document",
+        content=AUDIO, headers={"Content-Type": "audio/webm"}).json()
     asked = fake.v2rx.asked
     gone = client.delete("/api/scribe/sessions/%s" % started["session"]).json()
     assert gone["status"] == "withdrawn" and gone["drafts"] == []
     # The job may well finish at the service. Nothing here ever looks again.
-    fake.v2rx.answers = [scribe.SAMPLE]
+    fake.v2rx.answers = [TRANSCRIPT]
     after = client.get("/api/scribe/sessions/%s" % started["session"]).json()
     assert after["status"] == "withdrawn" and after["drafts"] == []
     assert fake.v2rx.asked == asked, "a withdrawn session is never fetched again"
@@ -488,8 +522,9 @@ def test_consent_withdrawn_while_the_job_runs_stops_the_poll_and_the_webhook():
     with its own one question form, so this posts that instead.
     """
     fake = fake_scribe(RUNNING)
-    started = client.post("/api/scribe/sessions?thread=enc-003", content=AUDIO,
-                          headers={"Content-Type": "audio/webm"}).json()
+    started = client.post(
+        "/api/scribe/sessions?thread=enc-003&role=mo&operations=phc.op.consult-document",
+        content=AUDIO, headers={"Content-Type": "audio/webm"}).json()
     assert started["status"] == "running"
 
     stop = client.post("/api/operations/phc.op.capture-withdraw/commit?role=mo",
@@ -499,7 +534,7 @@ def test_consent_withdrawn_while_the_job_runs_stops_the_poll_and_the_webhook():
     assert "capture.withdrawn" in stop.json()["thread"]["flags"]
     assert "capture.consented" not in stop.json()["thread"]["flags"]
 
-    fake.v2rx.answers = [scribe.SAMPLE]          # the service finished anyway
+    fake.v2rx.answers = [TRANSCRIPT]             # the service finished anyway
     asked = fake.v2rx.asked
     after = client.get("/api/scribe/sessions/%s" % started["session"]).json()
     assert after["status"] == "withdrawn" and after["drafts"] == [], after
@@ -512,17 +547,19 @@ def test_consent_withdrawn_while_the_job_runs_stops_the_poll_and_the_webhook():
     assert fake.v2rx.asked == asked, "nor by the webhook"
 
     # And a second recording cannot be started on that visit at all.
-    again = client.post("/api/scribe/sessions?thread=enc-003", content=AUDIO,
-                        headers={"Content-Type": "audio/webm"})
+    again = client.post(
+        "/api/scribe/sessions?thread=enc-003&role=mo&operations=phc.op.consult-document",
+        content=AUDIO, headers={"Content-Type": "audio/webm"})
     assert again.status_code == 403, again.text
 
 
 def test_the_webhook_only_collects_a_session_this_kernel_started():
     # The callback fires when the job is done, so the service answers with the
     # draft the first time it is asked.
-    fake = fake_scribe(scribe.SAMPLE)
-    started = client.post("/api/scribe/sessions?thread=enc-003", content=AUDIO,
-                          headers={"Content-Type": "audio/webm"}).json()
+    fake = fake_scribe(TRANSCRIPT)
+    started = client.post(
+        "/api/scribe/sessions?thread=enc-003&role=mo&operations=phc.op.consult-document",
+        content=AUDIO, headers={"Content-Type": "audio/webm"}).json()
     txn = scribe.SESSIONS[started["session"]]["txn"]
 
     stranger = client.post("/api/scribe/webhook",
@@ -540,6 +577,50 @@ def test_a_session_id_nobody_started_is_a_404_that_says_so():
     reply = client.get("/api/scribe/sessions/scr-invented")
     assert reply.status_code == 404
     assert "Nothing was kept" in reply.json()["detail"]
+
+
+def test_templates_are_the_stations_and_the_callers():
+    body = client.get("/api/scribe/templates?station=doctor&role=mo").json()
+    assert body["default"] == "phc.op.consult-document"
+    assert [c["operation"] for c in body["choose"]] == \
+        ["phc.op.consult-document", "phc.op.rx-prescribe"]
+    assert "hi" in body["languages"] and "ta" in body["languages"]
+    nurse_as_pharmacist = client.get("/api/scribe/templates?station=nurse&role=pharmacist").json()
+    assert nurse_as_pharmacist["choose"] == [], "no capability, no template"
+
+
+def test_a_recording_fills_the_named_template_and_switches_without_rerecording():
+    reset()
+    fake = fake_scribe(TRANSCRIPT)
+    scribe.extractor_module.extract = fake_extract   # restored below
+    try:
+        thread = consented_thread()                  # the helper the consent test uses
+        started = client.post(
+            f"/api/scribe/sessions?thread={thread}&operations=phc.op.vitals-record"
+            "&language=hinglish&role=nurse",
+            content=AUDIO, headers={"Content-Type": "audio/webm"}).json()
+        ready = client.get(f"/api/scribe/sessions/{started['session']}?role=nurse").json()
+        assert ready["status"] == "ready", ready
+        assert ready["drafts"][0]["values"] == {"systolic": 140}
+        assert ready["drafts"][0]["tick"] == ["systolic"]
+        assert fake.v2rx.uploads[0]["bytes"] == AUDIO
+
+        switched = client.post(f"/api/scribe/sessions/{started['session']}/extract?role=mo",
+                               json={"operations": ["phc.op.consult-document"]}).json()
+        assert switched["operations"] == ["phc.op.consult-document"]
+        assert len(fake.v2rx.uploads) == 1, "switching never uploads again"
+
+        refused = client.post(
+            f"/api/scribe/sessions?thread={thread}&operations=phc.op.lab-order&role=mo",
+            content=AUDIO, headers={"Content-Type": "audio/webm"})
+        assert refused.status_code == 403, "not on the scribe's list"
+        too_many = client.post(
+            f"/api/scribe/sessions?thread={thread}&role=mo&operations="
+            "phc.op.consult-document,phc.op.rx-prescribe,phc.op.vitals-record",
+            content=AUDIO, headers={"Content-Type": "audio/webm"})
+        assert too_many.status_code == 400
+    finally:
+        importlib.reload(scribe.extractor_module)
 
 
 def test_roles_lists_presets_and_saves_a_deviation():
