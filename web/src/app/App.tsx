@@ -205,6 +205,7 @@ export function App() {
         onSettings={() => go("#/settings")}
         onCloseDrawer={() => setDrawer(false)}
       />
+      {drawer && <div className="drawer-scrim" onClick={() => setDrawer(false)} />}
       <div className="main">
         <Topbar
           title={title}

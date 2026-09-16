@@ -12,7 +12,10 @@ export function Topbar({ title, sub, theme, onSearch, onTheme, onMenu }: {
 }) {
   return (
     <header className="topbar">
-      <button className="icon-btn" onClick={onMenu} aria-label="Menu" style={{ display: "none" }} data-drawer>
+      {/* Below 768px the rail is a drawer and this is the only way to it.
+          It was inline-styled display:none with no rule to bring it back,
+          which left a phone with no navigation at all. shell.css shows it. */}
+      <button className="icon-btn topbar__menu" onClick={onMenu} aria-label="Open navigation">
         <Icon name="list" />
       </button>
       <div className="topbar__title">

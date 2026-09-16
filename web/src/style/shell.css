@@ -63,6 +63,9 @@
   border-bottom: 1px solid var(--color-border-subtle);
 }
 .topbar__title { min-width: 0; overflow: hidden; }
+/* Only where the rail is a drawer. Above that the rail is on screen and a
+   button to reveal it would open nothing. */
+.topbar__menu { display: none; }
 .topbar__spacer { margin-left: auto; }
 
 .workspace { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
@@ -78,6 +81,7 @@
 }
 @media (max-width: 768px) {
   .app-shell { grid-template-columns: minmax(0, 1fr); }
+  .topbar__menu { display: grid; }
   .sidebar { display: none; }
   .sidebar[data-open="true"] {
     display: flex; position: fixed; inset: 0 auto 0 0; width: 248px; z-index: 40;
@@ -87,5 +91,8 @@
   .sidebar[data-open="true"] .nav-item span,
   .sidebar[data-open="true"] .sidebar-group { display: initial; }
   .sidebar[data-open="true"] .nav-item { justify-content: flex-start; padding: var(--space-2) 10px; }
+  /* Tapping away closes it. Without this the drawer can only be dismissed by
+     the control that opened it, which is now behind the drawer. */
+  .drawer-scrim { position: fixed; inset: 0; z-index: 39; background: var(--color-accent); opacity: .28; }
   .workspace-scroll { padding: var(--space-4); }
 }
