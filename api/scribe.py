@@ -303,10 +303,14 @@ SESSIONS = {}
 
 
 def begin(thread, actor, txn, operations, instrument=""):
+    """A new session, already carrying its expiry. Set here and not only when a
+    transcript arrives, because a session that fails, is withdrawn or is simply
+    abandoned never gets a transcript and would otherwise never be dropped."""
     session = {"id": "scr-" + uuid.uuid4().hex[:12], "thread": thread,
                "actor": actor, "txn": txn, "operations": operations,
                "instrument": instrument, "status": "running", "reason": "",
-               "drafts": [], "transcript": "", "expires": None}
+               "drafts": [], "transcript": "",
+               "expires": time.time() + TRANSCRIPT_SECONDS}
     SESSIONS[session["id"]] = session
     return session
 
@@ -319,32 +323,38 @@ def by_txn(txn):
 
 
 def expire(now=None):
-    """Drop every transcript past its 24 hours. Called on every session read,
+    """Drop every session past its 24 hours. Called on every session read,
     so nothing needs a timer; a kernel nobody asks keeps nothing it could have
     dropped either, because a restart empties SESSIONS."""
     now = time.time() if now is None else now
-    for sid in [s for s, v in SESSIONS.items() if v["expires"] and v["expires"] <= now]:
+    for sid in [s for s, v in SESSIONS.items() if v["expires"] <= now]:
         del SESSIONS[sid]
 
 
 def refill(session, operations, *, extractor=None, today=None):
     """Build drafts for these operations from the transcript already held. The
-    template switch: no re-recording, no second upload."""
+    template switch: no re-recording, no second upload.
+
+    The model call takes seconds and a withdrawal can land in the middle of it.
+    So the drafts are built from a local copy of the transcript into a local
+    list, and written to the session only if it is still not withdrawn once
+    they exist. Writing as it went, and marking ready at the end, is how a
+    patient's stop used to be quietly undone by the model finishing."""
     extractor = extractor or extractor_module.extract
     today = today or date.today()
-    session["operations"] = operations
-    session["drafts"] = []
+    transcript = session["transcript"]
+    drafts = []
     for op_id, spec in sorted(operations.items()):
-        answers = extractor(filler.flatten(spec["schema"]), session["transcript"])
-        d = filler.build_draft(op_id, spec["schema"], answers, session["transcript"],
+        answers = extractor(filler.flatten(spec["schema"]), transcript)
+        d = filler.build_draft(op_id, spec["schema"], answers, transcript,
                                instrument=session["instrument"], today=today)
         if d:
-            session["drafts"].append(d)
-    if session["drafts"]:
-        session.update(status="ready", reason="")
-    else:
-        session.update(status="ready", reason="Nothing in the recording fills this form. "
-                       "The transcript is below. Type the note.")
+            drafts.append(d)
+    if session["status"] == "withdrawn":
+        return session
+    reason = "" if drafts else ("Nothing in the recording fills this form. "
+                                "The transcript is below. Type the note.")
+    session.update(operations=operations, drafts=drafts, status="ready", reason=reason)
     return session
 
 
@@ -358,13 +368,16 @@ def collect(session, *, extractor=None):
         return session
     if running(status):
         return session
-    session["transcript"] = transcript_of(status)
-    if not session["transcript"]:
+    if session["status"] == "withdrawn":     # withdrawn while the poll was out
+        return session
+    transcript = transcript_of(status)
+    if not transcript:
         said = failures(status)
         session.update(status="failed", reason="No transcript came back. %s Type the note."
                        % " ".join(said))
         return session
-    session["expires"] = time.time() + TRANSCRIPT_SECONDS
+    # The day is counted from when the transcript arrives, not from the upload.
+    session.update(transcript=transcript, expires=time.time() + TRANSCRIPT_SECONDS)
     return refill(session, session["operations"], extractor=extractor)
 
 
@@ -441,6 +454,27 @@ def demo():
 
     expire(now=s["expires"] + 1)
     assert s["id"] not in SESSIONS, "past a day the transcript is gone"
+
+    # A session that never reaches ready still ages out: failed, withdrawn and
+    # abandoned sessions are dropped on the same day as a transcript would be.
+    stuck = begin("enc-003", "user:mo", "phc-stuck", {}, instrument="i")
+    assert stuck["expires"] - time.time() > 24 * 3600 - 5, "every session has an expiry"
+    expire(now=stuck["expires"] + 1)
+    assert stuck["id"] not in SESSIONS, "a never-ready session does not live forever"
+
+    # A withdrawal that lands while the model is still reading is not undone
+    # when the model finishes.
+    racing = begin("enc-003", "user:mo", "phc-race", {"v.op": {"schema": vitals}},
+                   instrument="i")
+    racing.update(status="ready", transcript="BP is 140 over 90.")
+
+    def withdrawn_midway(fields, transcript):
+        withdraw(racing)
+        return fake(fields, transcript)
+
+    refill(racing, racing["operations"], extractor=withdrawn_midway)
+    assert racing["status"] == "withdrawn", racing
+    assert racing["drafts"] == [] and racing["transcript"] == "", racing
 
     withdrawn = begin("enc-003", "user:mo", "phc-z", {}, instrument="i")
     withdrawn["transcript"] = "something"
