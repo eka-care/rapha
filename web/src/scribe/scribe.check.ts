@@ -18,7 +18,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  apply, draftFor, elsewhere, narrative, pickMime, preview, reasonFor, sentence,
+  apply, draftFor, elsewhere, mustTick, pickMime, preview, reasonFor, sentence,
   type ScribeSession,
 } from "./session.ts";
 import type { Questionnaire } from "../types";
@@ -33,36 +33,53 @@ const ok = (cond: unknown, what: string) => {
   assert.ok(cond, `FAIL ${what}`);
 };
 
-const consult = schema("phc.schema.consult-v1");
-const vitals = schema("phc.schema.vitals-v1");
+// keep the schemas loaded: other properties in this file read them.
+schema("phc.schema.consult-v1");
+schema("phc.schema.vitals-v1");
 
-// -- 1. narrative and lists, never a number -------------------------------
-const allowed = narrative(consult);
-ok(allowed.has("history") && allowed.has("assessment"), "prose fields may be drafted");
-ok(allowed.has("diagnosis"), "a structured list may be drafted");
-ok(!allowed.has("capture_stop"), "the consent question is not the scribe's to answer");
-assert.deepEqual([...narrative(vitals)], [], "FAIL no field on the vitals form may be drafted");
-checks++;
+// 1. A number a recording filled cannot be committed until it is ticked, and
+//    editing it to something else makes it the person's number, not a heard one.
+{
+  const draft = {
+    instrument: "i", operation: "phc.op.vitals-record",
+    values: { systolic: 140, history: "fever" },
+    confidence: { systolic: 0.89, history: 0.89 },
+    evidence: { systolic: "BP is 140", history: "fever" },
+    tick: ["systolic"], unfilled: [], transcript: "BP is 140, fever",
+  };
+  assert.deepEqual(mustTick(draft, new Set(), { systolic: 140 }), ["systolic"]);
+  assert.deepEqual(mustTick(draft, new Set(["systolic"]), { systolic: 140 }), []);
+  assert.deepEqual(mustTick(draft, new Set(), { systolic: 120 }), [],
+    "typed over, so it is no longer a heard value");
+  assert.deepEqual(mustTick(null, new Set(), {}), []);
+  const applied = apply(draft, {});
+  assert.deepEqual(applied.fill, { systolic: 140, history: "fever" });
+  checks += 5;
+}
+// Nothing in the renderer still refuses numbers by type.
+assert.ok(!read("web/src/scribe/session.ts").includes("export function narrative"));
+checks += 1;
 
 const session: ScribeSession = {
-  session: "scr-1", status: "ready", reason: "",
+  session: "scr-1", status: "ready", reason: "", transcript: "", operations: [],
   drafts: [
     { instrument: "phc.inst.consult-scribe", operation: "phc.op.consult-document",
       values: { history: "fever for three days", assessment: "URTI",
-                diagnosis: [{ code: "Acute upper respiratory tract infection" }],
-                systolic: 138 },
-      confidence: { history: 0, assessment: 0, diagnosis: 0, systolic: 0 },
+                diagnosis: [{ code: "Acute upper respiratory tract infection" }] },
+      confidence: { history: 0, assessment: 0, diagnosis: 0 },
+      evidence: { history: "fever for three days", assessment: "URTI", diagnosis: "URTI" },
+      tick: [], unfilled: [],
       transcript: "Good morning. Fever for three days." },
     { instrument: "phc.inst.consult-scribe", operation: "phc.op.rx-prescribe",
       values: { medications: [{ medication: "Paracetamol 650 mg", dosage_instruction: "SOS" }] },
-      confidence: { medications: 0 }, transcript: "" },
+      confidence: { medications: 0 },
+      evidence: { medications: "Paracetamol 650 mg SOS" }, tick: [], unfilled: [],
+      transcript: "" },
   ],
 };
 
-const empty = apply(draftFor(session, "phc.op.consult-document"), allowed, {});
+const empty = apply(draftFor(session, "phc.op.consult-document"), {});
 assert.deepEqual(Object.keys(empty.fill).sort(), ["assessment", "diagnosis", "history"]);
-checks++;
-assert.deepEqual(empty.refused, ["systolic"], "FAIL a number in a draft is dropped, not filled");
 checks++;
 ok(empty.held.length === 0, "an empty form takes the whole draft");
 
@@ -73,7 +90,7 @@ for (const d of session.drafts)
     ok(c < 0.9, "a drafted value is never confirmed by the machine that drafted it");
 
 // -- 2. what a doctor typed stands ----------------------------------------
-const typed = apply(draftFor(session, "phc.op.consult-document"), allowed,
+const typed = apply(draftFor(session, "phc.op.consult-document"),
                     { history: "pt says fever x3d", diagnosis: [] });
 ok(!("history" in typed.fill), "a field the doctor typed into is not overwritten");
 assert.deepEqual(typed.held.map((h) => h.link_id), ["history"]);

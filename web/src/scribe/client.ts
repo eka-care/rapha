@@ -38,14 +38,36 @@ async function ask(path: string, init: RequestInit): Promise<ScribeSession> {
   return JSON.parse(body) as ScribeSession;
 }
 
+export type Templates = {
+  default: string | null;
+  choose: { operation: string; title: string }[];
+  languages: string[];
+};
+
+/** What this station may be recorded into, and the language choices, ahead of
+ *  the microphone being pressed at all. */
+export async function templates(station: string): Promise<Templates> {
+  const res = await fetch(`${API_BASE}${ROUTE.replace("/sessions", "/templates")}?station=${encodeURIComponent(station)}`,
+                          { headers: { "X-PHC-Role": currentRole() } });
+  if (!res.ok) throw new ApiError(`The kernel answered ${res.status}.`, "Type the note.", res.status);
+  return res.json();
+}
+
 /** Hand one recording to the kernel. The blob is the body: no multipart, no
  *  base64, and no field around it that could carry a patient's name. */
-export const startSession = (thread: string, audio: Blob) =>
-  ask(`${ROUTE}?thread=${encodeURIComponent(thread)}`,
+export const startSession = (thread: string, audio: Blob, operations: string[], language: string) =>
+  ask(`${ROUTE}?thread=${encodeURIComponent(thread)}&operations=${encodeURIComponent(operations.join(","))}` +
+      `&language=${encodeURIComponent(language)}`,
       { method: "POST", body: audio, headers: { "Content-Type": audio.type || "audio/webm" } });
 
 export const pollSession = (id: string) =>
   ask(`${ROUTE}/${encodeURIComponent(id)}`, { method: "GET" });
+
+/** Fill more operations from a session already transcribed, without
+ *  re-recording: the transcript stands, only the questionnaire is new. */
+export const refill = (id: string, operations: string[]) =>
+  ask(`${ROUTE}/${encodeURIComponent(id)}/extract`,
+      { method: "POST", body: JSON.stringify({ operations }), headers: { "Content-Type": "application/json" } });
 
 /** Withdrawal, and also the doctor giving up on it. Same call, because the
  *  effect is the one thing E.3 asks for: nothing further is fetched and any

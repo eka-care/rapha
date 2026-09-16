@@ -10,14 +10,13 @@
  *  Everything here is pure and is what `scribe.check.ts` runs; the three calls
  *  themselves are in client.ts.
  *
- *  The rule this file holds is the instrument rule: a recording may fill a
- *  narrative or structured field and may never fill a number, so a draft value
- *  for a numeric question is dropped here as well as being absent from what the
- *  kernel sends. Two gates, because a misheard number is silent, plausible and
- *  unrecoverable.
+ *  The rule this file holds is the tick rule: the kernel may fill any question
+ *  its instrument declares, numbers included, but a non-text value it filled
+ *  is not committed on the strength of the recording alone. It needs a
+ *  person's tick, and editing it to something else -- rather than ticking it
+ *  -- makes it the person's number, not a heard one.
  */
-import type { Payload, Question, Questionnaire } from "../types";
-import { walk } from "../validate.ts";      // the extension is for node: scribe.check.ts runs this outside vite
+import type { Payload } from "../types";
 
 export type ScribeStatus = "running" | "ready" | "failed" | "withdrawn";
 
@@ -33,6 +32,12 @@ export type ScribeDraft = {
    *  carries is a boolean about whether a diagnosis matched a code, and
    *  audio_matrix is about the recording rather than the words. */
   confidence: Record<string, number>;
+  /** The words each value was taken from, shown beside the field. */
+  evidence: Record<string, string>;
+  /** Non-text values: each needs a person's tick before Commit. */
+  tick: string[];
+  /** Heard, but not a value this form can hold. Named, never guessed into a field. */
+  unfilled: string[];
   transcript: string;
 };
 
@@ -41,6 +46,8 @@ export type ScribeSession = {
   status: ScribeStatus;
   reason: string;
   drafts: ScribeDraft[];
+  transcript: string;
+  operations: string[];
 };
 
 // ----------------------------------------------------------------- the pure half
@@ -65,41 +72,47 @@ export const draftFor = (s: ScribeSession | null, operation: string): ScribeDraf
 export const elsewhere = (s: ScribeSession | null, operation: string): string[] =>
   (s?.drafts ?? []).map((d) => d.operation).filter((id) => id !== operation);
 
-/** The link_ids a recording is allowed to fill on this form: narrative and
- *  structured, never a number. Same rule as web/src/voice/instruments.ts
- *  applies in the other direction, and it is the renderer's own, not a
- *  courtesy extended to whatever the server sent. */
-export function narrative(schema: Questionnaire): Set<string> {
-  return new Set(
-    walk(schema.questions)
-      .filter((q: Question) => q.type === "text" || q.type === "structured")
-      .map((q: Question) => q.link_id),
-  );
-}
-
 export type Applied = {
   /** Goes straight into the empty fields, marked unconfirmed. */
   fill: Record<string, unknown>;
   /** A field the person already typed into. Their text stands; the drafted
    *  text is offered beside it and taken only by a tap. */
   held: { link_id: string; value: unknown }[];
-  /** A value for a question a recording may not fill. Should be empty: the
-   *  server fills no numeric field either. Shown if it ever is not. */
+  /** Kept for type compatibility with callers that still read it. The kernel
+   *  fills only what its instrument declares, so this is always empty. */
   refused: string[];
 };
 
-export function apply(draft: ScribeDraft | null, allowed: Set<string>, payload: Payload): Applied {
+export function apply(draft: ScribeDraft | null, payload: Payload): Applied {
   const out: Applied = { fill: {}, held: [], refused: [] };
   for (const [link_id, value] of Object.entries(draft?.values ?? {})) {
-    if (!allowed.has(link_id)) {
-      out.refused.push(link_id);
-    } else if (typed(payload[link_id])) {
-      out.held.push({ link_id, value });
-    } else {
-      out.fill[link_id] = value;
-    }
+    if (typed(payload[link_id])) out.held.push({ link_id, value });
+    else out.fill[link_id] = value;
   }
   return out;
+}
+
+/** The ticked fields still owed before Commit: values the kernel heard that
+ *  have not been ticked, and have not been typed over either -- typing over
+ *  one makes it the person's number, not a heard one, and it drops off this
+ *  list without ever being ticked. */
+export function mustTick(draft: ScribeDraft | null, ticked: Set<string>, payload: Payload): string[] {
+  return (draft?.tick ?? []).filter(
+    (id) => !ticked.has(id) && JSON.stringify(payload[id]) === JSON.stringify(draft!.values[id]),
+  );
+}
+
+/** The operation a doctor filled from a recording last time, at this station.
+ *  Not a preference worth losing to a private window or a cleared cache: a
+ *  wrong guess costs one extra tap, on the picker this restores. */
+const KEY = (role: string, station: string) => `scribe.template.${role}.${station}`;
+
+export function lastTemplate(role: string, station: string): string | null {
+  try { return localStorage.getItem(KEY(role, station)); } catch { return null; }
+}
+
+export function rememberTemplate(role: string, station: string, op: string) {
+  try { localStorage.setItem(KEY(role, station), op); } catch { /* private mode */ }
 }
 
 /** Whether a person has already put something in this field. An empty string,
