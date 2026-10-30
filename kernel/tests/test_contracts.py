@@ -10,9 +10,11 @@ from __future__ import annotations
 import dataclasses
 import json
 import pathlib
+from datetime import date
 
 import yaml
 
+from api import fill
 from care_phc.thread import LINE, STORED
 from catalogue import validate, vocab
 from catalogue.build import parse
@@ -95,11 +97,110 @@ def test_voice_and_scribe_instruments_read_back_and_commit_by_tap():
             schema = validate.load(CAT["operations"][op]["input"])
             link_ids = {q["link_id"] for q in validate.walk(schema["questions"])}
             assert set(inst.fields) <= link_ids or not inst.fields, f"{iid}: unknown field"
-            if inst.kind == "scribe":
-                assert CAT["operations"][op]["instrument"] != "device", \
-                    f"{iid}: scribe offered on a numeric station"
         if inst.kind == "constrained-voice":
             assert inst.grammar in c.VOICE_GRAMMARS
+    # A scribe used to be refused outright on a numeric station. It is now
+    # offered there, behind a per field tick: see the test below, which is
+    # where that property is checked.
+
+
+# Free text and structured rows arrive unconfirmed but without a tick; groups
+# and display items carry no value at all. Every other CARE type is a discrete
+# value and must be ticked. Splitting the vocabulary three ways here means a
+# new CARE question type fails this check until somebody decides which it is.
+_UNTICKED = {"string", "text", "url", "structured"}
+_STRUCTURAL = {"group", "display"}
+
+
+def _say(field):
+    """Something a person could plausibly have said into this field, by type.
+
+    Deliberately total: an unhandled type raises rather than being skipped,
+    because a silently skipped field is a field this check does not cover
+    while still reading as coverage.
+    """
+    kind = field["type"]
+    if kind == "integer":
+        return "3"
+    if kind == "decimal":
+        return "3.5"
+    if kind == "quantity":
+        return "3"
+    if kind == "boolean":
+        return "yes"
+    if kind in ("date", "dateTime"):
+        return "2026-01-02"
+    if kind == "time":
+        return "09:30"
+    if kind == "choice":
+        assert field["options"], f"{field['link_id']}: a choice with no options"
+        return field["options"][0]
+    raise AssertionError(f"this check cannot speak a {kind}: teach it one")
+
+
+def test_every_non_text_value_a_recording_fills_comes_back_owing_a_tick():
+    """The replacement for "a scribe is never offered on a numeric station".
+
+    That rule was reversed by decision 4 of
+    docs/superpowers/specs/2026-09-16-scribe-design.md: a recording may fill a
+    number, and the safety property moves to a per field tick. The clinical
+    risk is unchanged. A misheard "one forty" for "one fourteen" is silent,
+    plausible and unrecoverable, so no heard discrete value may reach the
+    record without a person confirming that one value.
+
+    Be clear about what was traded. The old rule was structural and lived
+    here: the kernel would not let a scribe near a numeric form at all, so no
+    renderer could get it wrong. The new rule is split in two. This check owns
+    the half that is still structural and still kernel side:
+
+      every non-text value a scribe instrument can fill is a type the draft
+      builder puts in `tick`, so the draft that reaches the renderer always
+      says which values are owed a confirmation.
+
+    The other half, that Commit stays disabled until each owed value is
+    ticked, is renderer side only (kernel/DECLARATIONS.md section 4 says so)
+    and is checked in web/src/scribe/scribe.check.ts. The kernel cannot
+    enforce it: the guard sees a payload of tapped values and has no way to
+    tell which of them were heard rather than typed. A renderer that ignored
+    `tick` would commit unconfirmed numbers and this check would not catch it.
+    """
+    assert set(validate.TYPES) == set(fill.TICK_TYPES) | _UNTICKED | _STRUCTURAL, \
+        "a CARE question type is in neither the ticked nor the untickable set"
+    assert not set(fill.TICK_TYPES) & _UNTICKED, "a type cannot be both"
+    # Named, because the cheap way to defeat the rest of this check is to move
+    # a type out of TICK_TYPES rather than to stop ticking it. These six are
+    # the ones that are dangerous when misheard.
+    assert {"integer", "decimal", "quantity", "date", "choice", "boolean"} \
+        <= set(fill.TICK_TYPES), "a heard number, date, choice or yes/no is always owed a tick"
+
+    seen = 0
+    for iid, fm in _of("instrument").items():
+        inst = c.Instrument(**fm)
+        if inst.kind != "scribe":
+            continue
+        for op in inst.operations:
+            schema = validate.load(CAT["operations"][op]["input"])
+            fields = fill.flatten(schema)
+            assert fields, f"{iid}: {op} has no answerable question"
+            discrete = [f for f in fields if f["type"] not in _UNTICKED]
+            for f in discrete:
+                assert f["type"] in fill.TICK_TYPES, \
+                    f"{iid}/{op}/{f['link_id']}: a {f['type']} is neither free text nor ticked"
+            # Not just the type table: the draft the kernel actually builds for
+            # this operation names every one of those fields in `tick`.
+            answers = {f["link_id"]: {"value": _say(f), "confidence": 1.0,
+                                      "evidence": "said so"} for f in discrete}
+            if not answers:
+                continue
+            draft = fill.build_draft(op, schema, answers, "said so",
+                                     instrument=iid, today=date(2026, 1, 2))
+            assert draft, f"{iid}/{op}: nothing coerced, so this check proved nothing"
+            assert set(draft["values"]) == set(answers), \
+                f"{iid}/{op}: {set(answers) - set(draft['values'])} did not coerce"
+            assert set(draft["tick"]) == set(answers), \
+                f"{iid}/{op}: heard but not owed a tick: {set(answers) - set(draft['tick'])}"
+            seen += len(answers)
+    assert seen, "no scribe instrument fills a discrete value, so nothing was checked"
 
 
 def test_views_and_metrics_name_only_declared_things():

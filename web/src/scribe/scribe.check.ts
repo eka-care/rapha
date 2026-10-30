@@ -4,9 +4,12 @@
  *
  *  Four properties, in the order they matter:
  *
- *  1. A recording never fills a number. The kernel does not send one and this
- *     side drops one if it ever does, so the property survives a change on
- *     either side of the wire.
+ *  1. A recording may fill a number, and Commit is held until a person ticks
+ *     each heard non-text value. This is the half of the old "a recording
+ *     never fills a number" rule that survives, and it lives only here: the
+ *     kernel marks which values are owed a tick (api/fill.py TICK_TYPES,
+ *     checked in kernel/tests/test_contracts.py) but cannot hold the commit,
+ *     because the guard cannot tell a heard value from a typed one.
  *  2. Nothing a doctor typed is overwritten by a draft that arrives later.
  *  3. Nothing on this path can write: no module under web/src/scribe contains
  *     commit or confirm, and the panel's two writes are still inside the one
