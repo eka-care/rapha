@@ -123,7 +123,7 @@ def test_every_operation_in_the_bundle_writes_a_row_with_something_in_it():
 def test_a_column_this_table_does_not_have_is_refused_and_not_dropped():
     store = fresh()
     try:
-        store.write("observation", {"code": "systolic", "value": 118,
+        store.write("observation", {"code": "8480-6", "value": 118,
                                     "override_reason": "on the other arm"},
                     thread="enc-002")
     except ValueError as e:
@@ -139,12 +139,18 @@ def test_the_vitals_payload_fans_out_into_one_row_per_reading():
         store.write(resource, row, thread="enc-002")
     rows = store.select("observation", thread="enc-002",
                         where={"category": "vital-signs"},
-                        fields=["code", "value", "unit"], limit=10)
-    # rows written in the same second sort by id, which is a uuid, so this
-    # says nothing about their order and only about what was written.
+                        fields=["code", "code_system", "code_display", "value",
+                                "unit", "unit_system"], limit=10)
+    # The code is the question's bound LOINC concept, which is what makes a
+    # row countable in another facility: `WHERE code = '8480-6'` means the
+    # same thing everywhere and `WHERE code = 'systolic'` means nothing
+    # outside this questionnaire.
     by_code = {r["code"]: r for r in rows}
-    assert set(by_code) == {"systolic", "diastolic", "pulse"}
-    assert by_code["systolic"] == {"code": "systolic", "value": "118", "unit": "mm[Hg]"}
+    assert set(by_code) == {"8480-6", "8462-4", "8867-4"}, sorted(by_code)
+    assert by_code["8480-6"] == {
+        "code": "8480-6", "code_system": "http://loinc.org",
+        "code_display": "Systolic blood pressure", "value": "118",
+        "unit": "mm[Hg]", "unit_system": "http://unitsofmeasure.org"}, by_code["8480-6"]
 
 
 def test_a_flag_raised_twice_is_one_flag():

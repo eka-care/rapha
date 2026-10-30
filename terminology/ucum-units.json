@@ -1,0 +1,47 @@
+{
+  "slug": "ucum-units",
+  "title": "Units of measure",
+  "system": "http://unitsofmeasure.org",
+  "binding": "a questionnaire question's `unit`, read from styling_metadata.phc.unit",
+  "generated": "2026-10-31",
+  "source": "Every unit symbol the shipped questionnaires declare, at bundles/*/ and questionnaires/*.json. A declared unit is a bound unit whether or not any mapping projects it today, which is what stops 'mmol per litre' reaching a column FHIR says is UCUM. UCUM is a small grammar rather than a code list, so a cache of the symbols in use is the honest shape until a real validator is behind the seam; see the ceiling in kernel/terminology.py.",
+  "verified": "unverified",
+  "concepts": {
+    "%": {
+      "display": "percent",
+      "verified": "unverified: UCUM case sensitive symbol"
+    },
+    "/min": {
+      "display": "per minute",
+      "verified": "unverified: UCUM case sensitive symbol"
+    },
+    "10*3/uL": {
+      "display": "thousand per microlitre",
+      "verified": "unverified: UCUM case sensitive symbol"
+    },
+    "Cel": {
+      "display": "degree Celsius",
+      "verified": "unverified: UCUM case sensitive symbol"
+    },
+    "g/dL": {
+      "display": "gram per decilitre",
+      "verified": "unverified: UCUM case sensitive symbol"
+    },
+    "kg": {
+      "display": "kilogram",
+      "verified": "unverified: UCUM case sensitive symbol"
+    },
+    "mg/dL": {
+      "display": "milligram per decilitre",
+      "verified": "unverified: UCUM case sensitive symbol"
+    },
+    "mm[Hg]": {
+      "display": "millimetre of mercury",
+      "verified": "unverified: UCUM case sensitive symbol"
+    },
+    "mmol/L": {
+      "display": "millimole per litre",
+      "verified": "unverified: UCUM case sensitive symbol"
+    }
+  }
+}

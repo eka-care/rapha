@@ -89,13 +89,27 @@ GOLDEN = {
                                 "dosage_instruction": "1 tab TDS",
                                 "status": "active"}),
     ],
+    # The code is the question's bound LOINC concept and not its link_id, and
+    # each coding spans the three columns a FHIR Coding has. Nothing here can
+    # be written by hand into the record: a Coding exists only if the value
+    # set its question binds to vouched for it, so these three expected rows
+    # are also an assertion that the binding resolved.
     "phc.op.vitals-record": [
-        ("observation", {"category": "vital-signs", "code": "systolic",
-                         "value": "118", "unit": "mm[Hg]"}),
-        ("observation", {"category": "vital-signs", "code": "diastolic",
-                         "value": "76", "unit": "mm[Hg]"}),
-        ("observation", {"category": "vital-signs", "code": "pulse",
-                         "value": "80", "unit": "/min"}),
+        ("observation", {"category": "vital-signs", "code": "8480-6",
+                         "code_system": "http://loinc.org",
+                         "code_display": "Systolic blood pressure",
+                         "value": "118", "unit": "mm[Hg]",
+                         "unit_system": "http://unitsofmeasure.org"}),
+        ("observation", {"category": "vital-signs", "code": "8462-4",
+                         "code_system": "http://loinc.org",
+                         "code_display": "Diastolic blood pressure",
+                         "value": "76", "unit": "mm[Hg]",
+                         "unit_system": "http://unitsofmeasure.org"}),
+        ("observation", {"category": "vital-signs", "code": "8867-4",
+                         "code_system": "http://loinc.org",
+                         "code_display": "Heart rate",
+                         "value": "80", "unit": "/min",
+                         "unit_system": "http://unitsofmeasure.org"}),
     ],
 }
 
@@ -131,10 +145,20 @@ def test_an_unanswered_question_is_no_row_and_not_an_empty_one():
 def test_the_unit_comes_from_the_questionnaire_and_is_written_nowhere_else():
     (record,) = OPERATIONS["phc.op.vitals-record"]["mapping"]
     assert record["fields"]["unit"] == {"question": "unit"}
-    assert {q["link_id"]: q["unit"] for q in record["per_question"]}["spo2"] == "%"
+    by_link = {q["link_id"]: q for q in record["per_question"]}
+    assert by_link["spo2"]["unit"] == "%"
+    # The unit is declared once, in styling_metadata.phc.unit, next to the
+    # range that validates it. What is new is that the same string is now
+    # bound to the UCUM value set at build time, so the symbol that reaches a
+    # FHIR Quantity is one UCUM vouched for and the system travels with it.
+    assert by_link["spo2"]["unit_system"] == "http://unitsofmeasure.org"
     rows = mapping.records(OPERATIONS["phc.op.vitals-record"], {"spo2": 97})
-    assert rows == [("observation", {"category": "vital-signs", "code": "spo2",
-                                     "value": 97, "unit": "%"})], rows
+    assert rows == [("observation", {
+        "category": "vital-signs", "code": "59408-5",
+        "code_system": "http://loinc.org",
+        "code_display": "Oxygen saturation in Arterial blood by Pulse oximetry",
+        "value": 97, "unit": "%",
+        "unit_system": "http://unitsofmeasure.org"})], rows
 
 
 def test_every_write_operation_in_the_bundle_declares_a_mapping():
@@ -194,9 +218,12 @@ def test_a_row_with_no_author_fails_the_build():
 def test_the_author_lands_on_every_row_and_never_stands_in_for_an_answer():
     op = OPERATIONS["phc.op.vitals-record"]
     rows = mapping.records(op, {"spo2": 97}, actor="user:nurse")
-    assert rows == [("observation", {"created_by": "user:nurse",
-                                     "category": "vital-signs", "code": "spo2",
-                                     "value": 97, "unit": "%"})], rows
+    assert rows == [("observation", {
+        "created_by": "user:nurse", "category": "vital-signs",
+        "code": "59408-5", "code_system": "http://loinc.org",
+        "code_display": "Oxygen saturation in Arterial blood by Pulse oximetry",
+        "value": 97, "unit": "%",
+        "unit_system": "http://unitsofmeasure.org"})], rows
     # An author is not an answer: a payload that produced nothing is still no
     # row, not a row carrying only its author.
     assert mapping.records(op, {}, actor="user:nurse") == []

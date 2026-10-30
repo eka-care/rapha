@@ -14,6 +14,7 @@
       "link_id": "systolic",
       "text": "Systolic BP",
       "type": "integer",
+      "code": "8480-6",
       "required": true,
       "is_observation": true,
       "styling_metadata": {
@@ -35,6 +36,7 @@
       "link_id": "diastolic",
       "text": "Diastolic BP",
       "type": "integer",
+      "code": "8462-4",
       "required": true,
       "is_observation": true,
       "styling_metadata": {
@@ -56,6 +58,7 @@
       "link_id": "pulse",
       "text": "Pulse",
       "type": "integer",
+      "code": "8867-4",
       "required": true,
       "is_observation": true,
       "styling_metadata": {
@@ -77,6 +80,7 @@
       "link_id": "spo2",
       "text": "SpO2",
       "type": "integer",
+      "code": "59408-5",
       "required": false,
       "is_observation": true,
       "styling_metadata": {
@@ -98,6 +102,7 @@
       "link_id": "weight",
       "text": "Weight",
       "type": "decimal",
+      "code": "29463-7",
       "required": false,
       "is_observation": true,
       "styling_metadata": {
@@ -114,6 +119,7 @@
       "link_id": "temperature",
       "text": "Temperature",
       "type": "decimal",
+      "code": "8310-5",
       "required": false,
       "is_observation": true,
       "styling_metadata": {

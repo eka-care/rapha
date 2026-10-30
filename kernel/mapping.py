@@ -93,6 +93,7 @@ import re
 
 from catalogue import validate
 from catalogue.build import parse
+from kernel import terminology
 
 OPS = pathlib.Path(__file__).parents[1] / "catalogue" / "ops"
 
@@ -105,7 +106,41 @@ PAYLOAD_FREE = ("const", "actor")
 ACTOR_FACTS = ("id",)
 ITEM_ONLY = ("item", "minus")
 QUESTION_ONLY = ("question",)
-QUESTION_FACTS = ("link_id", "answer", "unit")
+# What `{question: X}` may ask about the question a row is being made for.
+# `link_id` and `answer` are facts about the form. The five below are facts a
+# question's BINDING produced, which is why this file imports
+# kernel/terminology.py, and each maps to (which binding, which part of that
+# binding's coding).
+#
+# How invariant I1 is held, in two places, because one of them cannot be
+# enough:
+#
+#   at build time, _compile_record resolves each of these through
+#   Terminology.bound(), whose only way to return anything is to have found
+#   the code in the value set. A question declaring a code its value set does
+#   not hold fails the build.
+#
+#   at write time, _value re-checks the code against the same authority before
+#   it will fill a column with it. That check is not a formality: the compiled
+#   mapping goes on the wire as plain JSON (web/src/structured.ts reads it, so
+#   web/src/messages.check.ts json.dumps it), which means the Coding object
+#   cannot travel and the facts arrive as strings. A string carries no proof,
+#   so the proof is re-established where the row is made.
+#
+# The re-check is a dict lookup in an lru_cached local file. No socket, no
+# database, nothing that can be down. CARE pays a Postgres read plus an HTTP
+# round trip per bound field per write for the same guarantee, and stubs the
+# whole thing out in its test suite because of it.
+CODING_FACTS = {
+    "code": ("code", "code"),
+    "code_system": ("code", "system"),
+    "code_display": ("code", "display"),
+    "unit": ("unit", "code"),
+    "unit_system": ("unit", "system"),
+}
+# Which value set each binding is closed over.
+CODING_BINDING = {"code": terminology.CODE_BINDING, "unit": terminology.UNIT_BINDING}
+QUESTION_FACTS = ("link_id", "answer") + tuple(CODING_FACTS)
 LINK_LISTS = ("joined", "note")
 RECORD_KEYS = ("resource", "per_item", "per_question", "fields")
 MAPPING_KEYS = ("records", "ignored")
@@ -138,6 +173,31 @@ def _first(context, keys):
     return None
 
 
+def _bound_fact(fact, context, terminology_=None):
+    """One fact a question's binding produced, re-checked before it is stored.
+
+    This is the write path half of invariant I1, and the clause that makes it
+    a check and not a comment is the `validate` call: a code the value set
+    does not hold stops the write rather than becoming a row. A missing fact
+    stops it too, because a coding column that lands null is the silent
+    failure this file exists to prevent.
+    """
+    which, _ = CODING_FACTS[fact]
+    code = context.get(which if which != "code" else "code")
+    value = context.get(fact)
+    where = context.get("link_id")
+    if _blank(code) or _blank(value):
+        raise terminology.UnboundCoding(
+            "question %r has no %s binding, so {question: %s} has nothing a "
+            "value set vouched for" % (where, which, fact))
+    t = terminology_ or terminology.LOCAL
+    if not t.validate(CODING_BINDING[which], code):
+        raise terminology.UnboundCoding(
+            "question %r would store %r, which value set %r does not hold"
+            % (where, code, CODING_BINDING[which]))
+    return value
+
+
 def _value(source, payload, context, actor=None):
     (kind, arg), = source.items()
     if kind == "const":
@@ -152,6 +212,8 @@ def _value(source, payload, context, actor=None):
         value = _first(context, arg)
         return None if _blank(value) else "-%s" % value
     if kind == "question":
+        if arg in CODING_FACTS:
+            return _bound_fact(arg, context)
         return context.get(arg)
     if kind == "joined":
         return " ".join(str(payload[k]) for k in arg
@@ -234,6 +296,13 @@ def _lint_source(source, where, record, questions, fail):
                 if not _unit(questions.get(link_id)):
                     fail("%s: question '%s' declares no unit, so {question: unit} "
                          "has nothing to read" % (where, link_id))
+        elif arg in CODING_FACTS:
+            which, _ = CODING_FACTS[arg]
+            for link_id in record.get("per_question") or []:
+                if not _declares(questions.get(link_id), which):
+                    fail("%s: question '%s' binds no %s, so {question: %s} has "
+                         "nothing a value set vouched for. Declare it, or stop "
+                         "writing that column" % (where, link_id, which, arg))
         return set()
     if kind == "answer":
         if arg not in questions:
@@ -260,6 +329,19 @@ def _lint_source(source, where, record, questions, fail):
 
 def _unit(question):
     return ((question or {}).get("styling_metadata") or {}).get("phc", {}).get("unit")
+
+
+def _declares(question, which):
+    """Does this question bind a coding of this kind at all?
+
+    A question's own concept is declared as a bare `code`; its unit is read
+    from styling_metadata.phc.unit, where it already lives next to the range
+    that validates it. Neither is moved and neither is duplicated: see
+    kernel/terminology.question_codings.
+    """
+    if which == "unit":
+        return bool(_unit(question))
+    return bool((question or {}).get("code"))
 
 
 def _lint_record(record, index, writes, questions, fail):
@@ -366,17 +448,51 @@ def compile_records(fm, schema):
 
     if failures:
         return [], failures
-    return [_compile_record(r, questions) for r in declared], []
+    try:
+        return [_compile_record(r, questions) for r in declared], []
+    except terminology.UnboundCoding as exc:
+        # A declared code outside its value set is a build failure, reported
+        # like every other lint line rather than raised as a traceback: the
+        # person who mistyped a LOINC code should read it next to whatever
+        # else is wrong with the atom.
+        return [], ["%s" % exc]
 
 
-def _compile_record(record, questions):
+def _compile_record(record, questions, terminology_=None):
+    """One compiled record.
+
+    Compiling resolves two things so that evaluation never opens a file: the
+    per_question facts, and the bound codings. The codings are resolved HERE,
+    at build time, once per question per build, and not once per write: the
+    local cache is the authority and it does not change between builds, so a
+    per write lookup would buy nothing and put a file read on the hot path.
+    CARE pays a database read plus an HTTP round trip per bound field per
+    write; this pays none. kernel/terminology.py says more about why.
+    """
     return {
         "resource": record["resource"],
         "per_item": record.get("per_item"),
-        "per_question": [{"link_id": link_id, "unit": _unit(questions[link_id])}
+        "per_question": [_compile_question(questions[link_id], terminology_)
                          for link_id in record.get("per_question") or []] or None,
         "fields": dict(record["fields"]),
     }
+
+
+def _compile_question(question, terminology_=None):
+    """One per_question context: plain JSON, every coding fact resolved.
+
+    Plain JSON because this travels. The compiled mapping is served on
+    /operations and read by web/src/structured.ts, so a Coding object here
+    would be a 500 on the thread panel and a failed renderer check. The
+    objects do their work in question_codings() and then only their facts
+    survive, which is why _bound_fact re-checks one before storing it.
+    """
+    codings = terminology.question_codings(question, terminology_)
+    out = {"link_id": question["link_id"]}
+    for fact, (which, attr) in CODING_FACTS.items():
+        coding = codings.get(which)
+        out[fact] = getattr(coding, attr) if coding is not None else None
+    return out
 
 
 def load(ops_dir=OPS):

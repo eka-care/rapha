@@ -14,7 +14,7 @@ sections:
   - title: Vitals
     resource: observation
     where: {category: vital-signs}
-    fields: [code, value, unit, created_date]
+    fields: [code_display, value, unit, created_date]
   - title: Notes
     resource: notes
     fields: [text, created_by, created_date]

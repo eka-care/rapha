@@ -57,7 +57,20 @@ TABLES = {
     "patient": ("id", "name", "age", "sex", "phone", "village", "category",
                 "abha_number", "created_by", "created_date"),
     "encounter": ("id", "patient", "status", "token", "created_by", "created_date"),
-    "observation": ("id", "encounter", "category", "code", "value", "unit",
+    # A coding is three columns, not one: the code, the system it is from, and
+    # the display the value set gave it. Flat, because a district count is
+    # `WHERE code = '8480-6'` and a trend is an ORDER BY, and both want a
+    # column rather than a JSON path. CARE stores codings in untyped
+    # JSONFields (care/emr/models/observation.py:9-11), which is why nothing
+    # there can count them without unpacking JSON in SQL.
+    #
+    # code_display is stored rather than looked up again on read for two
+    # reasons. A screen that draws a row must not need a terminology to draw
+    # it, and the display is part of what was recorded: a value set that
+    # renames a concept next year must not silently restate what a nurse
+    # wrote this year.
+    "observation": ("id", "encounter", "category", "code", "code_system",
+                    "code_display", "value", "unit", "unit_system",
                     "created_by", "created_date"),
     "condition": ("id", "encounter", "code", "verification_status",
                   "created_by", "created_date"),
@@ -430,7 +443,7 @@ class SqliteStore:
         if status:
             sql += " AND status = ?"
             params.append(status)
-        sql += " ORDER BY created_at, id"
+        sql += " ORDER BY created_at, rowid"
         return [_proposal(r) for r in self.db.execute(sql, params).fetchall()]
 
     def append_audit(self, record):
@@ -443,8 +456,22 @@ class SqliteStore:
             [row.get(k) for k in keys])
 
     def audit(self, thread):
+        """Oldest first, as kernel.contracts.ThreadView promises.
+
+        The tiebreak is `rowid` and not `id`. AuditRecord.at is ISO 8601 to
+        the second (kernel/proposals.now()), so two decisions on one thread
+        inside the same second tie on `at`, and `id` is a random uuid hex, so
+        the order between them was whatever the hex sorted to. That is not a
+        cosmetic problem: an audit panel showing a refusal after the write it
+        refused, or a registration after the vitals recorded on it, reads as a
+        different sequence of events from the one that happened, and the audit
+        trail is the record we would defend. SQLite's implicit rowid is
+        insertion order, so this is oldest first by construction with nothing
+        to keep in sync. Store.proposals above has the same tie and the same
+        fix.
+        """
         rows = self.db.execute(
-            "SELECT * FROM audit WHERE thread = ? ORDER BY at, id", [thread]).fetchall()
+            "SELECT * FROM audit WHERE thread = ? ORDER BY at, rowid", [thread]).fetchall()
         return [AuditRecord(**dict(dict(r), payload=json.loads(r["payload"] or "{}")))
                 for r in rows]
 

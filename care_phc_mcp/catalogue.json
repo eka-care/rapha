@@ -1602,7 +1602,7 @@
         },
         {
           "fields": [
-            "code",
+            "code_display",
             "value",
             "unit",
             "created_date"

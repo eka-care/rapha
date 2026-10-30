@@ -20,6 +20,12 @@ echo "\n== the instrument vocabulary is one list, not two =="
 # that starts again, in either direction.
 python3 scripts/check_instruments.py
 
+echo "\n== coded data: the terminology seam and the FHIR projection =="
+# A coding exists only if the value set its question binds to vouched for it,
+# and a thread projects to an ABDM document with LOINC codes and UCUM units.
+python3 -m kernel.terminology
+python3 -m kernel.fhir
+
 echo "\n== the kernel and its contracts =="
 python3 -m catalogue.tests.test_guard
 python3 -m catalogue.tests.test_validate
@@ -32,6 +38,10 @@ python3 -m kernel.tests.test_mapping
 python3 -m kernel.tests.test_spine
 python3 -m bundles.lab.check      # a second bundle on the same kernel; SKIP_E2E=1 skips its socket half
 python3 -m bundles.phc.check      # capture consent: raised, declined, scoped to the visit, withdrawable
+# One vertical slice through every layer: a nurse records a blood pressure, it
+# validates, it is coded, the guard allows it, the rows land, the thread
+# projects to an ABDM WellnessRecord. No socket.
+python3 scripts/check_vitals.py
 
 echo "\n== the adapter and the service =="
 python3 -m api.scribe          # the scribe's response reading, against a recorded live answer

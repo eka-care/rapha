@@ -22,9 +22,12 @@ mapping:
       fields:
         created_by: {actor: id}
         category: {const: vital-signs}
-        code: {question: link_id}
+        code: {question: code}
+        code_system: {question: code_system}
+        code_display: {question: code_display}
         value: {question: answer}
         unit: {question: unit}
+        unit_system: {question: unit_system}
 emits: [vitals.recorded, vitals.flagged]
 surfaces: [rendered, mcp]
 verified:

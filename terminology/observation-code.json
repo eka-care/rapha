@@ -1,0 +1,35 @@
+{
+  "slug": "observation-code",
+  "title": "Observation codes",
+  "system": "http://loinc.org",
+  "binding": "a questionnaire question's own `code`, when the question is the concept",
+  "generated": "2026-10-31",
+  "source": "Hand seeded from the published LOINC vital signs panel 85353-1 member list. Step 2 of docs/superpowers/plans/2026-10-30-coded-data-symbiosis.md replaces this by hand confirming the list once through Eka codification with unit as context. Step 1 implementation 2 replaces the whole file with a local index built from the NRCeS release files.",
+  "verified": "unverified",
+  "concepts": {
+    "8480-6": {
+      "display": "Systolic blood pressure",
+      "verified": "unverified: published LOINC vital signs panel 85353-1"
+    },
+    "8462-4": {
+      "display": "Diastolic blood pressure",
+      "verified": "unverified: published LOINC vital signs panel 85353-1"
+    },
+    "8867-4": {
+      "display": "Heart rate",
+      "verified": "unverified: published LOINC vital signs panel 85353-1"
+    },
+    "59408-5": {
+      "display": "Oxygen saturation in Arterial blood by Pulse oximetry",
+      "verified": "unverified: published LOINC vital signs panel 85353-1. Chosen over 2708-6 because a health centre measures it by pulse oximeter, and the method is part of the concept."
+    },
+    "29463-7": {
+      "display": "Body weight",
+      "verified": "unverified: published LOINC vital signs panel 85353-1"
+    },
+    "8310-5": {
+      "display": "Body temperature",
+      "verified": "unverified: published LOINC vital signs panel 85353-1"
+    }
+  }
+}

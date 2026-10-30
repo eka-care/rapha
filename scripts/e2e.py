@@ -214,7 +214,10 @@ def agent_confirms(base, db, thread):
     assert confirmed["proposal"]["status"] == "confirmed"
     written = dict(rows(db, "SELECT code, value FROM observation WHERE encounter=?",
                         (thread,)))
-    assert written.get("systolic") == "132", written
+    # Keyed by the question's bound LOINC concept, which is what the row
+    # carries: a stored code means the same thing in another facility and a
+    # link_id means nothing outside this questionnaire.
+    assert written.get("8480-6") == "132", written
     assert not [p for p in call(base, "/threads/%s/" % thread)["proposals"]
                 if p["id"] == pid]
     ok("a person confirming it on the rendered surface is what writes the row")
@@ -263,8 +266,8 @@ def thread_confirms_edited(base, db):
     assert confirmed["proposal"]["status"] == "confirmed"
     written = dict(rows(db, "SELECT code, value FROM observation WHERE encounter=?",
                         (thread,)))
-    assert written.get("systolic") == "152", written
-    assert written.get("pulse") == "74", written
+    assert written.get("8480-6") == "152", written
+    assert written.get("8867-4") == "74", written
     ok("the edited value is what lands in the database, not the one proposed")
 
     # The thread the renderer re-reads after the tap: the card is gone from
@@ -280,7 +283,7 @@ def thread_confirms_edited(base, db):
     again = call(base, "/proposals/%s/confirm/" % pid,
                  {"payload": edited, "confirmed": True}, expect=409)
     assert "confirmed once" in again["detail"], again
-    assert len(rows(db, "SELECT * FROM observation WHERE encounter=? AND code='systolic'",
+    assert len(rows(db, "SELECT * FROM observation WHERE encounter=? AND code='8480-6'",
                     (thread,))) == 1
     ok("a second tap on the same card is refused: one proposal writes one row")
 
@@ -374,7 +377,7 @@ def composer_says(base, db):
     assert confirmed["proposal"]["status"] == "confirmed"
     written = dict(rows(db, "SELECT code, value FROM observation WHERE encounter=?",
                         (thread,)))
-    assert written.get("systolic") == "134", written
+    assert written.get("8480-6") == "134", written
     assert [r[0] for r in rows(db, "SELECT DISTINCT actor FROM audit WHERE thread=? "
                                    "AND outcome='confirmed'", (thread,))] == ["user:demo"]
     ok("a person confirms the agent's card and that is what writes the row")
@@ -530,9 +533,16 @@ def main():
         confirmed = call(base, "/proposals/%s/confirm/" % pid, {"confirmed": True})
         assert confirmed["proposal"]["status"] == "confirmed"
         assert confirmed["thread"]["station"] == "doctor"
-        written = rows(db, "SELECT code, value FROM observation WHERE encounter='enc-002'")
-        assert dict(written)["systolic"] == "138", written
-        ok("confirming writes the row, and the line moves to the next station")
+        written = rows(db, "SELECT code, code_system, value FROM observation"
+                           " WHERE encounter='enc-002'")
+        # The stored code is the question's bound LOINC concept, not its
+        # link_id, which is what makes this row mean the same thing in another
+        # facility. Read over a real socket out of the real file, so this says
+        # the binding survived the whole path and not only the mapping.
+        by_code = {r[0]: r for r in written}
+        assert by_code["8480-6"][2] == "138", written
+        assert by_code["8480-6"][1] == "http://loinc.org", written
+        ok("confirming writes the row with its LOINC code, and the line moves on")
 
         call(base, "/proposals/%s/confirm/" % pid, {"confirmed": True}, expect=409)
         ok("a proposal is confirmed once; the replay is a 409")
