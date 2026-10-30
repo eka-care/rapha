@@ -541,8 +541,16 @@ ROUTES = {
 }
 
 
+# Top-level keys of catalogue.json, split by who narrows them. The first four
+# are catalogue wide: `operations` is the union over every bundle, because the
+# Go server embeds the whole file and asks the kernel which bundle it loaded.
+# The rest are the one loaded bundle's, and are exactly what
+# kernel.declarations.compile_json emits, so a new one belongs in BUNDLE_KEYS
+# and nowhere else.
+CATALOGUE_KEYS = ("capabilities", "bundles", "states", "operations")
+BUNDLE_KEYS = ("manifest", "workflows", "views", "instruments", "metrics", "scribe")
+
+
 def compiled_keys() -> Iterable[str]:
-    """Top-level keys of catalogue.json after this contract. The first four
-    exist today; the rest are added by the build agent."""
-    return ("capabilities", "bundles", "states", "operations",
-            "manifest", "workflows", "views", "instruments", "metrics")
+    """Top-level keys of catalogue.json after this contract."""
+    return CATALOGUE_KEYS + BUNDLE_KEYS

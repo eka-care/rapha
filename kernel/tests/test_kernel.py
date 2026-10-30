@@ -13,6 +13,8 @@ import dataclasses
 import inspect
 import json
 
+from datetime import datetime, timezone
+
 from care_phc.thread import Snapshot, derive
 from care_phc.thread import station as coded_station
 from catalogue import guard, vocab
@@ -433,15 +435,39 @@ def test_a_metric_with_an_empty_denominator_is_zero_and_not_an_error():
     assert (m.numerator, m.denominator, m.value) == (1, 4, 25.0)
 
 
+def _inside(window):
+    """A timestamp the given window contains, derived from the window itself.
+
+    A literal date here is a time bomb. `2026-09-10T09:00:00Z` was inside the
+    window on the day it was typed and outside it a month later, so this check
+    started failing on a change nobody made. Deriving the stamp from
+    `views.window_start` keeps the check about the windowing rule rather than
+    about the month it was written in. Same reason
+    `adapters/local/tests/test_store.py` derives its count from the declared
+    seed instead of writing the number down.
+    """
+    start = datetime.strptime(views.window_start(window), "%Y-%m-%dT%H:%M:%SZ")
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    assert start < now, f"{window} starts in the future"
+    return (start + (now - start) / 2).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def test_a_dashboard_evaluates_every_metric_locally():
+    view = BUNDLE.views["phc.view.facility-dashboard"]
+    at = _inside(view.window)
     s = Fake()
-    s.add("encounter", n=2, created_date="2026-09-10T09:00:00Z")
-    s.add("thread_flag", flag="vitals.flagged", created_date="2026-09-10T09:00:00Z")
+    s.add("encounter", n=2, created_date=at)
+    s.add("thread_flag", flag="vitals.flagged", created_date=at)
     res = views.resolve(BUNDLE, "phc.view.facility-dashboard", s)
     by_id = {m.metric: m for m in res.rows}
     assert by_id["phc.metric.visits"].value == 2
     assert by_id["phc.metric.vitals-flagged-rate"].value == 50.0
-    assert all(m.window == "week" for m in res.rows), "the view's window did not win"
+    assert all(m.window == view.window for m in res.rows), "the view's window did not win"
+    # Without this the line above is satisfied by a resolver that ignores the
+    # view and reads each metric's own window: at least one metric on this
+    # dashboard must declare a different one for the override to be exercised.
+    assert any(BUNDLE.metrics[m.metric].window != view.window for m in res.rows), \
+        "every metric here declares the view's own window, so nothing is overridden"
 
 
 def test_a_tasklist_resolves_a_count_and_the_matching_threads_per_task():
@@ -647,8 +673,13 @@ def test_the_compiled_form_is_plain_json():
     import json
     blob = json.dumps(declarations.compile_json(BUNDLE), sort_keys=True)
     back = json.loads(blob)
-    assert set(back) == {"manifest", "workflows", "views", "instruments", "metrics"}
+    # The key set comes from the contract, not from a copy of it written here.
+    # A sixth key (`scribe`) was added to the compiler and this literal said
+    # five, so the check failed on a change that was correct.
+    assert set(back) == set(c.BUNDLE_KEYS), set(back) ^ set(c.BUNDLE_KEYS)
     assert back["workflows"]["phc.wf.outpatient"]["steps"][0]["station"] == "reception"
+    assert not set(c.BUNDLE_KEYS) & set(c.CATALOGUE_KEYS), \
+        "a bundle key and a catalogue-wide key cannot share a name"
     assert set(back) <= set(c.compiled_keys())
 
 
