@@ -374,7 +374,7 @@ unskipped.
       compiled key set, and the scribe tick property replacing the structural
       numeric ban. Both mutation proved.
 
-- [ ] **Step 1. Delete the CARE adapter.** Pure subtraction, no new concept.
+- [x] **Step 1. Delete the CARE adapter.** Done, 2135 lines removed. Pure subtraction, no new concept.
       `adapters/care/` is 2053 lines across 6 files and its entire load bearing
       surface outside itself is 4 lines in `api/main.py` (:93, :102, :103, :110)
       and 2 in `scripts/check.sh` (:32, :33). `PHC_STORE` already defaults to
@@ -407,9 +407,19 @@ unskipped.
 
 - [ ] **Step 3. Move `_scrub` and `api/fill.py` to the core.** Two small moves
       that remove the two cross-plugin dependencies named in §6, before any
-      plugin is asked to be removable. `api/fill.py` to `kernel/fill.py`;
-      `_scrub` out of `care_phc/connectors/abdm/eka.py` into a core redaction
-      module. `kernel/tests/test_contracts.py`'s import follows the file.
+      plugin is asked to be removable.
+      - [x] `_scrub` out of `care_phc/connectors/abdm/eka.py` into
+            `care_phc/connectors/redact.py`, owned by neither connector, whose
+            check asserts that no connector imports a sibling.
+      - [ ] `api/fill.py` to `kernel/fill.py`, with
+            `kernel/tests/test_contracts.py`'s import following the file.
+            **Not done, and held deliberately.** It is mechanically small, two
+            importers, but it adds a module to `kernel/`, and
+            `kernel/ARCHITECTURE.md:70` says that directory is the architect's:
+            report a gap, do not patch it. The gap is reported in §6 and in
+            decision 6 below. The leak is live meanwhile and is not dangerous:
+            a kernel test imports an api module, which is the wrong direction
+            but not a runtime dependency.
 
 - [ ] **Step 4. `voice` as the first real plugin.** Chosen over scribe because
       it is the same shape with a fifth of the entanglement: `web/src/voice/`
@@ -468,7 +478,13 @@ rather than invented.
    accounts. Accept that Step 5's proof is server side, or do accounts first.
 5. **The `abha/` carve-out in `ui.check.ts:117-119` stays a carve-out of one.**
    A second one turns a documented exception into a convention. Confirm.
-6. **Local HTTPS port.** `~/code/nectar/apps/abdm-parent/vite.config.ts` uses
+6. **Should `api/fill.py` become `kernel/fill.py`?** It is pure, it names no
+   clinical word, it has no vendor in it, and `kernel/tests/test_contracts.py`
+   already imports it to check the scribe tick property, so the dependency
+   already points the wrong way. Moving it fixes that and makes the scribe
+   plugin's boundary honest. Not done, because `kernel/ARCHITECTURE.md:70`
+   reserves that directory. Owner's call.
+7. **Local HTTPS port.** `~/code/nectar/apps/abdm-parent/vite.config.ts` uses
    port 443, which needs elevated permissions. 8443 with
    `@vitejs/plugin-basic-ssl` and `server.host = "sam.eka.care"` needs none.
    Owner picks; no `sudo` was run.
