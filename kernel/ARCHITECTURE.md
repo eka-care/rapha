@@ -44,7 +44,8 @@ declared in a bundle and drawn by a generic renderer.
 |---|---|---|
 | declarations | nothing; they are data | any code |
 | `catalogue/` (vocab, build, guard, validate) | stdlib, yaml | kernel, adapters, clients |
-| `kernel/` | `catalogue/`, `kernel/contracts` | adapters (only through the `Store` protocol, injected), Django, network |
+| `terminology/*.json` | nothing; generated, read only data | any code |
+| `kernel/` | `catalogue/`, `kernel/contracts`, `terminology/*.json` through `kernel/terminology.py` | adapters (only through the `Store` protocol, injected), Django, network |
 | `adapters/*` | `kernel/contracts`, its own driver (sqlite3, requests) | the guard, state derivation, the renderer |
 | clients (`care_phc_fe`, `care_phc_mcp`, `analytics`) | the API over HTTP and `catalogue.json` | the kernel in-process, any adapter |
 | `care_phc/` (the CARE plug) | `catalogue/`, `kernel/contracts`, Django | nothing new tonight; it becomes adapter 1's home later |
@@ -135,3 +136,24 @@ patched one:
   shape (`@originjs/vite-plugin-federation`, `exposes: { "./manifest": ... }`,
   port 10123). It is in the history at `9253069:care_phc_fe/vite.config.mts`
   if adapter 1 ever wants it, and `care_eka_scribe_fe` is the upstream one.
+
+## What moved after that, 2026.10.31
+
+- **A clinical fact carries a code, and the kernel grew two modules for it.**
+  `kernel/terminology.py` holds the value set seam and the one constructor a
+  coding can come from; `kernel/fhir.py` projects a thread's rows into an ABDM
+  document. Both are pure, both name no clinical word, and
+  `scripts/check_vitals.py` is what fails if either starts to. Neither is a
+  plugin: a facility that could switch off "codes mean the same thing
+  elsewhere" has switched off the reason to record them.
+- **The declarations layer gained a layer under it.** `terminology/*.json` is
+  generated read only data, LOINC and UCUM rather than a facility's words, so
+  it sits beside `questionnaires/` and not inside `bundles/<id>/`. A bundle
+  declares which concept a question binds to; whether that concept exists is
+  not a bundle's business.
+- **The architecture document is `docs/superpowers/plans/2026-10-31-application-architecture.md`.**
+  It carries the layering, the five seams with their methods, the record's path
+  end to end, where Eka attaches and how each piece degrades, the data model,
+  the offline story, the testing strategy, and what was deliberately not
+  architected. This file stays the kernel's own map; that one is the
+  application's.

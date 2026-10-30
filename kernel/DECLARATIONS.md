@@ -206,7 +206,8 @@ A field's value is a single key source:
 | `{const: <literal>}` | a literal |
 | `{item: <key>}` or `{item: [<key>]}` | the current item's value, first non empty |
 | `{minus: <key>}` | the same, negated, for a stock decrement |
-| `{question: link_id \| answer \| unit}` | about the current question |
+| `{question: link_id \| answer}` | about the current question |
+| `{question: code \| code_system \| code_display \| unit \| unit_system}` | a fact the current question's binding produced |
 | `{joined: [<link_id>]}` | non empty answers joined with a space |
 | `{note: [<link_id>]}` | non empty answers as labelled paragraphs |
 | `{json: payload}` | the whole payload as sorted JSON |
@@ -216,14 +217,32 @@ A field's value is a single key source:
 which is why no adapter repeats a unit: it is written once, next to the range
 that validates it.
 
+The five coding facts read a question's BINDING rather than its text. There are
+two bindings and they are closed, because LOINC and UCUM are nobody's choice:
+
+- `code` on the question, bound to the `observation-code` value set, for a
+  question that IS a concept. Declared as a bare code (`code: "8480-6"`); the
+  system comes from the value set and the display from its cache, so neither
+  can be retyped wrongly.
+- the unit, bound to `ucum-units`, read from the `styling_metadata.phc.unit`
+  that is already there. Nothing moved and nothing is duplicated.
+
+A value set is a read only generated file in `terminology/<slug>.json`, and
+`kernel/terminology.py` is the only thing that opens one. The guarantee is that
+a coding exists only if the value set vouched for it: `Coding` has one
+constructor, it validates first, and a question declaring a code its value set
+does not hold fails the build naming both. The write path re-checks the code
+before filling the column, because the compiled mapping travels as JSON and a
+string carries no proof. See the architecture document's section 6.
+
 Lint refuses, and every one of these is a build failure and not a warning:
 
 - a record naming a link_id the questionnaire does not have, anywhere;
 - a record naming a resource the operation does not list in `writes`, or a
   `writes` entry no record maps anything into;
 - `{item: ...}` or `{minus: ...}` without `per_item`, `{question: ...}`
-  without `per_question`, `{question: unit}` where a listed question declares
-  no unit;
+  without `per_question`, a coding fact where a listed question declares no
+  unit or binds no code;
 - a required question that is neither mapped nor listed under `ignored`. An
   answer with nowhere to go is a clinical value dropped in silence, so
   dropping one has to be written down;
