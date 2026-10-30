@@ -294,6 +294,35 @@ assert back["id"] == row["id"], "publishing changed the row's own id"
 assert back["created_by"] == MEENA, "publishing changed who registered her"
 ok("publishing records the identifier and the moment, and changes nothing else")
 
+# The worst case on this path, and the one a plain call would get wrong: the
+# directory accepted the patient and the receipt could not be written. Without
+# the catch in publish_pending the exception escapes, the record of every
+# publish that already succeeded in the sweep is thrown away, and the next
+# sweep publishes the same person again into a national directory.
+
+
+class BadReceipt:
+    def __init__(self, real):
+        self._real = real
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+    def record_directory_id(self, *a, **kw):
+        raise ValueError("the disk went away")
+
+
+again = fresh()
+lost_thread, _ = register(again, SUNITA, token="D01")
+lost = directory.pending(again)[0]["id"]
+report2 = directory.publish_pending(BadReceipt(again), Live(oid="oid-dup"), at="now")
+assert report2.published == [], report2
+assert len(report2.failed) == 1 and report2.failed[0][0] == lost, report2
+assert "receipt could not be written" in report2.failed[0][1], report2.failed
+assert [r["id"] for r in directory.pending(again)] == [lost],     "a patient the directory accepted but we could not record is still pending"
+ok("a directory that accepted a patient we could not record is a failure on "
+   "that row, not a lost sweep and not a silent duplicate")
+
 # ---------------------------------------------------------------------------
 # 6. The receipt. What may and may not be written when the directory answers.
 # ---------------------------------------------------------------------------
@@ -416,6 +445,37 @@ else:
     from api.main import DIRECTORY, app
 
     assert isinstance(DIRECTORY, directory.AbsentDirectory), type(DIRECTORY)
+
+    # PHC_DIRECTORY=absent above short circuits make_directory() before the
+    # credential path, so asserting on DIRECTORY alone left the branch that
+    # actually matters unchecked: a deployment that MEANT to use Eka and has
+    # no token. Exercised directly, both ways round.
+    import api.main as service
+
+    kept = {k: os.environ.get(k) for k in
+            ("PHC_DIRECTORY", "EKA_ACCESS_TOKEN", "EKA_CLIENT_ID")}
+    try:
+        os.environ.pop("PHC_DIRECTORY", None)
+        os.environ.pop("EKA_ACCESS_TOKEN", None)
+        os.environ.pop("EKA_CLIENT_ID", None)
+        wanted_eka = service.make_directory()
+        assert isinstance(wanted_eka, directory.AbsentDirectory), type(wanted_eka)
+        ok("a deployment that meant to use Eka and has no token still comes up, "
+           "on the local register")
+
+        os.environ["EKA_ACCESS_TOKEN"] = "not-a-real-token"
+        os.environ["EKA_CLIENT_ID"] = "EC_0000"
+        configured = service.make_directory()
+        assert not isinstance(configured, directory.AbsentDirectory), type(configured)
+        assert isinstance(configured, eka.EkaDirectory), type(configured)
+        ok("and one with a token gets the vendor, so the fallback is a fallback "
+           "and not the only path this code can take")
+    finally:
+        for key, value in kept.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
     client = TestClient(app)
     answer = client.get("/api/v1/phc/patients/search", params={"q": "Sunita"})
     assert answer.status_code == 200, (answer.status_code, answer.text)
@@ -432,6 +492,33 @@ else:
     assert blocked.status_code == 403, blocked.status_code
     assert "facility.admin" in blocked.json()["detail"], blocked.json()
     ok("and publishing a patient off this machine needs facility.admin")
+
+    # The audit separation over the WIRE. The checks above prove the kernel
+    # keeps two actors apart, which it does, but they call proposals.commit
+    # directly and never touch caller(), so they said nothing about whether
+    # the service carries the staff member through. With one account holding
+    # every capability, caller() is the only thing standing between "which
+    # desk" and "which person", and the record is the person.
+    staff = TestClient(app)
+    opened = staff.post("/api/v1/phc/threads", json={"token": "E01"},
+                        headers={"X-PHC-Actor": "user:meena"})
+    assert opened.status_code == 200, opened.text
+    wire_thread = opened.json()["id"]
+    committed = staff.post(
+        "/api/v1/phc/operations/phc.op.patient-register/commit",
+        json={"thread": wire_thread, "payload": SUNITA, "confirmed": True},
+        headers={"X-PHC-Actor": "user:meena"})
+    assert committed.status_code == 200, committed.text
+    panel = staff.get("/api/v1/phc/threads/%s" % wire_thread,
+                      headers={"X-PHC-Actor": "user:ravi"}).json()
+    actors = {line["actor"] for line in panel["audit"]}
+    assert actors == {"user:meena"}, actors
+    assert "user:demo" not in actors, \
+        "the account stood in for the staff member in the record"
+    assert panel["held"] == sorted(ACCOUNT), \
+        "this check proves nothing unless one account really does hold everything"
+    ok("over the wire, one account holds every capability and the audit still "
+       "records which staff member acted")
 
 try:
     eka.EkaDirectory(token="", client_id="")

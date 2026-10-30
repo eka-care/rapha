@@ -350,7 +350,21 @@ def publish_pending(store, directory, *, at, limit=50):
                 reachable = False
                 break
             continue
-        store.record_directory_id(row["id"], directory_id, at=at)
+        try:
+            store.record_directory_id(row["id"], directory_id, at=at)
+        except Exception as broke:
+            # The dangerous one, and the reason this is not a bare call. The
+            # directory has accepted the patient and we could not write down
+            # the identifier it gave us, so the next sweep would publish the
+            # same person again and put a duplicate in a national directory.
+            # Reported as a failure on this row, which keeps it in pending()
+            # and keeps the honest state visible, rather than raised: a raise
+            # here would also throw away the record of every publish that
+            # already succeeded in this sweep.
+            failed.append((row.get("id"),
+                           "the directory accepted them as %s and the receipt "
+                           "could not be written: %s" % (directory_id, broke)))
+            continue
         done.append((row.get("id"), directory_id))
     return Published(published=done, failed=failed, reachable=reachable)
 
