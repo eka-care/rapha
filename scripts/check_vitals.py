@@ -144,14 +144,20 @@ except terminology.UnboundCoding as exc:
 else:
     raise AssertionError("an unvalidated code reached a row")
 
-missing = dict(compiled["systolic"], code=None, code_system=None)
+# A good code with a missing system is the dangerous one, because nothing
+# about it looks wrong: the validate call above passes, the row is written,
+# and it is written without the system that makes the code resolvable. So the
+# check nulls the fact and keeps the code valid.
+missing = dict(compiled["systolic"], code_system=None)
+assert terminology.LOCAL.validate(terminology.CODE_BINDING, missing["code"]), \
+    "this check proves nothing unless the code itself is still good"
 try:
     mapping.records({"mapping": [dict(record, per_question=[missing])]},
                     {"systolic": 140}, actor=A_NURSE)
 except terminology.UnboundCoding:
     ok("a coding column that would land null stops the write instead")
 else:
-    raise AssertionError("a null coding column was written")
+    raise AssertionError("a coding column landed null")
 
 # And the build refuses it too, so it never gets that far in practice.
 bad = dict(QUESTIONS["systolic"], code="9999-9")
@@ -197,11 +203,41 @@ assert not store.select("observation", thread=thread, where={}, fields=["id"],
                         limit=5), "a proposal wrote a row"
 ok("a reading from a machine surface is a proposal and writes nothing")
 
-# The audit row is written BEFORE the write executes. Proven by the order of
-# the rows: the allowed line is appended by _audit() and the observation rows
-# by _write(), and commit() calls them in that order. A refusal leaves an
-# audit line and no rows, which is the same property seen from the other side
-# and is already asserted above.
+# The audit row is written BEFORE the write executes. The order is only
+# observable when the write fails, which is the whole reason it matters: if
+# the rows went first, a write that blew up half way would leave a thread
+# with no record that anybody tried. So this hands the kernel a store whose
+# write raises and asserts the audit line survives.
+
+
+class Breaks:
+    """A store that records everything and refuses to write a clinical row."""
+
+    def __init__(self, real):
+        self._real = real
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+    def write(self, *a, **kw):
+        raise RuntimeError("the disk went away")
+
+
+broken = Breaks(store)
+try:
+    proposals.commit(broken, BUNDLE, "phc.op.vitals-record", thread=thread,
+                     payload=READING, caps=NURSE, actor=A_NURSE)
+except RuntimeError:
+    pass
+else:
+    raise AssertionError("a store that cannot write reported success")
+tried = [r for r in store.audit(thread)
+         if r.operation == "phc.op.vitals-record" and r.outcome == "allowed"]
+assert len(tried) == 1, [r.outcome for r in store.audit(thread)]
+assert not store.select("observation", thread=thread, where={}, fields=["id"],
+                        limit=5), "a row survived a failed write"
+ok("a write that fails still leaves its audit line: the audit goes first")
+
 before = len(store.audit(thread))
 allowed = proposals.commit(store, BUNDLE, "phc.op.vitals-record", thread=thread,
                            payload=READING, caps=NURSE, actor=A_NURSE)
@@ -212,8 +248,11 @@ last = trail[-1]
 assert last.operation == "phc.op.vitals-record" and last.outcome == "allowed"
 assert last.actor == A_NURSE and last.surface == guard.RENDERED
 assert last.payload == READING, last.payload
+# The failed write above left an "allowed" line of its own, which is the
+# point of it: what was attempted is on the record whether or not it landed.
 assert [r.outcome.split(":")[0] for r in trail] == \
-    ["allowed", "denied", "denied", "proposed", "allowed"], [r.outcome for r in trail]
+    ["allowed", "denied", "denied", "proposed", "allowed", "allowed"], \
+    [r.outcome for r in trail]
 ok("the audit trail is oldest first and holds both refusals and the machine's "
    "proposal, not only what worked")
 

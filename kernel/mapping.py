@@ -291,18 +291,21 @@ def _lint_source(source, where, record, questions, fail):
     if kind == "question":
         if arg not in QUESTION_FACTS:
             fail("%s: question takes one of %s" % (where, ", ".join(QUESTION_FACTS)))
-        elif arg == "unit":
-            for link_id in record.get("per_question") or []:
-                if not _unit(questions.get(link_id)):
-                    fail("%s: question '%s' declares no unit, so {question: unit} "
-                         "has nothing to read" % (where, link_id))
         elif arg in CODING_FACTS:
+            # One branch for all five, because they are one rule: a column
+            # that reads a binding needs the question to have that binding,
+            # or it lands null. The wording differs because the two bindings
+            # are declared differently, not because the rule does.
             which, _ = CODING_FACTS[arg]
             for link_id in record.get("per_question") or []:
-                if not _declares(questions.get(link_id), which):
-                    fail("%s: question '%s' binds no %s, so {question: %s} has "
-                         "nothing a value set vouched for. Declare it, or stop "
-                         "writing that column" % (where, link_id, which, arg))
+                if _declares(questions.get(link_id), which):
+                    continue
+                fail("%s: question '%s' %s, so {question: %s} has nothing %s"
+                     % (where, link_id,
+                        "declares no unit" if which == "unit" else "binds no code",
+                        arg,
+                        "to read" if which == "unit"
+                        else "a value set vouched for"))
         return set()
     if kind == "answer":
         if arg not in questions:

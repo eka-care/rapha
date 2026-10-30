@@ -271,6 +271,29 @@ def test_a_unit_the_questionnaire_does_not_carry_fails_the_build():
     assert "declares no unit" in failures(bad)
 
 
+def test_a_question_that_binds_no_concept_may_not_write_a_code_column():
+    """The companion of the unit rule above, and the sharper half of it.
+
+    A question binds a concept by declaring a `code`, which is then checked
+    against the value set it binds to. A record writing {question: code} for
+    a question that declares none would fill the code column with nothing,
+    and a row whose code is null is a clinical fact that means nothing
+    anywhere, including here.
+    """
+    bad = {"records": [{"resource": "observation", "per_question": ["note"],
+                        "fields": {"created_by": {"actor": "id"},
+                                   "code": {"question": "code"}}}],
+           "ignored": ["drugs", "systolic"]}
+    said = failures(bad)
+    assert "binds no code" in said, said
+    for fact in ("code_system", "code_display"):
+        worse = {"records": [{"resource": "observation", "per_question": ["note"],
+                              "fields": {"created_by": {"actor": "id"},
+                                         fact: {"question": fact}}}],
+                 "ignored": ["drugs", "systolic"]}
+        assert "binds no code" in failures(worse), (fact, failures(worse))
+
+
 def test_a_source_that_needs_a_context_it_does_not_have_fails_the_build():
     bad = {"records": [{"resource": "observation",
                         "fields": {"code": {"item": "code"}}}],
