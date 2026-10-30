@@ -14,8 +14,10 @@ record and must not become one. It emits ABDM compliant FHIR R4.
 **What this document decides.** Where each seam falls in the code that is
 actually here, what each layer may know, and how a record travels from a
 spoken sentence to a document under a patient's ABHA number. It is written
-against the branch `feat/phc-catalogue-and-guard` at commit `c9d9467`, where
-`sh scripts/check.sh` exits 0 with 427 `ok` lines and nothing skipped.
+against the branch `feat/phc-catalogue-and-guard` at commit `f828145`, where
+`sh scripts/check.sh` exits 0 with 464 `ok` lines and nothing skipped. It is
+revised in place rather than appended to: an out of date map is worse than a
+patched one, and section 12 records what each revision invalidated.
 
 **What is already decided elsewhere, and is not reopened here.**
 `kernel/ARCHITECTURE.md` and `kernel/DECLARATIONS.md` hold the declaration
@@ -114,18 +116,22 @@ branch.
 | declarations | nothing; they are data | any code |
 | `terminology/*.json` | nothing; generated data | any code |
 | `catalogue/` | stdlib, yaml | kernel, adapters, clients |
-| `kernel/` | `catalogue/`, `kernel/contracts`, `terminology/*.json` through `kernel/terminology.py` | adapters except through the `Store` protocol, Django, **any network** |
+| `kernel/` | `catalogue/`, `kernel/contracts`, `terminology/*.json` through `kernel/terminology.py` | adapters except through the `Store` protocol, a directory except through the `PatientDirectory` protocol, Django, **any network** |
 | `adapters/*` | `kernel/contracts`, its own driver | the guard, state derivation, the renderer, the terminology |
 | clients | the API over HTTP, and `catalogue.json` | the kernel in process, any adapter |
-| connectors | `kernel/contracts` for `Draft`, their own vendor SDK | the Store, the guard, the kernel's write path |
+| connectors | `kernel/contracts` for `Draft` and `PatientDirectory`, their own vendor SDK or an HTTP client | the Store, the guard, the kernel's write path |
 
 The `kernel/` row is the one that matters most, and the clause in bold is why
-the terminology is a local file. A kernel module that can open a socket is a
-kernel module that can hang a clinic.
+the terminology is a local file and why patient identity resolves through a
+protocol rather than a client. A kernel module that can open a socket is a
+kernel module that can hang a clinic. Since 2026-10-31 the clause is a check
+rather than a rule: `scripts/check_directory.py` fails if any module in
+`kernel/`, `catalogue/` or `adapters/local` imports a network library, and
+asserts the vendor connector does import one so it cannot pass vacuously.
 
 ### The seams, as interfaces
 
-Five seams. Each has a real implementation and, where absence is possible, a
+Six seams. Each has a real implementation and, where absence is possible, a
 degradation. The seam is the thing of value, because it is what makes the far
 side swappable without a rewrite. `Store` has already proved that once.
 
@@ -173,7 +179,30 @@ Implementation: `CachedTerminology`, reading `terminology/<slug>.json`. Read
 only and generated. Nothing in the product writes a value set, which answers
 "who may edit one": nobody, here.
 
-**3. `Codification`, not built.** The seam's shape is settled in the coded
+**3. `PatientDirectory`, in `kernel/contracts.py`.** Four methods, beside
+`Store` and not in a connector, because the kernel needs this interface:
+resolving who is at the desk is kernel logic, and a protocol kept in a
+connector would make the kernel import one.
+
+```
+search(prefix, *, limit)  -> [DirectoryPatient]
+by_mobile(mobile)         -> [DirectoryPatient]
+fetch(directory_id)       -> DirectoryPatient | None
+publish(patient)          -> str            # the directory's own id
+```
+
+Three reads and one write, and the asymmetry is the design: a read that fails
+is a smaller answer, a write that fails is a row published later. There is
+deliberately no `update`, because a facility that can edit the master has
+rebuilt the master, and deliberately no `delete`, because Eka's REST API has
+one and deleting a person while their visits sit in our store leaves clinical
+records pointing at nobody.
+
+Implementations: `care_phc/connectors/directory/eka.py` over Eka's REST API,
+and `kernel/directory.AbsentDirectory`, which is the degraded path and is what
+the checks run against.
+
+**4. `Codification`, not built.** The seam's shape is settled in the coded
 data plan section 2.2 and is one method.
 
 ```
@@ -187,7 +216,7 @@ anything becomes unusable when `suggest` returns nothing, codification has
 become load bearing, which the plan's own table forbids. Not built because
 nothing in the PHC bundle binds an *answer* yet; see section 6.
 
-**4. Capture, in `care_phc/connectors/scribe/base.py` and `api/extract.py`.**
+**5. Capture, in `care_phc/connectors/scribe/base.py` and `api/extract.py`.**
 
 ```
 submit(audio, operation) -> session            # Eka
@@ -203,7 +232,7 @@ questionnaire values. The rule that makes the second half ours is in
 > a field is answered only with a verbatim span copied from the transcript;
 > no span, no answer.
 
-**5. Bundle out, in `kernel/fhir.py`.**
+**6. Bundle out, in `kernel/fhir.py`.**
 
 ```
 sections(profile) -> {slice: {title, code}}
@@ -312,8 +341,8 @@ its queue, record a vital sign and finish a visit.
 
 | Eka service | attaches at | without it |
 |---|---|---|
-| auth | *nothing* | the role comes from a header and the service is meant for localhost. See the ceiling below. |
-| patient directory | *nothing yet* | patients are rows in the local store. The CARE adapter that used to hold them was deleted when patients moved to Eka's directory, so this is currently a gap rather than a degradation. |
+| auth | *nothing* | one system account holds every capability; see the assumption below. |
+| patient directory | `care_phc/connectors/directory/eka.py`, behind `kernel.contracts.PatientDirectory` | the local register answers searches, a registration commits and is marked unpublished, and nothing is sent. Section 6 has the whole of it. This is the one attach point where the degraded path is checked on every run rather than reasoned about. |
 | scribe | `api/scribe.py`, through `care_phc/connectors/scribe/base.py` | `api/scribe.py` raises with a sentence ending "or type the note", `api/main.py` turns it into a 503, and the doctor types. No consultation is blocked. |
 | ABHA | `care_phc/connectors/abdm/eka.py`, behind `AbdmConnector` | `GET /abha/config` returns `hip_id: None`, which the journey reports honestly instead of pretending. A patient with no ABHA is an ordinary patient: the number is a FHIR identifier, never our row id. |
 | codification | *not built*, seam shape settled | a picker instead of a prefill. The stub returns nothing and everything works. |
@@ -331,14 +360,70 @@ not find a better way), so the best idea in that codebase is never exercised
 in its CI. Ours is a constructor argument, so a check passes a fake and the
 gate exercises the real one.
 
-**Ceiling, stated rather than hidden.** `caller()` in `api/main.py` has no
-authentication, and `ROLES["demo"]` is the union of every declared capability.
-So the browser can only be a superuser, which means no capability based
-behaviour can be demonstrated in the browser until there are accounts. Every
-proof of a capability rule in this repository is therefore server side, in
-`bundles/phc/check.py`, `bundles/lab/check.py` and `scripts/check_vitals.py`.
-The core and plugins plan already records this as decision 4 and it is still
-the owner's.
+### The auth assumption, settled 2026-10-31
+
+**One system account holding every capability. Real logins come later.** This
+is a decision, not a gap, and everything below depends on it, so it is written
+here rather than left to be inferred from `api/main.py`.
+
+**The distinction the code already holds, and that must not collapse.** One
+account for *permissions* is not one actor in the *audit*. These are separate
+in the code today and the separation is load bearing:
+
+- capabilities come from the role: `caller()` reads `X-PHC-Role` and looks up
+  `ROLES`, where `ROLES["demo"]` is the union of every declared capability.
+- the actor comes from `X-PHC-Actor`, independently, and falls back to
+  `user:<role>` only when no header is sent.
+- `catalogue/guard.person()` resolves the human behind an actor string,
+  stripping any `agent:` prefix, so a rule about who acted cannot be laundered
+  by dictating the sentence instead of tapping the button.
+- the mapping's `{actor: id}` source writes that actor into `created_by` on
+  every row, and a record with no author fails lint.
+
+So capability checks all pass because the single account holds everything, and
+the record still says which staff member made it. That matters beyond tidiness:
+a record travelling under a patient's ABHA number carries who made it, and
+that is part of the record rather than a permissions question.
+
+`bundles/lab/check.py` is the existing proof that the two are not collapsed.
+`senior_technologist` is one role holding both `lab.result.enter` and
+`lab.result.validate`, and the separation of duties rule still refuses the
+person who keyed a result the right to verify it, because the two actors are
+different strings. One account, two people, and the rule bites.
+`scripts/check_directory.py` proves the same thing over the wire with the
+actor header set.
+
+**One gap in this, found while writing it down.** Nothing *sends*
+`X-PHC-Actor` today: it appears in `api/main.py` and in checks, and in no
+client. So in practice the actor currently collapses to `user:demo` in the
+browser, not because the seam is wrong but because nothing exercises it. The
+staff switcher on a shared device is what would send it, and it is a renderer
+change of one header, not an architecture change. Until then every proof of
+the separation is server side.
+
+**Blast radius, the day real logins arrive.** What becomes true, and what in
+this branch would have to change:
+
+- `caller()` stops reading two headers and reads one session. The actor comes
+  from the session rather than a header, which closes the gap above by
+  removing the header rather than by populating it.
+- `ROLES["demo"]` stops being the union of every capability, and the line that
+  builds it (`api/main.py`, already commented as the one to narrow first) is
+  the only place that changes. Nothing downstream does: the guard,
+  `kernel.state.actions`, `visible()`, `/whoami` and `care_phc_mcp`'s `For()`
+  all read the narrowed set already.
+- plugin off switches become demonstrable in the browser. This is the known
+  consequence of the current position, recorded as decision 4 of the core and
+  plugins plan: while one account holds every capability, no plugin can be
+  shown as off in the browser, so **every off switch proof stays server side**,
+  in `bundles/phc/check.py`, `bundles/lab/check.py` and
+  `scripts/check_directory.py`.
+- `OVERRIDES` and the plugin off map stop being per header value and become per
+  user. They are in process today, one facility per kernel, which `api/main.py`
+  already states.
+- nothing in the audit changes, which is the point of keeping the two apart
+  now. A record written today names a person, so records written before logins
+  arrive do not have to be explained away afterwards.
 
 ---
 
@@ -395,7 +480,7 @@ clinical facts today:
 
 | table | carries | coded |
 |---|---|---|
-| `patient` | demographics, `abha_number` | no. Demographics are not clinical concepts. |
+| `patient` | demographics, `abha_number`, `directory_id`, `directory_synced` | no. Demographics are not clinical concepts. See "who a person is" below. |
 | `encounter` | the thread itself, its token and status | no |
 | `observation` | `category`, `code`, `code_system`, `code_display`, `value`, `unit`, `unit_system` | **yes**, this branch |
 | `condition` | `code`, `verification_status` | not yet. Needs repeating groups, plan step 4. |
@@ -406,6 +491,70 @@ clinical facts today:
 
 A coding is three columns and not one: the code, the system it came from, and
 the display the value set gave it.
+
+### Who a person is, and which identifier is the row
+
+**Settled 2026-10-31: Eka's patient directory is the source of truth for
+patient identity, and we do not rebuild a local patient master.** The
+directory mints the identifier, dedupes, and holds the canonical profile.
+There is no `update` and no `delete` on the seam, because a facility that can
+edit the master has rebuilt it.
+
+The question this leaves, which was flagged as ABHA shaped in the first draft
+of this document, is which of two identifiers is the row's identity. **The
+answer is forced by the offline requirement and not chosen for taste:
+`patient.id` stays this product's own, and the directory's id is a column
+beside it.** Exactly as `abha_number` is, and for the reason
+`kernel/fhir.patient()` already gives: a national or platform identifier is a
+fact about a person, not our name for their row.
+
+It has to be this way round. A clinical record is created at the moment a
+person is in front of a clerk, which may be while no registry can be reached.
+If the row's primary key were the directory's, creating a record then would
+mean either refusing to register, which is a clinic that stops when the line
+does, or minting a provisional key and rewriting it later, which is a clinical
+record whose identifier changes after the fact with audit payloads and any
+already generated FHIR bundle left pointing at a ghost. So the row keeps its
+own key forever and the directory's id arrives beside it whenever it arrives.
+
+`kernel/spine.py` is untouched by this: it joins `encounter.patient` to
+`patient.id`, and that join did not move.
+
+**What the local table is, then, if it is not a master.** Two things, neither
+a competing source of truth. It is the cache of profiles this facility has
+seen, which the queue already required: `Store.threads` merges the patient row
+into every queue row's subject, so a line that draws names was always reading
+a local row. And it is the staging area for a patient registered while the
+directory could not be asked, which is not a master record but an unpublished
+one.
+
+**One column decides, not two.** There is no `directory_status`. A row with a
+`directory_id` is known to the directory and one without is not, so there is
+one fact and nothing to disagree. `directory_synced` is freshness, not status.
+That is the same argument the core and plugins plan makes for catchment, where
+a patient stores exactly one habitation id because storing four makes four
+facts that can disagree and the one that disagrees decides who visits the
+house.
+
+**So the publish queue is not a queue.** It is a query over rows we already
+keep (`kernel/directory.pending`), which is why it cannot drift from the
+records it is about, and why a registration taken while the line was down
+needed nothing bolted on to be retried: it is already in the answer.
+
+**And a directory hit is a suggestion.** It becomes values for the register
+form with the field it matched on beside each one, is drawn in editable
+fields, and is committed by a tap through `phc.op.patient-register`. So there
+is still exactly one path to a write and the guard is on it, which is rule 2
+of `kernel/ARCHITECTURE.md` and is not bent. It is deliberately not
+`contracts.Draft`, because a `Draft` names the instrument declaration that
+produced it and there is no instrument for a directory lookup: inventing a
+sixth instrument kind to borrow a dataclass would be a promise no screen
+keeps.
+
+**What this bought beyond identity.** A returning patient is now one person.
+Until there was a directory id the adapter could not answer "is this the same
+person", so a patient registered on Tuesday and again on Friday was two rows
+and the spine showed each of them one visit.
 
 ### Why flat rows and not documents
 
@@ -551,6 +700,18 @@ a leased one. Three consequences, two of them already true:
 - **The store is a file.** Already true. `adapters/local/store.py` is SQLite
   with WAL on a thread local connection, and nothing in a write path reaches a
   socket.
+- **Patient identity is local first.** Built 2026-10-31. A search reads the
+  local register and then the directory, and a directory that could not be
+  asked is a field in the answer rather than an error. The route answers 200
+  with `reachable: false` and a reason, because a clerk looking for somebody
+  already in today's line must not be shown a failure about a directory they
+  were not relying on.
+- **Nothing on the clinical write path can reach a network.** Built
+  2026-10-31, and it generalises the layer rule this document already stated
+  rather than adding a new one: no module in `kernel/`, `catalogue/` or
+  `adapters/local` may import `urllib.request`, `http.client`, `requests`,
+  `socket`, `httpx` or `aiohttp`, over seventeen files, and the check asserts
+  that the vendor connector really does open one so it cannot pass vacuously.
 - **Audio and ABDM are queues.** *Not built.* A recording and a document are
   both "something to hand to a vendor when the line comes back", and neither
   is a clinical write. They are the only two things on the whole path that
@@ -578,6 +739,15 @@ answer, station by station:
   taps confirm, against the thread state as it is then, so a proposal made
   when a precondition held is denied at confirm if the precondition has since
   gone.
+- **A registration taken while the line is down is an ordinary
+  registration.** It commits through the guard, the visit starts, and the row
+  is unpublished, which is a state and not an error. Publishing is a separate
+  non clinical sweep over whatever has no directory id yet. The failure worth
+  naming is the narrow one in the middle: a directory that accepted the patient
+  while the receipt could not be written. That is reported against the row,
+  which keeps it pending and the duplicate traceable, rather than raised,
+  which would throw away the record of every publish that already succeeded in
+  the sweep. Found by mutation, not by reasoning.
 - **The thread stands where its rows say it stands.** This is the deepest
   reason the state rules are declarative: there is no cursor, no "current
   step" column, nothing to be left inconsistent. `kernel/state.flags` derives
@@ -632,6 +802,8 @@ nothing and is reported as such, never as a pass.
 | kernel state | `kernel/tests/test_kernel.py`, `test_contracts.py`, `test_spine.py` | the declaration and the code it replaced agree; every non text value a recording fills comes back owing a tick |
 | adapter | `adapters/local/tests/test_store.py` | the ten protocol names, the query grammar over real SQL, a column the table lacks is refused and not dropped, two threads writing at once do not corrupt the file |
 | projection | `kernel/fhir.py` demo, `scripts/check_vitals.py` | a LOINC coded Observation with a UCUM quantity, a numeric value that is a number and not a quoted string, a code with no system is text rather than a resolvable coding, the same rows give the same document |
+| directory | `scripts/check_directory.py` | 35 checks, almost all with no directory at all and none opening a socket: the local register answers, a registration commits, the queue draws the name, a visit is recorded, a suggestion writes nothing, and the audit names the staff member over the wire |
+| the wire translations | `care_phc/connectors/directory/eka.py` demo | every field both ways over the shapes the Eka specification gives, including that an age becomes a marked approximate birthday and the `abha` field is read as an address |
 | portability | `bundles/lab/check.py` | the same kernel runs a laboratory, 36 checks, not one word of a health centre's vocabulary |
 | the whole slice | `scripts/check_vitals.py` | 27 checks across every layer above, no socket |
 | over a socket | `scripts/e2e.py` | 45 checks against a real uvicorn and a real SQLite file, including that a stored vital carries its LOINC code |
@@ -697,8 +869,50 @@ Twenty, all proved: FAIL with the mutation, PASS after revert.
 | the engine may not type a clinical word | add a module level constant holding a LOINC code |
 | the renderer is served plain JSON | leave the `Coding` object in the compiled mapping |
 
-Three of these came back `DID NOT FAIL` on the first run, and each was a hole
-in my own check rather than a false alarm:
+### The directory's mutations
+
+Thirty five more, all proved, over `a65c6cf` and `f828145`. Nine of them
+attack the offline path specifically, because that is the requirement most
+easily asserted hollowly: an unreachable directory raising instead of being
+reported, `AbsentDirectory` returning an empty list instead of refusing, the
+local register not being read at all, the service not falling back with no
+token, a configured deployment silently getting the absent one, a kernel
+module importing `urllib.request`, the adapter importing `socket`, a sweep
+hammering a dead line instead of stopping, and a receipt that could not be
+written reading as a publish. The rest cover the identity columns, the
+same person join, the suggestion rules, the receipt guards, every wire
+translation, the route's status code and gate, and the actor over the wire.
+
+Three of those came back `DID NOT FAIL` on the first run, and all three were
+holes in my own checks rather than false alarms:
+
+1. **The credential fallback was never exercised.** The check sets
+   `PHC_DIRECTORY=absent`, which short circuits `make_directory()` before the
+   branch that actually matters: a deployment that meant to use Eka and has no
+   token. That branch is now called directly, both ways round, so the fallback
+   is shown to be a fallback and not the only path the code can take.
+2. **The audit separation was proved only inside the kernel.** Those checks
+   call `proposals.commit` directly and never touch `caller()`, so they said
+   nothing about whether the service carries the staff member through. Now
+   driven over the wire with the actor header, asserting the audit names the
+   person and never the account, and asserting the account really does hold
+   every capability so the check cannot pass for the wrong reason.
+3. **A bug, not a weak check.** The sweep called `record_directory_id` with no
+   catch, so a directory that accepted a patient while the receipt could not be
+   written threw out of `publish_pending`, losing the record of every publish
+   that had already succeeded and leaving the row pending, so the next sweep
+   would publish the same person again into a national directory. Now reported
+   against that row.
+
+A fourth mutation reported `NO TARGET (2 matches)` and therefore proved
+nothing: `facility.admin` is checked in two places in `api/main.py`. Retargeted
+on a unique string and then proved. It is listed here because a mutation that
+applies nothing reads exactly like one that passes.
+
+### The slice's three
+
+Three of the vitals mutations came back `DID NOT FAIL` on the first run, and
+each was a hole in my own check rather than a false alarm:
 
 1. **A coding column that lands null.** The check nulled the code itself,
    which the value set lookup catches anyway, so it never exercised the guard
@@ -734,6 +948,22 @@ proved.
 - [ ] **`OPConsultRecord`**, once there are Conditions, MedicationRequests
       and ServiceRequests to put in its sections. The profile table in
       `kernel/fhir.py` takes one more entry; the rest is declaration.
+- [ ] **A client that sends `X-PHC-Actor`.** The seam separates the account
+      from the staff member and nothing exercises it, so the actor collapses to
+      the account in the browser today. A staff switcher on a shared device is
+      one header, not an architecture change, and until it exists the
+      separation is only proved server side.
+- [ ] **Ask Eka to enable global patient search for this workspace.** The
+      specification's own description of the search endpoint says "Global
+      Search is exclusive to specific workspaces only. Please reach out to
+      support." `by-mobile` carries no such note, so a numeric query already
+      takes the path more likely to be enabled, which is also the one a clerk
+      has. **This is a conversation with Eka, not a code change**, and until it
+      happens a name search may answer nothing against a reachable directory.
+- [ ] **Verify the directory's four HTTP calls against api.eka.care.** The
+      translations around them are checked exhaustively and the calls
+      themselves have never been made from this branch. Record what comes back
+      in the connector, the way `api/scribe.py` records it.
 - [ ] **The two network queues**, for audio and for ABDM documents. They are
       the only two things on the path that need a network, and they are
       queues so that a bad line is a delay rather than a failure.
@@ -755,27 +985,31 @@ proved.
 
 ---
 
-## 12. What the code now contradicts in the two existing plans
+## 12. What the code now contradicts in what we have written down
 
-Reported rather than quietly worked around. Four of these need a word changed
-in a plan; one is a fact about the renderer that was already wrong.
+Reported rather than quietly worked around. The first three were accepted on
+2026-10-31 and the edits are made in
+`docs/superpowers/plans/2026-10-30-coded-data-symbiosis.md`, marked where they
+apply. Two more are facts that were already wrong, one is this document's own
+earlier draft, and one is a package name in the brief.
 
 **1. Coded data, invariant I1: "Enforced as a type at the write path, not as a
-lint."** Not achievable as written, and the reason is structural rather than
+lint."** *Accepted and amended in the plan.* Not achievable as written, and the reason is structural rather than
 awkward. The compiled mapping is served to the renderer as JSON, so a type
 object cannot reach the write path. The invariant as built is: one validated
 constructor, which makes an unvalidated coding unconstructible anywhere, plus a
 re-check against the same offline authority at the write path. Stronger than a
 lint in both halves, and the plan's wording should say so.
 
-**2. Coded data, section 2.1: `validate(valueset_slug, coding) -> bool`.** The
+**2. Coded data, section 2.1: `validate(valueset_slug, coding) -> bool`.**
+*Accepted and amended in the plan.* The
 signature cannot be right alongside I1. If a `Coding` can only be constructed
 by validating, then `validate` cannot take one. It takes a code. The
 implemented seam is `validate(valueset, code)`, `bound(valueset, code) ->
 Coding`, `expand(valueset, query, count) -> [Coding]`.
 
 **3. Coded data, step 3: "Switch the 6 vitals and the lab result to
-`quantity`".** Not done, and on the evidence of this branch not needed for the
+`quantity`".** *Accepted and narrowed in the plan to the lab result.* Not done, and on the evidence of this branch not needed for the
 stated outcome. A question of type `integer` or `decimal` with a bound unit
 already produces a correct FHIR `valueQuantity` carrying the UCUM system, which
 section 3 step 9 and the tier one validator both confirm. Switching the type
@@ -799,6 +1033,27 @@ breaks because `web/src/structured.ts` only reads `per_item` records. It is a
 type that lies, in a file whose whole job is to describe the wire, and it
 should be corrected when somebody is next in there.
 
+**6. This document's own section 4 and section 13, as first written.** Both
+said the patient directory was a gap: "patients are rows in the local store"
+and "nothing replaced it". That was true on 2026-10-31 in the morning and is
+not true now. Corrected in place rather than annotated, because an out of date
+map is worse than a patched one, which is the rule
+`kernel/ARCHITECTURE.md` already applies to itself.
+
+**7. The brief named a package that does not exist.** The work was requested
+against `@eka-care/patient-ts-sdk`. No package of that name appears anywhere
+in Eka's developer documentation. What exists is `@eka-care/eka-care-core`, a
+browser SDK whose `patients` module has `addPatientToDirectory`,
+`searchPatientByMobile`, `getPatientDetailsById` and `updatePatientDetails`,
+and the REST Patient Directory API. Built on the REST API, server side, for
+three reasons: a browser SDK puts the credential in the browser and this
+product's trust boundary is the API; the SDK's cache is per browser while
+identity has to be readable by the server; and Eka's own changelog records a
+`forceApiSearch` flag added to bypass that cache and a fix for "stale or
+partial cached state" surfacing incorrect patient search results, so it is not
+the cache to put patient identity behind. Ours is in the store, it is the row
+the queue already needed, and it says when it was last agreed.
+
 **And one bug, fixed here rather than reported.** `Store.audit` is documented
 as oldest first and could not deliver it. `AuditRecord.at` is ISO 8601 to the
 second, so two decisions on one thread inside the same second tied on `at`, and
@@ -812,17 +1067,11 @@ same fix.
 
 ## 13. What I deliberately did not architect, and why
 
-**Authentication and accounts.** The single largest hole, and deliberately not
-mine to fill: it decides what a user is, which is a product decision about
-whether staff log in as themselves, as a station, or through Eka's identity.
-Everything in section 4's ceiling follows from it. Until it exists, every
-capability proof in this repository is server side and the browser is a
-superuser sandbox.
-
-**The patient directory.** Patients are local rows. The plan says they live in
-Eka's directory now, which is why the CARE adapter went, but nothing replaced
-it. Whether a thread's subject is an Eka patient id, a local row, or both with
-a join is a public contract decision with an ABHA shaped question inside it.
+**Authentication and accounts.** Settled on 2026-10-31 as one system account
+holding every capability, with real logins later. Not built here and not mine
+to build. Section 4 carries the assumption and its blast radius, including the
+one consequence to live with: while one account holds everything, no plugin can
+be shown as off in the browser, so every off switch proof stays server side.
 
 **`OPConsultRecord`.** Section 11 has it. It needs Condition,
 MedicationRequest and ServiceRequest projections, all of which need repeating

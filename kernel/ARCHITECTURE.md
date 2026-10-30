@@ -151,6 +151,28 @@ patched one:
   it sits beside `questionnaires/` and not inside `bundles/<id>/`. A bundle
   declares which concept a question binds to; whether that concept exists is
   not a bundle's business.
+- **Patient identity is Eka's, and the clinic works without it.**
+  `kernel/contracts.py` gained `PatientDirectory`, `DirectoryPatient` and
+  `DirectoryError`, beside `Store` and not in a connector, because the kernel
+  needs that interface: resolving who is standing at the desk is
+  `kernel/directory.py`, and a protocol kept in a connector would make the
+  kernel import one. The vendor is
+  `care_phc/connectors/directory/eka.py`.
+  A `patient` row keeps its own id and carries the directory's beside it, as
+  it already carries an ABHA number, because a record is created when a person
+  is in front of a clerk and that may be while no registry can be reached.
+  A row with no directory id is unpublished, so the publish queue is a query
+  over records we already keep rather than a second table that can disagree
+  with them.
+  A directory hit is a suggestion: it becomes values in editable fields and is
+  committed by a tap through `phc.op.patient-register`, so rule 2 above is
+  unchanged and there is still one path to a write.
+- **Rule 1 has a check now.** "Pure logic has no I/O" was a rule and is a
+  check: no module in `kernel/`, `catalogue/` or `adapters/local` may import
+  `urllib.request`, `http.client`, `requests`, `socket`, `httpx` or `aiohttp`.
+  `scripts/check_directory.py` owns it, and asserts the vendor connector does
+  import one so it cannot pass against a tree with no network code in it at
+  all.
 - **The architecture document is `docs/superpowers/plans/2026-10-31-application-architecture.md`.**
   It carries the layering, the five seams with their methods, the record's path
   end to end, where Eka attaches and how each piece degrades, the data model,
