@@ -528,8 +528,17 @@ Two rules this branch has already paid for and that apply to all of the above:
   `scripts/mock_care.py`. It is not touched here and it is not a plugin
   problem, but it is the kind of duplication that makes a plugin look removable
   when it is not.
-- `catalogue/vocab.py:81` `INSTRUMENTS` and `kernel/contracts.py:68`
-  `INSTRUMENT_KINDS` disagree: `palette` versus `spoken-prompt`. One of them is
-  stale. Found while inventorying; not fixed here because it is not this plan's
-  change, and `scripts/check_khoj.py` exists specifically to assert the
-  `Palette` rename stayed done.
+- ~~`catalogue/vocab.py:81` `INSTRUMENTS` and `kernel/contracts.py:68`
+  `INSTRUMENT_KINDS` disagree: `palette` versus `spoken-prompt`.~~ Resolved.
+  `palette` was the stale one: it outlived the Palette-to-Khoj rename because
+  `scripts/check_khoj.py` hunts the capital P `Palette` identifier and this was
+  a lowercase string in a tuple. They are now one vocabulary.
+  `catalogue/vocab.py` owns `INSTRUMENT_KINDS` and `kernel/contracts.py`
+  re-exports it, that direction and not the reverse because kernel imports
+  catalogue and never the other way round. An operation's `instrument:` reads
+  `INSTRUMENTS`, derived as the master minus `NOT_AN_OPERATION_DEFAULT`: a
+  `spoken-prompt` is a line spoken TO the patient, mounted inside a form and
+  rendered from the instrument declaration, so there is no pill for an
+  operation to default to. `scripts/check_instruments.py` fails if the two
+  drift again in either direction, or if a kind is named that no atom declares
+  and no pill draws, which is the hole `palette` came through.

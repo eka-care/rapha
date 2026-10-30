@@ -76,9 +76,38 @@ KERNEL_RESOURCES = frozenset({"thread_flag"})
 # catalogue/guard.py is what enforces it and there is one guard.
 IRREVERSIBILITY = ("reversible", "correctable", "irreversible")
 
-# Capture grammar. The renderer implements these four and no more, so a bundle
-# cannot invent a fifth without renderer code.
-INSTRUMENTS = ("form", "device", "constrained-voice", "scribe", "palette")
+# Capture grammar, and the one vocabulary behind both instrument fields.
+#
+# INSTRUMENT_KINDS is the master list: every sort of instrument the renderer
+# implements, and so the whole of what an instrument atom's `kind:` may name.
+# A bundle cannot invent a sixth without renderer code, which is what makes a
+# declaration naming one a promise the screen can keep. kernel/contracts.py
+# re-exports it, because declaration lint reads it there; it is defined here
+# because this is the lower layer (kernel imports catalogue, never the other
+# way round) and because "which instrument kinds there are" is what this
+# module is for.
+INSTRUMENT_KINDS = ("form", "device", "constrained-voice", "scribe", "spoken-prompt")
+
+# INSTRUMENTS is the narrower question: what an OPERATION's `instrument:` may
+# name as its default. The renderer draws that default as a pill icon and a
+# tag and nothing else (web/src/icons.tsx, and TAG in
+# web/src/screens/Encounter.tsx), so it is exactly the kinds a pill can draw.
+#
+# A strict subset on purpose. A spoken-prompt is not a way of capturing
+# anything: it is a line the agent speaks TO the patient, mounted inside a
+# form beside the fields and rendered from the instrument declaration
+# (web/src/form/Panel.tsx), never from an operation's default. There is no
+# pill for it, and an operation defaulting to one would be a promise no screen
+# keeps.
+#
+# Derived rather than typed out a second time, so the two lists cannot drift
+# apart again. They had: `palette` was written out here, outlived the
+# Palette-to-Khoj rename because scripts/check_khoj.py hunts the capital P
+# identifier and this was a lowercase string, and was still accepted by lint
+# for an instrument no renderer implements. scripts/check_instruments.py now
+# fails if any of this disagrees, in either direction.
+NOT_AN_OPERATION_DEFAULT = ("spoken-prompt",)
+INSTRUMENTS = tuple(k for k in INSTRUMENT_KINDS if k not in NOT_AN_OPERATION_DEFAULT)
 KINDS = ("read", "write")
 
 # The five sections an operation atom's body must carry. A writing rule about

@@ -55,6 +55,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Iterable, Mapping, Optional, Protocol, Sequence
 
 from catalogue.guard import MCP, RENDERED, Decision  # noqa: F401  re-exported
+from catalogue.vocab import INSTRUMENT_KINDS  # noqa: F401  re-exported
 
 # --------------------------------------------------------------------------
 # Closed vocabularies for the new declaration types. These join, not replace,
@@ -65,7 +66,10 @@ DECLARATION_TYPES = ("operation", "workflow", "view", "instrument", "metric")
 VIEW_KINDS = ("queue", "summary", "dashboard", "tasklist")
 VIEW_SCOPES = ("today", "open", "all")
 SUMMARY_SHOW = ("line", "actions", "proposals", "audit", "flags")
-INSTRUMENT_KINDS = ("form", "device", "constrained-voice", "scribe", "spoken-prompt")
+# INSTRUMENT_KINDS is re-exported from catalogue/vocab.py above, not defined
+# here: an instrument atom's `kind:` and an operation's `instrument:` are one
+# vocabulary, the second being the subset a pill can draw. Writing it out in
+# both files is what let them drift (`palette` here, `spoken-prompt` there).
 VOICE_GRAMMARS = ("number", "choice", "date", "free")
 METRIC_UNITS = ("count", "percent", "ratio")
 METRIC_WINDOWS = ("day", "week", "month", "all")

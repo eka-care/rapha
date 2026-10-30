@@ -13,6 +13,13 @@ python3 -m kernel.declarations
 echo "\n== khoj: the rename actually happened, and stayed that way =="
 python3 scripts/check_khoj.py
 
+echo "\n== the instrument vocabulary is one list, not two =="
+# catalogue/vocab.py owns it, kernel/contracts.py re-exports it, and an
+# operation's default is the subset a pill can draw. They were written out
+# twice and drifted (`palette` versus `spoken-prompt`); this is what fails if
+# that starts again, in either direction.
+python3 scripts/check_instruments.py
+
 echo "\n== the kernel and its contracts =="
 python3 -m catalogue.tests.test_guard
 python3 -m catalogue.tests.test_validate
