@@ -54,6 +54,19 @@
       "required": true
     },
     {
+      "link_id": "directory_id",
+      "text": "Patient directory id",
+      "type": "string",
+      "required": false,
+      "styling_metadata": {
+        "phc": {
+          "readonly": true,
+          "short": "From the directory",
+          "help": "Eka's own identifier for this person, carried by a directory suggestion. Empty for a patient the directory has not seen, which is a supported registration and not an incomplete one."
+        }
+      }
+    },
+    {
       "link_id": "village",
       "text": "Village",
       "type": "string",

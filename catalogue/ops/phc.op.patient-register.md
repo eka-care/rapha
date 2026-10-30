@@ -25,6 +25,12 @@ mapping:
         phone: {answer: phone}
         village: {answer: village}
         category: {answer: category}
+        # Eka's own identifier for this person, when a directory suggestion
+        # carried one. Mapped rather than ignored because it is what makes a
+        # returning patient one person instead of two rows, and it arrives the
+        # same way every machine filled value does: in an editable field, read
+        # by a person, committed by their tap.
+        directory_id: {answer: directory_id}
 emits: [registered, abha.pending]
 surfaces: [rendered, mcp]
 verified:

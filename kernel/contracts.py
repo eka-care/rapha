@@ -432,6 +432,109 @@ class Store(Protocol):
     def audit(self, thread: str) -> list: ...
 
 
+
+# --------------------------------------------------------------------------
+# The PatientDirectory protocol: what the kernel needs from a patient
+# directory. Here beside Store, and not in care_phc/connectors/directory/,
+# for one structural reason: the kernel needs this interface. Resolving who is
+# standing at the desk is kernel logic (kernel/directory.py), so a protocol
+# kept in a connector would make the kernel import a connector, which the
+# layer table in kernel/ARCHITECTURE.md forbids. The scribe and ABDM
+# interfaces stay in their own connectors because nothing above them needs
+# one; this one is the Store pattern instead, protocol here and implementation
+# outside.
+#
+# Settled 2026-10-31: Eka's patient directory is the source of truth for
+# patient identity and we do not rebuild a local patient master. The vendor is
+# care_phc/connectors/directory/eka.py.
+# --------------------------------------------------------------------------
+
+class DirectoryError(RuntimeError):
+    """Any failure from a patient directory, scrubbed on the way out.
+
+    The only error type that crosses this boundary, for the reason AbdmError
+    and ScribeError exist: a vendor exception carries the response body
+    verbatim, and a patient profile is in that body.
+
+    `reachable` separates "the directory answered and said no" from "there was
+    no directory to ask". kernel/directory.py treats those differently and a
+    clinic depends on the difference: one means nobody matched, the other
+    means nobody looked, and a clerk who cannot tell them apart registers a
+    duplicate.
+    """
+
+    def __init__(self, message, *, status=None, reachable=True):
+        super().__init__(message)
+        self.status = status
+        self.reachable = reachable
+
+
+@dataclass(frozen=True)
+class DirectoryPatient:
+    """One directory profile, in this product's words rather than the wire's.
+
+    A vendor's field names are abbreviated and an implementation translates
+    them. They are not repeated above this boundary, because the day the
+    vendor changes is the day that would be two translations instead of one.
+
+    `directory_id` is the directory's own identifier (Eka's `oid`). It is an
+    identifier and never this product's row id, for the same reason
+    `abha_number` is not: a national or platform identifier is a fact about a
+    person, not our name for their row. See kernel/directory.py.
+    """
+    directory_id: str
+    name: str = ""
+    sex: str = ""                   # this product's words: female | male | other
+    dob: str = ""                   # ISO 8601, as the directory holds it
+    age: Optional[int] = None       # derived from dob where there is one
+    phone: str = ""
+    abha_address: str = ""
+    abha_number: str = ""
+    # Which field the search matched on, kept so a suggestion can say why this
+    # person was offered. The readback rule is the one voice already has: a
+    # value shown with the words it came from.
+    matched_on: str = ""
+    extras: dict = field(default_factory=dict)
+
+
+class PatientDirectory(Protocol):
+    """Four methods, and the split between them is the whole design.
+
+    A read that fails is a smaller answer, not a broken clinic:
+    kernel/directory.py answers from the local cache and reports that the
+    directory was not asked. A write that fails is a row that stays
+    unpublished and is published later.
+
+    There is deliberately no `update`: a profile edit belongs to whoever owns
+    the profile, and a facility that can edit the master has rebuilt the
+    master. There is deliberately no `delete`: Eka's REST API has one and
+    nothing in this product may call it, because deleting a person while their
+    visits sit in our store leaves clinical records pointing at nobody.
+
+    What a caller may never do with a result is write it. A hit is a
+    suggestion about who is at the desk, and a suggestion is not an assertion:
+    it becomes values in editable fields, committed by a tap through
+    phc.op.patient-register, so there is still one path to a write and the
+    guard is on it.
+    """
+
+    def search(self, prefix: str, *, limit: int = 10) -> Sequence[DirectoryPatient]:
+        """Profiles whose name, mobile or username starts with `prefix`.
+
+        Raises DirectoryError with `reachable=False` when the directory could
+        not be asked. It never returns an empty list to mean "could not ask".
+        """
+
+    def by_mobile(self, mobile: str) -> Sequence[DirectoryPatient]: ...
+    # Profiles on this number. A household shares one, so several come back.
+
+    def fetch(self, directory_id: str) -> Optional[DirectoryPatient]: ...
+    # One profile, or None if the directory has no such id.
+
+    def publish(self, patient: Mapping[str, Any]) -> str: ...
+    # Put a locally registered patient in the directory, return its id.
+
+
 # --------------------------------------------------------------------------
 # API shapes. Stable JSON: these are what the renderer and the MCP server
 # read. Field names are frozen; add, never rename.
@@ -540,6 +643,13 @@ ROUTES = {
     "reject": "POST /api/v1/phc/proposals/{id}/reject/",
     "thread": "GET  /api/v1/phc/threads/{id}/",
     "subject": "GET  /api/v1/phc/subjects/{id}/",   # the spine: one subject, every visit
+    # The patient directory. `search` always answers 200: a directory that
+    # could not be asked is a field in the body, never a status, because a
+    # clerk looking for somebody already in today's line must not be shown an
+    # error about a directory they were not relying on.
+    "patient_search": "GET  /api/v1/phc/patients/search/?q=",
+    "patient_pending": "GET  /api/v1/phc/patients/pending/",
+    "patient_publish": "POST /api/v1/phc/patients/publish/",   # facility.admin
     "view": "GET  /api/v1/phc/views/{id}/",
     "catalogue": "GET  /api/v1/phc/catalogue/",
 }

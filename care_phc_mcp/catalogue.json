@@ -1193,6 +1193,13 @@
           "type": "string"
         },
         {
+          "link_id": "directory_id",
+          "options": null,
+          "required": false,
+          "text": "Patient directory id",
+          "type": "string"
+        },
+        {
           "link_id": "village",
           "options": null,
           "required": true,

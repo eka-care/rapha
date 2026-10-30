@@ -42,6 +42,11 @@ python3 -m bundles.phc.check      # capture consent: raised, declined, scoped to
 # validates, it is coded, the guard allows it, the rows land, the thread
 # projects to an ABDM WellnessRecord. No socket.
 python3 scripts/check_vitals.py
+# Patient identity lives in Eka's directory, and the clinic works without it.
+# Runs with PHC_DIRECTORY=absent and opens no socket; the one module that can
+# is the vendor connector, and this is what fails if that stops being true.
+python3 -m care_phc.connectors.directory.eka
+python3 scripts/check_directory.py
 
 echo "\n== the adapter and the service =="
 python3 -m api.scribe          # the scribe's response reading, against a recorded live answer

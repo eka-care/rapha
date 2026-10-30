@@ -54,8 +54,20 @@ from kernel.contracts import AuditRecord, Proposal, ThreadRef
 # One table per resource this bundle's operations read or write, plus the
 # kernel's own three. Columns are query grammar field names, verbatim.
 TABLES = {
+    # Two identifier columns, neither of them this row's identity.
+    # `abha_number` is a national identifier and `directory_id` is Eka's own
+    # (its `oid`); both are facts about a person rather than our name for
+    # their row, which is why `id` stays ours. kernel/directory.py says why at
+    # length, and the short version is that a record is created when a person
+    # is in front of a clerk, which may be while no registry can be reached.
+    #
+    # `directory_synced` is freshness, not status. There is no
+    # `directory_status`: a row with a directory_id is known to the directory
+    # and one without is not, so one column decides and two facts cannot
+    # disagree about whether somebody gets published twice.
     "patient": ("id", "name", "age", "sex", "phone", "village", "category",
-                "abha_number", "created_by", "created_date"),
+                "abha_number", "directory_id", "directory_synced",
+                "created_by", "created_date"),
     "encounter": ("id", "patient", "status", "token", "created_by", "created_date"),
     # A coding is three columns, not one: the code, the system it is from, and
     # the display the value set gave it. Flat, because a district count is
@@ -327,6 +339,22 @@ class SqliteStore:
             # this is does not need the operation's name, only the join.
             existing = self.select("patient", thread=thread, where={},
                                    fields=["id"], limit=1)
+            if not existing and str(record.get("directory_id") or "").strip():
+                # The same person, on a second visit. Until there was a
+                # directory id, "the same person" was a question this adapter
+                # could not answer: a patient registered on Tuesday and again
+                # on Friday was two rows, so kernel/spine.py showed each of
+                # them one visit and a returning patient had no history. The
+                # directory's identifier is what makes it answerable, and
+                # answering it is this adapter's business because the join is.
+                #
+                # Scoped to a thread=None lookup on purpose: it is a question
+                # about a person across visits, not within one.
+                same = self.select("patient", thread=None,
+                                   where={"directory_id": record["directory_id"]},
+                                   fields=["id"], limit=1)
+                if same:
+                    existing = same
             if existing:
                 record["id"] = existing[0]["id"]
         written = self._put(resource, record, thread=thread)
@@ -418,6 +446,46 @@ class SqliteStore:
             "INSERT INTO thread_flag (id, thread, flag, created_by, created_date)"
             " VALUES (?, ?, ?, ?, ?)",
             [new_id("flag"), thread, flag, actor, now()])
+
+    def record_directory_id(self, patient_id, directory_id, *, at, profile=None):
+        """Record that the patient directory knows this person, and when.
+
+        Not one of the Store protocol's ten methods, and the second gap worth
+        reporting rather than working around: the protocol has no way to say
+        "record a receipt from an external registry". `open_thread` above is
+        the first, for the same reason.
+
+        Deliberately narrow. It writes the identifier, the moment we agreed,
+        and optionally the handful of profile columns a refresh may rewrite,
+        on a row that must already exist. It cannot create a patient, it
+        cannot touch an encounter, and it raises no flag, so it is not a path
+        to a clinical write and `catalogue.guard` stays the only one.
+
+        `profile` is already narrowed by kernel/directory.CACHED before it
+        gets here, and is narrowed again against this table's own columns,
+        because a cache refresh must never overwrite a facility's own words
+        about a person with a directory's guess at them.
+        """
+        columns = TABLES["patient"]
+        row = {"directory_id": str(directory_id), "directory_synced": str(at)}
+        for key, value in (profile or {}).items():
+            if key not in columns:
+                raise ValueError("patient has no column %r" % key)
+            if key in ("id", "directory_id", "created_by", "created_date"):
+                raise ValueError("%r is not a profile column a refresh may "
+                                 "rewrite" % key)
+            if value not in (None, ""):
+                row[key] = _text(value)
+        found = self.db.execute("SELECT 1 FROM patient WHERE id = ?",
+                                [patient_id]).fetchone()
+        if not found:
+            raise ValueError("no patient %r to record a directory id against"
+                             % patient_id)
+        self.db.execute(
+            "UPDATE patient SET %s WHERE id = ?"
+            % ", ".join("%s = ?" % k for k in row),
+            list(row.values()) + [patient_id])
+        return patient_id
 
     # -------------------------------------------------- proposals and audit
 

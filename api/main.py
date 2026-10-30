@@ -40,8 +40,8 @@ from adapters.local.store import SqliteStore, seed
 from agent import turn
 from api import scribe
 from catalogue import validate, vocab
-from kernel import declarations, spine, proposals, state, views
-from kernel.contracts import ThreadRef
+from kernel import declarations, directory, spine, proposals, state, views
+from kernel.contracts import DirectoryError, ThreadRef
 
 BUNDLE = declarations.load(os.environ.get("PHC_BUNDLE", "phc"))
 WORKFLOW = BUNDLE.workflow()
@@ -283,6 +283,92 @@ def open_thread(request: Request, body: dict = Body(default={})):
     user = caller(request)
     thread = store.open_thread(token=body.get("token"), actor=user["id"])
     return panel(thread, user)
+
+
+# ---------------------------------------------------- the patient directory
+# Settled 2026-10-31: Eka's directory is the source of truth for patient
+# identity. One seam (kernel.contracts.PatientDirectory), one vendor behind it,
+# and a degraded path that is the designed path rather than a fallback.
+
+
+def make_directory():
+    """The directory this process talks to, or the kernel's absent one.
+
+    No credential is not an error. A developer with no Eka account, and a
+    health centre whose line is down, get the same thing: the local register
+    answers searches, a registration commits, and nothing is published until
+    there is a directory to publish to. That is the whole offline design and
+    it is reached by the ordinary path, not by a flag.
+    """
+    if os.environ.get("PHC_DIRECTORY", "eka") == "absent":
+        return directory.AbsentDirectory()
+    try:
+        from care_phc.connectors.directory.eka import EkaDirectory
+
+        return EkaDirectory()
+    except DirectoryError:
+        return directory.AbsentDirectory()
+
+
+DIRECTORY = make_directory()
+
+
+@router.get("/patients/search")
+def patient_search(request: Request, q: str = "", limit: int = 10):
+    """Who might this be: the local register, then the directory.
+
+    Always 200. A directory that could not be asked is reported in the body
+    (`reachable: false` and a reason) beside whatever the local register
+    found, and never as an error status: a clerk looking for a patient who is
+    in today's line must not be shown a failure about a directory they were
+    not relying on. That is the degradation this product is designed around
+    and it is tested with no socket in scripts/check_directory.py.
+    """
+    caller(request)                     # capability-free read, but 400 on a bad role
+    found = directory.resolve(store, DIRECTORY, q, limit=max(1, min(int(limit), 50)))
+    return {
+        "query": found.query,
+        "local": found.local,
+        "suggestions": [asdict(s) for s in found.suggestions],
+        "reachable": found.reachable,
+        "reason": found.reason,
+        # What a suggestion is for. Said on the wire so the renderer cannot
+        # invent a different answer: these are values for the register form,
+        # and committing them is an ordinary guarded write.
+        "commits_through": "phc.op.patient-register",
+    }
+
+
+@router.get("/patients/pending")
+def patient_pending(request: Request, limit: int = 200):
+    """Patients this facility registered that the directory has not seen.
+
+    A query over rows we already keep rather than a queue, so it cannot
+    disagree with the records it is about. See kernel/directory.pending.
+    """
+    caller(request)
+    rows = directory.pending(store, limit=max(1, min(int(limit), 500)))
+    return {"pending": rows, "count": len(rows)}
+
+
+@router.post("/patients/publish")
+def patient_publish(request: Request, body: dict = Body(default={})):
+    """Publish what is pending. Needs facility.admin.
+
+    Not a clinical write and not an operation in the catalogue: it records the
+    identifier a registry minted for a person already registered here, on a
+    row that already exists. Behind facility.admin because it is the only verb
+    here that sends a patient's details off this machine.
+    """
+    user = caller(request)
+    if "facility.admin" not in user["capabilities"]:
+        raise HTTPException(403, "publishing to the patient directory needs "
+                                 "facility.admin")
+    report = directory.publish_pending(
+        store, DIRECTORY, at=proposals.now(),
+        limit=max(1, min(int(body.get("limit") or 50), 200)))
+    return {"published": report.published, "failed": report.failed,
+            "reachable": report.reachable, "count": report.count}
 
 
 @router.get("/queue")
