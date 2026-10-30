@@ -14,11 +14,14 @@ Two fields read that one list:
     by removing NOT_AN_OPERATION_DEFAULT.
 
 They were written out twice and drifted: `catalogue/vocab.py` carried
-`palette`, left behind by the Palette-to-Khoj rename, while
+`palette`, left behind by the rename to Khoj, while
 `kernel/contracts.py` carried `spoken-prompt`. So an operation could never
 declare the instrument that exists and could happily declare the one that
-does not. scripts/check_khoj.py missed it because it hunts the capital P
-`Palette` identifier and this was a lowercase string in a tuple.
+does not. scripts/check_khoj.py missed it because that check hunts the old
+capitalised component identifier, and this was a lowercase string in a tuple.
+This file deliberately does not retype that identifier: check_khoj.py forbids
+it in every tracked source file and exempts only itself, and a second
+exemption would turn one documented carve-out into a convention.
 
 Mutation: add a sixth entry to INSTRUMENT_KINDS in catalogue/vocab.py, or
 define INSTRUMENT_KINDS in kernel/contracts.py again instead of importing it,
