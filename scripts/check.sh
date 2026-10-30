@@ -32,6 +32,11 @@ python3 -m adapters.local.tests.test_store   # the one adapter, and the Store pr
 python3 -m api.tests.test_api
 
 echo "\n== the agent, and the ABDM connector =="
+# What no connector may let through, and what no connector may import: the
+# scribe used to borrow the ABDM connector's Aadhaar pattern, which meant a
+# facility could not have dictation without ABHA. Needs no SDK, so it runs
+# whether or not ekacare is installed, unlike the two connector checks below.
+python3 -m care_phc.connectors.redact
 python3 -m agent.tests.test_planner
 python3 -m agent.turn          # one conversational turn, no kernel and no key
 python3 -m agent.tests.test_live      # binds a port; SKIP_E2E=1 skips that half

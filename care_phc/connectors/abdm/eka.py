@@ -43,14 +43,12 @@ import re
 from ekacare import EkaCareClient
 from ekacare.utils.exceptions import EkaCareError
 
+from care_phc.connectors import redact
 from care_phc.connectors.abdm.base import AbdmError, AbhaResult
 
 CHECK_PHR = "/abdm/na/v1/registration/phr/check"
 AADHAAR_INIT = "/abdm/na/v1/registration/aadhaar/init"
 CARE_CONTEXT_LINK = "/abdm/v1/care-contexts/link"
-
-# 12 digits, optionally spaced. Matched so it can be removed, never stored.
-_AADHAAR = re.compile(r"\b\d{4}[ -]?\d{4}[ -]?\d{4}\b")
 
 # The SDK carries the HTTP status in its message text and nowhere else, so a
 # status we need for the 401 retry has to be read back out of the string.
@@ -58,8 +56,13 @@ _STATUS = re.compile(r"\b([1-5]\d\d)\b")
 
 
 def _scrub(text):
-    """Remove anything Aadhaar-shaped before it can reach a log or a traceback."""
-    return _AADHAAR.sub("<aadhaar-redacted>", str(text))
+    """Remove anything Aadhaar-shaped before it can reach a log or a traceback.
+
+    The pattern is care_phc/connectors/redact.py's, shared with the scribe
+    connector so the two cannot drift apart on what an Aadhaar number looks
+    like. This name stays because it is this connector's one exit filter and
+    its check calls it by name."""
+    return redact.aadhaar(text)
 
 
 def last4(mobile):

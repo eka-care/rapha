@@ -68,7 +68,7 @@ import os
 import re
 import uuid
 
-from care_phc.connectors.abdm.eka import _scrub as _redact_aadhaar
+from care_phc.connectors import redact
 from care_phc.connectors.scribe import draft as to_draft
 from care_phc.connectors.scribe.base import AudioRetention, ScribeError
 
@@ -97,10 +97,11 @@ _AUDIO = re.compile(r"\b[\w .()\-]+\.(?:wav|mp3|m4a|aac|ogg|oga|flac|webm|aiff?)
 
 
 def _scrub(text):
-    """The one exit filter. Aadhaar first, reusing the ABDM connector's own
-    pattern so the two connectors cannot drift apart on what an Aadhaar number
-    looks like, then anything path or recording shaped."""
-    out = _redact_aadhaar(text)
+    """The one exit filter. Aadhaar first, from the shared pattern in
+    care_phc/connectors/redact.py so the two connectors cannot drift apart on
+    what an Aadhaar number looks like, then anything path or recording
+    shaped."""
+    out = redact.aadhaar(text)
     out = _AUDIO.sub("<audio-redacted>", out)
     return _PATH.sub("<path-redacted>", out)
 
