@@ -154,9 +154,9 @@ def test_the_unit_comes_from_the_questionnaire_and_is_written_nowhere_else():
     assert by_link["spo2"]["unit_system"] == "http://unitsofmeasure.org"
     rows = mapping.records(OPERATIONS["phc.op.vitals-record"], {"spo2": 97})
     assert rows == [("observation", {
-        "category": "vital-signs", "code": "59408-5",
+        "category": "vital-signs", "code": "2708-6",
         "code_system": "http://loinc.org",
-        "code_display": "Oxygen saturation in Arterial blood by Pulse oximetry",
+        "code_display": "Oxygen saturation in Arterial blood",
         "value": 97, "unit": "%",
         "unit_system": "http://unitsofmeasure.org"})], rows
 
@@ -220,8 +220,8 @@ def test_the_author_lands_on_every_row_and_never_stands_in_for_an_answer():
     rows = mapping.records(op, {"spo2": 97}, actor="user:nurse")
     assert rows == [("observation", {
         "created_by": "user:nurse", "category": "vital-signs",
-        "code": "59408-5", "code_system": "http://loinc.org",
-        "code_display": "Oxygen saturation in Arterial blood by Pulse oximetry",
+        "code": "2708-6", "code_system": "http://loinc.org",
+        "code_display": "Oxygen saturation in Arterial blood",
         "value": 97, "unit": "%",
         "unit_system": "http://unitsofmeasure.org"})], rows
     # An author is not an answer: a payload that produced nothing is still no

@@ -108,6 +108,20 @@ for link_id, q in compiled.items():
     assert q["code_display"], q
 ok("every compiled reading carries facts its value set vouched for")
 
+# A seeded code and a confirmed code are indistinguishable once a row is
+# written, so the difference has to be caught before one is. Every concept the
+# file offers names where it was confirmed; "unverified" is a word this check
+# refuses, not a status it reports.
+import json                                                   # noqa: E402
+
+VOCAB = json.loads(open("terminology/observation-code.json").read())
+assert not VOCAB["verified"].startswith("unverified"), VOCAB["verified"]
+for code, concept in VOCAB["concepts"].items():
+    assert not concept["verified"].startswith("unverified"), \
+        "%s is still seeded rather than confirmed" % code
+    assert concept["display"], code
+ok("every concept names where it was confirmed, not merely seeded")
+
 # The compiled mapping travels: it is served on /operations and
 # web/src/structured.ts reads it, so web/src/messages.check.ts json.dumps the
 # whole of it. A coding object here would be a 500 on the thread panel.
@@ -265,7 +279,7 @@ rows = store.select("observation", thread=thread, where={"category": "vital-sign
                             "unit_system", "created_by"], limit=20)
 assert len(rows) == len(READING), rows
 by_code = {r["code"]: r for r in rows}
-assert set(by_code) == {"8480-6", "8462-4", "8867-4", "59408-5", "29463-7", "8310-5"}, \
+assert set(by_code) == {"8480-6", "8462-4", "8867-4", "2708-6", "29463-7", "8310-5"}, \
     sorted(by_code)
 systolic = by_code["8480-6"]
 assert systolic["value"] == "186" and systolic["unit"] == "mm[Hg]", systolic
@@ -461,4 +475,11 @@ print("ok   vitals slice: %d checks passed" % checks)
 #       ->  the audit order check fails
 #   catalogue/ops/phc.op.vitals-record.md      drop the code_system column
 #       ->  the atom check fails, then the adapter and projection checks
+#   terminology/observation-code.json          verified -> "unverified"
+#       ->  the confirmation check fails, for the file and for one concept
+#
+#   Tried and rejected: asserting a row's code_display equals the value set's
+#   display. The compiled row takes its display from that same file, so the
+#   assertion compares a value with its own source and cannot fail. The
+#   hand-made Coding check above already covers a display nobody vouched for.
 # ---------------------------------------------------------------------------

@@ -80,7 +80,7 @@
       "link_id": "spo2",
       "text": "SpO2",
       "type": "integer",
-      "code": "59408-5",
+      "code": "2708-6",
       "required": false,
       "is_observation": true,
       "styling_metadata": {

@@ -4,32 +4,33 @@
   "system": "http://loinc.org",
   "binding": "a questionnaire question's own `code`, when the question is the concept",
   "generated": "2026-10-31",
-  "source": "Hand seeded from the published LOINC vital signs panel 85353-1 member list. Step 2 of docs/superpowers/plans/2026-10-30-coded-data-symbiosis.md replaces this by hand confirming the list once through Eka codification with unit as context. Step 1 implementation 2 replaces the whole file with a local index built from the NRCeS release files.",
-  "verified": "unverified",
+  "source": "Confirmed against the FHIR R4 vital signs value set, which fixes the LOINC code every ABDM consumer matches a vital sign on. Step 1 implementation 2 replaces this file with a local index built from the NRCeS release files.",
+  "verified": "confirmed 2026-10-30",
   "concepts": {
     "8480-6": {
       "display": "Systolic blood pressure",
-      "verified": "unverified: published LOINC vital signs panel 85353-1"
+      "verified": "confirmed 2026-10-30 against the FHIR R4 vital signs value set, hl7.org/fhir/R4/valueset-observation-vitalsignresult.html"
     },
     "8462-4": {
       "display": "Diastolic blood pressure",
-      "verified": "unverified: published LOINC vital signs panel 85353-1"
+      "verified": "confirmed 2026-10-30 against the FHIR R4 vital signs value set, hl7.org/fhir/R4/valueset-observation-vitalsignresult.html"
     },
     "8867-4": {
       "display": "Heart rate",
-      "verified": "unverified: published LOINC vital signs panel 85353-1"
+      "verified": "confirmed 2026-10-30 against the FHIR R4 vital signs value set, hl7.org/fhir/R4/valueset-observation-vitalsignresult.html"
     },
-    "59408-5": {
-      "display": "Oxygen saturation in Arterial blood by Pulse oximetry",
-      "verified": "unverified: published LOINC vital signs panel 85353-1. Chosen over 2708-6 because a health centre measures it by pulse oximeter, and the method is part of the concept."
+    "2708-6": {
+      "display": "Oxygen saturation in Arterial blood",
+      "verified": "confirmed 2026-10-30 against the FHIR R4 vital signs value set, hl7.org/fhir/R4/valueset-observation-vitalsignresult.html",
+      "note": "The FHIR R4 oxygensat profile fixes Observation.code to this code and allows a more specific coding beside it. A health centre measures by pulse oximeter, which is LOINC 59408-5, but that code alone would not match a consumer looking for a vital sign. When Observation.code carries more than one coding, 59408-5 is the second one, never the first."
     },
     "29463-7": {
       "display": "Body weight",
-      "verified": "unverified: published LOINC vital signs panel 85353-1"
+      "verified": "confirmed 2026-10-30 against the FHIR R4 vital signs value set, hl7.org/fhir/R4/valueset-observation-vitalsignresult.html"
     },
     "8310-5": {
       "display": "Body temperature",
-      "verified": "unverified: published LOINC vital signs panel 85353-1"
+      "verified": "confirmed 2026-10-30 against the FHIR R4 vital signs value set, hl7.org/fhir/R4/valueset-observation-vitalsignresult.html"
     }
   }
 }
