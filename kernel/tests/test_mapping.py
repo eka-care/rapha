@@ -310,6 +310,30 @@ def test_a_question_that_binds_no_concept_may_not_write_a_code_column():
         assert "binds no code" in failures(worse), (fact, failures(worse))
 
 
+def test_an_answer_coding_source_needs_a_question_that_binds_its_answer():
+    """The third binding form's own closure rule.
+
+    `{answer_code: x}` stores the code an answer names, resolved through the
+    value set that question binds. A question that binds nothing has no value
+    set to resolve through, so the column would hold whatever was typed: that
+    is exactly the defect the laboratory result's code column had, where the
+    analyte's free text became the report's code. Refused at build time.
+    """
+    bad = {"records": [{"resource": "observation", "per_question": ["systolic"],
+                        "fields": {"created_by": {"actor": "id"},
+                                   "code": {"answer_code": "note"}}}],
+           "ignored": ["drugs"]}
+    said = failures(bad)
+    assert "declares no answer_value_set" in said, said
+    assert "answer_code" in said, said
+    # And a link_id that is not a question at all is caught the same way.
+    worse = {"records": [{"resource": "observation", "per_question": ["systolic"],
+                          "fields": {"created_by": {"actor": "id"},
+                                     "code": {"answer_code": "nonsense"}}}],
+             "ignored": ["drugs", "note"]}
+    assert "is not a question on this form" in failures(worse), failures(worse)
+
+
 def test_a_source_that_needs_a_context_it_does_not_have_fails_the_build():
     bad = {"records": [{"resource": "observation",
                         "fields": {"code": {"item": "code"}}}],

@@ -229,11 +229,14 @@ def _value(source, payload, context, actor=None):
                 "have refused it" % (kind, arg))
         answer = payload.get(arg)
         if _blank(answer):
-            # An unanswered bound question is no coding and therefore no row,
-            # which _row handles: the column is left out and a record with no
-            # other derived value is not written. Returning None rather than
-            # raising is what makes an optional coded answer optional.
-            return None
+            # Unreachable from _row, which refuses the whole record first.
+            # Kept as the same fail closed shape _bound_fact has rather than
+            # returning None: a code column that lands null is the silent
+            # failure this file exists to prevent, and the two coding families
+            # must not disagree about that.
+            raise terminology.UnboundCoding(
+                "question %r was not answered, so {%s: %s} has no concept to "
+                "store" % (arg, kind, arg))
         coding = terminology.answer_coding(question, answer)
         return getattr(coding, ANSWER_CODING_FACTS[kind])
     if kind == "item":
@@ -257,7 +260,23 @@ def _value(source, payload, context, actor=None):
 
 
 def _row(record, payload, context, actor=None):
-    """One row, or None when this record has nothing to say about this payload."""
+    """One row, or None when this record has nothing to say about this payload.
+
+    A record that codes a column from an answer writes NOTHING when that
+    answer is absent. Not a style choice: without it a laboratory result whose
+    analyte was left blank became an observation carrying a value and a unit
+    and no code, which is a clinical number with nothing saying what it
+    measured. Found by mutation. The validator refuses that payload upstream
+    because the analyte is required, so this is the second line, and it is the
+    line that also makes an OPTIONAL coded answer safe: no concept means no
+    row rather than an uncoded one.
+    """
+    for source in record["fields"].values():
+        if not isinstance(source, dict) or len(source) != 1:
+            continue
+        (kind, arg), = source.items()
+        if kind in ANSWER_CODING_FACTS and _blank(payload.get(arg)):
+            return None
     row, derived, any_derived_source = {}, False, False
     for column, source in record["fields"].items():
         from_payload = not set(source) & set(PAYLOAD_FREE)

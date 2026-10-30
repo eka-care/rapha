@@ -187,6 +187,25 @@ ok("and a question that declares no binding produces no coding at all, rather "
    "than one nothing vouched for")
 
 
+# An optional bound question that nobody answered is no coding and therefore
+# no row, not a refusal. Checked because the branch is otherwise unreachable
+# from the shipped forms, where both bound questions are required: a future
+# optional coded answer would land on it, and a mutation of it passed
+# unnoticed until this was written.
+unanswered = mapping.records(OP, {"value": 9.4, "unit": "g/dL"}, actor=TECH)
+written = {r for r, _ in unanswered}
+assert "observation" not in written, unanswered
+assert "diagnostic_report" not in written, unanswered
+# This is the defect the mutation found rather than the one it was written
+# for: the row used to be written anyway, carrying a value and a unit and no
+# code, which is a clinical number with nothing saying what it measured.
+for resource, row in unanswered:
+    assert not (set(row) & {"code", "code_system", "code_display"}), (resource, row)
+    assert "value" not in row, (resource, row)
+ok("a record that codes a column from an answer writes nothing when that "
+   "answer is absent, rather than a row with a value and no code")
+
+
 # ---------------------------------------------------------------------------
 # 4. The agreement rule, on the guard's first step.
 # ---------------------------------------------------------------------------
@@ -232,6 +251,25 @@ silent = terminology.answer_problems(SCHEMA, RESULT, NoUnit())
 assert silent and "no unit" in silent[0], silent
 ok("an analyte with no unit recorded reports that it cannot decide one, "
    "rather than letting the unit through unchecked")
+
+# A unit_of pointing at a question that does not exist is a rule that can
+# never fire, which reads as a protection and is not one. The same reasoning
+# the catalogue linter applies to an `actor of` naming a missing operation.
+# Checked on a synthetic form rather than by breaking the shipped one, so the
+# message itself is pinned.
+DANGLING = {"questions": [
+    {"link_id": "analyte", "text": "Analyte", "type": "choice",
+     "answer_value_set": SLUG, "required": True},
+    {"link_id": "unit", "text": "Unit", "type": "choice",
+     "answer_value_set": terminology.UNIT_BINDING, "required": True,
+     "styling_metadata": {"phc": {"unit_of": "nonsense"}}},
+]}
+dangling = terminology.answer_problems(DANGLING, {"analyte": "718-7", "unit": "g/dL"})
+assert len(dangling) == 1, dangling
+assert "not a question on this form" in dangling[0], dangling
+assert "nonsense" in dangling[0], dangling
+ok("a unit_of naming a question that does not exist is reported, not a rule "
+   "that silently never fires")
 
 
 # ---------------------------------------------------------------------------
