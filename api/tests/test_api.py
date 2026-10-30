@@ -211,7 +211,10 @@ def test_the_mcp_facing_routes_did_not_move():
     assert "patient.find" in client.get("/api/v1/phc/whoami/").json()["capabilities"]
     reply = client.post("/api/v1/phc/operations/phc.op.lab-result-enter/propose/",
                         json={"patient": "enc-004",
-                              "payload": {"analyte": "Haemoglobin", "value": 9.4,
+                              # A LOINC code, because the analyte question
+                              # binds its answer to a value set and free text
+                              # is refused before a row is built.
+                              "payload": {"analyte": "718-7", "value": 9.4,
                                           "unit": "g/dL"}})
     assert reply.status_code == 200, reply.text
     assert reply.json()["awaiting"].startswith("clinician review")
@@ -358,9 +361,9 @@ def test_the_planner_only_answers_questions_the_operation_asks():
     op = main.BUNDLE.operations["phc.op.lab-result-enter"]
     assert "override_reason" in {f["link_id"] for f in op["fields"]}, \
         "this is the operation whose questionnaire carries the override"
-    assert planner.typed(op, {"analyte": "Haemoglobin", "value": 9.4, "unit": "g/dL",
+    assert planner.typed(op, {"analyte": "718-7", "value": 9.4, "unit": "g/dL",
                               "override_reason": "the agent said so",
-                              "invented": 1}) == {"analyte": "Haemoglobin",
+                              "invented": 1}) == {"analyte": "718-7",
                                                   "value": 9.4, "unit": "g/dL"}
 
 

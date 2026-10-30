@@ -24,7 +24,7 @@ from typing import Optional
 
 from catalogue import guard, validate
 from kernel import contracts as c
-from kernel import mapping
+from kernel import mapping, terminology
 from kernel.state import drawn_by
 from kernel.state import flags as thread_flags
 from kernel.state import performers
@@ -45,8 +45,30 @@ def _schema(questionnaire: str):
 
 def validator(op):
     """The same validator every surface uses. Loaded from the questionnaire
-    the operation names, so there is one definition of a valid payload."""
-    return validate.make_validator(_schema(op["input"]))
+    the operation names, so there is one definition of a valid payload.
+
+    Two halves, composed here and nowhere else. The schema rules are the
+    catalogue's (required, types, choices, the range rule) and the terminology
+    rules are the kernel's (an answer is a code its value set holds, and a
+    unit is the one its analyte is reported in). They are composed rather than
+    merged because the catalogue layer may not import the kernel and the value
+    sets are the kernel's, and composing them here keeps the property that
+    matters: there is still exactly one validator per operation and every
+    surface uses it.
+
+    Both halves run, and the problems are concatenated, so a technician with a
+    bad number and a bad unit is told about both at once rather than fixing
+    one and discovering the other. That is CARE's all or nothing submission
+    rule, which is the right one.
+    """
+    schema = _schema(op["input"])
+    schema_rules = validate.make_validator(schema)
+
+    def both(op, payload):
+        return (schema_rules(op, payload)
+                + terminology.answer_problems(schema, payload))
+
+    return both
 
 
 def raised(op, payload, workflow):

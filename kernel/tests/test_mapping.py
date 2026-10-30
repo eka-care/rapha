@@ -32,7 +32,11 @@ PAYLOADS = {
     "phc.op.rx-prescribe": {"medications": [{"medication": "Paracetamol 500mg",
                                              "dosage_instruction": "1 tab TDS"}]},
     "phc.op.lab-order": {"investigations": [{"code": "CBC"}]},
-    "phc.op.lab-result-enter": {"analyte": "Haemoglobin", "value": 9.4, "unit": "g/dL"},
+    # The analyte is a LOINC code now and not the word a technician typed, and
+    # the unit must be the one LOINC reports that analyte in. See
+    # scripts/check_lab.py for the rule and the reason.
+    "phc.op.lab-result-enter": {"analyte": "718-7", "value": 9.4, "unit": "g/dL",
+                                "note": "repeat on a fresh sample"},
     "phc.op.pharmacy-dispense": {"dispenses": [{"medication": "Paracetamol 500mg",
                                                 "quantity": 9}]},
     "phc.op.household-visit": {"visit_type": "routine", "consent_at_door": True,
@@ -69,10 +73,22 @@ GOLDEN = {
     "phc.op.lab-order": [
         ("service_request", {"code": "CBC", "status": "active"}),
     ],
+    # Three rows where there were two, and the new one is the point: the
+    # result is a quantity. It used to be prose in the report's conclusion,
+    # "9.4 g/dL", which is why nothing could trend or count it. The report
+    # keeps a narrative the technician wrote, and the specimen no longer
+    # claims the test name is its type.
     "phc.op.lab-result-enter": [
-        ("diagnostic_report", {"code": "Haemoglobin", "conclusion": "9.4 g/dL",
+        ("observation", {"category": "laboratory", "code": "718-7",
+                         "code_system": "http://loinc.org",
+                         "code_display": "Hemoglobin [Mass/volume] in Blood",
+                         "value": "9.4", "unit": "g/dL",
+                         "unit_system": "http://unitsofmeasure.org"}),
+        ("diagnostic_report", {"code": "718-7",
+                               "code_system": "http://loinc.org",
+                               "conclusion": "repeat on a fresh sample",
                                "status": "preliminary"}),
-        ("specimen", {"code": "Haemoglobin", "status": "available"}),
+        ("specimen", {"status": "available"}),
     ],
     "phc.op.patient-register": [
         ("patient", {"name": "Devi Prasad", "age": "41", "sex": "male",

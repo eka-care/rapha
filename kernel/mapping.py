@@ -98,7 +98,12 @@ from kernel import terminology
 OPS = pathlib.Path(__file__).parents[1] / "catalogue" / "ops"
 
 SOURCES = ("answer", "const", "item", "minus", "question", "joined", "note",
-           "json", "actor")
+           "json", "actor",
+           # The third binding form: the ANSWER carries the concept. One kind
+           # per part of the coding, mirroring the `question:` facts, because
+           # the grammar is one key and one argument and a nested selector
+           # would be the first exception to that.
+           "answer_code", "answer_code_system", "answer_code_display")
 # Sources that do not read the payload. A record made only of these is written
 # every time; a record with any other source is written only when the payload
 # gave one of them a value.
@@ -140,6 +145,16 @@ CODING_FACTS = {
 }
 # Which value set each binding is closed over.
 CODING_BINDING = {"code": terminology.CODE_BINDING, "unit": terminology.UNIT_BINDING}
+
+# The answer bound family, and which part of the resolved coding each reads.
+# Unlike the `question:` facts these cannot be resolved at build time: the
+# concept is whichever one the technician picked, so resolution happens in
+# _value at write time, through the same single constructor. The value set is
+# the question's own `answer_value_set`, so one source kind serves a lab
+# analyte and a unit and anything else that binds an answer later.
+ANSWER_CODING_FACTS = {"answer_code": "code",
+                       "answer_code_system": "system",
+                       "answer_code_display": "display"}
 QUESTION_FACTS = ("link_id", "answer") + tuple(CODING_FACTS)
 LINK_LISTS = ("joined", "note")
 RECORD_KEYS = ("resource", "per_item", "per_question", "fields")
@@ -206,6 +221,21 @@ def _value(source, payload, context, actor=None):
         return actor
     if kind == "answer":
         return payload.get(arg)
+    if kind in ANSWER_CODING_FACTS:
+        question = (context.get("questions") or {}).get(arg)
+        if question is None:
+            raise terminology.UnboundCoding(
+                "{%s: %s} has no question to read a binding from; lint should "
+                "have refused it" % (kind, arg))
+        answer = payload.get(arg)
+        if _blank(answer):
+            # An unanswered bound question is no coding and therefore no row,
+            # which _row handles: the column is left out and a record with no
+            # other derived value is not written. Returning None rather than
+            # raising is what makes an optional coded answer optional.
+            return None
+        coding = terminology.answer_coding(question, answer)
+        return getattr(coding, ANSWER_CODING_FACTS[kind])
     if kind == "item":
         return _first(context, arg)
     if kind == "minus":
@@ -260,7 +290,13 @@ def records(op, payload, actor=None):
                         if not _blank(payload.get(q["link_id"]))]
         else:
             contexts = [{}]
+        # The bound questions this record's answer coding sources need, so
+        # _value never opens a questionnaire. Compiled in, and JSON able,
+        # because the compiled mapping travels to the renderer.
+        bound = record.get("questions") or {}
         for context in contexts:
+            if bound:
+                context = dict(context, questions=bound)
             row = _row(record, payload, context, actor)
             if row is not None:
                 out.append((record["resource"], row))
@@ -310,6 +346,18 @@ def _lint_source(source, where, record, questions, fail):
     if kind == "answer":
         if arg not in questions:
             fail("%s: '%s' is not a question on this form" % (where, arg))
+        return {arg}
+    if kind in ANSWER_CODING_FACTS:
+        if arg not in questions:
+            fail("%s: '%s' is not a question on this form" % (where, arg))
+        elif not terminology.answer_binding(questions[arg]):
+            # The failure this exists for: a column that would hold a code,
+            # filled from an answer nothing checks. That is the defect the
+            # analyte column had, where whatever the technician typed became
+            # the report's code.
+            fail("%s: question '%s' declares no %s, so {%s: %s} would store a "
+                 "code no value set vouched for"
+                 % (where, arg, terminology.ANSWER_VALUE_SET, kind, arg))
         return {arg}
     if kind in LINK_LISTS:
         if not isinstance(arg, list) or not arg:
@@ -477,8 +525,31 @@ def _compile_record(record, questions, terminology_=None):
         "per_item": record.get("per_item"),
         "per_question": [_compile_question(questions[link_id], terminology_)
                          for link_id in record.get("per_question") or []] or None,
+        "questions": _compile_bound(record, questions),
         "fields": dict(record["fields"]),
     }
+
+
+def _compile_bound(record, questions):
+    """The questions this record's answer coding sources resolve against.
+
+    Only the two fields a resolution needs, so the compiled mapping stays
+    small and plain JSON: the link_id, and the value set the answer is drawn
+    from. The answer itself is not here, because it is not known until
+    somebody answers, which is the whole difference between this binding form
+    and the other two.
+    """
+    out = {}
+    for source in (record.get("fields") or {}).values():
+        if not isinstance(source, dict) or len(source) != 1:
+            continue
+        (kind, arg), = source.items()
+        if kind not in ANSWER_CODING_FACTS or arg not in questions:
+            continue
+        out[arg] = {"link_id": arg,
+                    terminology.ANSWER_VALUE_SET:
+                        terminology.answer_binding(questions[arg])}
+    return out
 
 
 def _compile_question(question, terminology_=None):

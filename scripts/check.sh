@@ -42,6 +42,12 @@ python3 -m bundles.phc.check      # capture consent: raised, declined, scoped to
 # validates, it is coded, the guard allows it, the rows land, the thread
 # projects to an ABDM WellnessRecord. No socket.
 python3 scripts/check_vitals.py
+# A laboratory value and its unit are one checked thing: the analyte is a coded
+# ANSWER (the third binding form) and the unit must be the one LOINC reports
+# that analyte in. scripts/seed_terminology.py generated the value set and is
+# deliberately NOT run here: it needs a network and confirming a code list is
+# design time work.
+python3 scripts/check_lab.py
 # Patient identity lives in Eka's directory, and the clinic works without it.
 # Runs with PHC_DIRECTORY=absent and opens no socket; the one module that can
 # is the vendor connector, and this is what fails if that stops being true.

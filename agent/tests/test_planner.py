@@ -52,7 +52,36 @@ def sample_payload(op):
         rng = phc.get("range")
         kind = q["type"]
         if kind == "choice":
-            payload[q["link_id"]] = q["answer_option"][0]["value"]
+            # A choice either lists its options or binds its answer to a value
+            # set, and since the laboratory result's analyte became a coded
+            # answer there are both kinds on the shipped forms. The helper
+            # promises the smallest payload the VALIDATOR accepts, and the
+            # validator now has a cross field rule, so the unit a question
+            # declares `unit_of` must be the one its peer's concept is
+            # reported in rather than the first code in the UCUM cache.
+            #
+            # A test reaching into kernel/terminology.py is a wider import
+            # than agent/ itself may have. Deliberate and confined to this
+            # helper: a test may know more than the code it tests, and the
+            # alternative is a hand written payload that goes stale the next
+            # time a form changes, which is the thing this helper exists to
+            # avoid.
+            from kernel import terminology
+
+            peer = terminology.unit_of(q)
+            slug = terminology.answer_binding(q)
+            if peer:
+                peer_q = next(x for x in validate.walk(schema["questions"])
+                              if x["link_id"] == peer)
+                peer_slug = terminology.answer_binding(peer_q)
+                chosen = payload.get(peer) or sorted(
+                    terminology.LOCAL.concepts(peer_slug))[0]
+                payload[q["link_id"]] = terminology.concept(peer_slug,
+                                                            chosen)["unit"]
+            elif slug:
+                payload[q["link_id"]] = sorted(terminology.LOCAL.concepts(slug))[0]
+            else:
+                payload[q["link_id"]] = q["answer_option"][0]["value"]
         elif kind == "boolean":
             payload[q["link_id"]] = True
         elif kind in ("integer", "decimal"):
@@ -182,9 +211,19 @@ def test_a_clause_ends_where_the_form_s_own_next_word_begins():
                    "phone": "9876543210", "sex": "female"}, got
     # override_reason can never be answered here, so it does not get to make
     # "value" an ambiguous name for the field that can be.
+    #
+    # The analyte and the unit are no longer filled from the sentence, and
+    # that is the intended outcome rather than a regression. Both bind their
+    # answer to a value set, and this planner matches a choice against the
+    # `answer_option` list a questionnaire declares, which a bound question
+    # does not have. More to the point, the word "glucose" does not say which
+    # glucose: a capillary glucometer reading and a serum or plasma one are
+    # different LOINC concepts and different numbers, so a planner that
+    # picked one would be inventing the specimen. The number is filled and the
+    # concept is picked by a person, which is what binding the answer is for.
     lab = fill(OPS["phc.op.lab-result-enter"],
                "bench result, analyte is glucose, value 5.4, unit mmol per litre")
-    assert lab == {"analyte": "glucose", "value": 5.4, "unit": "mmol per litre"}, lab
+    assert lab == {"value": 5.4}, lab
 
 
 def test_a_choice_is_matched_against_the_declared_options():

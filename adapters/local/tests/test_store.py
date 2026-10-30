@@ -27,7 +27,11 @@ PAYLOADS = {
     "phc.op.rx-prescribe": {"medications": [{"medication": "Paracetamol 500mg",
                                              "dosage_instruction": "1 tab TDS"}]},
     "phc.op.lab-order": {"investigations": [{"code": "CBC"}]},
-    "phc.op.lab-result-enter": {"analyte": "Haemoglobin", "value": 9.4, "unit": "g/dL"},
+    # The analyte is the LOINC code its question binds to, and the unit is the
+    # one LOINC reports it in: the free text this used to be is now refused
+    # before a row is built. scripts/check_lab.py owns that rule.
+    "phc.op.lab-result-enter": {"analyte": "718-7", "value": 9.4, "unit": "g/dL",
+                                "note": "repeat on a fresh sample"},
     "phc.op.pharmacy-dispense": {"dispenses": [{"medication": "Paracetamol 500mg",
                                                 "quantity": 9}]},
     "phc.op.household-visit": {"visit_type": "routine", "consent_at_door": True,

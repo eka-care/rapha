@@ -40,7 +40,8 @@ from adapters.local.store import SqliteStore, seed
 from agent import turn
 from api import scribe
 from catalogue import validate, vocab
-from kernel import declarations, directory, spine, proposals, state, views
+from kernel import (declarations, directory, spine, proposals, state,
+                    terminology, views)
 from kernel.contracts import DirectoryError, ThreadRef
 
 BUNDLE = declarations.load(os.environ.get("PHC_BUNDLE", "phc"))
@@ -369,6 +370,42 @@ def patient_publish(request: Request, body: dict = Body(default={})):
         limit=max(1, min(int(body.get("limit") or 50), 200)))
     return {"published": report.published, "failed": report.failed,
             "reachable": report.reachable, "count": report.count}
+
+
+@router.get("/valuesets/{slug}")
+def valueset(slug: str, request: Request, q: str = "", limit: int = 50):
+    """Expand a value set, for a picker.
+
+    A question that binds its answer to a value set has no `answer_option`
+    list, by design: the codes live in the value set and duplicating them into
+    the questionnaire would be the same list twice. So something has to offer
+    them, and this is it. Without this route the third binding form would be a
+    column nothing could fill from a screen.
+
+    Local and offline like everything else on this path: it reads the cache in
+    terminology/, which is the only implementation behind the seam and the
+    reason a health centre on a bad line can still pick an analyte.
+    """
+    caller(request)
+    try:
+        found = terminology.LOCAL.expand(slug, q, max(1, min(int(limit), 200)))
+    except terminology.UnboundCoding as broke:
+        raise HTTPException(404, str(broke))
+    concepts = terminology.LOCAL.concepts(slug)
+    return {
+        "valueset": slug,
+        "query": q,
+        # `value` and `display` are the names a choice control already reads,
+        # so a picker needs no new shape. The extras are what a coded answer
+        # needs beside the code: the system it is from, and for an analyte the
+        # unit it is reported in, which is what makes the unit field
+        # answerable without a second lookup.
+        "concepts": [dict({"value": c.code, "display": c.display,
+                           "system": c.system},
+                          **{k: v for k, v in (concepts.get(c.code) or {}).items()
+                             if k in ("unit", "unit_system")})
+                     for c in found],
+    }
 
 
 @router.get("/queue")

@@ -25,9 +25,20 @@ sections:
   - title: Investigations
     resource: service_request
     fields: [code, status, created_date]
-  - title: Results
+  # The number, read from the observation it is now stored in. Before the
+  # result became a quantity there was nothing to read: the value and its unit
+  # were squashed into the report's conclusion as prose, so this screen could
+  # show the sentence and nothing could trend or count it.
+  - title: Lab results
+    resource: observation
+    where: {category: laboratory}
+    fields: [code_display, value, unit, created_date]
+  # The report keeps the narrative and drops the raw code. A reader who wants
+  # to know which test it was reads the row above, where the display is; a
+  # LOINC number on screen helps nobody.
+  - title: Reports
     resource: diagnostic_report
-    fields: [code, conclusion, status]
+    fields: [conclusion, status, created_date]
   - title: Awaiting confirmation
     show: proposals
   - title: What you can do

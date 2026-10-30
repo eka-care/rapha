@@ -14,23 +14,53 @@ preconditions:
   - not lab.resulted
 irreversibility: correctable
 input: phc.schema.lab-result-v1
-writes: [diagnostic_report, specimen]
+writes: [observation, diagnostic_report, specimen]
 mapping:
   # The reason for an override is recorded on the audit line, which is where a
   # reader looks for why a value outside range was accepted. It is not a
   # column on the report.
   ignored: [override_reason]
   records:
+    # The result itself, as a quantity. This record is the point of the
+    # operation and it did not exist: the number was squashed into the
+    # report's prose by `conclusion: {joined: [value, unit]}`, so it could not
+    # be trended, counted or sent as a FHIR Quantity, and the code column held
+    # whatever free text the technician typed into the analyte field.
+    #
+    # The analyte is now a coded ANSWER, which is the third binding form: the
+    # question is a slot and the concept is whichever test was run, so the
+    # code is resolved from the answer through the value set it binds to. The
+    # unit is an answer too, and the validator refuses one that is not the
+    # unit LOINC reports that analyte in.
+    - resource: observation
+      fields:
+        created_by: {actor: id}
+        category: {const: laboratory}
+        code: {answer_code: analyte}
+        code_system: {answer_code_system: analyte}
+        code_display: {answer_code_display: analyte}
+        value: {answer: value}
+        unit: {answer_code: unit}
+        unit_system: {answer_code_system: unit}
+    # The report stays, and keeps a narrative conclusion. The narrative is now
+    # one the technician wrote rather than a number reformatted as prose.
     - resource: diagnostic_report
       fields:
         created_by: {actor: id}
-        code: {answer: analyte}
-        conclusion: {joined: [value, unit]}
+        code: {answer_code: analyte}
+        code_system: {answer_code_system: analyte}
+        conclusion: {answer: note}
         status: {const: preliminary}
+    # The specimen no longer carries the analyte in its code column. A
+    # specimen's code is a specimen TYPE (blood, serum, urine), not the name
+    # of the test run on it, and this form does not ask which specimen was
+    # taken. Writing the test name there made the row claim something false,
+    # so the claim is dropped rather than restated: the row records that a
+    # specimen exists and who recorded it. Giving it a real type needs a
+    # specimen value set and a question, which is its own piece of work.
     - resource: specimen
       fields:
         created_by: {actor: id}
-        code: {answer: analyte}
         status: {const: available}
 emits: [lab.resulted, lab.critical]
 surfaces: [rendered, mcp]

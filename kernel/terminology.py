@@ -95,12 +95,36 @@ CACHE = ROOT / "terminology"
 #   pressure is always LOINC 8480-6.
 #   a question's `unit`, when it carries a quantity.
 #
-# A question's `answer_value_set`, for when the ANSWER carries the concept, is
-# the third form and is not implemented: nothing in the PHC bundle binds an
-# answer yet, and an unused binding is a promise with no check behind it. It
-# is plan step 4 and it is named in the architecture document.
+# A question's `answer_value_set`, for when the ANSWER carries the concept.
+# Implemented 2026-10-31, because something finally binds an answer: a
+# laboratory result's analyte is a slot and the concept is whichever test the
+# technician ran, exactly as a diagnosis is a slot and "type 2 diabetes" is
+# the concept. Until then this was deliberately absent, on the rule that an
+# unused binding is a promise with no check behind it; the checks arrived with
+# the use, in scripts/check_lab.py.
+#
+# The slug is per question and not a constant, because the whole point of this
+# form is that different questions bind different value sets. So there is no
+# ANSWER_BINDING beside the two below: `answer_value_set` is read off the
+# question, and `answer_coding()` is what resolves it.
 CODE_BINDING = "observation-code"
 UNIT_BINDING = "ucum-units"
+
+# Where a question says which value set its ANSWER is drawn from. The FHIR
+# questionnaire field name, verbatim, because CARE has it too
+# (care/emr/resources/questionnaire/spec.py:145) and this is the one place the
+# two models should not diverge. CARE's is a bare string checked only for
+# existence, with enforcement re-implemented by hand twice in its response
+# validator; ours resolves through the same single constructor every other
+# coding goes through.
+ANSWER_VALUE_SET = "answer_value_set"
+
+# And where a question says its answer must be the unit that another answer's
+# concept is reported in. Declared in styling_metadata.phc beside `range_from`,
+# which has lived there as a renderer hint with nothing enforcing it; this one
+# is enforced. A laboratory value and its unit are one thing or they are two
+# strings that can disagree, and a haemoglobin of 12 mg/dL is storable today.
+UNIT_OF = "unit_of"
 
 
 class UnboundCoding(ValueError):
@@ -178,6 +202,9 @@ class Terminology(Protocol):
 
     def validate(self, valueset: str, code: str) -> bool: ...
 
+    def concepts(self, valueset: str) -> dict: ...
+    # The cached concepts by code, for the facts a Coding has no field for.
+
     def expand(self, valueset: str, query: str, count: int) -> Sequence[Coding]: ...
 
     def bound(self, valueset: str, code: str) -> Coding: ...
@@ -229,6 +256,11 @@ class CachedTerminology:
                 "a question bound to it" % (code, valueset))
         return Coding(blob["system"], str(code), concept.get("display") or "",
                       valueset, _VALIDATED)
+
+    def concepts(self, valueset):
+        """The cached concepts behind a value set, by code. Read only: a copy,
+        so a caller cannot edit the cache through it."""
+        return {k: dict(v) for k, v in self._load(valueset)["concepts"].items()}
 
     def expand(self, valueset, query="", count=20):
         blob = self._load(valueset)
@@ -282,6 +314,132 @@ def question_codings(question, terminology: Optional[Terminology] = None):
     if unit not in (None, ""):
         out["unit"] = t.bound(UNIT_BINDING, unit)
     return out
+
+
+def answer_binding(question):
+    """The value set this question's ANSWER is drawn from, or None."""
+    slug = (question or {}).get(ANSWER_VALUE_SET)
+    return str(slug).strip() or None if slug not in (None, "") else None
+
+
+def unit_of(question):
+    """The link_id whose concept decides this question's unit, or None."""
+    phc = ((question or {}).get("styling_metadata") or {}).get("phc") or {}
+    link_id = phc.get(UNIT_OF)
+    return str(link_id).strip() or None if link_id not in (None, "") else None
+
+
+def answer_coding(question, answer, terminology: Optional[Terminology] = None):
+    """The coding an answer names, through the question's own value set.
+
+    The third binding form, resolved at WRITE time rather than build time,
+    because the answer is not known until somebody answers. Everything else
+    about it is identical to the other two: one constructor, which validates
+    before it returns, so an answer the value set does not hold cannot become
+    a coding and therefore cannot become a row.
+
+    Raises UnboundCoding for a question that binds nothing (a caller asking
+    for a coding where no binding was declared is a mapping bug, not an empty
+    answer), and for an answer outside the value set.
+    """
+    slug = answer_binding(question)
+    if not slug:
+        raise UnboundCoding(
+            "question %r declares no %s, so its answer carries no concept"
+            % ((question or {}).get("link_id"), ANSWER_VALUE_SET))
+    if answer in (None, ""):
+        raise UnboundCoding(
+            "question %r was not answered, so there is no concept to store"
+            % question.get("link_id"))
+    return (terminology or LOCAL).bound(slug, answer)
+
+
+def concept(valueset, code, terminology: Optional[Terminology] = None):
+    """The raw cached concept behind a code, for the facts a Coding has no
+    field for. Today that is one fact: the unit LOINC reports an analyte in.
+
+    Deliberately not on `Coding`. A Coding is the four things FHIR's Coding
+    element has, and an expected unit is a fact ABOUT the concept rather than
+    part of it, so putting it on the dataclass would make every coding in the
+    product carry a field only lab analytes have.
+    """
+    t = terminology or LOCAL
+    if not t.validate(valueset, code):
+        raise UnboundCoding("%r is not in value set %r" % (code, valueset))
+    return dict(t.concepts(valueset).get(str(code)) or {})
+
+
+def answer_problems(schema, payload, terminology: Optional[Terminology] = None):
+    """Terminology failures in a payload, as sentences, or an empty list.
+
+    This is guard step 1's terminology half. It is composed into the validator
+    by kernel/proposals.validator rather than living in
+    catalogue/validate.py, because the catalogue layer may not import the
+    kernel and the value sets are the kernel's. The split is the honest one:
+    the schema rules are the catalogue's (required, types, choices, range) and
+    the terminology rules are the kernel's, and there is still exactly one
+    validator per operation that every surface uses.
+
+    Being on step 1 rather than at the write matters for the person: a
+    technician who picks the wrong unit is told before anything is written,
+    in a sentence, instead of getting a traceback from a row builder.
+
+    Two rules:
+
+      every answer bound to a value set is a code that value set holds;
+      an answer declared `unit_of` another is the unit that other answer's
+      concept is reported in.
+
+    The second is why a laboratory value and its unit are one checked thing
+    rather than two strings. A haemoglobin of 12 is a normal haemoglobin in
+    g/dL and a nonsense one in mg/dL, and nothing in the payload said which
+    until now.
+    """
+    t = terminology or LOCAL
+    questions = {q["link_id"]: q for q in _walk(schema.get("questions") or [])}
+    problems = []
+    for link_id, question in questions.items():
+        answer = payload.get(link_id)
+        slug = answer_binding(question)
+        if slug and answer not in (None, ""):
+            if not t.validate(slug, answer):
+                problems.append("%s is %r, which is not a code in %s"
+                                % (link_id, answer, slug))
+                continue
+        other = unit_of(question)
+        if not other:
+            continue
+        if other not in questions:
+            problems.append("%s declares %s '%s', which is not a question on "
+                            "this form" % (link_id, UNIT_OF, other))
+            continue
+        peer_slug = answer_binding(questions[other])
+        peer_answer = payload.get(other)
+        if not peer_slug or peer_answer in (None, "") or answer in (None, ""):
+            continue
+        if not t.validate(peer_slug, peer_answer):
+            continue        # the peer's own failure is already reported above
+        wanted = concept(peer_slug, peer_answer, t).get("unit")
+        if not wanted:
+            # A concept with no unit recorded cannot decide one. Reported
+            # rather than passed over: a rule that silently stops applying is
+            # worse than one that is absent.
+            problems.append("%s is reported with no unit in %s, so %s cannot "
+                            "be checked against it" % (peer_answer, peer_slug, link_id))
+            continue
+        if str(answer) != str(wanted):
+            problems.append(
+                "%s is %r, and %s is reported in %r. Correct the unit, or "
+                "pick the analyte that is measured in %r."
+                % (link_id, answer, peer_answer, wanted, answer))
+    return problems
+
+
+def _walk(questions):
+    for q in questions:
+        yield q
+        for inner in _walk(q.get("questions") or []):
+            yield inner
 
 
 def demo():

@@ -1101,7 +1101,7 @@
           "options": null,
           "required": true,
           "text": "Analyte",
-          "type": "string"
+          "type": "choice"
         },
         {
           "link_id": "value",
@@ -1115,7 +1115,14 @@
           "options": null,
           "required": true,
           "text": "Unit",
-          "type": "string"
+          "type": "choice"
+        },
+        {
+          "link_id": "note",
+          "options": null,
+          "required": false,
+          "text": "Remark",
+          "type": "text"
         },
         {
           "link_id": "override_reason",
@@ -1148,6 +1155,7 @@
       "type": "operation",
       "verified": "unverified",
       "writes": [
+        "observation",
         "diagnostic_report",
         "specimen"
       ]
@@ -1658,13 +1666,27 @@
         },
         {
           "fields": [
-            "code",
+            "code_display",
+            "value",
+            "unit",
+            "created_date"
+          ],
+          "resource": "observation",
+          "show": null,
+          "title": "Lab results",
+          "where": {
+            "category": "laboratory"
+          }
+        },
+        {
+          "fields": [
             "conclusion",
-            "status"
+            "status",
+            "created_date"
           ],
           "resource": "diagnostic_report",
           "show": null,
-          "title": "Results",
+          "title": "Reports",
           "where": {}
         },
         {

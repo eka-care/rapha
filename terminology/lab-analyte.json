@@ -1,0 +1,67 @@
+{
+  "slug": "lab-analyte",
+  "title": "Laboratory analytes a primary health centre reports",
+  "system": "http://loinc.org",
+  "binding": "a questionnaire question's `answer_value_set`, when the answer carries the concept",
+  "generated": "2026-10-31",
+  "source": "Concepts chosen from ICMR National Essential Diagnostics List 2025, Table 3, List of diagnostic tests at Primary Health Centre (PHC) and confirmed against LOINC through tx.fhir.org. Short on purpose: only the quantitative tests a PHC runs itself, and only where the specimen and method are stated clearly enough to pick a code that does not claim something that was not measured.",
+  "verified": "confirmed against LOINC 2.83 through tx.fhir.org",
+  "concepts": {
+    "2160-0": {
+      "display": "Creatinine [Mass/volume] in Serum or Plasma",
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org",
+      "why": "Serum creatinine. ICMR National Essential Diagnostics List 2025, Table 3, List of diagnostic tests at Primary Health Centre (PHC) row 31, serum, semi-autoanalyser. The serum or plasma concept, matching the stated specimen, rather than the whole blood one.",
+      "unit": "mg/dL",
+      "unit_system": "http://unitsofmeasure.org",
+      "unit_verified": "LOINC EXAMPLE_UCUM_UNITS for this code, LOINC 2.83 through tx.fhir.org"
+    },
+    "2345-7": {
+      "display": "Glucose [Mass/volume] in Serum or Plasma",
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org",
+      "why": "Glucose in serum or plasma. ICMR National Essential Diagnostics List 2025, Table 3, List of diagnostic tests at Primary Health Centre (PHC) row 22 footnote, blood glucose by semi-autoanalyser for women with gestational diabetes, and row 23, the glucose tolerance test on plasma. Seeded beside the glucometer concept rather than instead of it, because a technician who ran the analyser must be able to say so: that is what binding the ANSWER is for.",
+      "unit": "mg/dL",
+      "unit_system": "http://unitsofmeasure.org",
+      "unit_verified": "LOINC EXAMPLE_UCUM_UNITS for this code, LOINC 2.83 through tx.fhir.org"
+    },
+    "26464-8": {
+      "display": "Leukocytes [#/volume] in Blood",
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org",
+      "why": "Total leucocyte count. ICMR National Essential Diagnostics List 2025, Table 3, List of diagnostic tests at Primary Health Centre (PHC) row 6, EDTA whole blood, microscopy, and row 9, CBC on a 3-part analyser. Method NEUTRAL on purpose: a health centre may count by microscopy or by its analyser, so binding the manual concept would make the stored code a false claim about method whenever the analyser was used, and a consumer looking for a leucocyte count finds the neutral one either way.",
+      "unit": "10*3/uL",
+      "unit_system": "http://unitsofmeasure.org",
+      "unit_verified": "LOINC EXAMPLE_UCUM_UNITS for this code, LOINC 2.83 through tx.fhir.org"
+    },
+    "26515-7": {
+      "display": "Platelets [#/volume] in Blood",
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org",
+      "why": "Platelet count. ICMR National Essential Diagnostics List 2025, Table 3, List of diagnostic tests at Primary Health Centre (PHC) row 8, EDTA whole blood, microscopy, and row 9. Method neutral for the same reason as the leucocyte count above.",
+      "unit": "10*3/uL",
+      "unit_system": "http://unitsofmeasure.org",
+      "unit_verified": "LOINC EXAMPLE_UCUM_UNITS for this code, LOINC 2.83 through tx.fhir.org"
+    },
+    "3091-6": {
+      "display": "Urea [Mass/volume] in Serum or Plasma",
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org",
+      "why": "Blood urea. ICMR National Essential Diagnostics List 2025, Table 3, List of diagnostic tests at Primary Health Centre (PHC) row 30, serum, semi-autoanalyser. Urea mass per volume and NOT urea nitrogen: an Indian report gives urea in mg/dL while a urea nitrogen result is a different analyte and a different number, about half of it. 11065-0 was the code this was going to be seeded with from memory and it is urea nitrogen, pre dialysis.",
+      "unit": "mg/dL",
+      "unit_system": "http://unitsofmeasure.org",
+      "unit_verified": "LOINC EXAMPLE_UCUM_UNITS for this code, LOINC 2.83 through tx.fhir.org"
+    },
+    "41653-7": {
+      "display": "Glucose [Mass/volume] in Capillary blood by Glucometer",
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org",
+      "why": "Blood glucose by glucometer. ICMR National Essential Diagnostics List 2025, Table 3, List of diagnostic tests at Primary Health Centre (PHC) row 22, capillary blood, glucometer. Specific on purpose, and the opposite call from the leucocyte and platelet concepts below, for a reason: a capillary glucometer reading is numerically not a plasma glucose, so storing it as the serum or plasma concept would be a false claim about the specimen rather than a vaguer true one.",
+      "unit": "mg/dL",
+      "unit_system": "http://unitsofmeasure.org",
+      "unit_verified": "LOINC EXAMPLE_UCUM_UNITS for this code, LOINC 2.83 through tx.fhir.org"
+    },
+    "718-7": {
+      "display": "Hemoglobin [Mass/volume] in Blood",
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org",
+      "why": "Haemoglobin. ICMR National Essential Diagnostics List 2025, Table 3, List of diagnostic tests at Primary Health Centre (PHC) row 1, capillary blood, digital haemoglobinometer. The unqualified blood mass per volume concept, which capillary blood is: the arterial and by-calculation concepts would both claim something the haemoglobinometer did not do.",
+      "unit": "g/dL",
+      "unit_system": "http://unitsofmeasure.org",
+      "unit_verified": "LOINC EXAMPLE_UCUM_UNITS for this code, LOINC 2.83 through tx.fhir.org"
+    }
+  }
+}

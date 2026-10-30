@@ -93,8 +93,12 @@ TABLES = {
                             "created_by", "created_date"),
     "service_request": ("id", "encounter", "code", "status",
                         "created_by", "created_date"),
-    "diagnostic_report": ("id", "encounter", "code", "conclusion", "status",
-                          "created_by", "created_date"),
+    # `code_system` for the same reason observation has one: a code with no
+    # system is unresolvable in FHIR R4 and unexportable to ABDM. No
+    # code_display here, because a report is read through its observations and
+    # duplicating the display on both rows is two places for one fact.
+    "diagnostic_report": ("id", "encounter", "code", "code_system", "conclusion",
+                          "status", "created_by", "created_date"),
     "specimen": ("id", "encounter", "code", "status", "created_by", "created_date"),
     "inventory_item": ("id", "encounter", "code", "quantity", "status",
                        "created_by", "created_date"),
