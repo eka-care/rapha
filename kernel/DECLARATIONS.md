@@ -208,6 +208,7 @@ A field's value is a single key source:
 | `{minus: <key>}` | the same, negated, for a stock decrement |
 | `{question: link_id \| answer}` | about the current question |
 | `{question: code \| code_system \| code_display \| unit \| unit_system}` | a fact the current question's binding produced |
+| `{answer_code \| answer_code_system \| answer_code_display: <link_id>}` | a fact the coding that ANSWER names carries |
 | `{joined: [<link_id>]}` | non empty answers joined with a space |
 | `{note: [<link_id>]}` | non empty answers as labelled paragraphs |
 | `{json: payload}` | the whole payload as sorted JSON |
@@ -227,8 +228,28 @@ two bindings and they are closed, because LOINC and UCUM are nobody's choice:
 - the unit, bound to `ucum-units`, read from the `styling_metadata.phc.unit`
   that is already there. Nothing moved and nothing is duplicated.
 
+The third form is `answer_value_set` on the question, for when the ANSWER
+carries the concept rather than the question being it. A laboratory result's
+analyte is the case: the question is a slot and the concept is whichever test
+was run, so the code is resolved from the answer at write time rather than at
+build time. The three `answer_code*` sources read it. Two rules bite:
+
+- a record that codes a column from an answer writes NOTHING when that answer
+  is absent, so a value never lands with no code saying what it measured, and
+  an optional coded answer stays safely optional;
+- a question may declare `styling_metadata.phc.unit_of: <link_id>`, and its
+  answer must then be the unit the other answer's concept is reported in. A
+  haemoglobin of 12 is normal in g/dL and nonsense in mg/dL, so a value and
+  its unit are one checked thing. Enforced on the guard's first step, beside
+  the schema rules, so the person is told in a sentence before anything is
+  written.
+
 A value set is a read only generated file in `terminology/<slug>.json`, and
-`kernel/terminology.py` is the only thing that opens one. The guarantee is that
+`kernel/terminology.py` is the only thing that opens one, and
+`scripts/seed_terminology.py` is what generates one, at design time, from a
+terminology server, so a concept's "confirmed against LOINC 2.83" is
+reproducible rather than a claim. Nothing at the point of care needs a
+network. The guarantee is that
 a coding exists only if the value set vouched for it: `Coding` has one
 constructor, it validates first, and a question declaring a code its value set
 does not hold fails the build naming both. The write path re-checks the code

@@ -486,7 +486,8 @@ clinical facts today:
 | `condition` | `code`, `verification_status` | not yet. Needs repeating groups, plan step 4. |
 | `notes` | narrative text | no, and narrative stays narrative |
 | `medication_request`, `medication_dispense` | `medication`, dosage, quantity, status | not yet. Needs a medication ontology, plan step 4. |
-| `service_request`, `specimen`, `diagnostic_report`, `inventory_item` | the laboratory and pharmacy lines | not yet |
+| `diagnostic_report` | `code`, `code_system`, `conclusion`, `status` | **yes**, 2026-10-31. The code is the analyte; the conclusion is a narrative somebody wrote, not a number reformatted |
+| `service_request`, `specimen`, `inventory_item` | the laboratory and pharmacy lines | not yet. The specimen's `code` is a specimen TYPE and the form does not ask it, so the row no longer claims the test name is its type |
 | `thread_flag`, `proposal`, `audit` | the kernel's own records | not applicable |
 
 A coding is three columns and not one: the code, the system it came from, and
@@ -608,12 +609,48 @@ in both shipped bundles, nine of them, is now checked against UCUM at build
 time.
 
 **`answer_value_set` on the question, when the answer carries the concept.**
+Built 2026-10-31.
 The third form, for diagnosis and medication, where the question is a slot and
-"type 2 diabetes" is the concept. **Not implemented.** Nothing in the PHC
-bundle binds an answer yet, and an unused binding is a promise with no check
-behind it. It arrives with repeating groups, plan step 4, and it is the form
-that needs codification, which is why section 2 seam 3 is a shape and not a
-file.
+"type 2 diabetes" is the concept. **Was deliberately absent, and is now built**, because something finally
+binds an answer: a laboratory result's analyte. Nothing in the PHC
+bundle bound an answer until then, and an unused binding is a promise with no
+check behind it; the checks arrived with the use, in `scripts/check_lab.py`.
+
+The form differs from the other two in exactly one way and it is the
+interesting one: **the coding is resolved at write time, not at build time**,
+because the concept is not known until somebody answers. Everything else is
+identical, and that is the point: one constructor, which validates before it
+returns, so an answer the value set does not hold cannot become a coding and
+therefore cannot become a row. CARE has this field too
+(`care/emr/resources/questionnaire/spec.py:145`) as a bare string checked only
+for existence, with enforcement re-implemented by hand twice in its response
+validator and two live TODOs admitting user authored options are never
+checked at all. Ours goes through the same single constructor as every other
+coding.
+
+Three mapping sources read it, mirroring the `question:` facts:
+`{answer_code: x}`, `{answer_code_system: x}` and `{answer_code_display: x}`.
+A record that codes a column from an answer writes **nothing** when that
+answer is absent, which is what stops a result with a value and no code, and
+is also what makes an optional coded answer safe.
+
+**And a second rule the form made possible: a value and its unit are one
+checked thing.** A question may declare `unit_of: <link_id>`, and its answer
+must then be the unit LOINC reports that other answer's concept in. A
+haemoglobin of 12 is a normal haemoglobin in g/dL and a nonsense one in
+mg/dL, and until this rule nothing in the payload said which. It is enforced
+on the guard's first step rather than at the write, so a technician is told in
+a sentence before anything is stored. The unit per analyte is not anybody's
+choice: it is LOINC's own `EXAMPLE_UCUM_UNITS` for that code, fetched by
+`scripts/seed_terminology.py`.
+
+This is also where the declaration layer stopped promising something it could
+not keep. `styling_metadata.phc.range_from` has sat on the laboratory result's
+value question as a renderer hint with nothing enforcing it, printing "Range
+depends on analyte" while no range was checked. `unit_of` sits beside it and
+is enforced. The range itself still is not, and that is in the owed list
+below, because per analyte reference ranges are clinical thresholds and not
+mine to invent.
 
 ### How the binding is held
 
@@ -804,6 +841,7 @@ nothing and is reported as such, never as a pass.
 | projection | `kernel/fhir.py` demo, `scripts/check_vitals.py` | a LOINC coded Observation with a UCUM quantity, a numeric value that is a number and not a quoted string, a code with no system is text rather than a resolvable coding, the same rows give the same document |
 | directory | `scripts/check_directory.py` | 35 checks, almost all with no directory at all and none opening a socket: the local register answers, a registration commits, the queue draws the name, a visit is recorded, a suggestion writes nothing, and the audit names the staff member over the wire |
 | the wire translations | `care_phc/connectors/directory/eka.py` demo | every field both ways over the shapes the Eka specification gives, including that an age becomes a marked approximate birthday and the `abha` field is read as an address |
+| lab result | `scripts/check_lab.py` | 29 checks: the two defects cannot return, a free text analyte never becomes a code, the number is a column and not prose, a unit that is not the analyte's is refused in a sentence, and a record with an absent coded answer writes nothing |
 | portability | `bundles/lab/check.py` | the same kernel runs a laboratory, 36 checks, not one word of a health centre's vocabulary |
 | the whole slice | `scripts/check_vitals.py` | 27 checks across every layer above, no socket |
 | over a socket | `scripts/e2e.py` | 45 checks against a real uvicorn and a real SQLite file, including that a stored vital carries its LOINC code |
@@ -941,8 +979,26 @@ proved.
       in section 9. Check: a repeat whose coding is outside its bound value
       set is refused. Mutation: bind diagnosis to the observation value set
       instead.
-- [ ] **`answer_value_set` as the third binding form**, which repeating
-      groups need and nothing before them does.
+- [x] **`answer_value_set` as the third binding form.** Done 2026-10-31,
+      with a laboratory result's analyte as the thing that bound an answer.
+      Repeating groups need it and now have it.
+- [ ] **Per analyte reference and critical ranges.** Two declarations on the
+      laboratory result's value question promise something nothing delivers:
+      `range_from: analyte` prints "Range depends on analyte" and no range is
+      checked, and the question declares `flags: lab.critical` with no
+      `critical` band, so `lab.critical` is declared, emitted by the atom and
+      raised by nothing. The operation's own body text says an out of range
+      value blocks the commit, which it does not. **Not invented here on
+      purpose:** reference ranges are clinical thresholds, they vary by age,
+      sex and pregnancy, and LOINC does not publish them. They need a
+      clinical source and a sign off, and the shape is ready: the analyte
+      concept already carries a unit from a primary source and a range would
+      sit beside it.
+- [ ] **A picker for a bound answer in the renderer.** The expansion is served
+      at `GET /valuesets/{slug}` with each concept's unit beside it, and
+      nothing calls it yet, so a coded question draws as a choice with no
+      options. One screen, and the route exists so it is a renderer change
+      rather than an architecture one.
 - [ ] **The codification seam plus its empty stub.** Check: the whole PHC
       flow passes with `suggest` returning nothing.
 - [ ] **`OPConsultRecord`**, once there are Conditions, MedicationRequests
@@ -1053,6 +1109,26 @@ identity has to be readable by the server; and Eka's own changelog records a
 partial cached state" surfacing incorrect patient search results, so it is not
 the cache to put patient identity behind. Ours is in the store, it is the row
 the queue already needed, and it says when it was last agreed.
+
+**8. The laboratory result operation's own body text was false.** It says "A
+value inside the physiological range commits and emits `lab.resulted`. A value
+outside it blocks the commit and requires an explicit override carrying a
+reason." No range is checked on a laboratory value: the question declares
+`range_from: analyte`, which is a renderer hint, and the range rule in
+`catalogue/validate.py` reads `styling_metadata.phc.range`, which that
+question does not have. The same question declares `flags: lab.critical` with
+no `critical` band, and `catalogue/validate.flags` raises a bandless flag only
+on a boolean true, so `lab.critical` is declared in the bundle, emitted by the
+atom, and raised by nothing. Both are recorded as owed work in section 11
+rather than fixed, because reference ranges are clinical thresholds and
+inventing one is exactly the class of thing a model must not do.
+
+**9. The brief named two defects in that operation and there were three.** The
+specimen row carried the analyte in its `code` column, so a specimen was
+labelled with the name of the test run on it. A specimen's code is a specimen
+type. The form does not ask which specimen was taken, so the false claim is
+dropped rather than restated, and giving it a real type needs its own value
+set and question.
 
 **And one bug, fixed here rather than reported.** `Store.audit` is documented
 as oldest first and could not deliver it. `AuditRecord.at` is ISO 8601 to the

@@ -244,9 +244,12 @@ confirmation is dead on arrival in an OPD. The rule:
 
 ## 6. Sequence
 
-- [ ] **1. Terminology seam with the local cache.** Two methods, a file, and a
-      check that `validate` refuses a code outside the valueset. Mutation:
-      add a code to the file and confirm the check that asserts closure fails.
+- [x] **1. Terminology seam with the local cache.** Done. Four methods now
+      (`validate`, `bound`, `expand`, `concepts`), three generated files, and
+      `scripts/seed_terminology.py` to generate them from a terminology server
+      at design time so that "confirmed against LOINC 2.83" is reproducible
+      rather than a claim. The script is deliberately not in the gate: it
+      needs a network, and nothing at the point of care does.
 - [ ] **2. Bind the 7 fixed codes.** Batch them through Eka codification with
       unit as context, confirm the list once by hand, write them into the
       cache. This is design time work; it never runs at the point of care.
@@ -265,16 +268,26 @@ confirmation is dead on arrival in an OPD. The rule:
       `api/fill.py` coercion, the voice grammar's number handling and the
       renderer's field, so it costs three layers of change for no difference at
       ABDM.
-      **What is left of this step is the lab result**, where the unit genuinely
-      is an answer rather than a property of the question: a bench technologist
-      types the analyte and its unit together, so that one wants `quantity` and
-      an `answer_value_set`. It arrives with step 4.
+      **The lab result, which was what was left of this step, is done.** Done
+      2026-10-31. The unit genuinely was an answer there rather than a
+      property of the question, and the analyte was too: both now bind their
+      ANSWER to a value set, which is the third binding form. The question
+      types still did not change. What made the laboratory result different
+      was never the type, it was that the concept and the unit are answers,
+      and binding an answer is a different mechanism from switching a type.
       Check: `scripts/check_vitals.py`, and the tier one validation recorded in
       `docs/superpowers/plans/2026-10-31-application-architecture.md` section 3.
 - [ ] **4. Replace `structured` with repeating groups** for diagnosis,
       medications, investigations and dispense, per the table in 4. Check: a
       repeat whose coding is outside its bound valueset is refused. Mutation:
       bind diagnosis to the observation valueset instead and confirm FAIL.
+      **The binding half of this step is already built**, 2026-10-31:
+      `answer_value_set` works, resolves at write time through the one
+      validating constructor, and has three mapping sources and twenty nine
+      checks behind it, driven by the laboratory result's analyte. What is
+      left is the repeating group itself, which is the part that turns one
+      repeat into one resource. A repeat's bound coding uses the form that now
+      exists rather than needing a new one.
 - [ ] **5. Codification seam plus stub.** Check: the whole PHC flow passes with
       the stub returning nothing.
 - [ ] **6. Proposal and confirmation path.** I4 and I6 as checks. Mutation:
