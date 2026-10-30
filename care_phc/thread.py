@@ -11,8 +11,7 @@ Only three flags are stored, because only three are things CARE cannot answer.
 derive() is deliberately pure: a Snapshot in, a set of flags out, no ORM, so
 it can be tested exhaustively without a running CARE. The Django querying that
 used to build a Snapshot (queries.py) is deleted: every field name it guessed
-was wrong, and adapters/care/map.py now holds the CARE mapping with the mark
-saying how each name was established. kernel/state.py is what derives a
+was wrong. kernel/state.py is what derives a
 thread's flags today; this file and its check are what that was proved
 against.
 """

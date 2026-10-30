@@ -28,9 +28,7 @@ python3 -m bundles.phc.check      # capture consent: raised, declined, scoped to
 
 echo "\n== the adapter and the service =="
 python3 -m api.scribe          # the scribe's response reading, against a recorded live answer
-python3 -m adapters.local.tests.test_store
-python3 -m adapters.care.tests.test_store    # adapter 1, CARE REST, fake transport
-python3 -m adapters.care.tests.test_live     # READ ONLY against a public CARE; skipped when offline or SKIP_E2E
+python3 -m adapters.local.tests.test_store   # the one adapter, and the Store protocol's ten names
 python3 -m api.tests.test_api
 
 echo "\n== the agent, and the ABDM connector =="

@@ -85,29 +85,23 @@ ROLES[DEMO_ROLE] = sorted(vocab.CAPABILITIES)
 OVERRIDES: dict[str, list[str]] = {}
 
 
-# Which system of record. `local` is the SQLite file this repository ships
-# with and is the only one that has been run end to end; `care` is adapters/
-# care over CARE's REST API, which needs a CARE and credentials that are not
-# in here. The choice is configuration because the kernel only ever sees
-# kernel.contracts.Store, so nothing below this function changes with it.
+# Which system of record. There is one: `local`, the SQLite file this
+# repository ships with. The CARE adapter was deleted because patients now live
+# in Eka's directory, so it had no remaining job and was not in the default
+# path. PHC_STORE is still read, and still refuses a value it cannot serve,
+# because the seam it names is the thing of value: the kernel only ever sees
+# kernel.contracts.Store, so a second adapter is a new file and no edit here.
+# The FHIR shaped resource names it mapped onto (patient, encounter,
+# observation, medication_dispense, inventory_item) are kept in
+# catalogue/vocab.py. Removing the adapter was not removing the model.
 STORE = os.environ.get("PHC_STORE", "local")
 
 
 def make_store():
-    """A store, seeded on first use so the queue is never an empty screen.
-
-    A CARE that cannot be reached is a normal thing to get wrong here, so it
-    exits with a sentence instead of a connection traceback out of urllib.
-    """
-    if STORE == "care":
-        from adapters.care.store import CareUnreachable, open_care
-        try:
-            return open_care(db=DB)
-        except CareUnreachable as exc:
-            raise SystemExit("\n%s\n" % exc)
+    """A store, seeded on first use so the queue is never an empty screen."""
     if STORE != "local":
         raise SystemExit(
-            "\nPHC_STORE=%r is not an adapter. It is local or care.\n" % STORE)
+            "\nPHC_STORE=%r is not an adapter. There is one: local.\n" % STORE)
     store = SqliteStore(DB)
     if not store.db.execute("SELECT 1 FROM encounter").fetchone():
         seed(store)

@@ -269,6 +269,27 @@ def test_two_threads_writing_at_once_do_not_corrupt_the_file():
     assert store.count("observation", thread=None, where={}) == 4 * 20 * 6
 
 
+def test_every_store_method_the_contract_names_is_here():
+    """A missing one is an AttributeError somewhere in the kernel, which is a
+    bad place to find out.
+
+    Relocated here when adapters/care was deleted. It was the only assertion in
+    the repository that pinned the protocol's method names against a class, and
+    the protocol outlived the second adapter, so the check had to outlive it
+    too. kernel/contracts.py used to call the protocol "nine methods" while
+    declaring ten; the count is asserted from the class rather than from the
+    prose, which is how that was found.
+    """
+    from kernel.contracts import Store
+
+    declared = sorted(n for n in vars(Store) if not n.startswith("_"))
+    assert declared == ["append_audit", "audit", "count", "proposals",
+                        "put_proposal", "raise_flag", "select", "stored_flags",
+                        "threads", "write"], declared
+    for name in declared:
+        assert callable(getattr(SqliteStore, name, None)), "SqliteStore has no " + name
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

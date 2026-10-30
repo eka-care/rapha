@@ -11,10 +11,9 @@ PHC_BUNDLE=lab PHC_DB=lab.sqlite3 PORT=8001 sh api/run.sh        # LAB   :8001
 (cd web && npm run dev:lab -- --port 5174)                       #       :5174
 ```
 
-Nothing here needs CARE, a network, or a database server. Python 3.9 and
-Node 22+ are the whole of it. There is now a second adapter, `PHC_STORE=care`,
-and it does need all three; see "Switching adapters" below for what it can and
-cannot do.
+Nothing here needs a network or a database server. Python 3.9 and Node 22+ are
+the whole of it. There is one adapter, SQLite, and `PHC_STORE` still names it;
+see "The adapter seam" below.
 
 ## 0. Once
 
@@ -111,57 +110,35 @@ Three things the switch does not carry, all of them real:
   in from `questionnaires/*.json` at build time, so a new form needs a restart,
   not a reload.
 
-### Switching adapters
+### The adapter seam
 
 `PHC_STORE` names the system of record. It is read once, in `api/main.py`,
 and nothing downstream of it changes: the kernel only ever sees
-`kernel.contracts.Store`.
+`kernel.contracts.Store`, a protocol of ten methods.
 
 ```sh
-sh api/run.sh                       # PHC_STORE=local, the default
-PHC_STORE=care CARE_BASE_URL=https://your-care CARE_TOKEN=... sh api/run.sh
+sh api/run.sh                       # PHC_STORE=local, the only value
 ```
 
 - **`local`** is `adapters/local`, the SQLite file. It needs nothing, it is
-  what every check in `scripts/check.sh` runs against, and it is the only
-  adapter that has been run end to end. Both bundles, both screens.
-- **`care`** is `adapters/care`, CARE's REST API over HTTP. It reads
-  `CARE_BASE_URL` and `CARE_TOKEN`, both required, plus `CARE_FACILITY`,
-  `CARE_GEO_ORGANIZATION`, `CARE_ABHA_CONFIG` and `CARE_AUTH_PREFIX`
-  (`Bearer`, or `Token` for CARE's other scheme) when the calls that need
-  them are made. **This has never served a request.** There is no CARE in
-  this repository and no credentials for one, so what is proven is the field
-  mapping against CARE's published schema and 24 checks against a fake
-  transport, not a working facility. Read `adapters/care/map.py` before
-  believing any of it: every one of its 88 fields carries a mark saying
-  whether it was seen in a live response, read in the schema, read in CARE's
-  source, or guessed.
+  what every check in `scripts/check.sh` runs against. Both bundles, both
+  screens.
 
-Four things `care` does not do, and refuses rather than guesses:
+There was a second adapter, `adapters/care`, over CARE's REST API. It is
+deleted. It never served a request, nothing in the default path reached it,
+and patients now live in Eka's directory, so it had no remaining job. What was
+kept is the thing of value: the protocol, whose ten method names are pinned in
+`adapters/local/tests/test_store.py`, and the FHIR shaped resource names in
+`catalogue/vocab.py` (`patient`, `encounter`, `observation`,
+`medication_dispense`, `inventory_item`). Removing the adapter was not
+removing the model, and a second adapter is still a new file and no edit to
+the kernel.
 
-- **`write("observation", ...)` raises.** CARE exposes no POST that creates
-  an observation, so the PHC vitals operation cannot run against CARE today.
-  That is the largest single gap.
-- **`open_thread` raises.** `EncounterCreateSpec` requires a patient, so CARE
-  cannot open a walk-in encounter before the person exists; `adapters/local`
-  can. That is a real ordering constraint on a bundle, not a missing feature.
-- **A dispense and a specimen are refused** for the same kind of reason:
-  CARE wants product and location ids a PHC payload does not carry, and a
-  specimen is created from the order it belongs to.
-- **Six of the Store methods are not CARE's at all.** The proposal queue, the
-  per-thread flags and this kernel's audit trail have no CARE equivalent, so
-  they are delegated to a sidecar `SqliteStore` on the same `PHC_DB` file. A
-  check asserts none of the six ever reaches the network.
-
-Getting it wrong ends in a sentence, not a traceback. `PHC_STORE=care` with
-nothing listening, with no `CARE_TOKEN`, or pointed at something that is not a
-CARE, prints what is wrong and how to go back to SQLite, and the kernel does
-not start:
+Getting it wrong ends in a sentence, not a traceback. `PHC_STORE` set to
+anything but `local` prints what is wrong and the kernel does not start:
 
 ```
-Cannot use CARE at https://careapi.ohc.network.
-CARE is there and refused CARE_TOKEN: {'detail': 'Invalid Token, please relogin to continue'}
-Fix that, or run on the SQLite adapter instead: sh api/run.sh
+PHC_STORE='care' is not an adapter. There is one: local.
 ```
 
 ## 3. Start the renderer
@@ -412,12 +389,9 @@ port.
   before anyone reads it as provenance.
 - **No authentication.** The role comes from `?role=` or `X-PHC-Role` and
   defaults to a union role holding every capability. This is a localhost demo.
-- **No CARE is running.** `adapters/local` is the only adapter that has
-  served a request. `adapters/care` exists and is selectable with
-  `PHC_STORE=care`, but nothing here has a CARE to point it at: three GETs
-  against the public `careapi.ohc.network` confirmed its pagination envelope,
-  its error shape and five field names, and everything past that is the
-  published schema. See "Switching adapters".
+- **One adapter.** `adapters/local` is the only one, and the only one that has
+  ever served a request. The protocol it implements is the seam; see "The
+  adapter seam".
 
 - **ABDM is a connector, not a capability.** `care_phc/connectors/abdm/`
   speaks to Eka's ABDM Connect gateway, on the official `ekacare` SDK for

@@ -35,7 +35,6 @@ declared in a bundle and drawn by a generic renderer.
     +-----------------------------------------------------------+
     |  ADAPTERS  implement kernel.contracts.Store                 |
     |  adapters/local   SQLite, FHIR-shaped tables    adapter 0   |
-    |  adapters/care    CARE REST, headless           adapter 1   |
     +-----------------------------------------------------------+
 ```
 
@@ -74,7 +73,6 @@ one owner and an append-only rule.
 | `catalogue/guard.py`, `catalogue/validate.py`, `catalogue/ops/` | nobody | unchanged tonight |
 | `kernel/state.py`, `kernel/proposals.py`, `kernel/api.py`, `kernel/tests/` | kernel agent | pure modules plus one HTTP server (stdlib `http.server` is enough; `scripts/mock_care.py` shows the shape) |
 | `adapters/local/` | adapter agent | SQLite, one table per `vocab.CARE_RESOURCES` name it needs plus `thread_flag`, `proposal`, `audit`. Field names verbatim from the query grammar |
-| `adapters/care/` | later | not tonight |
 | `care_phc_fe/` | frontend agent | rename `patient` to `subject`, draw `line` from the API instead of the LINE constant, add a `Draft` field state and the tap-to-commit control, generic queue, summary and dashboard renderers |
 | `care_phc_mcp/` | MCP agent | point at the kernel API; add a `thread` and `view` read tool from `catalogue.json`. Still no confirm verb |
 | `analytics/` | analytics agent | evaluate `Metric` over `Store`; local only |

@@ -387,8 +387,8 @@ class ThreadRef:
 # --------------------------------------------------------------------------
 
 class Store(Protocol):
-    """Adapter interface. Deliberately small: nine methods, and a SQLite file
-    and a CARE REST client can both satisfy every one.
+    """Adapter interface. Deliberately small: ten methods, and a SQLite file
+    and a REST client over somebody else's record can both satisfy every one.
 
     Every read is scoped to a thread. How a resource joins to the thread's
     subject (patient via encounter, dispense via encounter) is the adapter's

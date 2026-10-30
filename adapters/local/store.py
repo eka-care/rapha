@@ -21,13 +21,15 @@ The guard, state derivation, or what an operation means. It stores rows.
 
 Honest limits
 -------------
-- Column names are taken from care/emr/models and are UNVERIFIED against a
-  running CARE. Adapter 1 (adapters/care/map.py) maps every one of them onto
-  a CARE field and records how that field was established, which is where to
-  look before believing any name in here.
+- Column names are taken from care/emr/models and are UNVERIFIED against any
+  running system of record. They are kept because they are FHIR shaped, which
+  costs nothing and keeps a second adapter cheap. Adapter 1 (adapters/care)
+  used to record how each name was established; it was deleted when patients
+  moved to Eka's directory, so there is no longer a second opinion on any name
+  in here. Treat them as this file's own choices.
 - write() takes one row, already shaped by the operation's declared mapping
   (kernel/mapping.py). This adapter no longer knows what a blood pressure is,
-  which is the point: adapter 1 inherits the same mapping instead of deriving
+  which is the point: a second adapter inherits the same mapping instead of deriving
   its own. It upserts, because linking an ABHA updates the patient row that
   registration created.
 - One connection per thread, autocommit, WAL on a file. FastAPI runs sync
