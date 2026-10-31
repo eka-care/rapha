@@ -127,6 +127,12 @@ Each is finished when the gate is green and the named checks pass against Go.
 - **G8. The outbox.** Durable, nothing lost, nothing sent twice, nothing
   reported as sent when it was not. Still switched off: the audio retention
   window is unsigned.
+- **G8b. The planner.** `POST /khoj`, the ask-and-search turn in
+  `agent/turn.py`. **Added 2026-10-31, after G4,** because no slice owned it
+  and 28 of the 49 socket checks in `scripts/e2e.py main()` sit behind it.
+  The nine original slices were drawn from the kernel and the API; the
+  planner is neither, which is how it went unnamed. Nothing can retire the
+  Python while a route no slice owns still answers 501.
 - **G9. Retire the Python.** Only on the owner's word, and only when every
   check passes against Go.
 
