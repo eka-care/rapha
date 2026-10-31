@@ -82,6 +82,39 @@ BEFORE it claims, and an item the guard now denies becomes `refused` and is
 never sent. An item queued under capabilities somebody has since lost, or for
 a plugin this centre has since switched off, does not go out.
 
+NOT WIRED INTO THE LIVE SCRIBE ROUTE, AND THAT IS A DECISION FOR A PERSON
+-------------------------------------------------------------------------
+This module is complete and proved, and `api/scribe.py` does not call it. That
+is deliberate, because wiring it in contradicts two sentences that file states
+as rules:
+
+  "the recording never reaches the repository: it is written to one temporary
+   file, handed to the connector, and deleted in a `finally`" (line 4)
+  "Nothing under this repository ever holds a recording, and there is no
+   second copy to forget about." (start())
+  "In memory on purpose. A restart loses an in flight job, which costs a
+   doctor one re-recording and costs the record nothing." (SESSIONS)
+
+Those cannot all hold at the same time as "a recording must not be lost when
+the line is down". Surviving an outage MEANS holding the recording. There is
+no version of this requirement that does not put consultation audio on a disk
+for a while.
+
+What this module does about it is as narrow as the contradiction allows: the
+bytes wait OUTSIDE the repository, owner readable only, under the retention
+backstop `care_phc/connectors/scribe/base.py` already declares and already
+says has no clinical or legal sign-off. That satisfies the letter of "never
+reaches the repository" and changes the substance of "no second copy to forget
+about" into "one copy, with a sweep that forgets it".
+
+Flipping the live route over is therefore not a code decision. It starts
+writing identifiable health data to a clinic's disk in a product whose scribe
+module says it never does, and the retention window that makes it safe is
+unsigned. Somebody has to decide that, and the right order is: sign the
+retention window, then wire the route. Said here rather than only in a
+handover note, because the next person to read this file is the one who will
+want to know why it is not plugged in.
+
 Pure: everything takes a `Spool`, a `Sender` and a clock, and returns values.
 Opens no socket, reads no environment, imports no connector.
 

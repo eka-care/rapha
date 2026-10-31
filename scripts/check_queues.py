@@ -296,6 +296,52 @@ assert lines(log3) == [item3.key], lines(log3)
 assert third.get(item3.id).state == "sent", third.get(item3.id)
 ok("and it settles from the remote's answer without a second send")
 
+# The same property stated about the REPORT and not only about the row. A
+# caller, and an operator reading a sweep, must not be told an item went when
+# it did not; the crash above proves the row, and this proves the answer.
+# Written because mutation 3 (report the unwritable receipt as a success
+# anyway) changed only the report and the crash check did not notice.
+class Unwritable:
+    """The spool, with the one write that records a receipt broken."""
+
+    def __init__(self, inner):
+        self.inner = inner
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+    def settle(self, item_id, *, state, at, receipt="", error=""):
+        if state == "sent":
+            raise OSError("the outbox is read only")
+        return self.inner.settle(item_id, state=state, at=at, receipt=receipt,
+                                 error=error)
+
+
+box = SqliteSpool(":memory:")
+lost = queues.enqueue(box, kind="document", key="enc-unwritable",
+                      thread="enc-u", operation="phc.op.consult-document",
+                      capability="encounter.document", facility="all-plugins",
+                      at=NOW)
+sent_log = os.path.join(WORK, "unwritable.log")
+report = queues.pump(Unwritable(box), {"document": LoggingRemote(sent_log)},
+                     permit=lambda i: allow, bodies=lambda i: {"x": 1}, now=NOW)
+assert lines(sent_log) == [lost.key], \
+    "the remote did not take it, so this is not the situation being tested"
+assert report.sent == [], \
+    "a receipt that could not be written was REPORTED as sent"
+assert [i for i, _ in report.unrecorded] == [lost.id], report
+assert "receipt could not be written" in report.unrecorded[0][1], report.unrecorded
+assert box.get(lost.id).state == "sending", box.get(lost.id)
+ok("an item the remote accepted and whose receipt could not be written is "
+   "reported as unrecorded rather than as sent, and left where recovery "
+   "looks for it")
+
+# And recovery finishes it without a second send.
+queues.recover(box, {"document": LoggingRemote(sent_log)}, now=LATER)
+assert lines(sent_log) == [lost.key], lines(sent_log)
+assert box.get(lost.id).state == "sent", box.get(lost.id)
+ok("and recovery completes it from the remote's own answer, once")
+
 # The same property without a crash: a remote that raises, and one that
 # answers with nothing to point at.
 class Refusing:
@@ -304,7 +350,12 @@ class Refusing:
 
     def send(self, item, body):
         if self.how == "raise":
-            raise queues.Unsendable("the gateway refused it")
+            # A real gateway's refusal carries whatever it was sent. This one
+            # carries a mobile number and an Aadhaar number, so the scrubber
+            # is on the path a sender's own sentence takes and not only on the
+            # paths this module writes itself.
+            raise queues.Unsendable("the gateway refused it: mobile 9876543210 "
+                                    "and Aadhaar 1234 5678 9012 do not match")
         if self.how == "explode":
             raise ValueError("9876543210 is not a known patient")
         return ""
@@ -339,6 +390,13 @@ for how, why in (("raise", "a sender that raises"),
     failures[how] = after
 ok("a sender that raises, one that raises something unexpected, and one that "
    "returns no receipt are all three failures and none is recorded as sent")
+
+# A sender's own refusal is scrubbed on the way to the row, not trusted.
+kept = failures["raise"].last_error
+assert "9876543210" not in kept and "1234 5678 9012" not in kept, kept
+assert "ending 3210" in kept and "<aadhaar-redacted>" in kept, kept
+ok("a sender's own refusal is scrubbed before it reaches the row, so a "
+   "gateway echoing what it was sent cannot write it to our disk")
 
 # And the unexpected one's own words never reach the row.
 assert "9876543210" not in failures["explode"].last_error, failures["explode"]
