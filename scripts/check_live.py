@@ -327,20 +327,61 @@ def main():
 
 
 # ---------------------------------------------------------------------------
-# Mutations this file and web/src/live.check.ts are built to fail under
+# The mutation ledger: 12 applied, 12 caught, with the check that failed FIRST
 # ---------------------------------------------------------------------------
 #
-# - delete the questionnaires route from api/main.py: the capture's "forms"
-#   key is empty and section 1 of the renderer half fails first.
-# - have web/src/declarations.ts answer a questionnaire it was never given
-#   (go back to reading a file): the renderer half's "every form came from
-#   this kernel" assertion fails.
-# - make /facility serve `without` as {} always: grants.check.ts fails first,
-#   then this file's facility assertions.
-# - seed the same threads at both shapes: "the two demo days differ" fails.
-# - drop a route from kernel/contracts.py ROUTES: nothing fails, which is why
-#   that assertion is about ROUTES being honest rather than complete. Said
-#   out loud rather than claimed as coverage.
+# Each one was applied, proved applied (the file changed AND the replaced text
+# was gone), run through the whole gate, reverted, and the revert proved clean
+# against git. The gate stops at the first failure, so "first" below is the
+# gate's own order and not this file's.
+#
+#  1. api/main.py: the questionnaires route returns an empty dict.
+#     -> scripts/check_live.py, the capture's own `assert got["questionnaires"]`.
+#  2. web/src/declarations.ts: questionnaire() invents an empty form for a slug
+#     it was never given, which is what reading a file back would look like.
+#     -> web/src/live.check.ts, "an unserved slug has no form".
+#  3. web/src/declarations.ts: a value set expands to no concepts.
+#     -> web/src/live.check.ts, "condition binds condition-code and has
+#        nothing to choose".
+#  4. web/src/grants.ts: drop the withheld test from inert().
+#     -> web/src/ui.check.ts, "a withheld capability is dead, whatever the
+#        workflow draws". Also caught behaviourally on its own by
+#        web/src/grants.check.ts, confirmed separately, because a text match is
+#        not a proof that the function behaves.
+#  5. kernel/plugins.py: absent() returns {}, so no plugin has a title.
+#     -> web/src/grants.check.ts, the sentence reads out a plugin id.
+#  6. kernel/views.py: a summary section stops sending its `fields`.
+#     -> web/src/live.check.ts, "a summary section carries rows and declares
+#        no fields".
+#  7. web/src/view/View.tsx: lead a row with the old six word list.
+#     -> web/src/ui.check.ts, "in the declared order, and from no other list".
+#  8. web/src/screens/Patient.tsx: read age, sex and village off the subject.
+#     -> web/src/ui.check.ts, the portability check: `view column "village"`.
+#  9. web/src/declarations.ts: put the build time glob back.
+#     -> web/src/ui.check.ts, "a renderer file reads a declaration off disk
+#        instead of from the kernel".
+# 10. web/src/app/App.tsx: draw a screen before the forms have arrived.
+#     -> web/src/ui.check.ts, "and does not draw a screen until they are there".
+# 11. scripts/check_queues.py: put the visit back on the wall clock.
+#     -> scripts/check_queues.py itself, which is the point: the fix is load
+#        bearing and the check it repairs is what fails without it.
+# 12. api/main.py: caller() stops subtracting a withheld plugin.
+#     -> scripts/check_plugins.py, which owns that property and runs first.
+#        web/src/live.check.ts was then run alone against the same mutation and
+#        failed with "phc.op.lab-order is still offered at a centre whose
+#        plugin for it is off", so this file is not relying on the earlier one.
+#
+# Refused before it ran: one. The first spelling of mutation 2 appended its new
+# branch above the old return and left the old text in place, so the harness
+# refused it. That is the substring trap in the direction that matters: it
+# would have run, passed, and been recorded as a mutation that proved nothing.
+#
+# One assertion was deleted rather than kept. grants.check.ts asserted that an
+# inert switch's sentence does not print a plugin id, which cannot be tested
+# here: the only withheld plugin's id is `orders` and its title is "Laboratory
+# orders and results", so the id is a substring of the title and the assertion
+# fails on the one case it has. The equality against the declared title that
+# sits beside it is the real test.
 
 if __name__ == "__main__":
     sys.exit(main())

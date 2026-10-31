@@ -1578,6 +1578,99 @@ without sending anything to ABDM therefore has nothing to declare. Whether
 national publishing should be a plugin of its own is a product and policy
 question, not a code one, and it is not resolved here.
 
+**32. The forms were the one declaration the kernel never served, and both
+files that knew it said so and stopped there.** `web/src/declarations.ts`
+opened with "Honest gap: kernel/contracts.py ROUTES has no questionnaire
+route, so the declarations are compiled into the bundle from
+questionnaires/*.json at build time... the moment the API serves them, replace
+the body of questionnaire() with a fetch and delete the glob." And
+`api/main.py`'s `/valuesets/{slug}` carried its own argument for why it had to
+exist -- "without this route the third binding form would be a column nothing
+could fill from a screen" -- and no screen had ever called it, so every bound
+choice on every form drew an empty dropdown in the browser while
+`messages.check.ts` passed by reading the same files off disk itself. Two
+correct notes, each describing the other's fix, neither acted on. Now closed:
+`GET /questionnaires/` serves the forms, `declarations.ts` fetches both and
+Vite's `fs.allow` escape is gone, and `ui.check.ts` refuses a glob or a
+`.json` path in any renderer file.
+
+**33. Section 8 of this document is right about the mechanism and was wrong
+about this renderer.** It says the renderer "draws `ThreadView` and
+`ViewResult` and may name nothing", and offers as the cheapest demonstration
+of the architecture that changing a view declaration's `fields:` from `[code,
+...]` to `[code_display, ...]` changed what a nurse sees with no renderer file
+touched. Half of that was not true when it was written. `kernel/views.py` did
+narrow a row to the declared fields, so the WORDS changed; but `View.tsx`
+chose which of a row's columns to lead with from six field names it had typed
+out -- title, text, name, code, operation, status -- so reordering a section's
+`fields:` changed nothing at all, and a bundle whose own first column was none
+of those six got whichever of the six it happened to carry. Fixed by sending
+`fields` with the rows and leading with the first one present.
+
+**34. A check in this suite went red at a wall-clock instant, on every
+machine, for a reason unconnected to what it checks.**
+`scripts/check_queues.py` wrote its consultation at the real clock and every
+queue row at a literal `NOW = "2026-10-31T10:00:00+00:00"`. `Store.audit`
+orders by `at` and breaks ties on rowid, so "the denial is the last thing on
+the trail" held only while the machine's clock was behind that instant, and
+from 10:00 UTC on 2026-10-31 the gate failed everywhere, permanently. Fixed by
+writing the visit at the same instant as everything else in the file. The
+wider fact is not fixed and is a decision: ten check scripts pin a literal
+instant on 2026-10-31, so this suite is dated, and the next one to mix a
+literal with `datetime.now()` fails the same way.
+
+**35. The patient screen decided what a patient is.** `web/src/screens/
+Patient.tsx` read `age`, `sex` and `village` off the subject by name, which is
+a second opinion about a subject's shape held in a file that may hold none:
+the queue view declares `columns: [name, age, sex, village, token]` and
+`messages.header()` already reads it. At a bundle whose subject is a specimen
+the screen showed three empty fields. Fixed by calling `header()`;
+`ui.check.ts` now refuses any screen that reads a subject by a field name it
+typed, with `.id` exempt because that is the `Store` protocol's own primary key
+and not a word a bundle chose.
+
+**36. Contradiction 25's stated reason for leaving it unfixed was wrong in one
+half, and the fix cost one serialized field.** It says the withheld map "is
+served at `GET /facility` and is not in `catalogue.json`", and that fixing it
+means "putting plugin ids into `catalogue.json`", which "adds words the
+renderer may never type". The second half never followed from the first.
+`web/src/app/App.tsx` already loaded `GET /facility` for its sidebar, so the
+withheld map was in the renderer's hands the whole time; the only thing
+missing was a human word for a plugin, which is now `without` on the same
+route, carrying the title the bundle itself chose. The renderer still types no
+plugin id. What remains true in 25 is the other barrier, stated in section 13:
+one demo account holds every capability, so the disabled switch cannot be seen
+by switching role in the browser, and the proof stays server side.
+
+**37. Eleven check files are the only TypeScript in this repository that is
+never type checked, and that hid a vacuous assertion in a new check for the
+length of one session.** `web/tsconfig.json` excludes every `*.check.ts`,
+because they import node builtins and typing them would mean `@types/node` for
+files that never ship. The cost showed up immediately:
+`web/src/live.check.ts` called `messages(ctx, thread)` with the arguments
+reversed, and the assertion that followed -- that the thread screen composes
+some messages -- passed on a value built from the wrong object. `tsc` would
+have caught it in a second. It was found by reading, not by a check, and
+nothing in the gate would have found it. Reported rather than fixed, because
+the fix is either `@types/node` as a dev dependency for the check files or a
+second tsconfig over them, and that is a build decision.
+
+**38. The home screen invents an outpatient session, and is the last piece of
+made-up data left on a screen.** `web/src/screens/Today.tsx` draws a
+"Session" arc with a progress bar and "N h left" against `span = { from: 9 *
+60, to: 14 * 60 }`, and its own comment says what that is: "The prototype's
+OPD window; there is no declaration for a facility's hours, so this shows the
+time and the day's progress through it rather than inventing an opening hour."
+The second half of that sentence is not what the code does. A five hour window
+starting at nine IS an opening hour, it is a claim about how an Indian primary
+health centre runs its outpatient day, and no bundle declares it. Everything
+else on that screen -- the counts, the brief, the stations, the suggested
+questions -- comes from a declaration or a live row. Not fixed here, for two
+reasons: removing the arc is a decision about the hero of the home screen,
+which was deliberately rebuilt to a prototype somebody approved, and declaring
+a facility's hours is a new declaration key nobody has asked for. A person
+decides which.
+
 ---
 
 ## 13. What I deliberately did not architect, and why
