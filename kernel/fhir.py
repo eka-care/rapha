@@ -315,6 +315,22 @@ def observation(row, *, subject, encounter, performer=None):
     `scripts/check_verification.py` holds every declared literal against the
     published list.
     """
+    if row.get(VERIFICATION) or row.get(CLINICAL):
+        # R4's Observation has no verificationStatus and no clinicalStatus. It
+        # has no negation element either: there is no way in this resource to
+        # say that a finding was denied, hypothetical, a family member's or
+        # historical. FHIR's answer is that such a finding is a Condition, and
+        # invariant I6 is held there.
+        #
+        # So a row carrying one is refused rather than projected without it.
+        # Dropping it would be the one failure this whole module exists to
+        # prevent: a value whose certainty was recorded, published as a fact
+        # because the resource it landed in had nowhere to put the doubt.
+        raise KeyError(
+            "observation row %r carries a clinical or verification status, and "
+            "R4's Observation has neither element. A finding whose certainty "
+            "matters is a Condition; publishing this as an Observation would "
+            "drop the doubt and keep the value." % row.get("id"))
     status = row.get("status")
     if not status:
         raise KeyError(

@@ -62,6 +62,12 @@ python3 scripts/check_rx.py
 # travels as narrative text into an ABDM document. The last of those is proved
 # rather than asserted; it was written down twice and did not exist.
 python3 scripts/check_codification.py
+# How sure anybody was, on every coded thing rather than only on a diagnosis.
+# Every status literal an operation stores is held against the published FHIR
+# list R4 binds that element to; no projection chooses a clinical certainty
+# for itself; and invariant I6 is proved case by case, including the two
+# resources where it is NOT kept and the reason it cannot be.
+python3 scripts/check_verification.py
 # The connector behind the seam, against a stand-in transport fed the vendor's
 # own published response examples. No credential, no socket, no recording of a
 # live call, and the check says so in its docstring.
