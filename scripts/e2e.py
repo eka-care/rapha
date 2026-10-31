@@ -393,6 +393,129 @@ def composer_says(base, db):
     ok("an utterance claiming its own confirmation still links no ABHA")
 
 
+def tools_of(base):
+    """The Go MCP server's tool list, against the kernel at `base`.
+
+    Deliberately initialize and tools/list only. mcp() above drives a tool
+    CALL as well, which is the right thing there; here the whole question is
+    which tools exist, and a second call would be a second thing to go wrong
+    for reasons that have nothing to do with this.
+    """
+    binary = ROOT / "care_phc_mcp" / "care_phc_mcp"
+    if not binary.exists():
+        return None
+    lines = [
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+         "params": {"protocolVersion": "2024-11-05", "capabilities": {},
+                    "clientInfo": {"name": "e2e", "version": "1"}}},
+        {"jsonrpc": "2.0", "method": "notifications/initialized"},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+    ]
+    proc = subprocess.Popen(
+        [str(binary)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL, text=True,
+        env=dict(os.environ, CARE_BASE_URL=base))
+    replies = {}
+    try:
+        proc.stdin.write("\n".join(json.dumps(x) for x in lines) + "\n")
+        proc.stdin.flush()
+        for _ in lines:
+            line = proc.stdout.readline()
+            if not line:
+                break
+            if line.startswith("{"):
+                reply = json.loads(line)
+                if "id" in reply:
+                    replies[reply["id"]] = reply
+            if 2 in replies:
+                break
+    finally:
+        proc.stdin.close()
+        proc.wait(timeout=10)
+    assert 2 in replies, replies
+    return {t["name"] for t in replies[2]["result"]["tools"]}
+
+
+def facility_shape():
+    """The same bundle, the same binary, one declared list different.
+
+    This is the socket half of scripts/check_plugins.py, and it is the half
+    that cannot be faked: the real Go MCP server, built from the same embedded
+    catalogue, pointed at a kernel running `no-laboratory`. It builds its tool
+    list from GET /whoami, so a capability this centre withholds is a tool
+    that does not exist for an agent, not one that errors when called.
+
+    A check that only proved a button was missing would prove nothing, so the
+    same operation is also called over HTTP and has to be refused by name.
+    """
+    db = os.path.join(tempfile.mkdtemp(), "shape.sqlite3")
+    port = free_port()
+    base = "http://127.0.0.1:%d" % port
+    log = os.path.join(os.path.dirname(db), "api.log")
+    handle = open(log, "w")
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "api.main:app", "--host", "127.0.0.1",
+         "--port", str(port)], cwd=str(ROOT), stdout=handle, stderr=subprocess.STDOUT,
+        env=dict(os.environ, PHC_DB=db, PHC_BUNDLE="phc",
+                 PHC_FACILITY="no-laboratory"))
+    try:
+        wait_for(base, proc, log)
+        facility = call(base, "/facility/")
+        assert facility["bundle"]["id"] == "phc", facility["bundle"]
+        assert facility["facility"] == "no-laboratory", facility["facility"]
+        assert sorted(facility["withheld"]) == ["lab.order", "lab.result.enter",
+                                                "lab.result.validate"], facility
+        # The declared list stays whole. A facility declines a capability; it
+        # does not delete one from the bundle, which is what would make this a
+        # fork.
+        assert "lab.order" in facility["capabilities"], facility["capabilities"]
+        ok("the same bundle on a second kernel runs the no-laboratory shape, "
+           "withholding %d capabilities it still declares" % len(facility["withheld"]))
+
+        # The line is shorter, because nothing can raise the flag that makes
+        # the laboratory step apply. Nobody waits at a station this centre
+        # does not have.
+        line = call(base, "/threads/", {"token": "S-1"})["line"]
+        at_lab = [s["status"] for s in line if s["station"] == "lab"]
+        assert at_lab == ["skipped"], line
+        ok("and the laboratory step of its line is skipped, not pending")
+
+        tools = tools_of(base)
+        if tools is None:
+            print("skip the Go MCP server: build it with (cd care_phc_mcp && go build .)")
+        else:
+            for name in ("propose_lab_order", "propose_lab_result_enter"):
+                assert name not in tools, sorted(tools)
+            assert "propose_consult_document" in tools, sorted(tools)
+            assert "propose_vitals_record" in tools, sorted(tools)
+            ok("the unmodified Go MCP server offers %d tools to this centre and "
+               "neither laboratory tool is among them, because it builds its "
+               "list from GET /whoami" % len(tools))
+
+        # And called anyway it is refused by the guard, which is the part that
+        # matters: an absent button is not an enforced rule.
+        thread = register(base, "Shape Test", "S-2")
+        denied = call(base, "/operations/phc.op.lab-order/propose/",
+                      {"patient": thread, "payload": {"investigations": ["CBC"]}},
+                      expect=422)
+        assert "lab.order" in denied["detail"] and "orders" in denied["detail"], denied
+        assert rows(db, "SELECT * FROM service_request WHERE encounter=?",
+                    (thread,)) == []
+        audit = [r[0] for r in rows(db, "SELECT outcome FROM audit WHERE thread=?",
+                                    (thread,))]
+        assert any(o.startswith("denied: capability lab.order withheld by plugin")
+                   for o in audit), audit
+        ok("and called anyway over the wire it is refused, names the plugin in "
+           "the audit row, and writes no row: %s" % denied["detail"])
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        handle.close()
+
+
 def lab_separation():
     """A second bundle on the same kernel, and the one rule the PHC cannot show.
 
@@ -638,6 +761,11 @@ def main():
         except subprocess.TimeoutExpired:
             proc.kill()
         handle.close()
+
+    # The same bundle, a different facility, on its own kernel. Before the
+    # second bundle, because this is the one that would say a facility's shape
+    # had stopped working.
+    facility_shape()
 
     # A second bundle, on its own kernel and its own file. Last, because it
     # binds a second port and the health centre's walk is the one that matters
