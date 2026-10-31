@@ -50,7 +50,20 @@ def tracked_source_files():
 # Everywhere else, a comment is allowed to talk about /agent/say (that is
 # history, same as a .md file), but code is not: see the comment-strip below,
 # the same technique web/src/messages.check.ts uses for the same reason.
-ALLOWED_SAY_CODE = {"api/main.py", "api/tests/test_api.py"}
+#
+# care_phc_mcp/cmd/api/main.go is the Go engine's route table, which is the
+# same kind of file as api/main.py for the same reason: it has to NAME every
+# path the Python serves, because scripts/check_go_parity.py holds the two
+# engines' route tables against each other and a path left out of the Go's
+# would read as a route the Go serves. It names /agent/say and does not call
+# it: the entry answers 501 and says which slice will bring it.
+#
+# This widens the rule, and the exposure is worth saying out loud: a live call
+# to /agent/say added to the Go API later would pass. That is exactly the
+# exposure api/main.py's own entry already has, and the check's rule is about
+# the rename having happened rather than about guarding a route.
+ALLOWED_SAY_CODE = {"api/main.py", "api/tests/test_api.py",
+                    "care_phc_mcp/cmd/api/main.go"}
 
 
 def code_only(text: str) -> str:
