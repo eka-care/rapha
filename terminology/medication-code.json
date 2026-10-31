@@ -6,36 +6,52 @@
   "generated": "2026-10-31",
   "source": "A STARTER SET, NOT A FORMULARY. Every medicine here is marked P, primary level of healthcare, in India's National List of Essential Medicines 2022, the report of the Standing National Committee on Medicines, Ministry of Health and Family Welfare, read 2026-10-31 from https://icmr.gov.in/icmrobject/custom_data/1720338777_report_nlem_2022_f_website.pdf. The report marks every medicine with its level of healthcare, P for primary, S for secondary, T for tertiary, and only P medicines are seeded.. It is short because the report publishes the level of care only in its annexures of changes, so these are the primary level medicines that document could be read to confirm, not the whole of the primary level list. No dose limit, no indication and no interaction is stated here and none may be inferred from the list. NEEDS SIGN-OFF: a facility formulary approved by a named medical officer, which is also what the `rx.prescribe` capability's own qualifier has been waiting for.",
   "verified": "every concept confirmed to be in http://snomed.info/sct?fhir_vs=isa/763158003, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+  "semantic_tags": [
+    "medicinal product"
+  ],
+  "semantic_tags_source": "The SNOMED CT semantic tags a candidate for this value set may carry. A codification service returns a concept's semantic tag beside its code, and a candidate whose tag is not in this list is refused before anything else looks at it, so a procedure cannot be offered as a diagnosis and a dose form cannot be offered as a medicine. THIS IS NOT A CLAIM ABOUT EVERY DESCENDANT OF THE BRANCH: it is the set of tags the concepts in this file actually carry, the full specified name of every concept in this file was read from tx.fhir.org on 2026-10-31, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, and the tag in its brackets is recorded below. A legitimate concept under some other tag is therefore refused too, and that is the direction to be wrong in: refusing a real candidate costs a picker, offering a procedure as a diagnosis costs a record.",
   "concepts": {
     "774448003": {
       "display": "Albendazole only product",
       "verified": "confirmed in value set http://snomed.info/sct?fhir_vs=isa/763158003, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
-      "why": "Albendazole. India's National List of Essential Medicines 2022, the report of the Standing National Committee on Medicines, Ministry of Health and Family Welfare, read 2026-10-31 from https://icmr.gov.in/icmrobject/custom_data/1720338777_report_nlem_2022_f_website.pdf. The report marks every medicine with its level of healthcare, P for primary, S for secondary, T for tertiary, and only P medicines are seeded., Annexure 3.3, section 6.1.1 intestinal anthelminthics, level of healthcare P,S,T."
+      "why": "Albendazole. India's National List of Essential Medicines 2022, the report of the Standing National Committee on Medicines, Ministry of Health and Family Welfare, read 2026-10-31 from https://icmr.gov.in/icmrobject/custom_data/1720338777_report_nlem_2022_f_website.pdf. The report marks every medicine with its level of healthcare, P for primary, S for secondary, T for tertiary, and only P medicines are seeded., Annexure 3.3, section 6.1.1 intestinal anthelminthics, level of healthcare P,S,T.",
+      "semantic_tag": "medicinal product",
+      "fully_specified_name": "Product containing only albendazole (medicinal product)"
     },
     "774586009": {
       "display": "Amoxicillin only product",
       "verified": "confirmed in value set http://snomed.info/sct?fhir_vs=isa/763158003, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
-      "why": "Amoxicillin. India's National List of Essential Medicines 2022, the report of the Standing National Committee on Medicines, Ministry of Health and Family Welfare, read 2026-10-31 from https://icmr.gov.in/icmrobject/custom_data/1720338777_report_nlem_2022_f_website.pdf. The report marks every medicine with its level of healthcare, P for primary, S for secondary, T for tertiary, and only P medicines are seeded., Annexure 3.3, section 6.2.1 beta-lactam antibacterials, level of healthcare P,S,T."
+      "why": "Amoxicillin. India's National List of Essential Medicines 2022, the report of the Standing National Committee on Medicines, Ministry of Health and Family Welfare, read 2026-10-31 from https://icmr.gov.in/icmrobject/custom_data/1720338777_report_nlem_2022_f_website.pdf. The report marks every medicine with its level of healthcare, P for primary, S for secondary, T for tertiary, and only P medicines are seeded., Annexure 3.3, section 6.2.1 beta-lactam antibacterials, level of healthcare P,S,T.",
+      "semantic_tag": "medicinal product",
+      "fully_specified_name": "Product containing only amoxicillin (medicinal product)"
     },
     "775195004": {
       "display": "Chlorpheniramine only product",
       "verified": "confirmed in value set http://snomed.info/sct?fhir_vs=isa/763158003, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
-      "why": "Chlorpheniramine. India's National List of Essential Medicines 2022, the report of the Standing National Committee on Medicines, Ministry of Health and Family Welfare, read 2026-10-31 from https://icmr.gov.in/icmrobject/custom_data/1720338777_report_nlem_2022_f_website.pdf. The report marks every medicine with its level of healthcare, P for primary, S for secondary, T for tertiary, and only P medicines are seeded., Annexure 3.3, level of healthcare P,S,T. The section heading above this row in the extracted text is not legible enough to quote, so it is not quoted."
+      "why": "Chlorpheniramine. India's National List of Essential Medicines 2022, the report of the Standing National Committee on Medicines, Ministry of Health and Family Welfare, read 2026-10-31 from https://icmr.gov.in/icmrobject/custom_data/1720338777_report_nlem_2022_f_website.pdf. The report marks every medicine with its level of healthcare, P for primary, S for secondary, T for tertiary, and only P medicines are seeded., Annexure 3.3, level of healthcare P,S,T. The section heading above this row in the extracted text is not legible enough to quote, so it is not quoted.",
+      "semantic_tag": "medicinal product",
+      "fully_specified_name": "Product containing only chlorphenamine (medicinal product)"
     },
     "776654009": {
       "display": "Mefenamic acid only product",
       "verified": "confirmed in value set http://snomed.info/sct?fhir_vs=isa/763158003, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
-      "why": "Mefenamic acid. India's National List of Essential Medicines 2022, the report of the Standing National Committee on Medicines, Ministry of Health and Family Welfare, read 2026-10-31 from https://icmr.gov.in/icmrobject/custom_data/1720338777_report_nlem_2022_f_website.pdf. The report marks every medicine with its level of healthcare, P for primary, S for secondary, T for tertiary, and only P medicines are seeded., Annexure 3.3, section 2.1, level of healthcare P,S,T."
+      "why": "Mefenamic acid. India's National List of Essential Medicines 2022, the report of the Standing National Committee on Medicines, Ministry of Health and Family Welfare, read 2026-10-31 from https://icmr.gov.in/icmrobject/custom_data/1720338777_report_nlem_2022_f_website.pdf. The report marks every medicine with its level of healthcare, P for primary, S for secondary, T for tertiary, and only P medicines are seeded., Annexure 3.3, section 2.1, level of healthcare P,S,T.",
+      "semantic_tag": "medicinal product",
+      "fully_specified_name": "Product containing only mefenamic acid (medicinal product)"
     },
     "776713006": {
       "display": "Metformin only product",
       "verified": "confirmed in value set http://snomed.info/sct?fhir_vs=isa/763158003, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
-      "why": "Metformin. India's National List of Essential Medicines 2022, the report of the Standing National Committee on Medicines, Ministry of Health and Family Welfare, read 2026-10-31 from https://icmr.gov.in/icmrobject/custom_data/1720338777_report_nlem_2022_f_website.pdf. The report marks every medicine with its level of healthcare, P for primary, S for secondary, T for tertiary, and only P medicines are seeded., Annexure 3.3, section 18.4.1 insulins and other antidiabetic agents, level of healthcare P,S,T."
+      "why": "Metformin. India's National List of Essential Medicines 2022, the report of the Standing National Committee on Medicines, Ministry of Health and Family Welfare, read 2026-10-31 from https://icmr.gov.in/icmrobject/custom_data/1720338777_report_nlem_2022_f_website.pdf. The report marks every medicine with its level of healthcare, P for primary, S for secondary, T for tertiary, and only P medicines are seeded., Annexure 3.3, section 18.4.1 insulins and other antidiabetic agents, level of healthcare P,S,T.",
+      "semantic_tag": "medicinal product",
+      "fully_specified_name": "Product containing only metformin (medicinal product)"
     },
     "777067000": {
       "display": "Acetaminophen only product",
       "verified": "confirmed in value set http://snomed.info/sct?fhir_vs=isa/763158003, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
-      "why": "Paracetamol. India's National List of Essential Medicines 2022, the report of the Standing National Committee on Medicines, Ministry of Health and Family Welfare, read 2026-10-31 from https://icmr.gov.in/icmrobject/custom_data/1720338777_report_nlem_2022_f_website.pdf. The report marks every medicine with its level of healthcare, P for primary, S for secondary, T for tertiary, and only P medicines are seeded., Annexure 3.3, section 2.1 non-opioid analgesics, antipyretics and nonsteroidal anti-inflammatory medicines, level of healthcare P,S,T. SNOMED International's preferred term is the United States name, acetaminophen; the Indian preferred term needs the SNOMED CT India extension, which needs the MLDS licence this build does not hold."
+      "why": "Paracetamol. India's National List of Essential Medicines 2022, the report of the Standing National Committee on Medicines, Ministry of Health and Family Welfare, read 2026-10-31 from https://icmr.gov.in/icmrobject/custom_data/1720338777_report_nlem_2022_f_website.pdf. The report marks every medicine with its level of healthcare, P for primary, S for secondary, T for tertiary, and only P medicines are seeded., Annexure 3.3, section 2.1 non-opioid analgesics, antipyretics and nonsteroidal anti-inflammatory medicines, level of healthcare P,S,T. SNOMED International's preferred term is the United States name, acetaminophen; the Indian preferred term needs the SNOMED CT India extension, which needs the MLDS licence this build does not hold.",
+      "semantic_tag": "medicinal product",
+      "fully_specified_name": "Product containing only paracetamol (medicinal product)"
     }
   }
 }
