@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -198,10 +199,17 @@ func TestTheAuditTrailIsInsertionOrderWithinOneSecond(t *testing.T) {
 	s := open(t)
 	thread, _ := s.OpenThread("T-9", "nurse")
 	at := "2026-10-31T10:00:00+00:00"
-	for _, outcome := range []string{"denied: first", "allowed", "proposed"} {
+	// The ids descend on purpose. With NewID's random hex this assertion
+	// failed only 5 times in 8 under the mutation that tiebreaks on `id`,
+	// because three random ids sort into insertion order about one run in
+	// six: a real reordering bug would have escaped at that rate. Ids chosen
+	// to sort backwards make it fail every time.
+	for i, outcome := range []string{"denied: first", "allowed", "proposed"} {
 		if err := s.AppendAudit(AuditRecord{
-			ID: NewID("aud"), Thread: thread, Operation: "phc.op.vitals-record",
-			Surface: "RENDERED", Outcome: outcome, At: at,
+			ID:        fmt.Sprintf("aud-%c", 'c'-i),
+			Thread:    thread,
+			Operation: "phc.op.vitals-record",
+			Surface:   "RENDERED", Outcome: outcome, At: at,
 			Payload: map[string]any{"systolic": 140},
 		}); err != nil {
 			t.Fatal(err)

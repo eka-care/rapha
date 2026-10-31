@@ -693,6 +693,30 @@ def test_the_compiled_form_is_plain_json():
         "a bundle key and a catalogue-wide key cannot share a name"
     assert set(back) <= set(c.compiled_keys())
 
+    # The three keys a second engine answers GET /facility from. Asserted to
+    # carry something rather than only to be present: emptying them left the
+    # key set right, this test green, and the Go backend serving a centre that
+    # withholds nothing whatever PHC_FACILITY said. scripts/check_go_parity.py
+    # caught that, and it is skipped under SKIP_E2E, so the hole was real.
+    plugins = back["plugins"]
+    assert plugins, "catalogue.json carries no plugin declarations"
+    for pid, decl in plugins.items():
+        assert decl.get("title"), pid
+        assert decl.get("capabilities"), pid
+        for cap in decl["capabilities"]:
+            assert cap in vocab.CAPABILITIES, (pid, cap)
+    shapes = back["facilities"]
+    assert shapes["default"] in shapes["declared"], shapes["default"]
+    for fid, decl in shapes["declared"].items():
+        assert decl.get("title"), fid
+        assert set(decl.get("without") or []) <= set(plugins), fid
+    # The loaded bundle's own words, which are NARROWER than the catalogue
+    # wide union the four original keys carry.
+    assert back["vocabulary"]["capabilities"] == sorted(vocab.CAPABILITIES)
+    assert back["vocabulary"]["roles"] == {r: list(caps) for r, caps
+                                           in dict(vocab.BUNDLES).items()}
+    assert back["vocabulary"]["states"] == sorted(vocab.STATES)
+
 
 def test_the_file_on_disk_carries_every_key_the_contract_promises():
     """catalogue.json after `catalogue.build` then `kernel.declarations`. If
