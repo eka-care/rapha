@@ -238,3 +238,23 @@ Each is finished when the gate is green and the named checks pass against Go.
   the one account holds every capability. The port must not invent an auth
   model. Carry the header, name the gap, and leave the decision.
 - **When the Python goes.** Not an agent's call.
+- **Whether `documents` joins `kernel/contracts.BUNDLE_KEYS`.** Added
+  2026-10-31, after G6. The placement declaration in `bundles/<id>/bundle.yaml`
+  says which section of which profile each kind of row is filed under. It is
+  not a bundle key, so the word never reaches `catalogue.json` and no Go
+  process can read it. `Document()` takes it as an argument instead. This is
+  a change to the compiled artifact's public contract, and it blocks G8: no
+  Go path can publish a document even once the outbox exists.
+- **What replaces the two Python-only holds at G9.** Added 2026-10-31, after
+  G6. The Go section table and the Go observation-status refusal are held by
+  the differential check PLUS two Python checks and nothing else:
+  `scripts/check_rx.py`'s section-code assertion, which pins the codes
+  against the NRCeS fact sheet, and `python3 -m kernel.fhir`'s own demo.
+  Retiring the Python without replacing those two loses both holds. They
+  must move, not be deleted with it.
+- **`MedicationRequest.status` defaults to `"unknown"` where
+  `Observation.status` refuses.** Added 2026-10-31, after G6. Two resources,
+  two answers to the same question, in one file whose docstring says it may
+  not choose how settled a measurement is. `"unknown"` is in the bound value
+  set, so it is legal. Which of the two is right is a clinical call, and the
+  Go side copies the Python exactly until it is made.
