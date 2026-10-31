@@ -1527,6 +1527,57 @@ that happened, and the audit trail is the record we would defend. It now breaks
 the tie on SQLite's insertion order. `Store.proposals` had the same tie and the
 same fix.
 
+**28. "Nothing under this repository ever holds a recording" cannot coexist
+with "a recording must not be lost when the line is down."** `api/scribe.py`
+states the first three times: the recording "never reaches the repository", it
+is "written to one temporary file, handed to the connector, and deleted in a
+`finally`", and the in-memory session table is "in memory on purpose. A restart
+loses an in flight job, which costs a doctor one re-recording and costs the
+record nothing." The queues brief requires the opposite, and it is right to:
+surviving an outage MEANS holding the recording, because the bytes exist
+nowhere else. There is no version of the requirement that does not put
+consultation audio on a disk for a while. `kernel/queues.py` narrows the
+contradiction as far as it goes (outside the repository, owner readable only,
+under the retention backstop `care_phc/connectors/scribe/base.py` already
+declares) and does NOT wire the live route over, because doing so starts
+writing identifiable health data to a clinic's disk under a retention window
+that file says has no clinical or legal sign-off. The order has to be: sign the
+window, then wire the route. A person decides.
+
+**29. `kernel/directory.py` calls an eleventh `Store` method that the protocol
+does not declare.** `publish_pending()` calls `store.record_directory_id(...)`.
+The `Store` docstring says of its ten methods that "a SQLite file and a REST
+client over somebody else's record can both satisfy every one", and
+`adapters/local/tests/test_store.py` pins exactly those ten names against
+`SqliteStore`. Neither notices a call the kernel makes to an eleventh. So a
+second adapter would pass the ten-name test and then raise `AttributeError`
+inside `publish_pending`, and the seam that let a whole EMR adapter be deleted
+is one method weaker than it reads. `scripts/check_queues.py` holds the
+kernel's off-protocol `Store` calls at exactly this one, so a second one fails
+the gate; fixing the first means changing the protocol and the test that pins
+it, which is a decision about the `Store` seam.
+
+**30. "The publish queue is not a queue" is true of derivable work and of
+nothing else.** `kernel/directory.py` says it, and the reasoning is right: an
+unpublished patient is found by a query over rows we already keep, so nothing
+can fall out of sync and nothing had to be enqueued. The national document path
+inherits that unchanged, because a document is a projection. Audio cannot: a
+recording is derivable from nothing, so its bytes must be held somewhere and
+the receipt-beside-the-record pattern does not reach it. As written, the
+sentence reads as a general architectural rule, and a reader who takes it as
+one concludes this product never needs an outbox. It needs one for exactly one
+kind of work, and the reason is a property of the work rather than a
+preference.
+
+**31. A facility cannot decline to publish nationally, because the only
+capability on that path is one it may not switch off.** The `documents:`
+declaration carries no capability of its own, so the guard re-check at send
+time has to use the operation's: `encounter.document`, which sits in the
+`baseline` plugin declared `always: true`. A centre that wants to run the line
+without sending anything to ABDM therefore has nothing to declare. Whether
+national publishing should be a plugin of its own is a product and policy
+question, not a code one, and it is not resolved here.
+
 ---
 
 ## 13. What I deliberately did not architect, and why

@@ -1002,28 +1002,43 @@ print("ok   queues: %d checks" % checks)
 
 
 # ==========================================================================
-# Mutations this file is built to fail under. Each one was made, the gate was
-# run, the first failing check was recorded, and the mutation was reverted.
+# Mutations this file is built to fail under. Each one was applied, the whole
+# gate was run, the first failing check was recorded, and it was reverted and
+# the gate confirmed green again (exit 0, 722 ok). 17 applied, 17 caught.
 #
-#   kernel/queues.py   claim after the send instead of before it
-#                      -> property 1: the row comes back `ready`, so a
-#                         recovery cannot tell tried work from untried
-#   kernel/queues.py   recover() puts a stuck item back in `ready` without
-#                      asking delivered()
-#                      -> property 2: the send log gets a second line
-#   kernel/queues.py   settle(sent) wrapped so a failed write is reported as
-#                      a success anyway
-#                      -> property 3: the item is marked sent with no receipt
-#   kernel/queues.py   permit called after claim instead of before
-#                      -> a guard denial costs an attempt
-#   kernel/queues.py   refusal() consulted at enqueue only, not in due()
-#                      -> an item outlives the shape that admitted it
-#   kernel/queues.py   an empty receipt accepted as a success
-#   kernel/queues.py   scrubbed() dropped from the error path
-#   kernel/queues.py   the mobile rule run before the Aadhaar rule
-#                      -> an Aadhaar number kept as "ending 9012"
-#   adapters/local/spool.py  claim without the `state = 'ready'` condition
-#                      -> eight pumps claim one item
-#   scripts/check.sh   the line running this file deleted
-#                      -> scripts/check_declarations.py's wiring assertion
+# Two of them were refused by the harness before they ran, in both cases
+# because the replacement text still CONTAINED the text it replaced, so the
+# mutation would have been a no-op dressed as a change. They were re-anchored
+# and then caught. That trap is the reason the harness asserts the file
+# changed AND the old text is gone, on a string, before it writes anything.
+#
+#   mutation                                      first check to fail
+#   -----------------------------------------------------------------------
+#   claim leaves the state alone                  a crash mid-send left the
+#     (adapters/local/spool.py)                   item 'ready'
+#   claim without the compare-and-set             8 of 8 pumps claimed one item
+#   recovery returns a stuck item to the          it was not settled from the
+#     queue without asking the remote             remote's own answer
+#   a remote that cannot say is guessed about     kernel/queues demo: a remote
+#                                                 that cannot say holds it
+#   an unwritable receipt reported as sent        it was REPORTED as sent
+#   permit judged after the claim                 a guard denial cost an attempt
+#   permit's answer ignored entirely              it was sent anyway
+#   a withheld plugin not refused at send time    it was sent anyway
+#   an empty receipt counts as a success          recorded as a success
+#   the error path does not scrub                 the syntax tree: error= is
+#                                                 not a scrubbed() call
+#   the mobile rule before the Aadhaar rule       an Aadhaar number kept as
+#                                                 "ending 9012"
+#   audio that aged out recorded as sent          it did not stop in 'failed'
+#   a canned document body instead of the         the bundle has no identifier
+#     projection
+#   the kernel reaches past the Spool protocol    AttributeError: no 'vacuum'
+#   a content column on the row (dataclass only)  spool demo: COLUMNS and
+#                                                 QueueItem have drifted
+#   the same column in BOTH places                the outbox has grown a column
+#   the gate's line running this file deleted     check_templates.py: the gate
+#                                                 does not run check_queues.py
+#
+# No assertion was deleted for being unfailable.
 # ==========================================================================
