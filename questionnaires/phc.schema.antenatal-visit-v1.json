@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "slug": "phc-antenatal-visit-v1",
+  "title": "Antenatal visit",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.antenatal-visit",
+      "scribe": true
+    }
+  },
+  "questions": [
+    {
+      "link_id": "history",
+      "text": "History",
+      "type": "text",
+      "required": false
+    },
+    {
+      "link_id": "examination",
+      "text": "Examination",
+      "type": "text",
+      "required": false
+    },
+    {
+      "link_id": "assessment",
+      "text": "Assessment",
+      "type": "text",
+      "required": true
+    },
+    {
+      "link_id": "plan",
+      "text": "Plan",
+      "type": "text",
+      "required": false
+    }
+  ]
+}

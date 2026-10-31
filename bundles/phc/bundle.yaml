@@ -23,6 +23,10 @@ operations:
   - phc.op.household-visit
   - phc.op.handover
   - phc.op.handover-reply
+  # Generated from the `templates` declaration below.
+  - phc.op.ncd-review
+  - phc.op.antenatal-visit
+  - phc.op.followup
 workflows:
   - phc.wf.outpatient
 views:
@@ -53,7 +57,10 @@ stations: [reception, nurse, doctor, lab, pharmacy, community]
 scribe:
   reception: {default: phc.op.patient-register, choose: [phc.op.patient-register]}
   nurse:     {default: phc.op.vitals-record,    choose: [phc.op.vitals-record]}
-  doctor:    {default: phc.op.consult-document, choose: [phc.op.consult-document, phc.op.rx-prescribe]}
+  doctor:    {default: phc.op.consult-document,
+              choose: [phc.op.consult-document, phc.op.ncd-review,
+                       phc.op.antenatal-visit, phc.op.followup,
+                       phc.op.rx-prescribe]}
   community: {default: null,                    choose: [phc.op.household-visit]}
 
 # What this facility publishes to ABDM, and what it files under which of the
@@ -95,6 +102,92 @@ documents:
       # The narrative, which for most consultations is the whole record: only
       # three conditions and six medicines can be coded here.
       DocumentReference: [{resource: notes}]
+
+# The doctor's templates. A clinician does not want the general consultation
+# form for every patient, and a template is how this bundle says so.
+#
+# A template is NOT a new questionnaire and NOT a fifth declaration type. The
+# `scribe` key above already says what a template is: an operation, whose
+# questionnaire is the form and whose mapping is the only way anything heard
+# reaches a row. So each entry below names one operation it narrows (`of`) and
+# the ordered subset of that form's own questions it asks. From that,
+# kernel/templates.py GENERATES the operation atom and the questionnaire, with
+# the base's own bindings, mapping sources, capability, station,
+# preconditions, instrument, emits and surfaces. Three hand written forms
+# would be three more files to keep in step with every value set and every
+# mapping; a generated one cannot drift, because the gate holds what is on
+# disk against this declaration.
+#
+# Nothing clinical is declared here. No condition, no medicine, no value set,
+# no review interval, no antenatal schedule, no threshold. The only thing a
+# template says is which of the questions the general consultation already
+# asks this kind of visit puts in front of a clinician.
+#
+# WHICH questions each visit type should ask is a clinical and product
+# decision that has not been made. The narrowings below are provisional and
+# each one carries its own `sign_off` sentence saying so, for the same reason
+# terminology/condition-code.json carries a banner: content without a named
+# clinician's sign-off must not be read as clinical guidance. The one
+# narrowing that is NOT a clinical judgement is the antenatal visit's, and it
+# is a fact about this build's vocabulary rather than about obstetrics.
+templates:
+  phc.op.ncd-review:
+    of: phc.op.consult-document
+    short: NCD review
+    title: Review a long term condition
+    summary: A review visit for a condition already being treated.
+    asks: [history, examination, assessment, diagnosis, plan]
+    require: [examination]
+    plain: |
+      A review of a condition somebody is already being treated for. It asks
+      the same five things the general consultation asks, and it will not
+      commit without what you found on examination, because a review whose
+      measurements are missing is a visit nobody can compare the next one to.
+    sign_off: |
+      NEEDS SIGN-OFF. That the examination is required here, rather than
+      optional as it is on the general consultation, is a product choice made
+      without a clinician. It states no interval, no target and no threshold,
+      and it must not be read as a review protocol. A named clinical officer
+      has to confirm it before this template is offered to anybody.
+  phc.op.antenatal-visit:
+    of: phc.op.consult-document
+    short: Antenatal
+    title: Antenatal visit
+    summary: An antenatal visit, recorded as narrative.
+    asks: [history, examination, assessment, plan]
+    plain: |
+      An antenatal visit. It asks for the history, what you found, your
+      assessment and the plan, and it does not offer the coded diagnosis
+      rows, because this build can code three conditions and not one of them
+      is obstetric. The whole of this visit travels as narrative text into
+      the published document, which is what that fallback was built for.
+    sign_off: |
+      This narrowing is a fact about this build's vocabulary and not a
+      clinical judgement: terminology/condition-code.json holds three
+      concepts and says it is not a diagnosis list, so there is no obstetric
+      concept for a coded row to carry. It follows that this template codes
+      NOTHING. It is not clinically useful as a coded record until a
+      published obstetric list is signed off by a named clinical officer, and
+      it should not be mistaken for one. What it does do is keep the visit as
+      text in a record that reaches ABDM.
+  phc.op.followup:
+    of: phc.op.consult-document
+    short: Follow up
+    title: Follow up visit
+    summary: A return visit about something already recorded.
+    asks: [history, assessment, diagnosis, plan]
+    plain: |
+      A return visit about something already recorded. It asks what has
+      happened since, your assessment, the conditions this visit is about and
+      the plan. It does not ask for an examination, on the view that a return
+      visit is usually about what changed rather than about a fresh set of
+      findings.
+    sign_off: |
+      NEEDS SIGN-OFF. Leaving the examination off this form is a product
+      choice made without a clinician, and a follow up that does need an
+      examination has nowhere to put it on this template. The general
+      consultation asks all five questions and is the answer until a named
+      clinical officer confirms this narrowing or replaces it.
 
 # Thread state flags. Derived from CARE resources where CARE knows the answer;
 # stored on the thread only where it does not. phc.wf.outpatient must declare a

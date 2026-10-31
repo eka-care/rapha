@@ -149,6 +149,9 @@
         "phc.op.patient-register",
         "phc.op.vitals-record",
         "phc.op.consult-document",
+        "phc.op.ncd-review",
+        "phc.op.antenatal-visit",
+        "phc.op.followup",
         "phc.op.rx-prescribe",
         "phc.op.household-visit"
       ],
@@ -245,7 +248,10 @@
       "phc.op.pharmacy-dispense",
       "phc.op.household-visit",
       "phc.op.handover",
-      "phc.op.handover-reply"
+      "phc.op.handover-reply",
+      "phc.op.ncd-review",
+      "phc.op.antenatal-visit",
+      "phc.op.followup"
     ],
     "title": "Primary health centre",
     "version": "2026.09.10",
@@ -755,6 +761,68 @@
         "patient"
       ]
     },
+    "phc.op.antenatal-visit": {
+      "capability": "encounter.document",
+      "description": "An antenatal visit. It asks for the history, what you found, your\nassessment and the plan, and it does not offer the coded diagnosis\nrows, because this build can code three conditions and not one of them\nis obstetric. The whole of this visit travels as narrative text into\nthe published document, which is what that fallback was built for.\n\nThis narrowing is a fact about this build's vocabulary and not a\nclinical judgement: terminology/condition-code.json holds three\nconcepts and says it is not a diagnosis list, so there is no obstetric\nconcept for a coded row to carry. It follows that this template codes\nNOTHING. It is not clinically useful as a coded record until a\npublished obstetric list is signed off by a named clinical officer, and\nit should not be mistaken for one. What it does do is keep the visit as\ntext in a record that reaches ABDM.",
+      "emits": [
+        "consult.documented"
+      ],
+      "fields": [
+        {
+          "link_id": "history",
+          "options": null,
+          "required": false,
+          "text": "History",
+          "type": "text"
+        },
+        {
+          "link_id": "examination",
+          "options": null,
+          "required": false,
+          "text": "Examination",
+          "type": "text"
+        },
+        {
+          "link_id": "assessment",
+          "options": null,
+          "required": true,
+          "text": "Assessment",
+          "type": "text"
+        },
+        {
+          "link_id": "plan",
+          "options": null,
+          "required": false,
+          "text": "Plan",
+          "type": "text"
+        }
+      ],
+      "id": "phc.op.antenatal-visit",
+      "input": "phc.schema.antenatal-visit-v1",
+      "instrument": "scribe",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "registered"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "Antenatal",
+      "station": "doctor",
+      "summary": "An antenatal visit, recorded as narrative.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Antenatal visit",
+      "tool": "propose_antenatal_visit",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "encounter",
+        "notes"
+      ]
+    },
     "phc.op.capture-withdraw": {
       "capability": "encounter.document",
       "description": "The patient changes their mind. One tick and the scribe is off for the rest\nof the visit. This used to ride on the consultation form, where `assessment`\nis required, so a consent could not be withdrawn without also writing a note.\nStopping a recording is not a clinical act and must not require one.",
@@ -885,6 +953,97 @@
       ],
       "title": "Document a consultation",
       "tool": "propose_consult_document",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "encounter",
+        "notes",
+        "condition"
+      ]
+    },
+    "phc.op.followup": {
+      "capability": "encounter.document",
+      "description": "A return visit about something already recorded. It asks what has\nhappened since, your assessment, the conditions this visit is about and\nthe plan. It does not ask for an examination, on the view that a return\nvisit is usually about what changed rather than about a fresh set of\nfindings.\n\nNEEDS SIGN-OFF. Leaving the examination off this form is a product\nchoice made without a clinician, and a follow up that does need an\nexamination has nowhere to put it on this template. The general\nconsultation asks all five questions and is the answer until a named\nclinical officer confirms this narrowing or replaces it.",
+      "emits": [
+        "consult.documented"
+      ],
+      "fields": [
+        {
+          "link_id": "history",
+          "options": null,
+          "required": false,
+          "text": "History",
+          "type": "text"
+        },
+        {
+          "link_id": "assessment",
+          "options": null,
+          "required": true,
+          "text": "Assessment",
+          "type": "text"
+        },
+        {
+          "link_id": "diagnosis",
+          "options": null,
+          "required": false,
+          "text": "Diagnosis",
+          "type": "group"
+        },
+        {
+          "link_id": "condition",
+          "options": null,
+          "required": true,
+          "text": "Condition",
+          "type": "choice"
+        },
+        {
+          "link_id": "clinical_status",
+          "options": null,
+          "required": true,
+          "text": "Clinical status",
+          "type": "choice"
+        },
+        {
+          "link_id": "verification_status",
+          "options": null,
+          "required": true,
+          "text": "How sure",
+          "type": "choice"
+        },
+        {
+          "link_id": "onset",
+          "options": null,
+          "required": false,
+          "text": "Since",
+          "type": "date"
+        },
+        {
+          "link_id": "plan",
+          "options": null,
+          "required": false,
+          "text": "Plan",
+          "type": "text"
+        }
+      ],
+      "id": "phc.op.followup",
+      "input": "phc.schema.followup-v1",
+      "instrument": "scribe",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "registered"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "Follow up",
+      "station": "doctor",
+      "summary": "A return visit about something already recorded.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Follow up visit",
+      "tool": "propose_followup",
       "type": "operation",
       "verified": "unverified",
       "writes": [
@@ -1186,6 +1345,104 @@
         "observation",
         "diagnostic_report",
         "specimen"
+      ]
+    },
+    "phc.op.ncd-review": {
+      "capability": "encounter.document",
+      "description": "A review of a condition somebody is already being treated for. It asks\nthe same five things the general consultation asks, and it will not\ncommit without what you found on examination, because a review whose\nmeasurements are missing is a visit nobody can compare the next one to.\n\nNEEDS SIGN-OFF. That the examination is required here, rather than\noptional as it is on the general consultation, is a product choice made\nwithout a clinician. It states no interval, no target and no threshold,\nand it must not be read as a review protocol. A named clinical officer\nhas to confirm it before this template is offered to anybody.",
+      "emits": [
+        "consult.documented"
+      ],
+      "fields": [
+        {
+          "link_id": "history",
+          "options": null,
+          "required": false,
+          "text": "History",
+          "type": "text"
+        },
+        {
+          "link_id": "examination",
+          "options": null,
+          "required": true,
+          "text": "Examination",
+          "type": "text"
+        },
+        {
+          "link_id": "assessment",
+          "options": null,
+          "required": true,
+          "text": "Assessment",
+          "type": "text"
+        },
+        {
+          "link_id": "diagnosis",
+          "options": null,
+          "required": false,
+          "text": "Diagnosis",
+          "type": "group"
+        },
+        {
+          "link_id": "condition",
+          "options": null,
+          "required": true,
+          "text": "Condition",
+          "type": "choice"
+        },
+        {
+          "link_id": "clinical_status",
+          "options": null,
+          "required": true,
+          "text": "Clinical status",
+          "type": "choice"
+        },
+        {
+          "link_id": "verification_status",
+          "options": null,
+          "required": true,
+          "text": "How sure",
+          "type": "choice"
+        },
+        {
+          "link_id": "onset",
+          "options": null,
+          "required": false,
+          "text": "Since",
+          "type": "date"
+        },
+        {
+          "link_id": "plan",
+          "options": null,
+          "required": false,
+          "text": "Plan",
+          "type": "text"
+        }
+      ],
+      "id": "phc.op.ncd-review",
+      "input": "phc.schema.ncd-review-v1",
+      "instrument": "scribe",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "registered"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "NCD review",
+      "station": "doctor",
+      "summary": "A review visit for a condition already being treated.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Review a long term condition",
+      "tool": "propose_ncd_review",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "encounter",
+        "notes",
+        "condition"
       ]
     },
     "phc.op.patient-register": {
@@ -1529,6 +1786,9 @@
     "doctor": {
       "choose": [
         "phc.op.consult-document",
+        "phc.op.ncd-review",
+        "phc.op.antenatal-visit",
+        "phc.op.followup",
         "phc.op.rx-prescribe"
       ],
       "default": "phc.op.consult-document"
@@ -1950,6 +2210,9 @@
           "done_when": "consult.documented",
           "operations": [
             "phc.op.consult-document",
+            "phc.op.ncd-review",
+            "phc.op.antenatal-visit",
+            "phc.op.followup",
             "phc.op.rx-prescribe",
             "phc.op.lab-order",
             "phc.op.capture-withdraw",

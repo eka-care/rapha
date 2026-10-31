@@ -247,7 +247,7 @@ def test_an_utterance_proposes_and_the_card_carries_what_the_thread_must_draw():
     # per field, and only for fields that ended up in the payload.
     assert card["confidence"] == {"systolic": 0.82, "pulse": 0.91}
     assert card["verdict"] == {"allowed": True, "reason": "proposed", "next": ""}
-    assert card["order"] == "the kernel lists it 1 of 4 at nurse", \
+    assert card["order"] == "the kernel lists it 1 of 7 at nurse", \
         "ordering is read from kernel actions(), never decided by the agent"
     assert card["offered_here"] is True
 
@@ -634,8 +634,16 @@ def test_a_session_id_nobody_started_is_a_404_that_says_so():
 def test_templates_are_the_stations_and_the_callers():
     body = client.get("/api/scribe/templates?station=doctor&role=mo").json()
     assert body["default"] == "phc.op.consult-document"
+    # The doctor's five: the general consultation, the three templates that
+    # narrow it, and the prescription. Order is the bundle's own, and the
+    # three templates are generated from one `templates` declaration rather
+    # than written here or anywhere else.
     assert [c["operation"] for c in body["choose"]] == \
-        ["phc.op.consult-document", "phc.op.rx-prescribe"]
+        ["phc.op.consult-document", "phc.op.ncd-review",
+         "phc.op.antenatal-visit", "phc.op.followup", "phc.op.rx-prescribe"]
+    assert [c["title"] for c in body["choose"]][1:4] == \
+        ["Review a long term condition", "Antenatal visit", "Follow up visit"], \
+        "a template's title is the declaration's, not a renderer's"
     assert "hi" in body["languages"] and "ta" in body["languages"]
     nurse_as_pharmacist = client.get("/api/scribe/templates?station=nurse&role=pharmacist").json()
     assert nurse_as_pharmacist["choose"] == [], "no capability, no template"

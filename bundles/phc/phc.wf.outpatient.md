@@ -14,7 +14,9 @@ steps:
     operations: [phc.op.vitals-record]
   - station: doctor
     done_when: consult.documented
-    operations: [phc.op.consult-document, phc.op.rx-prescribe, phc.op.lab-order,
+    operations: [phc.op.consult-document, phc.op.ncd-review,
+                 phc.op.antenatal-visit, phc.op.followup,
+                 phc.op.rx-prescribe, phc.op.lab-order,
                  phc.op.capture-withdraw, phc.op.handover, phc.op.handover-reply]
   - station: lab
     done_when: lab.resulted

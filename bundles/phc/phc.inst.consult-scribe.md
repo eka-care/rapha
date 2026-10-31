@@ -4,7 +4,9 @@ type: instrument
 kind: scribe
 title: Scribe
 summary: Transcribes a recording into the station's template.
-operations: [phc.op.patient-register, phc.op.vitals-record, phc.op.consult-document, phc.op.rx-prescribe, phc.op.household-visit]
+operations: [phc.op.patient-register, phc.op.vitals-record, phc.op.consult-document,
+             phc.op.ncd-review, phc.op.antenatal-visit, phc.op.followup,
+             phc.op.rx-prescribe, phc.op.household-visit]
 requires: capture.consented
 readback: required
 commit: tap
