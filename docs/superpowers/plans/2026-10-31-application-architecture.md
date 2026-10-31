@@ -1048,6 +1048,26 @@ proved.
       Where a row goes is now the bundle's declaration, not a caller's
       choice. See section 12 entries 17 and 18 for the two contradictions this
       found.
+- [x] **The doctor's templates.** Done 2026-10-31. An NCD review, an
+      antenatal visit and a follow up, declared under `templates` in
+      `bundles/phc/bundle.yaml` and GENERATED into an operation atom and a
+      questionnaire by `kernel/templates.py`. A template declares one
+      operation it narrows and the ordered subset of that form's questions it
+      asks, and nothing else: no condition, no medicine, no value set, no
+      interval, no schedule, no threshold. Check:
+      `scripts/check_templates.py` 25, offline. Mutations: 26 of 27 caught,
+      the miss being a check that cannot notice its own removal from the gate.
+      What this does NOT deliver is three clinically useful forms. The
+      antenatal template **codes nothing**: `terminology/condition-code.json`
+      holds three concepts, says it is not a diagnosis list, and not one of
+      them is obstetric, so that visit travels entirely as narrative into a
+      DocumentReference and is not a coded record until a published obstetric
+      list is signed off. The other two narrowings are product choices made
+      without a clinician and each carries a NEEDS SIGN-OFF sentence on the
+      atom a clinician reads, the way the two seeded value sets carry theirs.
+      Which questions a visit type should ask is the open decision, and the
+      declaration is the one line that changes when it is made.
+      See section 12 entries 19 to 22 for the four contradictions this found.
 - [ ] **A client that sends `X-PHC-Actor`.** The seam separates the account
       from the staff member and nothing exercises it, so the actor collapses to
       the account in the browser today. A staff switcher on a shared device is
@@ -1376,6 +1396,72 @@ ABDM is not ours to decide. Two documents per visit is what the published
 profiles permit today. If it should be one, somebody has to get the
 PhysicalExamination slice's own fixed code out of the StructureDefinition, and
 the route in is the docs server or the packaged guide `ndhm.in#6.5.0`.
+
+**19. "A template is an operation" was written down and cost a hand written
+form every time.** That sentence is `bundles/phc/bundle.yaml`'s own, on the
+`scribe` key, and it was true in the sense that mattered least. Every
+operation carried its own questionnaire, its own mapping and its own back
+pointer from the form to the atom, all maintained by hand, so a fourth way to
+document a consultation meant a fourth copy of five questions, four bindings
+and three mapping records to keep in step with every value set. The sentence
+described a cost rather than a mechanism.
+
+Fixed rather than reported. A `templates` declaration names one operation and
+the ordered subset of its questions a visit type asks, and
+`kernel/templates.py` generates the atom and the form from the base's own
+question objects and mapping sources. `drift()` holds what is on disk against
+the declaration, so a hand edit to a generated atom fails the gate.
+
+**20. Three templates over ONE operation cannot be offered, and the directory
+that would have to change is out of scope by instruction.**
+`web/src/scribe/ScribeBar.tsx` keys its Template dropdown on `c.operation`
+and `GET /scribe/templates` returns `{operation, title}` pairs. Three
+templates that were views onto `phc.op.consult-document` would be three
+options carrying the same value, and the picker would select the wrong one.
+Section 13 of this document puts everything under `web/src/scribe/` out of
+scope by instruction.
+
+So a template here is a distinct operation with its own generated form, not a
+view onto a shared one, and that was decided by a constraint rather than
+chosen. It is the better answer for two other reasons, both of which turned
+out to matter more: the narrowing is a real questionnaire, so the tick cannot
+be weakened by a hidden field, and the ordinary validator refuses an answer
+to a question the form does not ask. A renderer that merely hid a field would
+have left the value in the payload. But if the picker is ever keyed on a
+template id instead, revisit this: the cost of the present shape is entries
+21 and 22.
+
+**21. Narrowing a form for a clinician adds three tools to a machine
+surface, and SS4 gives no way to say otherwise.** `catalogue/build.py` fails
+any atom whose `surfaces` is not exactly `[rendered, mcp]`, citing v0.1 SS4:
+invocable identically from both surfaces, or it does not ship. A template is
+an operation, so the Go MCP server went from 13 tools to 16 and an agent's
+list now carries `propose_ncd_review`, `propose_antenatal_visit` and
+`propose_followup` beside `propose_consult_document`. Each one proposes, each
+one is guarded, and none of them is wrong. But what a clinician chose was a
+heading on a form, and SS4 has no vocabulary for "the same work under a
+different heading". Reported rather than worked around: narrowing `surfaces`
+on a template would be the first exception to SS4, and whether SS4 should
+have one is the owner's call, not a generator's.
+
+**22. The quick action row counts a template as another thing to do.**
+`kernel/state.actions()` lists every visible operation across stations, so
+the doctor's set at a nurse's thread went from four to seven. Three of the
+seven are alternatives to one job rather than three jobs, and nothing in a
+workflow step can say so. The ordering saves it today: the step lists
+`phc.op.consult-document` first, so the primary action is unchanged and the
+three templates sort into overflow. That is a property of the order somebody
+wrote, not a rule, and a bundle that listed a template first would make
+"Antenatal visit" the headline advice at every visit. A fifth template makes
+this worse and there is no cap that knows the difference.
+
+**And one hole the mutations found, in the gate rather than in this
+module.** Deleting the line that runs a check from `scripts/check.sh` left
+the gate green with 549 oks, and nothing anywhere said a check had gone
+missing. It was true of all ten check scripts. One assertion in
+`scripts/check_templates.py` now refuses a `scripts/check_*.py` that the gate
+does not name. It cannot cover the file holding it, because an assertion
+cannot notice that it was not run, and that limit is recorded where it lives.
 
 **And one bug, fixed here rather than reported.** `Store.audit` is documented
 as oldest first and could not deliver it. `AuditRecord.at` is ISO 8601 to the
