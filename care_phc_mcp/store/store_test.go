@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"github.com/eka-care/care_phc_mcp/pyval"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -226,8 +227,14 @@ func TestTheAuditTrailIsInsertionOrderWithinOneSecond(t *testing.T) {
 	if !reflect.DeepEqual(order, []string{"denied: first", "allowed", "proposed"}) {
 		t.Fatalf("the trail reordered itself: %v", order)
 	}
-	if trail[0].Payload["systolic"] != float64(140) {
-		t.Fatalf("the payload did not round-trip: %v", trail[0].Payload)
+	// json.Number("140") and not float64(140). A payload read back out of
+	// its TEXT column keeps the spelling it was written with, because a
+	// decimal answer and a whole one are different clinical values on the
+	// wire: the Python writes 37.0 and narrowing every number to float64 made
+	// Go write 37. Asserted as the SPELLING, so the round-trip is about the
+	// digits and not only about the magnitude.
+	if got := pyval.Str(trail[0].Payload["systolic"]); got != "140" {
+		t.Fatalf("the payload did not round-trip: %q in %v", got, trail[0].Payload)
 	}
 }
 
@@ -257,7 +264,9 @@ func TestAProposalIsReplacedByIDAndRoundTrips(t *testing.T) {
 	if len(found) != 1 {
 		t.Fatalf("%d proposals, want 1", len(found))
 	}
-	if found[0].Status != "confirmed" || found[0].FinalPayload["systolic"] != float64(138) {
+	// Spelled, not just equal: see the audit trail's own note above.
+	if found[0].Status != "confirmed" ||
+		pyval.Str(found[0].FinalPayload["systolic"]) != "138" {
 		t.Fatalf("the replacement did not land: %+v", found[0])
 	}
 	if !reflect.DeepEqual(found[0].FlagsRaised, []string{"vitals.flagged"}) {

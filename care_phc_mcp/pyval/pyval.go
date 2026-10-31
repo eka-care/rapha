@@ -210,6 +210,38 @@ func FloatStr(f float64) string {
 	return s
 }
 
+// Float is a float64 that marshals to JSON the way Python's json.dumps writes
+// a float, which means a whole number keeps its ".0".
+//
+// For a field the Python computes as a float even when the value happens to be
+// whole. A metric's value is one: kernel/views.py computes round(value, 2),
+// which is a float for a plain count as much as for a percentage, so the
+// Python writes 24.0 where Go's encoding/json writes float64(24) as 24. Same
+// number, different bytes, and the bytes are what a renderer reads and what
+// the differential check compares.
+//
+// Found by mutation rather than by reading: scripts/check_go_parity.py used to
+// compare two DECODED bodies, and Python's own == says 24 == 24.0, so the two
+// engines disagreed on the wire and agreed in the check. That check now marks
+// a float as one.
+type Float float64
+
+// MarshalJSON writes the Python spelling. The three non-finite values are
+// json.dumps's own words for them, which is what the Python would put on the
+// wire; no declaration or computed metric in this repository reaches one.
+func (f Float) MarshalJSON() ([]byte, error) {
+	value := float64(f)
+	switch {
+	case math.IsInf(value, 1):
+		return []byte("Infinity"), nil
+	case math.IsInf(value, -1):
+		return []byte("-Infinity"), nil
+	case math.IsNaN(value):
+		return []byte("NaN"), nil
+	}
+	return []byte(FloatStr(value)), nil
+}
+
 // AsFloat is Python's float(value): a number, a numeric string or a bool.
 func AsFloat(v any) (float64, bool) {
 	switch t := v.(type) {
