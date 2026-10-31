@@ -418,7 +418,16 @@ ok("and an unexpected failure is recorded by type alone, so a response body "
 # ==========================================================================
 
 def consulted():
-    """A real store, a real registered patient, a real documented visit."""
+    """A real store, a real registered patient, a real documented visit.
+
+    Written AT NOW, like everything else in this file. It used to be written
+    at the real clock while every queue row below was written at NOW, and
+    `Store.audit` orders by `at` with rowid only as the tiebreak. So the
+    assertions that a denial is the LAST thing on the trail held only while
+    the wall clock was behind 2026-10-31T10:00:00+00:00, and from that instant
+    onwards this check failed on every machine, permanently and for a reason
+    that had nothing to do with queues. One instant, no clock.
+    """
     store = SqliteStore(":memory:")
     thread = store.open_thread(token="A01", actor=A_DOCTOR)
     assert proposals.commit(
@@ -426,12 +435,12 @@ def consulted():
         payload={"name": "Sunita Devi", "age": 34, "sex": "female",
                  "phone": "9876500000", "village": "Yadiki",
                  "category": "general"},
-        caps=NURSE | MO, actor=A_DOCTOR)
+        caps=NURSE | MO, actor=A_DOCTOR, at=NOW)
     assert proposals.commit(
         store, BUNDLE, "phc.op.consult-document", thread=thread,
         payload={"history": "cough for three days", "examination": "chest clear",
                  "assessment": "viral illness", "plan": "fluids and rest"},
-        caps=MO, actor=A_DOCTOR)
+        caps=MO, actor=A_DOCTOR, at=NOW)
     return store, thread
 
 
