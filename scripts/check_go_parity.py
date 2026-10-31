@@ -29,6 +29,7 @@ cmd/api/main.go).
 """
 from __future__ import annotations
 
+import base64
 import datetime
 import functools
 import json
@@ -1817,6 +1818,646 @@ def fill_parity(tmp):
 
 
 # --------------------------------------------------------------------------
+# the record projection: rows in, an ABDM document out
+# --------------------------------------------------------------------------
+#
+# WHY THIS IS NOT COMPARED OVER A SOCKET LIKE EVERYTHING ABOVE IT
+# ---------------------------------------------------------------
+# A document is not something a clinic asks for over the wire. It is what the
+# outbox sends to ABDM, so api/main.py serves no route that returns one and
+# there is nothing for e2e.py or check_live.py to compare. No route may be
+# invented so that a check can reach behind the service, which leaves the
+# shape fill_parity above already uses: a Go test that asserts nothing, fed
+# inputs from here and read back for the diff.
+#
+# WHERE THE ROWS COME FROM, AND WHY THEY ARE NOT TYPED HERE
+# ---------------------------------------------------------
+# A row is an INPUT, so this file may hold one; but a row typed here would be
+# a row no operation writes, and the thing worth comparing is what the
+# DECLARATIONS produce. So every row below is made by running the real
+# kernel/mapping.py over a payload generated from the questionnaire, with the
+# adapter's own _text() doing the TEXT coercion every column gets. A form that
+# grows a question grows these rows, and a mapping that changes changes them.
+#
+# Two actors, because the author on every row is the half of this slice that a
+# single-author document cannot see: `document()` collects the distinct
+# authors it met and the Composition names them, so a projection that dropped
+# `created_by` would publish a document with one author or none and still look
+# right.
+PROJECTION_ACTORS = ("user:ravi", "user:nurse")
+# A thread the stub store below answers for. Not a real id: the store is the
+# case file's own rows, so this is the name the two engines ask under.
+A_THREAD = "enc-parity"
+PROJECTION_NOW = "2026-10-31T10:05:00+00:00"
+
+
+class RowsOnly:
+    """The store seam `fhir.document()` reads, over rows from the case file.
+
+    Row ORDER is the real store's (`ORDER BY created_date, id`) and is NOT
+    re-implemented: the case file lists rows already in that order, so order
+    is an input to this comparison rather than something it compares. What is
+    implemented is the `where` grammar's equality and present forms, which is
+    the whole of what a section query uses today, and fhir/parity_test.go
+    implements the same two.
+
+    This pair is the one place the harness could agree with itself while both
+    engines were wrong. A `document()` that dropped its `where` instead of
+    passing it through would still show up, because only one engine would
+    drop it.
+    """
+
+    def __init__(self, tables):
+        self.tables = tables
+
+    def select(self, resource, *, thread, where, fields, limit=50):
+        out = []
+        for row in self.tables.get(resource) or []:
+            keep = True
+            for field, cond in (where or {}).items():
+                if cond == "*":
+                    keep = keep and bool(row.get(field))
+                else:
+                    keep = keep and row.get(field) == cond
+            if not keep:
+                continue
+            out.append(row)
+            if len(out) >= limit:
+                break
+        return out
+
+
+def _two_rows_per_group(slug, payload):
+    """The same payload with two rows in every repeating group it answers.
+
+    `filled` answers a group once, which is one row, and one row proves no
+    fan-out: a record that read only the first row, or that borrowed the row
+    above it, would pass. The second row carries a DIFFERENT concept wherever
+    the group binds an answer, so a projection that borrowed would publish the
+    same code twice.
+    """
+    out = dict(payload)
+    for question in validate_walk(schema(slug)["questions"]):
+        if question.get("type") != "group" or not question.get("repeats"):
+            continue
+        rows = out.get(question["link_id"])
+        if not rows:
+            continue
+        second = dict(rows[0])
+        for sub in question.get("questions") or []:
+            slugged = sub.get("answer_value_set")
+            if not slugged or sub["link_id"] not in second:
+                continue
+            others = [c for c in sorted(vocab(slugged)["concepts"])
+                      if c != second[sub["link_id"]]]
+            if others:
+                second[sub["link_id"]] = others[0]
+                break
+        out[question["link_id"]] = [rows[0], second]
+    return out
+
+
+def projection_rows():
+    """{table: [row]} as this bundle's own write operations produce them."""
+    from adapters.local.store import _text
+    from kernel import declarations, mapping
+    bundle = declarations.load("phc")
+    tables, made = {}, 0
+    for index, op_id in enumerate(sorted(bundle.manifest.operations)):
+        op = bundle.operations.get(op_id) or {}
+        if op.get("kind") != "write" or not op.get("mapping"):
+            continue
+        payload = _two_rows_per_group(
+            op["input"], filled(op["input"], coder(), every=True))
+        actor = PROJECTION_ACTORS[index % len(PROJECTION_ACTORS)]
+        for resource, row in mapping.records(op, payload, actor=actor):
+            made += 1
+            row = {k: _text(v) for k, v in row.items() if v is not None}
+            row.setdefault("id", "%s-%03d" % (resource, made))
+            row.setdefault("created_date", "2026-10-31T09:%02d:00+00:00" % (made % 60))
+            tables.setdefault(resource, []).append(row)
+    # The encounter and the patient a Composition cannot do without. Taken
+    # from what the operations wrote where they wrote one, and the id forced to
+    # the thread the two engines ask under, which is the adapter's own join
+    # (THREAD_COLUMN: an encounter's thread IS its id).
+    assert "encounter" in tables and "patient" in tables, sorted(tables)
+    tables["encounter"] = [dict(tables["encounter"][0], id=A_THREAD)]
+    tables["patient"] = [tables["patient"][0]]
+    # Every row a section can ask for, and the author on it. Both are
+    # properties rather than comparisons: two engines can agree on a document
+    # neither of them put an author in.
+    authored = {row.get("created_by") for rows in tables.values() for row in rows}
+    assert PROJECTION_ACTORS[0] in authored and PROJECTION_ACTORS[1] in authored, (
+        "every row was written by one actor, so the Composition names one "
+        "author and a projection that dropped created_by would pass: %s"
+        % sorted(a for a in authored if a))
+    return tables
+
+
+def projection_cases():
+    """The documents and the single projections both engines are asked for."""
+    from kernel import declarations, fhir
+    bundle = declarations.load("phc")
+    tables = projection_rows()
+    cases = {"rows": {"full": tables}, "documents": [], "projections": [],
+             "patients": tables["patient"], "encounters": [], "practitioners": [],
+             "numbers": [], "urns": []}
+
+    # --- the declared document, as the bundle declares it. The placement is
+    # read off the loaded bundle rather than typed, which is the whole reason
+    # `documents` is a declaration: three callers used to type their own and
+    # two of them disagreed about where a diagnosis goes.
+    assert bundle.documents, "this bundle declares no document to publish"
+    for did, declared in sorted(bundle.documents.items()):
+        cases["documents"].append({
+            "case": "full", "thread": A_THREAD, "profile": declared["profile"],
+            "now": PROJECTION_NOW, "identifier_system": "",
+            "what": "the declared document %r" % did,
+            "sections": [{"slice": name,
+                          "queries": [{"resource": resource, "where": dict(where or {})}
+                                      for resource, where in queries]}
+                         for name, queries in declared["sections_wanted"].items()]})
+
+    # --- every other slice this build CAN fill, one document per profile, so
+    # that a section code read off NRCeS's own example is compared rather than
+    # only the three the bundle happens to use. The resource for each is the
+    # one the rows above hold, which is what makes this an input and not a
+    # placement decision: nothing here says a diagnosis belongs in a heading.
+    for profile in sorted(fhir.PROFILES):
+        for slice_name in sorted(fhir.sections(profile)):
+            for resource in sorted(set(tables) & set(fhir.PROJECTIONS)):
+                cases["documents"].append({
+                    "case": "full", "thread": A_THREAD, "profile": profile,
+                    "now": PROJECTION_NOW, "identifier_system": "http://phc.local",
+                    "what": "%s/%s carrying %s rows" % (profile, slice_name, resource),
+                    "sections": [{"slice": slice_name,
+                                  "queries": [{"resource": resource, "where": {}}]}]})
+
+    # --- the five refusals and the one skip, each an input rather than an
+    # expectation: what the two engines SAY is the thing compared.
+    cases["rows"]["no-subject"] = {"encounter": tables["encounter"],
+                                   "notes": tables.get("notes") or []}
+    # A store that answers no encounter at all, which is the state "no such
+    # thread" is the sentence for. Reached this way rather than by asking
+    # under an unknown thread id, because the THREAD JOIN is the adapter's own
+    # (an encounter joins on its id, a patient on the encounter's `patient`
+    # column) and RowsOnly deliberately does not re-implement it: the join is
+    # compared over two REAL stores by write_path's walk, and a second
+    # implementation here could agree with the Go stub while both were wrong.
+    cases["rows"]["no-thread"] = {}
+    cases["rows"]["empty-note"] = {
+        "encounter": tables["encounter"], "patient": tables["patient"],
+        "notes": [dict((tables.get("notes") or [{}])[0], id="note-blank", text="   ")]}
+    cases["rows"]["nothing"] = {"encounter": tables["encounter"],
+                                "patient": tables["patient"]}
+    a_filled, an_empty = _a_where(tables)
+    for one in (
+        {"case": "full", "thread": A_THREAD, "profile": "OPConsultRecord",
+         "sections": [{"slice": "NotASliceNRCeSDeclares",
+                       "queries": [{"resource": "notes", "where": {}}]}],
+         "what": "a section slice the profile does not declare"},
+        {"case": "no-thread", "thread": "no-such-thread", "profile": "OPConsultRecord",
+         "sections": [{"slice": "DocumentReference",
+                       "queries": [{"resource": "notes", "where": {}}]}],
+         "what": "a thread the store has never heard of"},
+        {"case": "no-subject", "thread": A_THREAD, "profile": "OPConsultRecord",
+         "sections": [{"slice": "DocumentReference",
+                       "queries": [{"resource": "notes", "where": {}}]}],
+         "what": "a visit with no person on it"},
+        {"case": "nothing", "thread": A_THREAD, "profile": "OPConsultRecord",
+         "sections": [{"slice": "DocumentReference",
+                       "queries": [{"resource": "notes", "where": {}}]}],
+         "what": "a thread with nothing to put in any section"},
+        {"case": "full", "thread": A_THREAD, "profile": "OPConsultRecord",
+         "sections": [{"slice": "InvestigationAdvice",
+                       "queries": [{"resource": "service_request", "where": {}}]}],
+         "what": "a resource with no FHIR projection"},
+        {"case": "empty-note", "thread": A_THREAD, "profile": "OPConsultRecord",
+         "sections": [{"slice": "DocumentReference",
+                       "queries": [{"resource": "notes", "where": {}}]}],
+         "what": "a narrative row with nothing in it"},
+        {"case": "full", "thread": A_THREAD, "profile": "WellnessRecord",
+         "sections": [{"slice": "VitalSigns",
+                       "queries": [{"resource": "observation", "where": a_filled}]},
+                      {"slice": "OtherObservations",
+                       "queries": [{"resource": "observation", "where": an_empty}]}],
+         "what": "two sections, one narrowed by a where that matches and one "
+                 "by a where that matches nothing"},
+    ):
+        cases["documents"].append(dict(one, now=PROJECTION_NOW,
+                                       identifier_system=""))
+    assert "service_request" not in fhir.PROJECTIONS, \
+        "pick a resource with no projection"
+
+    # --- the single projections, every row through its own, so that a
+    # difference in one resource is read as that resource rather than as a
+    # whole document.
+    for resource in sorted(set(tables) & set(fhir.PROJECTIONS)):
+        for row in tables[resource]:
+            cases["projections"].append({
+                "resource": resource, "row": row, "subject": "urn:uuid:p",
+                "encounter": "urn:uuid:e", "performer": "urn:uuid:n",
+                "document_type": None})
+            cases["projections"].append({
+                "resource": resource, "row": row, "subject": "urn:uuid:p",
+                "encounter": "urn:uuid:e", "performer": "",
+                "document_type": {"code": "371530004",
+                                  "text": "Clinical consultation report"}})
+    # A narrative row with nothing in it, which is the one projection that
+    # DECLINES a row rather than making a resource or refusing: an empty
+    # attachment under a heading claiming there is a note is worse than no
+    # section at all. Three spellings of nothing, because `text.strip()` is
+    # what separates them from a note.
+    for blank in ("", "   ", "\n\t "):
+        cases["projections"].append({
+            "resource": "notes", "row": {"id": "note-blank", "text": blank},
+            "subject": "urn:uuid:p", "encounter": "urn:uuid:e",
+            "performer": "urn:uuid:n", "document_type": None})
+    # And an observation carrying a certainty R4 has nowhere to put, which is
+    # the refusal that keeps a denied finding from being published as a fact.
+    for column in ("verification_status", "clinical_status"):
+        cases["projections"].append({
+            "resource": "observation",
+            "row": {"id": "obs-doubted", "status": "final", column: "refuted",
+                    "value": "1"},
+            "subject": "urn:uuid:p", "encounter": "urn:uuid:e",
+            "performer": "", "document_type": None})
+    # An observation with no status at all: refused, never given one.
+    cases["projections"].append({
+        "resource": "observation", "row": {"id": "obs-unsettled", "value": "1"},
+        "subject": "urn:uuid:p", "encounter": "urn:uuid:e", "performer": "",
+        "document_type": None})
+
+    cases["encounters"] = [{"row": tables["encounter"][0], "subject": "urn:uuid:p"},
+                           {"row": dict(tables["encounter"][0], status="completed"),
+                            "subject": "urn:uuid:p"},
+                           {"row": {"id": "enc-bare"}, "subject": "urn:uuid:p"}]
+    cases["practitioners"] = sorted(
+        {row["created_by"] for rows in tables.values() for row in rows
+         if row.get("created_by")})
+    # Every value a column of these rows actually holds, so the TEXT to decimal
+    # cast is compared over what the declarations produce rather than over
+    # numbers somebody chose. Plus the four spellings that are not numbers.
+    cases["numbers"] = sorted(
+        {row[column] for rows in tables.values() for row in rows
+         for column in row if isinstance(row[column], str)}) \
+        + ["", " 140 ", "1_0", "not a number", "140.0", "-0"]
+    cases["urns"] = sorted({row["id"] for rows in tables.values() for row in rows})
+    # How many rows of each table the store holds, so that a property below
+    # can say "one resource per row" rather than "some resources".
+    cases["counts"] = {resource: len(rows) for resource, rows in tables.items()}
+    return cases
+
+
+def _a_where(tables):
+    """(a where that matches an observation row, one that matches none).
+
+    Read off the rows rather than typed, so the narrowing is a fact about what
+    the operations wrote. `category` because it is the one column a section
+    query in this tree narrows on.
+    """
+    categories = {row.get("category") for row in tables.get("observation") or []}
+    categories.discard(None)
+    assert categories, "no observation row carries a category to narrow on"
+    return {"category": sorted(categories)[0]}, {"category": "no-such-category"}
+
+
+def python_projection(cases):
+    from kernel import fhir
+    out = {"documents": [], "projections": [], "patients": [], "encounters": [],
+           "practitioners": [], "numbers": [], "urns": []}
+    for one in cases["documents"]:
+        wanted = {}
+        for section in one["sections"]:
+            wanted[section["slice"]] = [(q["resource"], dict(q["where"] or {}))
+                                        for q in section["queries"]]
+        try:
+            made = fhir.document(
+                RowsOnly(cases["rows"][one["case"]]), one["thread"],
+                profile=one["profile"], sections_wanted=wanted, now=one["now"],
+                **({"identifier_system": one["identifier_system"]}
+                   if one["identifier_system"] else {}))
+        except KeyError as exc:
+            out["documents"].append({"ok": False, "resource": None,
+                                     "refused": exc.args[0]})
+        else:
+            out["documents"].append({"ok": True, "resource": made, "refused": ""})
+    for one in cases["projections"]:
+        project = fhir.PROJECTIONS[one["resource"]]
+        extra = {"document_type": one["document_type"]} \
+            if one["resource"] in fhir.TYPED_BY_PROFILE else {}
+        try:
+            made = project(one["row"], subject=one["subject"],
+                           encounter=one["encounter"],
+                           performer=one["performer"] or None, **extra)
+        except KeyError as exc:
+            out["projections"].append({"ok": False, "resource": None,
+                                       "refused": exc.args[0]})
+        else:
+            out["projections"].append({"ok": True, "resource": made, "refused": ""})
+    out["patients"] = [fhir.patient(row) for row in cases["patients"]]
+    out["encounters"] = [fhir.encounter(one["row"], subject=one["subject"])
+                         for one in cases["encounters"]]
+    out["practitioners"] = [fhir.practitioner(a) for a in cases["practitioners"]]
+    out["numbers"] = [fhir._number(v) for v in cases["numbers"]]
+    out["urns"] = [fhir._urn(s) for s in cases["urns"]]
+    out["tables"] = python_projection_tables()
+    # Round tripped through JSON, because that is what the Go answer arrives
+    # as and a tuple would compare unequal for the wrong reason.
+    return json.loads(json.dumps(out))
+
+
+def python_projection_tables():
+    """Every declaration kernel/fhir.py holds, flattened the way the Go test
+    flattens its own, so that the two tables can be diffed."""
+    from kernel import fhir
+    return {
+        "profiles": {name: {
+            "profile": spec["profile"], "title": spec["title"],
+            "type": {"code": spec["type"]["code"] or "",
+                     "text": spec["type"]["text"]},
+            "required": list(spec["required"]),
+            "sections": {slice_name: {"title": section["title"],
+                                      "code": section["code"] or "",
+                                      "display": section.get("display") or ""}
+                         for slice_name, section in spec["sections"].items()}}
+            for name, spec in fhir.PROFILES.items()},
+        "document_bundle": fhir.DOCUMENT_BUNDLE,
+        "resource_type": dict(fhir.RESOURCE_TYPE),
+        "status_binding": {"%s.%s" % key: value
+                           for key, value in fhir.STATUS_BINDING.items()},
+        "translated_status": sorted("%s.%s" % key for key in fhir.TRANSLATED_STATUS),
+        "coded_status": {"%s.%s" % key: value
+                         for key, value in fhir.CODED_STATUS.items()},
+        "projections": sorted(fhir.PROJECTIONS),
+        "typed_by_profile": sorted(fhir.TYPED_BY_PROFILE),
+        "narrative": {"type": fhir.NARRATIVE_TYPE,
+                      "language": fhir.NARRATIVE_LANGUAGE},
+        "systems": {"nrces": fhir.NRCES, "loinc": fhir.LOINC, "ucum": fhir.UCUM,
+                    "snomed": fhir.SNOMED, "hl7_category": fhir.HL7_CATEGORY},
+    }
+
+
+def go_projection(cases, tmp):
+    cases_at = os.path.join(tmp, "fhir-cases.json")
+    answers_at = os.path.join(tmp, "fhir-answers.json")
+    with open(cases_at, "w") as f:
+        json.dump(cases, f)
+    done = subprocess.run(
+        ["go", "test", "./fhir/", "-run", "TestTheProjectionAnswersForTheParityCheck",
+         "-count=1"],
+        cwd=str(backend.GO_MODULE), capture_output=True, text=True,
+        env=dict(os.environ, PHC_FHIR_CASES=cases_at, PHC_FHIR_ANSWERS=answers_at))
+    if done.returncode != 0 or not os.path.exists(answers_at):
+        raise SystemExit("\nthe Go engine could not answer the projection cases:"
+                         "\n\n%s%s\n" % (done.stdout[-4000:], done.stderr[-2000:]))
+    with open(answers_at) as f:
+        return json.load(f)
+
+
+def projection_parity(tmp):
+    cases = projection_cases()
+    py = python_projection(cases)
+    gone = go_projection(cases, tmp)
+
+    # --- the declaration tables first. A difference here explains every
+    # difference below it, and a section code that drifted is a record filed
+    # under the wrong heading, which reads as correct everywhere it is read.
+    for key in sorted(py["tables"]):
+        assert py["tables"][key] == gone["tables"].get(key), (
+            "the two engines declare %s differently\npython: %s\ngo:     %s"
+            % (key, json.dumps(py["tables"][key], sort_keys=True),
+               json.dumps(gone["tables"].get(key), sort_keys=True)))
+    coded = sum(1 for spec in py["tables"]["profiles"].values()
+                for section in spec["sections"].values() if section["code"])
+    ok("the projection: both engines declare the same %d profiles, %d section "
+       "slices of which %d carry a published code, and the same %d FHIR "
+       "projections"
+       % (len(py["tables"]["profiles"]),
+          sum(len(s["sections"]) for s in py["tables"]["profiles"].values()),
+          coded, len(py["tables"]["projections"])))
+
+    # --- one resource at a time.
+    for one, a, b in zip(cases["projections"], py["projections"], gone["projections"]):
+        assert a == b, ("a %s row projects differently\nrow:    %s\npython: %s\n"
+                        "go:     %s" % (one["resource"],
+                                        json.dumps(one["row"], sort_keys=True),
+                                        json.dumps(a, sort_keys=True),
+                                        json.dumps(b, sort_keys=True)))
+    refused = [a for a in py["projections"] if not a["ok"]]
+    skipped = [a for a in py["projections"] if a["ok"] and a["resource"] is None]
+    # The three outcomes really all happened, or the line above is two engines
+    # agreeing about one of them.
+    assert refused and skipped and len(refused) + len(skipped) < len(py["projections"]), \
+        (len(refused), len(skipped), len(py["projections"]))
+    ok("the projection: %d rows from this bundle's own mappings become the "
+       "same resource in both engines, %d are refused with the same sentence "
+       "and %d are declined as an empty narrative"
+       % (len(py["projections"]), len(refused), len(skipped)))
+
+    # --- the small conversions, which are where a Go rewrite drifts quietly.
+    assert py["patients"] == gone["patients"], (py["patients"], gone["patients"])
+    assert py["encounters"] == gone["encounters"], (py["encounters"], gone["encounters"])
+    assert py["practitioners"] == gone["practitioners"], \
+        (py["practitioners"], gone["practitioners"])
+    assert py["urns"] == gone["urns"], (py["urns"][:3], gone["urns"][:3])
+    assert py["numbers"] == gone["numbers"], \
+        ("\n".join("%r: python %r, go %r" % (v, a, b)
+                   for v, a, b in zip(cases["numbers"], py["numbers"], gone["numbers"])
+                   if a != b))
+    # A stored number really did come back as a JSON number and not a string,
+    # or the cast this compares was never exercised.
+    cast = [v for v, a in zip(cases["numbers"], py["numbers"])
+            if isinstance(a, (int, float)) and not isinstance(a, bool)]
+    assert cast, "no stored column holds a number, so the decimal cast is unproved"
+    # And an actor's identity is hashed, not carried: every Practitioner id is
+    # the same length and none of them holds the login name it was made from.
+    for actor, made in zip(cases["practitioners"], py["practitioners"]):
+        assert actor not in made["id"] and made["name"][0]["text"] == actor, made
+    ok("the projection: %d patients, %d encounters and %d practitioners are "
+       "identical, %d row ids give the same stable urn, and %d of %d stored "
+       "values cast to the same JSON number"
+       % (len(py["patients"]), len(py["encounters"]), len(py["practitioners"]),
+          len(py["urns"]), len(cast), len(cases["numbers"])))
+
+    # --- the whole documents.
+    for one, a, b in zip(cases["documents"], py["documents"], gone["documents"]):
+        assert a == b, ("%s differs between the engines\npython: %s\ngo:     %s"
+                        % (one["what"], json.dumps(a, sort_keys=True)[:3000],
+                           json.dumps(b, sort_keys=True)[:3000]))
+    published = [a for a in py["documents"] if a["ok"]]
+    denied = [a for a in py["documents"] if not a["ok"]]
+    assert published and denied, (len(published), len(denied))
+    # Each refusal says its own thing, or one of them is standing in for
+    # another and a reader is told the wrong reason. With one collision, and
+    # the collision is the point rather than a flaw: a note with nothing in it
+    # is DECLINED, so its section is omitted, so the document has nothing to
+    # publish and the engine says exactly that. Which is the hole the
+    # narrative fallback was built to close, said by the engine rather than
+    # asserted here.
+    by_what = {one["what"]: a["refused"]
+               for one, a in zip(cases["documents"], py["documents"])
+               if not a["ok"]}
+    assert by_what["a narrative row with nothing in it"] \
+        == by_what["a thread with nothing to put in any section"], by_what
+    distinct = {a["refused"] for a in denied}
+    assert len(distinct) == len(by_what) - 1, sorted(distinct)
+    ok("the projection: %d documents are byte identical in both engines and "
+       "%d askings are refused with the same %d distinct sentences"
+       % (len(published), len(denied), len(distinct)))
+
+    # --- and the properties a diff cannot see, because two engines can agree
+    # on a document that is wrong in the same way.
+    declared = [a for one, a in zip(cases["documents"], py["documents"])
+                if one["what"].startswith("the declared document") and a["ok"]]
+    assert declared, "the bundle's own declared document published nothing"
+    for made in declared:
+        bundle = made["resource"]
+        by_type = {}
+        for entry in bundle["entry"]:
+            by_type.setdefault(entry["resource"]["resourceType"], []).append(entry)
+        composition = bundle["entry"][0]["resource"]
+        assert composition["resourceType"] == "Composition", bundle["entry"][0]
+        # Every reference resolves inside the document. A dangling reference is
+        # a document a gateway accepts and a reader cannot read.
+        inside = {entry["fullUrl"] for entry in bundle["entry"]}
+        for found in re.finditer(r'"reference": "([^"]+)"', json.dumps(bundle)):
+            assert found.group(1) in inside, found.group(1)
+        # THE AUTHOR ON EACH. Every row this bundle's mappings wrote carries
+        # its writer, so the Composition names every one it met and not one of
+        # them. Two actors wrote these rows; a projection that dropped
+        # created_by would name none and a document naming one would mean the
+        # author was being read from somewhere other than the row.
+        assert len(composition["author"]) == len(PROJECTION_ACTORS), \
+            composition["author"]
+        named = {entry["resource"]["name"][0]["text"]
+                 for entry in by_type["Practitioner"]}
+        assert named == set(PROJECTION_ACTORS), named
+        # ROWS PER GROUP ROW. The diagnosis and the medicine are repeating
+        # groups, and the second row of each carries a different concept, so a
+        # record that borrowed the row above it would publish one code twice.
+        for resource, kind in (("condition", "Condition"),
+                               ("medication_request", "MedicationRequest"),
+                               ("notes", "DocumentReference")):
+            assert len(by_type.get(kind) or []) == cases["counts"][resource], (
+                "%d %s rows became %d %s resources, so a record read some rows "
+                "and not others" % (cases["counts"][resource], resource,
+                                    len(by_type.get(kind) or []), kind))
+        for kind in ("Condition", "MedicationRequest"):
+            codes = []
+            for entry in by_type.get(kind) or []:
+                concept = entry["resource"].get("code") \
+                    or entry["resource"].get("medicationCodeableConcept") or {}
+                for coding in concept.get("coding") or []:
+                    codes.append(coding["code"])
+            assert len(codes) >= 2 and len(set(codes)) >= 2, (kind, codes)
+            # No code borrowed from the row above it. Every group's second row
+            # carries a DIFFERENT concept from its first, so two adjacent
+            # resources sharing a code would mean a record read the row above
+            # instead of its own.
+            for before, after in zip(codes, codes[1:]):
+                assert before != after, (kind, codes)
+        # And the narrative really is in there, carrying its own words rather
+        # than a heading claiming a note exists.
+        notes = by_type.get("DocumentReference") or []
+        assert notes, "the designed fallback published nothing"
+        for entry in notes:
+            attachment = entry["resource"]["content"][0]["attachment"]
+            assert base64.b64decode(attachment["data"]).decode("utf-8").strip(), \
+                attachment
+    ok("the projection: the document this bundle DECLARES names both authors "
+       "its rows carry, publishes one resource per group row with no code "
+       "borrowed from the row above, carries the narrative's own words, and "
+       "every reference in it resolves inside it")
+
+
+# --------------------------------------------------------------------------
+# the engine's own rule, on the Go side of the port
+# --------------------------------------------------------------------------
+
+def _go_live_code(path):
+    """A Go file's live code: no comments, no string-free trivia.
+
+    The Go half of scripts/engine_code.py, and it exists for the same reason:
+    a comment explaining a rule has to be able to name what breaking it would
+    look like. Comments are removed by scanning rather than by a regexp,
+    because a `//` inside a string literal would otherwise blank out the rest
+    of a live line.
+    """
+    text = path.read_text()
+    out, i, n = [], 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch == "/" and i + 1 < n and text[i + 1] == "/":
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "*":
+            i = text.find("*/", i + 2)
+            i = n if i < 0 else i + 2
+            continue
+        if ch in "\"'`":
+            out.append(ch)
+            i += 1
+            while i < n and text[i] != ch:
+                if ch != "`" and text[i] == "\\":
+                    out.append(text[i])
+                    i += 1
+                    if i < n:
+                        out.append(text[i])
+                        i += 1
+                    continue
+                out.append(text[i])
+                i += 1
+            if i < n:
+                out.append(text[i])
+                i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def go_names_no_clinical_word():
+    """No Go engine file types a diagnosis, a drug, a route or a frequency.
+
+    scripts/check_rx.py and scripts/check_vitals.py hold the PYTHON engine to
+    this, and nothing held the Go to it: the port could have moved the one
+    failure kernel/ARCHITECTURE.md calls the renderer's own, `if code ==
+    "29463-7"`, across the language boundary and no check would have noticed.
+    The words are the value sets' own, read off disk, so a concept added to a
+    value set arrives here without anybody editing this file.
+
+    Test files are excluded, for exactly the reason engine_code.py excludes
+    everything from `def demo(` onward: a demo has to name a concrete code and
+    a concrete unit or it is not a test of anything.
+    """
+    sets = ("condition-code", "medication-code", "medication-route",
+            "medication-frequency", "observation-code")
+    words = set()
+    for slug in sets:
+        for code, concept in vocab(slug)["concepts"].items():
+            words.add(code)
+            if concept.get("display"):
+                words.add(concept["display"])
+            if concept.get("unit"):
+                words.add(concept["unit"])
+    assert len(words) >= 44, len(words)
+    files = sorted(p for p in backend.GO_MODULE.rglob("*.go")
+                   if not p.name.endswith("_test.go"))
+    assert len(files) >= 20, len(files)
+    for path in files:
+        live = _go_live_code(path)
+        assert "func " in live, path
+        typed = sorted(w for w in words
+                       if '"%s"' % w in live or "`%s`" % w in live)
+        assert not typed, "%s types the clinical word(s) %r" % (path, typed)
+    ok("the Go engine: none of %d files types any of %d clinical codes, "
+       "displays or units from %d value sets"
+       % (len(files), len(words), len(sets)))
+
+
+# --------------------------------------------------------------------------
 # the roll forward: a demo day that is not today any more
 # --------------------------------------------------------------------------
 
@@ -1931,6 +2572,11 @@ def main():
         # cheaper to read than one found after three pairs of kernels have
         # been started.
         fill_parity(tmp)
+        # Then the record projection and the Go engine's own rule, for the
+        # same reason: neither opens a socket, and both are read more easily
+        # before three pairs of kernels have been started.
+        projection_parity(tmp)
+        go_names_no_clinical_word()
         # Before the shapes, because it is the one pair of kernels that does
         # not start from a file seeded today, and a difference here is cheaper
         # to read than one found after three pairs have been started.
