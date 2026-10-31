@@ -5,7 +5,9 @@
  *  Three rules, and the reason each exists is a bug this repository actually
  *  shipped:
  *
- *  1. CONTAINMENT. tokens.css is the only file that may name a colour. The
+ *  1. CONTAINMENT. tokens.css is the only file in web/src that may name a
+ *     colour, and that is now checked over the TypeScript too, not only the
+ *     stylesheets. The
  *     Vernier theme replaced the palette but not the components, so ~200 call
  *     sites went on spending names the new file no longer declared and the
  *     compatibility sweep that rescued them flattened every surface to the
@@ -37,16 +39,17 @@ const TOKENS = join(SRC, "style", "tokens.css");
 let checks = 0;
 const ok = (what: string) => { checks++; console.log("ok   " + what); };
 
-function cssFiles(dir: string): string[] {
+function filesUnder(dir: string, ext: string[]): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
     if (name === "node_modules") continue;
     const p = join(dir, name);
-    if (statSync(p).isDirectory()) out.push(...cssFiles(p));
-    else if (name.endsWith(".css")) out.push(p);
+    if (statSync(p).isDirectory()) out.push(...filesUnder(p, ext));
+    else if (ext.some((e) => name.endsWith(e))) out.push(p);
   }
   return out;
 }
+const cssFiles = (dir: string) => filesUnder(dir, [".css"]);
 
 /** Strip comments so a hex inside one is not a violation, and a token
  *  mentioned in prose is not a declaration. */
@@ -67,6 +70,27 @@ const COLOUR = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|color-m
   assert.deepEqual(offenders, [],
     "only style/tokens.css may name a colour; move these into a token:\n  " + offenders.join("\n  "));
   ok("containment: no colour literal outside style/tokens.css");
+}
+
+{
+  // The same rule over the TypeScript, which this check used to ignore
+  // entirely. An inline SVG is the hole it was ignoring: the approved
+  // mockup's lotus carries `fill="#215fff"` five times, and pasting it in
+  // would have put the ABDM blue back into a component where no palette swap
+  // could ever reach it. The mark takes `currentColor` instead and the caller
+  // sets `color` from the token.
+  const offenders: string[] = [];
+  for (const file of filesUnder(SRC, [".ts", ".tsx"])) {
+    if (file.endsWith(".check.ts")) continue;              // a check may quote one
+    readFileSync(file, "utf8").split("\n").forEach((line, i) => {
+      if (/^\s*(\*|\/\/|\/\*)/.test(line)) return;        // prose is not code
+      if (COLOUR.test(line)) offenders.push(`${relative(SRC, file)}:${i + 1}: ${line.trim()}`);
+    });
+  }
+  assert.deepEqual(offenders, [],
+    "a component names a colour; use currentColor or a var() on a token:\n  "
+    + offenders.join("\n  "));
+  ok("containment: no colour literal in any component either");
 }
 
 // ---------------------------------------------------------------- parse tokens

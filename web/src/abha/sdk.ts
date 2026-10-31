@@ -54,6 +54,16 @@ export const ABHA_OP = "phc.op.abha-link";
  *  neither file mentions the other. */
 export const ABHA_PENDING = "abha.pending";
 
+/** The bundle's own word for "this person has a national account". The third
+ *  hard-code in this file and the same kind as the two above: `abha.linked` is
+ *  decided by whether a patient row carries an ABHA number, which is a fact
+ *  about the national identifier and not a facility's judgement, so no bundle
+ *  can declare it differently. The queue draws the lotus beside a name when a
+ *  row carries it. ui.check.ts asserts a workflow still declares this state,
+ *  because a rename would make the lotus silently disappear rather than fail.
+ */
+export const ABHA_LINKED = "abha.linked";
+
 /** GET /abha/config. The server names the environment; the browser does not
  *  choose it and no credential is in here. */
 export type AbhaConfig = {

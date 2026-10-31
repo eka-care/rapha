@@ -1,25 +1,38 @@
-/** The four declared view kinds. A queue is a grid of patient CARDS, which is
- *  the prototype's shape and the right one: a queue is scanned for a person,
- *  not read across like a spreadsheet.
+/** The four declared view kinds. A queue is a LIST of numbered rows, which is
+ *  what docs/reference/front-desk/queue-labels.html draws and what a phone can
+ *  hold: a token, a name, what the row is in, and the time. The card grid it
+ *  replaced needed 268px a card, so a phone got one card a screen.
  *
  *  Columns, badge tones and the view's title are all the declaration's.
  */
-import { initialsOf } from "../agent";
+import { Lotus } from "../abha/Lotus";
+import { ABHA_LINKED } from "../abha/sdk";
 import { Icon } from "../icons";
+import { derivedStates, RISK_TONE } from "../loops";
+import { clock } from "../messages";
 import type {
   MetricValue, QueueRow, SectionResult, StepStatus, TaskRow, ViewDecl, ViewResult,
 } from "../types";
 import { human, title } from "../words";
 
-const TONE: Record<string, string> = { crit: "b-crit", warn: "b-warn", ok: "b-ok", mute: "b-mute" };
-
-export function View({ result, decl, onOpenThread }: {
+export function View({ result, decl, workflow, onOpenThread }: {
   result: ViewResult;
   decl?: ViewDecl;
+  /** The workflow this view's rows walk, when the caller has it. The queue
+   *  needs its state declarations to know which labels the kernel worked out
+   *  and which a person asserted. Absent draws every label solid. */
+  workflow?: Parameters<typeof derivedStates>[0];
   onOpenThread?: (thread: string) => void;
 }) {
   if (result.kind === "queue") {
-    return <Queue rows={(result.rows ?? []) as QueueRow[]} decl={decl} onOpenThread={onOpenThread} />;
+    return (
+      <Queue
+        rows={(result.rows ?? []) as QueueRow[]}
+        decl={decl}
+        derived={derivedStates(workflow)}
+        onOpenThread={onOpenThread}
+      />
+    );
   }
   if (result.kind === "tasklist") {
     return <Tasks rows={(result.rows ?? []) as TaskRow[]} onOpenThread={onOpenThread} />;
@@ -28,55 +41,81 @@ export function View({ result, decl, onOpenThread }: {
   return <Sections sections={(result.rows ?? []) as SectionResult[]} />;
 }
 
-/** The subject fields this card shows: the declaration's columns, or whatever
- *  the subject carries when the short form of a view omitted them. */
-function fields(decl: ViewDecl | undefined, row: QueueRow): { name: string; meta: string } {
+/** What a row leads with, what it says underneath, and which field is the
+ *  number.
+ *
+ *  All three come from the view's own `columns:`, in the order it declared
+ *  them. The short form of a view omits them, and then the row shows whatever
+ *  the subject carries, minus the plumbing. Nothing here decides what a
+ *  patient is.
+ */
+function fields(decl: ViewDecl | undefined, row: QueueRow): {
+  name: string; meta: string; token: string;
+} {
+  const subject = row.subject ?? {};
+  const has = (k: string) => subject[k] !== null && subject[k] !== undefined && subject[k] !== "";
   const keys = (decl?.columns ?? []).length
     ? (decl!.columns as string[])
-    : Object.keys(row.subject ?? {}).filter((k) => !/(^|_)id$|_date$|_by$/.test(k));
-  const values = keys.map((k) => row.subject?.[k]).filter((v) => v !== null && v !== undefined && v !== "");
-  const name = String(values[0] ?? row.thread);
-  return { name, meta: values.slice(1, 4).map(String).join(" · ") };
+    : Object.keys(subject).filter((k) => !/(^|_)id$|_date$|_by$/.test(k));
+  // The number is a column like any other, and it is drawn as the row's own
+  // square rather than repeated in the line underneath.
+  const tokenKey = keys.find((k) => /token/i.test(k) && has(k));
+  const rest = keys.filter((k) => k !== tokenKey && has(k));
+  const nameKey = rest[0];
+  return {
+    name: nameKey ? String(subject[nameKey]) : row.thread,
+    meta: [...rest.slice(1, 4).map((k) => String(subject[k])), human(row.station)]
+      .filter(Boolean).join(" · "),
+    token: tokenKey ? String(subject[tokenKey]) : "",
+  };
 }
 
-function Queue({ rows, decl, onOpenThread }: {
-  rows: QueueRow[]; decl?: ViewDecl; onOpenThread?: (t: string) => void;
+/** The labels on the right of a row.
+ *
+ *  Only the flags the view gave a tone to. A flag it did not name is a state
+ *  of the line, not a thing to shout on a row -- the same rule the thread
+ *  header follows. Risk leads, because it is the one of them that means a
+ *  clinician should look sooner.
+ */
+function labels(row: QueueRow, derived: Set<string>): { flag: string; risk: boolean; der: boolean }[] {
+  return (row.flags ?? [])
+    .filter((f) => row.badges?.[f])
+    .map((f) => ({ flag: f, risk: row.badges[f] === RISK_TONE, der: derived.has(f) }))
+    .sort((a, b) => Number(b.risk) - Number(a.risk));
+}
+
+function Queue({ rows, decl, derived, onOpenThread }: {
+  rows: QueueRow[]; decl?: ViewDecl; derived: Set<string>;
+  onOpenThread?: (t: string) => void;
 }) {
   if (!rows.length) {
     return <div className="state-empty">Nobody is waiting. This list fills as people are registered.</div>;
   }
   return (
-    <div className="qgrid">
+    <div className="qlist">
       {rows.map((r) => {
         const f = fields(decl, r);
-        const token = Object.entries(r.subject ?? {}).find(([k, v]) => /token/i.test(k) && v);
-        // A thread late in the line carries every flag it has ever raised, and
-        // all of them on a card is a wall nobody reads. The declaration already
-        // says which are worth calling out (`badges`), so those lead and the
-        // rest are a count.
-        const called = (r.flags ?? []).filter((fl) => r.badges?.[fl]);
-        const plain = (r.flags ?? []).filter((fl) => !r.badges?.[fl]);
-        const shown = [...called, ...plain].slice(0, 3);
-        const rest = (r.flags ?? []).length - shown.length;
         return (
-          <button className="qc" key={r.thread} onClick={() => onOpenThread?.(r.thread)}>
-            <div className="qc-top">
-              <span className="avatar sm">{initialsOf(f.name)}</span>
-              <div className="qc-b">
-                <div className="qc-n">{f.name}</div>
-                {f.meta && <div className="qc-m">{f.meta}</div>}
-              </div>
-              {token && <span className="qc-tok">{String(token[1])}</span>}
-            </div>
-            <div className="qc-chips">
-              {r.station && <span className="badge b-ink">{human(r.station)}</span>}
-              {shown.map((fl) => (
-                <span className={`badge ${TONE[r.badges?.[fl] ?? ""] ?? "b-mute"}`} key={fl}>
-                  {human(fl)}
+          <button className="qr" key={r.thread} onClick={() => onOpenThread?.(r.thread)}>
+            {f.token && <span className="qr-tk">{f.token}</span>}
+            <span className="qr-bd">
+              <span className="qr-l1">
+                <span className="qr-nm">{f.name}</span>
+                {(r.flags ?? []).includes(ABHA_LINKED) && <Lotus className="qr-lotus" />}
+              </span>
+              {f.meta && <span className="qr-sb">{f.meta}</span>}
+            </span>
+            <span className="qr-tags">
+              {labels(r, derived).map((l) => (
+                <span
+                  className={`qr-pg${l.risk ? " risk" : ""}${l.der ? " der" : ""}`}
+                  key={l.flag}
+                >
+                  {human(l.flag)}
                 </span>
               ))}
-              {rest > 0 && <span className="badge b-mute">+{rest}</span>}
-            </div>
+            </span>
+            <span className="qr-at">{clock(r.opened_at)}</span>
           </button>
         );
       })}

@@ -1,41 +1,162 @@
-/* §6.2 as the prototype draws it: filter tabs with counts, and patient CARDS
- * in a grid. A five column table is what this used to be, and a table is the
- * wrong shape for something you scan for a person rather than read across. */
+/* §6.2 as docs/reference/front-desk/queue-labels.html draws it: one scrolling
+ * strip of filter chips with their counts, then a LIST of numbered rows.
+ *
+ * Written for a phone and widened from there, because most stations will not
+ * have a laptop: a nurse, a doctor and a pharmacist are each holding a phone
+ * and only the front desk may have a keyboard. Three consequences are load
+ * bearing rather than decorative:
+ *
+ *   - Nothing is carried by hover. A phone has no hover, so a count or a
+ *     label that only appears on one does not exist.
+ *   - Every tappable thing is at least 44px tall. A chip and a row are both
+ *     tap targets, and the row is 56 because it holds two lines of text.
+ *   - The chips scroll sideways in one line rather than wrapping. Wrapped,
+ *     nine chips became a four-line block that pushed the queue off a 375px
+ *     screen, which is the opposite of a filter.
+ *
+ * Colour: the only coloured thing on a row is the declared tone that means
+ * clinical risk, and the lotus, which carries national identity and nothing
+ * else. Every other label is monochrome on purpose, so a red pill always
+ * means the same thing. The values themselves are style/tokens.css's.
+ */
+
+/* ---------------------------------------------------------------- the chips */
 
 .qtabs {
-  display: flex; gap: 5px; background: var(--color-bg-subtle);
-  padding: 4px; border-radius: var(--radius-md); margin-bottom: 14px; flex-wrap: wrap;
+  display: flex; align-items: stretch; gap: 6px;
+  flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
+  margin-bottom: 12px; padding: 2px 0;
+  /* The strip is scrolled by thumb, so its own bar is noise on a phone and
+     reduces the chips' height on a desktop. The chips themselves say there is
+     more by being cut off at the edge. */
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
-.qtab {
-  border: none; background: none; padding: 7px 13px; border-radius: var(--radius-sm);
-  font-size: 11.5px; font-weight: 600; color: var(--color-text-tertiary); cursor: pointer;
-  display: flex; align-items: center; gap: 7px;
-  transition: var(--duration-fast) var(--ease-out);
-}
-.qtab.on { background: var(--color-bg-surface); color: var(--color-text-primary); box-shadow: var(--shadow-sm); }
-.qtab .n {
-  font-size: 9.5px; font-weight: 700; background: var(--color-border-subtle);
-  color: var(--color-text-tertiary); border-radius: var(--radius-pill); padding: 1px 6px;
-}
-.qtab.on .n { background: var(--color-accent); color: var(--color-bg-surface); }
+.qtabs::-webkit-scrollbar { display: none; }
 
-.qgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 12px; }
-.qc {
-  padding: 13px; cursor: pointer; text-align: left; width: 100%;
-  background: var(--color-bg-surface); border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+.qtab {
+  flex: 0 0 auto; min-height: 44px; padding: 0 14px;
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-pill);
+  background: var(--color-bg-surface); color: var(--color-text-secondary);
+  font-size: 12.5px; font-weight: 500; white-space: nowrap; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px;
   transition: var(--duration-fast) var(--ease-out);
 }
-.qc:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: var(--color-accent-line); }
-.qc-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.qc-b { min-width: 0; }
-.qc-n { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.qc-m { font-size: 10.5px; color: var(--color-text-tertiary); margin-top: 1px; }
-.qc-tok {
-  margin-left: auto; flex-shrink: 0; font-size: 10px; font-weight: 700;
-  color: var(--color-text-tertiary); background: var(--color-bg-subtle);
-  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-sm); padding: 3px 7px;
+.qtab .n {
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 500;
+  color: var(--color-text-tertiary);
 }
+.qtab.on {
+  border-color: var(--color-accent); background: var(--color-accent);
+  color: var(--color-bg-surface); font-weight: 600;
+}
+.qtab.on .n { color: var(--color-bg-surface); }
+
+/* The one chip allowed to carry colour: the view's own tone for clinical
+   risk. Everything else, including a station and a programme, stays ink. */
+.qtab.risk.on {
+  border-color: var(--color-critical); background: var(--color-critical-soft);
+  color: var(--color-critical);
+}
+.qtab.risk.on .n { color: var(--color-critical); }
+
+/* Between the groups of chips. Decorative, and hidden from assistive tech. */
+.qtab-sep {
+  flex: 0 0 auto; width: 1px; margin: 8px 3px;
+  background: var(--color-border-subtle);
+}
+
+/* ----------------------------------------------------------------- the rows */
+
+.qlist { display: grid; gap: 2px; }
+
+/* Phone first: the number and the time hold the top line with the name, and
+   the labels take the line underneath. The name therefore never competes with
+   the labels for width, which is what truncated it to nothing. */
+.qr {
+  display: grid; width: 100%; text-align: left; cursor: pointer;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "tk bd at" "tk tags tags";
+  align-items: center; column-gap: 11px; row-gap: 5px;
+  min-height: 56px; padding: 9px 10px;
+  background: none; border: 1px solid transparent; border-radius: var(--radius-lg);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+/* --color-bg-subtle, and not --color-bg-hover, which is what this rule said
+   first. The row's quiet second line is --color-text-tertiary, and that ink
+   runs 4.47:1 on the hover ground: under AA, and invisible to anyone who did
+   not do the arithmetic. The subtle ground clears it at 4.55:1. ui.check.ts
+   holds the row to it. */
+.qr:hover { background: var(--color-bg-subtle); }
+
+.qr-tk {
+  grid-area: tk; width: 38px; height: 38px; flex: 0 0 auto;
+  display: grid; place-items: center; border-radius: var(--radius-md);
+  font-family: var(--font-mono); font-size: 14px; font-weight: 500;
+  color: var(--color-text-primary);
+  background: var(--color-bg-subtle); border: 1px solid var(--color-border-strong);
+}
+
+.qr-bd { grid-area: bd; min-width: 0; }
+.qr-l1 { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.qr-nm {
+  font-size: 14px; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* National identity, and the only other coloured thing on the row. */
+.qr-lotus { flex: 0 0 auto; color: var(--color-abdm); }
+.qr-sb {
+  display: block; margin-top: 1px; font-size: 11.5px; color: var(--color-text-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.qr-tags { grid-area: tags; display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+
+.qr-pg {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .07em;
+  text-transform: uppercase; white-space: nowrap; padding: 3px 9px;
+  border: 1px solid var(--color-border-control); border-radius: var(--radius-pill);
+  color: var(--color-text-secondary); background: var(--color-bg-surface);
+}
+/* Dashed means the kernel worked this out of the records rather than somebody
+   deciding it. The border carries that, so it is drawn in the 3:1 control
+   edge rather than the hairline: a distinction nobody can see is not one. */
+.qr-pg.der { border-style: dashed; color: var(--color-text-tertiary); }
+/* Red, and nothing else on this row, means clinical risk. */
+.qr-pg.risk {
+  border-style: solid; border-color: var(--color-critical);
+  background: var(--color-critical-soft); color: var(--color-critical);
+  font-weight: 500;
+}
+
+.qr-at {
+  grid-area: at; align-self: center; justify-self: end;
+  font-family: var(--font-mono); font-size: 10.5px; white-space: nowrap;
+  color: var(--color-text-tertiary);
+}
+
+/* Wide enough for one line: the labels move to the right of the row, which is
+   where the mockup draws them, and the time goes last. */
+@media (min-width: 560px) {
+  .qr {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "tk bd tags at";
+    row-gap: 0;
+  }
+  .qr-tags { justify-content: flex-end; }
+}
+
+/* Room enough that the chips need not scroll. */
+@media (min-width: 900px) {
+  .qtabs { flex-wrap: wrap; overflow-x: visible; }
+  .qtab-sep { align-self: center; height: 24px; margin: 0 3px; }
+}
+
+/* ------------------------------------------------- kept for the other views */
+
+/* The dashboard's metric cards, and a thread's own chip rows. */
+.qgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 12px; }
 .qc-chips { display: flex; gap: 5px; flex-wrap: wrap; }
 
 .avatar {
@@ -43,4 +164,3 @@
   background: var(--color-bg-subtle); color: var(--color-text-secondary);
   display: grid; place-items: center; font-weight: 700; font-size: 12.5px; flex-shrink: 0;
 }
-.avatar.sm { width: 30px; height: 30px; font-size: 11px; }

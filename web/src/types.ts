@@ -62,6 +62,15 @@ export type Workflow = {
    *  to -- which is the correct answer, not a missing feature. */
   spine?: string | null;
   steps: { station: string; done_when: string; applies_when: string | null; operations: string[] }[];
+  /** How each of this workflow's states is decided. `{stored: true}` means
+   *  somebody asserted it; every other shape (`exists`, `all_of`, `gte`) is
+   *  the kernel working it out from the records it already holds. The queue
+   *  needs the difference, because a label the system worked out is drawn
+   *  dashed and a person's decision is not. See loops.derivedStates. */
+  states?: Record<string, unknown>;
+  /** The declared order of those states, which is the order a row's labels
+   *  are read in. */
+  state_order?: string[];
 };
 
 // ---- compiled declarations ----

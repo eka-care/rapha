@@ -19,6 +19,12 @@
  *  3. ACCESSIBILITY (§68). An icon-only control with no accessible name, a
  *     positive tabIndex, or an animation that ignores prefers-reduced-motion.
  *
+ *  4. THE QUEUE ROW, which is the front desk's one screen and the one most
+ *     likely to be read on a phone at arm's length. Six properties, each of
+ *     them a decision the owner took in
+ *     docs/reference/front-desk/queue-labels.html and none of them something
+ *     a later edit should be able to undo quietly.
+ *
  *  THE HONEST LIMIT. This reads .tsx and .css as text under plain node: no
  *  DOM, no cascade, no layout. It cannot prove a contrast ratio that only
  *  exists once the cascade runs, it cannot see a rectangle, and it cannot tell
@@ -331,6 +337,141 @@ const IMPLEMENTED = [
     "a stylesheet drops the focus outline and never puts one back for " +
     ":focus-visible: " + removed.join(", "));
   ok("a11y: focus is visible and no stylesheet takes it away");
+}
+
+// ------------------------------------------------------------ 4. the queue row
+
+/** Split a stylesheet into { selector, body } pairs, media queries flattened.
+ *  Crude on purpose: it reads text under plain node and knows nothing about
+ *  the cascade, so it can only say what a rule WRITES, never what wins. */
+function rules(css: string): { selector: string; body: string }[] {
+  const flat = decomment(css).replace(/@media[^{]*\{/g, "").replace(/@keyframes[^{]*\{/g, "");
+  return [...flat.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .map((m) => ({ selector: m[1].trim(), body: m[2] }));
+}
+const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
+
+{
+  const queueCss = readFileSync(join(SRC, "style", "queue.css"), "utf8");
+  const view = code(readFileSync(join(SRC, "view", "View.tsx"), "utf8"));
+  const list = code(readFileSync(join(SRC, "screens", "ListScreen.tsx"), "utf8"));
+  const loops = code(readFileSync(join(SRC, "loops.ts"), "utf8"));
+  const sdk = code(readFileSync(join(SRC, "abha", "sdk.ts"), "utf8"));
+  const lotus = readFileSync(join(SRC, "abha", "Lotus.tsx"), "utf8");
+
+  // -- the lotus ------------------------------------------------------------
+  //
+  // ABHA is the one concept this renderer may name without a declaration, and
+  // abha/sdk.ts records why. The word itself therefore lives there and
+  // nowhere else: the row asks whether the kernel sent that flag, it does not
+  // spell it. If a bundle ever renames the state the lotus would simply stop
+  // appearing, which is why the state is checked against the compiled
+  // workflows rather than taken on trust.
+  assert.match(sdk, /export const ABHA_LINKED = "abha\.linked";/,
+    "the declared state the lotus reads is named once, in the exempt file");
+  assert.match(view, /\(r\.flags \?\? \[\]\)\.includes\(ABHA_LINKED\)/,
+    "the lotus is drawn from the flags the kernel sent, not from a subject field");
+  const declaresLinked = Object.values(catalogue.workflows ?? {})
+    .some((wf) => Object.keys((wf as { states?: object }).states ?? {})
+      .includes("abha.linked"));
+  assert.ok(declaresLinked,
+    "no workflow declares the state the lotus reads, so the lotus can never draw");
+  assert.match(lotus, /role="img"/, "the lotus is a graphic, and says so");
+  assert.match(lotus, /aria-label="[^"]{8,}"/, "§68: the lotus carries an accessible name");
+  assert.match(lotus, /<title>[^<]{8,}<\/title>/, "and a title, for a tooltip and for older readers");
+  assert.ok(!/fill="(?!currentColor)[^"]+"/.test(lotus),
+    "every fill in the lotus is currentColor; tokens.css names the colour");
+  ok("queue: the lotus reads a declared state, is named, and takes its colour from a token");
+
+  // -- colour means clinical risk, and nothing else -------------------------
+  //
+  // The anti-goal in the spec is "colour that does not mean anything". A
+  // programme is not a risk and a station is not a risk, so exactly one tone
+  // may be red. Which tone that is, is written once in loops.ts, and the
+  // stylesheet may not paint the critical ink on anything that is not it.
+  assert.match(loops, /export const RISK_TONE = "crit";/, "one tone means clinical risk");
+  assert.match(view, /row\.badges\[f\] === RISK_TONE/, "a row's label asks the declared tone");
+  assert.match(list, /decl\?\.badges\?\.\[f\] === RISK_TONE/, "and so does its filter chip");
+  const coloured = rules(queueCss)
+    .filter((r) => /--color-critical/.test(r.body))
+    .filter((r) => !/\brisk\b/.test(r.selector))
+    .map((r) => r.selector);
+  assert.deepEqual(coloured, [],
+    "the queue paints clinical red on something that is not the risk tone: " + coloured.join(", "));
+  ok("queue: only the declared risk tone carries colour; every other label is ink");
+
+  // -- a guess never looks like a decision ---------------------------------
+  //
+  // The workflow says how each of its states is decided. `{stored: true}` is
+  // somebody's tick; everything else the kernel worked out of the records.
+  // Dashed is the second kind. This is the property most easily lost, because
+  // dropping it makes the screen look tidier, not broken.
+  assert.match(loops, /"stored" in how/, "derived means: the workflow did not say somebody stored it");
+  assert.match(view, /der: derived\.has\(f\)/, "and a row's label asks that, per flag");
+  const dashed = rules(queueCss).filter((r) => /\bder\b/.test(r.selector));
+  assert.ok(dashed.some((r) => /border-style:\s*dashed/.test(r.body)),
+    "a derived label is drawn dashed");
+  assert.ok(rules(queueCss).some((r) => /\.qr-pg\.risk/.test(r.selector)
+    && /border-style:\s*solid/.test(r.body)),
+    "and risk puts the solid edge back, so a dashed red pill is impossible");
+  ok("queue: a label the kernel worked out is dashed, a person's decision is not");
+
+  // -- a phone -------------------------------------------------------------
+  //
+  // Most stations will not have a laptop. Three things follow, and all three
+  // were wrong before this slice: nine chips wrapped into a four-line block
+  // that pushed the queue off a 375px screen, a chip was 30px tall against
+  // the 44px target, and the row was a 268px card so a phone got one.
+  const base = (selector: string) =>
+    rules(queueCss).find((r) => r.selector === selector)?.body ?? "";
+  const chips = base(".qtabs");
+  assert.match(chips, /flex-wrap:\s*nowrap/, "the chips are one line on a phone");
+  assert.match(chips, /overflow-x:\s*auto/, "and that line scrolls, rather than clipping");
+  for (const [selector, floor] of [[".qtab", 44], [".qr", 44]] as const) {
+    const px = /min-height:\s*(\d+)px/.exec(base(selector));
+    assert.ok(px, `${selector} declares no min-height, so its tap target is whatever text it holds`);
+    assert.ok(Number(px![1]) >= floor,
+      `${selector} is ${px![1]}px tall; a tap target is at least ${floor}px`);
+  }
+  // The ground a row paints under its own quietest ink. --color-bg-hover,
+  // which this rule used first, runs 4.47:1 under --color-text-tertiary:
+  // under AA, and nothing on screen says so. style.check.ts clears
+  // --color-bg-subtle for all three inks, so that is the one the row may use.
+  assert.match(base(".qr:hover"), /background:\s*var\(--color-bg-subtle\)/,
+    "the row's hover ground must be one the contrast table has cleared for tertiary text");
+  // Nothing on this row may be hover-only. A phone has no hover, so a count
+  // or a label behind one is simply absent.
+  const hoverOnly = rules(queueCss)
+    .filter((r) => /:hover/.test(r.selector))
+    .filter((r) => /(^|;)\s*(display|visibility|opacity|content)\s*:/.test(r.body))
+    .map((r) => r.selector);
+  assert.deepEqual(hoverOnly, [],
+    "a queue rule reveals or hides something on hover, which a phone cannot do: "
+    + hoverOnly.join(", "));
+  // And the three things that may never be dropped at any width.
+  const hidden = rules(queueCss)
+    .filter((r) => /\.qr-tk|\.qr-nm|\.qr-pg\.risk/.test(r.selector))
+    .filter((r) => /display:\s*none|visibility:\s*hidden/.test(r.body))
+    .map((r) => r.selector);
+  assert.deepEqual(hidden, [],
+    "the number, the name or the risk label is hidden at some width: " + hidden.join(", "));
+  ok("queue: chips scroll in one line, every target is 44px, and nothing hides on hover");
+
+  // -- the counts ----------------------------------------------------------
+  //
+  // "Counts always visible, computed from the rows actually loaded." Both
+  // halves: the number is rendered unconditionally, and it is counted off the
+  // rows in hand rather than read from the groups the kernel happened to send
+  // for a different grouping.
+  assert.match(list, /<span className="n">\{t\.n\}<\/span>/,
+    "the count is rendered, never conditional on a state or a hover");
+  assert.match(list, /n: rows\.filter\(\(r\) => r\.flags\.includes\(f\)\)\.length/,
+    "a flag chip counts the rows actually loaded");
+  assert.match(list, /n: rows\.filter\(\(r\) => r\.station === s\)\.length/,
+    "and so does a station chip");
+  assert.ok(!/result\.groups/.test(list),
+    "the chips do not read the kernel's groups, which are one grouping and not these");
+  ok("queue: every chip carries a count, computed from the rows in hand");
 }
 
 console.log(`\n${checks} checks passed`);

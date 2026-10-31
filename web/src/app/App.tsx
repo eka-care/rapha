@@ -15,7 +15,7 @@ import { ListScreen } from "../screens/ListScreen";
 import { Patient } from "../screens/Patient";
 import { Roles } from "../screens/Settings";
 import { Today } from "../screens/Today";
-import type { QueueRow, ViewDecl, ViewResult } from "../types";
+import type { QueueRow, ViewDecl, ViewResult, Workflow } from "../types";
 import { IconSheet } from "../icons";
 import { Khoj } from "./Khoj";
 import { Sidebar } from "./Sidebar";
@@ -251,7 +251,11 @@ export function App() {
                   />
                 )}
                 {route.kind === "view" && (
-                  <ViewScreen id={route.id} nonce={nonce} decl={catalogue.views?.[route.id]} />
+                  <ViewScreen
+                    id={route.id} nonce={nonce}
+                    decl={catalogue.views?.[route.id]}
+                    workflow={catalogue.workflows?.[catalogue.views?.[route.id]?.workflow ?? ""]}
+                  />
                 )}
                 {route.kind === "patient" && (
                   <Patient id={route.id} cat={catalogue} onOpenThread={(t) => go(`#/threads/${t}`)} />
@@ -316,11 +320,18 @@ function titleFor(route: Route, views: ViewDecl[]): string {
   return "Not found";
 }
 
-function ViewScreen({ id, decl, nonce }: { id: string; decl?: ViewDecl; nonce: number }) {
+function ViewScreen({ id, decl, workflow, nonce }: {
+  id: string; decl?: ViewDecl; workflow?: Workflow; nonce: number;
+}) {
   const { data, error, loading, reload } = useAsync(() => api.view(id), [id, nonce]);
   if (loading) return <Loading what="this list" />;
   if (error) return <Failed error={error} what="load this list" onRetry={reload} />;
-  return <ListScreen result={data!} decl={decl} onOpenThread={(t) => go(`#/threads/${t}`)} />;
+  return (
+    <ListScreen
+      result={data!} decl={decl} workflow={workflow}
+      onOpenThread={(t) => go(`#/threads/${t}`)}
+    />
+  );
 }
 
 function ThreadScreen({ id, cat, ctx, said, asking, nonce, onSay, onChanged, onRemember, onOpenSubject }: {

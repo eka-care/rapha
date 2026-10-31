@@ -5,7 +5,7 @@
  *  disabled. So everything here is a question of weight, not permission.
  */
 
-import type { Operation, QueueRow, SectionResult, ViewDecl } from "./types";
+import type { Operation, QueueRow, SectionResult, ViewDecl, Workflow } from "./types";
 
 /** One filled button, everything else one level down.
  *
@@ -130,6 +130,36 @@ export function keep(rs: Recent[], live: string[]): Recent[] {
 // below names a station, a flag id, or a bundle.
 
 export type SortKey = "recent" | "name" | "station";
+
+/** The one declared badge tone that means clinical risk.
+ *
+ *  In this system colour means clinical risk and nothing else, so exactly one
+ *  of the tones a view may put on a flag is allowed to be red: a programme is
+ *  not a risk and an overdue wait is not a risk. The tone itself is the
+ *  bundle's decision, flag by flag; which tone red belongs to is this
+ *  renderer's, and it is written once, here. */
+export const RISK_TONE = "crit";
+
+/** Which of a workflow's states nobody asserted.
+ *
+ *  A workflow declares how each state is decided. `{stored: true}` means a
+ *  person said so and the kernel kept it: that is somebody's decision.
+ *  Everything else -- `exists`, `all_of`, `gte` -- is the kernel reading the
+ *  records it already holds and working the state out. The queue draws the
+ *  second kind dashed, so a guess never looks like a decision.
+ *
+ *  A workflow this renderer has not been given answers "nothing is derived",
+ *  which draws every label solid. That is the safer way round: a dashed label
+ *  claims the machine guessed, and saying that about a clinician's own tick
+ *  would be a lie. */
+export function derivedStates(wf: Pick<Workflow, "states"> | undefined): Set<string> {
+  const out = new Set<string>();
+  for (const [state, how] of Object.entries(wf?.states ?? {})) {
+    const asserted = !!how && typeof how === "object" && "stored" in how;
+    if (!asserted) out.add(state);
+  }
+  return out;
+}
 
 /** The sort menu this bundle's queue declaration earns. "Recent" and
  *  "Station" need no declaration (every QueueRow carries `opened_at` and

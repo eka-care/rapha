@@ -9,7 +9,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  cue, filterOptions, filterRows, keep, mine, offered, opensOnArrival, records, sortOptions, sortRows, weigh,
+  cue, derivedStates, filterOptions, filterRows, keep, mine, offered, opensOnArrival,
+  records, RISK_TONE, sortOptions, sortRows, weigh,
 } from "./loops.ts";
 import type { Operation, QueueRow, SectionResult, ViewDecl } from "./types";
 
@@ -206,5 +207,48 @@ ok(
   JSON.stringify(oneBadge.flags) !== JSON.stringify(twoBadges.flags),
   "the filter control set actually moved when the declaration did, not just its size",
 );
+
+// -- a guess never looks like a decision -----------------------------------
+//
+// The queue draws a label dashed when the kernel worked the state out of the
+// records, and solid when a person asserted it. The difference is the
+// workflow's own declaration: `{stored: true}` is somebody's tick, and
+// `exists`, `all_of` and `gte` are the kernel reading what it already holds.
+// Checked against the compiled workflows rather than a hand-made pair, so a
+// bundle that redeclares one of its states moves this and nothing else.
+for (const wf of Object.values(cat.workflows ?? {}) as { states?: Record<string, unknown> }[]) {
+  const derived = derivedStates(wf);
+  const asserted = Object.entries(wf.states ?? {})
+    .filter(([, how]) => !!how && typeof how === "object" && "stored" in (how as object))
+    .map(([state]) => state);
+  const worked = Object.keys(wf.states ?? {}).filter((state) => !asserted.includes(state));
+  ok(asserted.every((state) => !derived.has(state)),
+     "a state somebody stored is never called derived");
+  ok(worked.every((state) => derived.has(state)),
+     "a state the kernel works out of the records always is");
+  ok(derived.size === worked.length, "and the two sets are the whole of the declaration");
+}
+{
+  // The two shapes written out, so the rule survives a bundle that happens to
+  // declare only one kind.
+  const both = derivedStates({ states: { kept: { stored: true }, read: { exists: {} } } });
+  ok(!both.has("kept"), "stored means a person decided it");
+  ok(both.has("read"), "anything else means the kernel worked it out");
+  ok(derivedStates(undefined).size === 0,
+     "with no workflow nothing is called a guess, which draws every label solid");
+}
+
+// -- colour means clinical risk, and one tone carries it --------------------
+//
+// The tone itself is each view's decision, flag by flag. Which tone is red is
+// this renderer's, written once. If no declared view ever uses it, the red
+// pill is unreachable and the rule is decoration.
+{
+  const used = Object.values(cat.views ?? {})
+    .flatMap((v) => Object.values(((v as ViewDecl).badges ?? {})));
+  ok(used.includes(RISK_TONE), "some declared view gives a flag the tone that means risk");
+  ok(used.some((t) => t !== RISK_TONE),
+     "and some flag has a quieter tone, so the queue is not all red");
+}
 
 console.log(`ok   ${checks} loop checks`);
