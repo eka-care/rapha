@@ -325,6 +325,23 @@ Each is finished when the gate is green and the named checks pass against Go.
 - **G9. Retire the Python.** Only on the owner's word, and only when every
   check passes against Go.
 
+## Two facts about this repository, learned the hard way
+
+**`main` is not this project.** It carries an ABDM documentation portal, an
+unrelated piece of work that happens to share this repository. Every line of
+Eka Scribe lives on `feat/phc-catalogue-and-guard` and nowhere else. So a pull
+request from this branch to `main` would propose replacing that portal with
+this product. Nobody should open one. A fresh session is told "main branch:
+main" by its own tooling and will believe it.
+
+**A green gate does not always mean the whole gate.** `scripts/check.sh` skips
+every renderer check when `web/node_modules` is missing, which is the normal
+state of a fresh worktree. That is 109 of the 894 checks. It printed one
+warning line and then "all checks passed", and an agent working in a worktree
+read the bottom line, reported green, and was counting 785. Its work was
+sound; its verdict was narrower than it knew. The script now names what it
+skipped beside the verdict.
+
 ## Open, and the owner's
 
 - **Authentication.** There is none today: `caller()` reads an HTTP header and

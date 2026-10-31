@@ -217,6 +217,7 @@ if [ -d web/node_modules ]; then
   python3 scripts/check_live.py
 else
   echo "warn web: run (cd web && npm install) to check the renderer"
+  SKIPPED="${SKIPPED}the renderer (web/node_modules is missing), "
 fi
 echo "\n== end to end, over a real socket =="
 # Starts uvicorn on a free port against a throwaway SQLite file, walks a
@@ -224,8 +225,20 @@ echo "\n== end to end, over a real socket =="
 # that binds a port; skip it with SKIP_E2E=1 if that is a problem where you are.
 if [ -n "$SKIP_E2E" ]; then
   echo "warn e2e skipped: SKIP_E2E is set"
+  SKIPPED="${SKIPPED}end to end over a socket (SKIP_E2E is set), "
 else
   python3 scripts/e2e.py
 fi
 
-printf '\nall checks passed\n'
+# What was skipped is said HERE, next to the verdict, and not only where
+# it was skipped. A fresh worktree has no web/node_modules, which drops
+# about eighty checks, and the one-line warning scrolls off the top long
+# before "all checks passed" appears at the bottom. An agent read that
+# bottom line, reported a green gate, and was counting 778 where this
+# checkout counts 894. A green that does not say what it did not look at
+# is the same defect this repository keeps finding in its own checks.
+if [ -n "$SKIPPED" ]; then
+  printf '\nall checks that ran passed, and these did NOT run: %s\n' "${SKIPPED%, }"
+else
+  printf '\nall checks passed\n'
+fi
