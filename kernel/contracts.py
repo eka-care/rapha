@@ -790,7 +790,14 @@ ROUTES = {
 # kernel.declarations.compile_json emits, so a new one belongs in BUNDLE_KEYS
 # and nowhere else.
 CATALOGUE_KEYS = ("capabilities", "bundles", "states", "operations")
-BUNDLE_KEYS = ("manifest", "workflows", "views", "instruments", "metrics", "scribe")
+# `plugins`, `facilities` and `vocabulary` are the declarations an engine that
+# is not the Python needs in order to answer GET /facility for itself: which
+# plugins a bundle declares, which shapes it declares, and the bundle's own
+# capability, role and state words. They are carried UNRESOLVED, so the
+# compiled catalogue stays byte identical across every facility shape of one
+# bundle and the shape is still chosen at runtime by PHC_FACILITY.
+BUNDLE_KEYS = ("manifest", "workflows", "views", "instruments", "metrics",
+               "scribe", "plugins", "facilities", "vocabulary")
 
 
 def compiled_keys() -> Iterable[str]:

@@ -85,6 +85,34 @@ class Bundle:
     # title} for what this centre does not run. Served at GET /facility so a
     # screen can explain a switch it has disabled. See kernel/plugins.absent.
     without: dict = dataclasses.field(default_factory=dict)
+    # The DECLARATIONS the three fields above are derived from, carried
+    # through to catalogue.json unresolved: {plugin id: its declaration} and
+    # {facility id: its declaration} as bundle.yaml wrote them, plus this
+    # bundle's own vocabulary.
+    #
+    # Here because an engine that is not this one has to be able to answer
+    # GET /facility, and the three resolved fields above are PHC_FACILITY's
+    # answer for one process rather than the bundle's own words. Carrying the
+    # declarations means the shape is chosen at runtime by whichever engine is
+    # running, from the same line of YAML, instead of being compiled in. They
+    # are shape independent on purpose: scripts/check_plugins.py asserts the
+    # compiled catalogue is byte identical across all three shapes of one
+    # bundle, and that stays true because nothing resolved is added here.
+    plugins: dict = dataclasses.field(default_factory=dict)
+    # {default: the shape bundle.yaml's own `facility:` picks, declared:
+    # {facility id: its declaration}}. The default is carried beside the
+    # shapes it chooses between rather than on the manifest, because it is
+    # only meaningful against them: kernel/plugins.chosen() reads the
+    # argument, then PHC_FACILITY, then this.
+    facilities: dict = dataclasses.field(default_factory=dict)
+    # {capabilities, roles, states} for the bundle this build loaded. The
+    # catalogue wide `capabilities`, `bundles` and `states` keys are the UNION
+    # over every bundle, because the Go MCP server embeds the whole file and
+    # narrows at runtime; api/main.py has always overridden them per bundle
+    # when it serves /catalogue, from catalogue/vocab.py's module constants.
+    # This is that same narrowing, written down rather than recomputed by
+    # every reader that is not the Python.
+    vocabulary: dict = dataclasses.field(default_factory=dict)
 
     def workflow(self, wid: Optional[str] = None) -> c.Workflow:
         if wid is None:
@@ -685,12 +713,31 @@ def load(bundle_id="phc", catalogue=None, facility=None):
         seed=seed, scribe=dict(manifest.get("scribe") or {}),
         documents=_documents(manifest), instruments_raw=raw_instruments,
         facility=plugins.chosen(manifest, facility), withheld=held_back,
-        without=plugins.absent(manifest, facility))
+        without=plugins.absent(manifest, facility),
+        plugins=plugins.declared(manifest),
+        facilities={"default": manifest.get("facility"),
+                    "declared": plugins.facilities(manifest)},
+        vocabulary=_vocabulary(manifest["id"]))
+
+
+def _vocabulary(bundle_id):
+    """{capabilities, roles, states} for one bundle, from its own bundle.yaml.
+
+    Not the module level vocab.CAPABILITIES, which is PHC_BUNDLE's: a caller
+    may load a bundle that is not the active one, and scripts/check_plugins.py
+    does exactly that.
+    """
+    v = vocab.for_bundle(bundle_id)
+    return {"capabilities": sorted(v.capabilities),
+            "roles": {role: list(caps) for role, caps in dict(v.roles).items()},
+            "states": sorted(v.states)}
 
 
 def compile_json(bundle):
-    """The five new catalogue.json keys, as plain JSON-able dicts. build.py
-    can add them with one update(); the existing four keys do not change."""
+    """The loaded bundle's catalogue.json keys, as plain JSON-able dicts.
+    build.py can add them with one update(); the four catalogue wide keys do
+    not change. kernel/contracts.BUNDLE_KEYS is the list, and a new key
+    belongs there and nowhere else."""
     return {
         "manifest": dataclasses.asdict(bundle.manifest),
         "workflows": {k: dataclasses.asdict(v) for k, v in bundle.workflows.items()},
@@ -698,6 +745,11 @@ def compile_json(bundle):
         "instruments": {k: dataclasses.asdict(v) for k, v in bundle.instruments.items()},
         "metrics": {k: dataclasses.asdict(v) for k, v in bundle.metrics.items()},
         "scribe": bundle.scribe,
+        # The unresolved declarations a second engine needs to answer
+        # GET /facility for itself. See the Bundle fields.
+        "plugins": bundle.plugins,
+        "facilities": bundle.facilities,
+        "vocabulary": bundle.vocabulary,
     }
 
 
