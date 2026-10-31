@@ -241,3 +241,55 @@ func SortedOperationIDs(ops map[string]Operation) []string {
 	sort.Strings(out)
 	return out
 }
+
+// CompiledJSON is GET /catalogue's whole body, which api/main.py builds as
+//
+//	dict(declarations.compile_json(BUNDLE),
+//	     capabilities=sorted(vocab.CAPABILITIES), bundles=vocab.BUNDLES,
+//	     states=sorted(vocab.STATES), operations=BUNDLE.operations)
+//
+// Every one of compile_json's ten keys is already written into catalogue.json
+// for the LOADED bundle by kernel/declarations.write_catalogue, so this reads
+// the embedded file whole and substitutes exactly the four keys the route
+// overrides. Read whole rather than field by field for the reason ManifestRaw
+// is kept raw: what goes on the wire is the declaration the Python compiled,
+// so a key added to kernel/contracts.BUNDLE_KEYS arrives here without being
+// retyped in Go.
+//
+// THE TRAP IN THAT FILE, WHICH IS WHY THE FOUR KEYS ARE SUBSTITUTED
+// -----------------------------------------------------------------
+// catalogue.json's top level `capabilities`, `bundles` and `states` are the
+// UNION OVER EVERY BUNDLE — 22 capabilities and 13 roles — because the file is
+// embedded whole and narrowed at runtime (see write_catalogue's own comment).
+// What this route serves is the loaded bundle's own, 16 and 9, and those live
+// under `vocabulary`. Serving the union would hand the only account the
+// browser can be six laboratory capabilities a health centre does not
+// declare, and the renderer's capability list and role editor are built off
+// exactly this answer. `operations` is the same trap in the same file: it too
+// is catalogue wide, and it is narrowed here by the manifest's own list.
+//
+// Needs LoadDeclarations, because the operations it serves are the ones a
+// thread panel draws: the compiled atom with its mapping merged back in.
+func (c *Catalogue) CompiledJSON() (map[string]any, error) {
+	if c.ActionJSON == nil {
+		return nil, fmt.Errorf("the compiled catalogue has not been loaded: " +
+			"call LoadDeclarations before serving GET /catalogue")
+	}
+	body := map[string]any{}
+	if err := pyval.Decode(catalogueJSON, &body); err != nil {
+		return nil, fmt.Errorf("the embedded catalogue is not an object: %w", err)
+	}
+	caps := append([]string(nil), c.Vocabulary.Capabilities...)
+	sort.Strings(caps)
+	states := append([]string(nil), c.Vocabulary.States...)
+	sort.Strings(states)
+	operations := map[string]any{}
+	for id := range c.BundleOperations() {
+		operations[id] = c.ActionJSON[id]
+	}
+	body["capabilities"] = caps
+	body["bundles"] = c.Vocabulary.Roles
+	body["states"] = states
+	body["operations"] = operations
+	return body, nil
+}

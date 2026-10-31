@@ -74,9 +74,18 @@ type Band struct {
 }
 
 // Schema is one questionnaire.
+//
+// Raw is the whole file as it was parsed, numbers kept as their literals,
+// because GET /questionnaires/ serves catalogue/validate.load's return value
+// UNCHANGED: a form is a declaration and the route is a pipe. Anything this
+// package did not parse into Question would otherwise be dropped on the way
+// to a renderer -- `enable_when`, `description`, `structured_type`,
+// `answer_option.display` -- and the browser bundle would be reading a form
+// narrower than the one the guard validates against.
 type Schema struct {
 	Slug      string
 	Questions []Question
+	Raw       map[string]any
 }
 
 // Set is every questionnaire this kernel can validate against, by slug.
@@ -122,7 +131,8 @@ func Load(dir string) (*Set, error) {
 		// is carried for whoever wants it and is not the key.
 		name := strings.TrimSuffix(filepath.Base(path), ".json")
 		slug, _ := blob["slug"].(string)
-		set.schemas[name] = &Schema{Slug: slug, Questions: parseQuestions(blob["questions"])}
+		set.schemas[name] = &Schema{Slug: slug, Raw: blob,
+			Questions: parseQuestions(blob["questions"])}
 	}
 	return set, nil
 }

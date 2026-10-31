@@ -97,7 +97,17 @@ type valueSet struct {
 }
 
 // Load reads every cached value set under dir.
+//
+// The directory is resolved to an absolute path, because it is INTERPOLATED
+// INTO A DENIAL: kernel/terminology.CACHE is `ROOT / "terminology"`, a
+// pathlib.Path, so the Python's "no value set 'x' is cached in /..." carries
+// the absolute path and a relative one here would be a sentence the two
+// engines disagree about. GET /valuesets/{slug} hands that sentence to a
+// caller as a 404 body.
 func Load(dir string) (*Cache, error) {
+	if absolute, err := filepath.Abs(dir); err == nil {
+		dir = absolute
+	}
 	paths, err := filepath.Glob(filepath.Join(dir, "*.json"))
 	if err != nil {
 		return nil, err
@@ -186,6 +196,65 @@ func (c *Cache) Bound(slug string, code any) (Coding, error) {
 	}
 	display, _ := concept["display"].(string)
 	return Coding{system: set.system, code: text, display: display, valueset: slug}, nil
+}
+
+// Unbound is the UnboundCoding a missing value set raises, in the Python's
+// own words, because GET /valuesets/{slug} answers 404 with str(broke).
+func (c *Cache) Unbound(slug string) error {
+	return fmt.Errorf("no value set '%s' is cached in %s. A question may not "+
+		"bind to a value set this facility cannot check offline.", slug, c.dir)
+}
+
+// Expand is kernel/terminology.CachedTerminology.expand: the concepts of one
+// value set, filtered by a substring of the display or the code, capped at
+// `count`.
+//
+// Sorted by CODE and not by display, which is the Python's
+// `sorted(blob["concepts"].items())` and is what makes the cap deterministic
+// rather than map-order. The cap is a silent truncation and the route clamps
+// it at 200 (see api/main.py's valueset); every value set here holds at most
+// nine concepts, so it has never bitten, and it is what goes short the day a
+// real NRCeS release sits behind the same seam.
+func (c *Cache) Expand(slug, query string, count int) ([]Coding, error) {
+	set, found := c.sets[slug]
+	if !found {
+		return nil, c.Unbound(slug)
+	}
+	want := strings.ToLower(strings.TrimSpace(query))
+	out := []Coding{}
+	for _, code := range set.order {
+		display, _ := set.concepts[code]["display"].(string)
+		if want != "" && !strings.Contains(strings.ToLower(display), want) &&
+			!strings.Contains(strings.ToLower(code), want) {
+			continue
+		}
+		out = append(out, Coding{system: set.system, code: code,
+			display: display, valueset: slug})
+		if len(out) >= count {
+			break
+		}
+	}
+	return out, nil
+}
+
+// Concepts is the cached concepts behind a value set, by code. A copy, so a
+// caller cannot edit the cache through it, and nil for a value set that is
+// not cached: kernel/terminology.concepts raises there, and the one caller
+// (the expansion route) has already failed on Expand by then.
+func (c *Cache) Concepts(slug string) map[string]map[string]any {
+	set, found := c.sets[slug]
+	if !found {
+		return nil
+	}
+	out := make(map[string]map[string]any, len(set.concepts))
+	for code, concept := range set.concepts {
+		copied := make(map[string]any, len(concept))
+		for k, v := range concept {
+			copied[k] = v
+		}
+		out[code] = copied
+	}
+	return out
 }
 
 // Codes is every code this value set holds, sorted. For a check and for a

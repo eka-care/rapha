@@ -6,12 +6,17 @@
 // (docs/superpowers/plans/2026-10-31-go-backend-port.md, "Behaviour is
 // copied, not reinterpreted").
 //
-// WHAT THIS SERVES TODAY, which is slice G1 of nine
-// -------------------------------------------------
+// WHAT THIS SERVES TODAY, which is slices G1 to G3 of nine
+// --------------------------------------------------------
 //
 //	GET /                       the service, the bundle, and its own routes
 //	GET /api/v1/phc/whoami      what the MCP server builds its tool list from
 //	GET /api/v1/phc/facility    the bundle, the shape, and what it withholds
+//	GET /api/v1/phc/catalogue   the compiled catalogue, the loaded bundle's
+//	GET /api/v1/phc/questionnaires   every form this bundle's operations ask
+//	GET /api/v1/phc/valuesets/{slug} one bound choice, expanded
+//	the write path                   POST /threads, commit, propose, confirm,
+//	                                 reject, and GET a thread or a proposal
 //
 // Everything else in api/main.py answers 501 with the slice that will serve
 // it. Not 404: a route this engine has not reached yet and a route that does
@@ -361,8 +366,8 @@ var served = []struct {
 }{
 	{"/whoami", ""},
 	{"/facility", ""},
-	{"/catalogue", "G3 serves the compiled catalogue"},
-	{"/operations", "G3 serves the compiled catalogue"},
+	{"/catalogue", ""},
+	{"/operations", ""},
 	{"/operations/{op_id}/commit", ""},
 	{"/operations/{op_id}/propose", ""},
 	{"/proposals/{proposal_id}", ""},
@@ -373,8 +378,13 @@ var served = []struct {
 	{"/threads", ""},
 	{"/threads/{thread_id}", ""},
 	{"/subjects/{subject_id}", "G6 serves the spine: one subject, every visit"},
-	{"/questionnaires", "G3 serves questionnaire validation and fill"},
-	{"/valuesets/{slug}", "G4 serves the terminology seam"},
+	{"/questionnaires", ""},
+	// The expansion seam is G4's; the ROUTE is G3's, because a bound choice
+	// with nothing to choose is an empty dropdown on a form and
+	// scripts/check_live.py asks for every value set a question binds to.
+	// What G4 still owes is the rest of kernel/terminology.py: the semantic
+	// tags, the codification seam and the three binding forms at build time.
+	{"/valuesets/{slug}", ""},
 	{"/queue", "G6 serves the declared views"},
 	{"/views/{view_id}", "G6 serves the declared views"},
 	// The guard is served; the planner behind these two is agent/turn.py and
@@ -432,6 +442,12 @@ func (k *kernel) mount() http.Handler {
 		// Registered last so they win over any subtree above them.
 		mux.HandleFunc(prefix+"/whoami", k.whoami)
 		mux.HandleFunc(prefix+"/facility", k.facility_)
+		// api/main.py puts /catalogue and /operations on one function, and
+		// GET is the only method either answers.
+		mux.HandleFunc(prefix+"/catalogue", only(http.MethodGet, k.catalogue))
+		mux.HandleFunc(prefix+"/operations", only(http.MethodGet, k.catalogue))
+		mux.HandleFunc(prefix+"/questionnaires", only(http.MethodGet, k.questionnaires))
+		mux.HandleFunc(prefix+"/valuesets/{slug}", only(http.MethodGet, k.valueset))
 		k.mountGuard(mux, prefix)
 	}
 	return eitherSpelling(mux)
