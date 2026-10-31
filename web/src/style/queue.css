@@ -53,6 +53,16 @@
 }
 .qtab.on .n { color: var(--color-bg-surface); }
 
+/* A programme chip wears the same mono uppercase as the pill it filters, so
+   a code on a row and the same code on a chip are plainly the same thing.
+   The declaration gives no word for these values today, only the stored code,
+   and a code set in sentence case reads as a misspelling rather than as a
+   code. It carries no colour: a programme is not a risk. */
+.qtab.prog {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
 /* The one chip allowed to carry colour: the view's own tone for clinical
    risk. Everything else, including a station and a programme, stays ink. */
 .qtab.risk.on {

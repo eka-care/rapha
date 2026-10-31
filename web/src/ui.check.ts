@@ -398,6 +398,22 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
     .map((r) => r.selector);
   assert.deepEqual(coloured, [],
     "the queue paints clinical red on something that is not the risk tone: " + coloured.join(", "));
+  // The stylesheet half of that rule is only half. `risk` is a class, and a
+  // row can hand it to anything: painting the PROGRAMME pill red passes every
+  // assertion above, because the only rule that mentions the critical ink is
+  // still `.qr-pg.risk` and the pill is now wearing it. That mutation was run
+  // against this repository and nothing moved.
+  //
+  // So: no className on this screen may contain the word outright. The one
+  // legitimate use is a conditional on the DECLARED tone, and stripping the
+  // interpolations leaves it with nothing to find.
+  const sprayed = [...view.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)]
+    .map((m) => (m[1] ?? m[2]).replace(/\$\{[^}]*\}/g, ""))
+    .filter((c) => /\brisk\b/.test(c));
+  assert.deepEqual(sprayed, [],
+    "something on a queue row is given the risk class outright rather than " +
+    "from the tone the view declared, so red has stopped meaning one thing: "
+    + sprayed.join(", "));
   ok("queue: only the declared risk tone carries colour; every other label is ink");
 
   // -- a guess never looks like a decision ---------------------------------
@@ -457,6 +473,65 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
     "the number, the name or the risk label is hidden at some width: " + hidden.join(", "));
   ok("queue: chips scroll in one line, every target is 44px, and nothing hides on hover");
 
+  // -- the programme ------------------------------------------------------
+  //
+  // The mockup draws the patient's programme as a monochrome pill and gives
+  // it a filter chip, and the view now declares the column it comes from. The
+  // whole difficulty is that the view declares SIX columns and says which is
+  // which about none of them: it does not say "category is the programme",
+  // and it must not have to, because the renderer may not learn that word.
+  //
+  // So the distinction is read off the question that collects the answer: a
+  // column whose question offers a closed set and does not require one is an
+  // enrolment a person may not have, and everything else describes them.
+  // Both halves are asserted here against the COMPILED questionnaires, so a
+  // bundle that changes its mind fails this rather than quietly losing the
+  // pill.
+  const loopsSrc = loops;
+  assert.match(loopsSrc, /if \(!q \|\| q\.required\) return false;/,
+    "a REQUIRED column is a description of a person, not a programme they may not be on");
+  assert.match(loopsSrc, /!!q\.answer_option\?\.length \|\| !!q\.answer_value_set/,
+    "and a label column's answers are a closed set, or the chips are one per village");
+  assert.match(view, /labelColumns\(decl, questionFor\)/,
+    "the row asks the rule, rather than deciding for itself which column is a label");
+  assert.match(list, /labelColumns\(decl, questionFor\)/, "and so do the chips");
+
+  // Run the rule over the real declarations. This is the half a text check
+  // cannot do: it says the rule PICKS something out of this bundle, so a
+  // change that made it match nothing would fail here rather than render an
+  // empty region that looks deliberate.
+  const queueDecl = (catalogue.views ?? {})["phc.view.station-queue"] as { columns?: string[] };
+  const asked: Record<string, { required?: boolean; answer_option?: unknown[]; answer_value_set?: string }> = {};
+  for (const file of readdirSync(join(ROOT, "questionnaires"))) {
+    if (!file.endsWith(".json")) continue;
+    const form = JSON.parse(readFileSync(join(ROOT, "questionnaires", file), "utf8"));
+    for (const q of form.questions ?? []) asked[q.link_id] ??= q;
+  }
+  const picked = (queueDecl?.columns ?? []).filter((c) => {
+    const q = asked[c];
+    return q && !q.required && (!!(q.answer_option as unknown[])?.length || !!q.answer_value_set);
+  });
+  assert.equal(picked.length, 1,
+    "the label rule picks exactly one of this queue's declared columns; it picked " +
+    picked.length + " (" + picked.join(", ") + "). More than one and the row grows a " +
+    "pill nobody asked for; none and the programme the view was changed to carry " +
+    "never reaches a screen.");
+
+  // A word must not appear on the row twice: once as a pill and again in the
+  // line underneath. That is the bug the detail line had the moment the sixth
+  // column landed.
+  assert.match(view, /!labelCols\.includes\(k\)/,
+    "a label column is kept out of the detail line, or the row says the same word twice");
+
+  // And the pill carries no colour. Red means a clinician should look sooner;
+  // a programme is not a risk. rules(queueCss) above already forbids the
+  // critical ink outside a `risk` selector, which covers the chip too.
+  const progChip = rules(queueCss).find((r) => r.selector === ".qtab.prog")?.body ?? "";
+  assert.ok(progChip, ".qtab.prog is not styled, so a programme chip is indistinguishable from a station");
+  assert.ok(!/--color-critical|--color-success|--color-warning/.test(progChip),
+    "a programme chip carries a status colour, and a programme is not a status");
+  ok("queue: the programme is drawn from a declared column the rule picks, monochrome, once per row");
+
   // -- the counts ----------------------------------------------------------
   //
   // "Counts always visible, computed from the rows actually loaded." Both
@@ -469,6 +544,8 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
     "a flag chip counts the rows actually loaded");
   assert.match(list, /n: rows\.filter\(\(r\) => r\.station === s\)\.length/,
     "and so does a station chip");
+  assert.match(list, /n: rows\.filter\(\(r\) => String\(r\.subject\?\.\[column\] \?\? ""\) === value\)\.length/,
+    "and so does a programme chip, off the rows in hand and not off a kernel grouping");
   assert.ok(!/result\.groups/.test(list),
     "the chips do not read the kernel's groups, which are one grouping and not these");
   ok("queue: every chip carries a count, computed from the rows in hand");

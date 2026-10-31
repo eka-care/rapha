@@ -20,7 +20,7 @@
  *  Nothing here names a questionnaire, a value set, a concept or a code. The
  *  slugs come off the operations and the questions the kernel sent.
  */
-import type { Questionnaire } from "./types";
+import type { Question, Questionnaire } from "./types";
 import { walk } from "./validate.ts";
 import { optionsFrom, type Option, type ValueSet } from "./valuesets.ts";
 
@@ -77,6 +77,40 @@ export async function load(source: Source): Promise<{ forms: number; sets: numbe
   forms = got;
   sets = Object.fromEntries(expanded.filter(Boolean) as [string, ValueSet][]);
   return { forms: Object.keys(forms).length, sets: Object.keys(sets).length };
+}
+
+/** The first declared question anywhere that asks for this answer.
+ *
+ *  A queue view names its columns and says nothing about what any of them IS.
+ *  The questionnaires do: the same `link_id` is a question somewhere, with a
+ *  type, an option list and a `required`. So a screen that needs to know
+ *  whether a column is a description of a person or an enrolment they may not
+ *  have asks the form that collects it, rather than being told here.
+ *
+ *  First match wins across the forms. Two forms that ask for the same answer
+ *  in two different shapes is a bundle contradicting itself, and picking one
+ *  of them is a better failure than refusing to draw.
+ */
+export function questionFor(linkId: string): Question | null {
+  for (const form of Object.values(forms)) {
+    const found = walk(form.questions ?? []).find((q) => q.link_id === linkId);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** What a declared answer is CALLED.
+ *
+ *  The option's own display when the declaration carries one, and the stored
+ *  value itself when it does not. Today this bundle's questions list bare
+ *  values, so a programme draws as its own code; the day a question binds a
+ *  value set or carries displays, the word on screen improves here with no
+ *  edit in any screen.
+ */
+export function displayFor(linkId: string, value: string): string {
+  const q = questionFor(linkId);
+  if (!q) return value;
+  return options(q).find((o) => o.value === value)?.display || value;
 }
 
 export function questionnaire(id: string | undefined): Questionnaire | null {

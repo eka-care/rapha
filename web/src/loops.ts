@@ -5,7 +5,7 @@
  *  disabled. So everything here is a question of weight, not permission.
  */
 
-import type { Operation, QueueRow, SectionResult, ViewDecl, Workflow } from "./types";
+import type { Operation, Question, QueueRow, SectionResult, ViewDecl, Workflow } from "./types";
 
 /** One filled button, everything else one level down.
  *
@@ -187,7 +187,49 @@ export function sortRows(rows: QueueRow[], key: SortKey, decl: Pick<ViewDecl, "c
   return key === "recent" ? sorted.reverse() : sorted;
 }
 
-export type Filter = { flag: string } | { station: string } | null;
+/** Which of a view's declared columns are LABELS rather than details.
+ *
+ *  A queue row draws most of its columns as a line of text under the name --
+ *  who the person is -- and the mockup draws one of them as a pill on the
+ *  right: the programme they are enrolled in. The view declares the columns
+ *  and says nothing about which is which, so the distinction has to come from
+ *  somewhere, and the only honest source is the form that collects the
+ *  answer.
+ *
+ *  The rule, and what it rests on. A column is a label when its question
+ *  offers a CLOSED set of answers and does not REQUIRE one. Both halves
+ *  matter and both are the declaration's own words:
+ *
+ *    - Closed, because a filter chip over free text is a chip per village,
+ *      and a line nobody can filter is a line nobody reads.
+ *    - Not required, because that is how a declaration says a person may not
+ *      have one. Everybody has a name, an age, a sex and a village, and those
+ *      are required; nobody is obliged to be on a programme. An enrolment you
+ *      may not have is not a description of you, and that is exactly the
+ *      difference between a pill and a line of text.
+ *
+ *  So this renderer still learns nothing about what the programmes ARE, or
+ *  even that the column is a programme. It is told that one column is
+ *  optional and closed, and it draws optional closed things as labels.
+ *
+ *  THE COST, NAMED. A bundle that made its programme required would lose the
+ *  pill and get a word in the detail line instead, and a bundle that added a
+ *  second optional closed column would get a second pill without asking. The
+ *  alternative was a view saying which of its columns are labels, which is a
+ *  declaration that does not exist; this reads one that does.
+ */
+export function labelColumns(
+  decl: Pick<ViewDecl, "columns"> | undefined,
+  ask: (linkId: string) => Pick<Question, "required" | "answer_option" | "answer_value_set"> | null,
+): string[] {
+  return (decl?.columns ?? []).filter((column) => {
+    const q = ask(column);
+    if (!q || q.required) return false;
+    return !!q.answer_option?.length || !!q.answer_value_set;
+  });
+}
+
+export type Filter = { flag: string } | { station: string } | { column: string; value: string } | null;
 
 /** The filter chips this bundle's queue declaration earns: one per declared
  *  badge (a flag worth calling out), and one per station actually present in
@@ -195,10 +237,20 @@ export type Filter = { flag: string } | { station: string } | null;
 export function filterOptions(
   decl: Pick<ViewDecl, "badges"> | undefined,
   rows: QueueRow[],
-): { flags: string[]; stations: string[] } {
+  /** The declared columns that are labels. One chip per value actually
+   *  present, because a chip for a programme nobody in the room is on is a
+   *  chip that can only ever say nought. */
+  labels: string[] = [],
+): { flags: string[]; stations: string[]; labels: { column: string; values: string[] }[] } {
   return {
     flags: Object.keys(decl?.badges ?? {}),
     stations: [...new Set(rows.map((r) => r.station).filter((s): s is string => !!s))],
+    labels: labels
+      .map((column) => ({
+        column,
+        values: [...new Set(rows.map((r) => String(r.subject?.[column] ?? "")).filter(Boolean))].sort(),
+      }))
+      .filter((l) => l.values.length > 0),
   };
 }
 
@@ -207,5 +259,8 @@ export function filterOptions(
 export function filterRows(rows: QueueRow[], filter: Filter): QueueRow[] {
   if (!filter) return rows;
   if ("flag" in filter) return rows.filter((r) => r.flags.includes(filter.flag));
+  if ("column" in filter) {
+    return rows.filter((r) => String(r.subject?.[filter.column] ?? "") === filter.value);
+  }
   return rows.filter((r) => r.station === filter.station);
 }

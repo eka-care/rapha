@@ -8,7 +8,8 @@
 import { Lotus } from "../abha/Lotus";
 import { ABHA_LINKED } from "../abha/sdk";
 import { Icon } from "../icons";
-import { derivedStates, RISK_TONE } from "../loops";
+import { displayFor, questionFor } from "../declarations";
+import { derivedStates, labelColumns, RISK_TONE } from "../loops";
 import { clock } from "../messages";
 import type {
   MetricValue, QueueRow, SectionResult, StepStatus, TaskRow, ViewDecl, ViewResult,
@@ -30,6 +31,7 @@ export function View({ result, decl, workflow, onOpenThread }: {
         rows={(result.rows ?? []) as QueueRow[]}
         decl={decl}
         derived={derivedStates(workflow)}
+        labelCols={labelColumns(decl, questionFor)}
         onOpenThread={onOpenThread}
       />
     );
@@ -49,7 +51,7 @@ export function View({ result, decl, workflow, onOpenThread }: {
  *  the subject carries, minus the plumbing. Nothing here decides what a
  *  patient is.
  */
-function fields(decl: ViewDecl | undefined, row: QueueRow): {
+function fields(decl: ViewDecl | undefined, row: QueueRow, labelCols: string[] = []): {
   name: string; meta: string; token: string;
 } {
   const subject = row.subject ?? {};
@@ -60,7 +62,9 @@ function fields(decl: ViewDecl | undefined, row: QueueRow): {
   // The number is a column like any other, and it is drawn as the row's own
   // square rather than repeated in the line underneath.
   const tokenKey = keys.find((k) => /token/i.test(k) && has(k));
-  const rest = keys.filter((k) => k !== tokenKey && has(k));
+  // A label column is drawn as a pill on the right, so repeating it in the
+  // line underneath would put the same word on the row twice.
+  const rest = keys.filter((k) => k !== tokenKey && !labelCols.includes(k) && has(k));
   const nameKey = rest[0];
   return {
     name: nameKey ? String(subject[nameKey]) : row.thread,
@@ -84,8 +88,12 @@ function labels(row: QueueRow, derived: Set<string>): { flag: string; risk: bool
     .sort((a, b) => Number(b.risk) - Number(a.risk));
 }
 
-function Queue({ rows, decl, derived, onOpenThread }: {
+function Queue({ rows, decl, derived, labelCols, onOpenThread }: {
   rows: QueueRow[]; decl?: ViewDecl; derived: Set<string>;
+  /** The declared columns drawn as labels rather than as details. Which ones
+   *  those are is loops.labelColumns's answer, read off the questions the
+   *  kernel sent; this file is told nothing about what any of them means. */
+  labelCols: string[];
   onOpenThread?: (t: string) => void;
 }) {
   if (!rows.length) {
@@ -94,7 +102,7 @@ function Queue({ rows, decl, derived, onOpenThread }: {
   return (
     <div className="qlist">
       {rows.map((r) => {
-        const f = fields(decl, r);
+        const f = fields(decl, r, labelCols);
         return (
           <button className="qr" key={r.thread} onClick={() => onOpenThread?.(r.thread)}>
             {f.token && <span className="qr-tk">{f.token}</span>}
@@ -106,6 +114,17 @@ function Queue({ rows, decl, derived, onOpenThread }: {
               {f.meta && <span className="qr-sb">{f.meta}</span>}
             </span>
             <span className="qr-tags">
+              {/* The programme first, because it is a standing fact about the
+                  person, and monochrome, because it is not a risk: in this
+                  system red means a clinician should look sooner and nothing
+                  else. The word is whatever the declaration calls the stored
+                  value, which today is the value itself. */}
+              {labelCols.map((col) => {
+                const value = String(r.subject?.[col] ?? "");
+                return value ? (
+                  <span className="qr-pg" key={col}>{displayFor(col, value)}</span>
+                ) : null;
+              })}
               {labels(r, derived).map((l) => (
                 <span
                   className={`qr-pg${l.risk ? " risk" : ""}${l.der ? " der" : ""}`}

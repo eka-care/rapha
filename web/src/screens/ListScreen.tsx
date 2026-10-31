@@ -3,8 +3,9 @@
  *  filter, sort and search are held per view for the session.
  */
 import { useMemo, useState } from "react";
+import { displayFor, questionFor } from "../declarations";
 import {
-  filterOptions, filterRows, RISK_TONE, sortOptions, sortRows,
+  filterOptions, filterRows, labelColumns, RISK_TONE, sortOptions, sortRows,
   type Filter, type SortKey,
 } from "../loops";
 import type { QueueRow, ViewDecl, ViewResult, Workflow } from "../types";
@@ -47,13 +48,28 @@ export function ListScreen({ result, decl, workflow, onOpenThread }: {
    *  means clinical risk is allowed to carry colour. */
   const tabs = useMemo(() => {
     if (!isQueue) return [];
-    const { flags, stations } = filterOptions(decl, rows);
-    const made: { label: string; filter: Filter; n: number; risk?: boolean; sep?: boolean }[] = [
+    const { flags, stations, labels } = filterOptions(decl, rows, labelColumns(decl, questionFor));
+    const made: { label: string; filter: Filter; n: number; risk?: boolean; prog?: boolean; sep?: boolean }[] = [
       { label: "All", filter: null, n: rows.length },
     ];
     if (stations.length) made.push({ label: "", filter: null, n: 0, sep: true });
     for (const s of stations) {
       made.push({ label: title(s), filter: { station: s }, n: rows.filter((r) => r.station === s).length });
+    }
+    // One chip per value a label column actually carries today. This is what
+    // the queue is read for -- "show me everyone here on that programme" --
+    // and it is why the column was declared. The word is the declaration's,
+    // the grouping is the rows', and this file knows neither.
+    for (const { column, values } of labels) {
+      made.push({ label: "", filter: null, n: 0, sep: true });
+      for (const value of values) {
+        made.push({
+          label: displayFor(column, value),
+          filter: { column, value },
+          n: rows.filter((r) => String(r.subject?.[column] ?? "") === value).length,
+          prog: true,
+        });
+      }
     }
     if (flags.length) made.push({ label: "", filter: null, n: 0, sep: true });
     for (const f of flags) {
@@ -86,8 +102,8 @@ export function ListScreen({ result, decl, workflow, onOpenThread }: {
               <span className="qtab-sep" key={`sep-${i}`} aria-hidden="true" />
             ) : (
               <button
-                key={t.label}
-                className={`qtab${JSON.stringify(state.filter) === JSON.stringify(t.filter) ? " on" : ""}${t.risk ? " risk" : ""}`}
+                key={JSON.stringify(t.filter) + t.label}
+                className={`qtab${JSON.stringify(state.filter) === JSON.stringify(t.filter) ? " on" : ""}${t.risk ? " risk" : ""}${t.prog ? " prog" : ""}`}
                 aria-pressed={JSON.stringify(state.filter) === JSON.stringify(t.filter)}
                 onClick={() => set({ filter: t.filter })}
               >
