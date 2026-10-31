@@ -21,7 +21,8 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  apply, draftFor, elsewhere, mergeDrafts, mustTick, pickMime, preview, reasonFor, sentence,
+  apply,
+  at, draftFor, elsewhere, mergeDrafts, mustTick, pickMime, preview, reasonFor, sentence,
   type ScribeSession,
 } from "./session.ts";
 import type { Questionnaire } from "../types";
@@ -59,6 +60,38 @@ schema("phc.schema.vitals-v1");
   assert.deepEqual(applied.fill, { systolic: 140, history: "fever" });
   checks += 5;
 }
+// 1b. A repeating group owes one tick per value per ROW, and the id addresses
+//     the row. A draft that heard three medicines owes three drug ticks; one
+//     tick on the question would commit two rows nobody read.
+{
+  const rows = {
+    instrument: "i", operation: "phc.op.rx-prescribe",
+    values: { medications: [{ drug: "777067000", dose: 500 }, { drug: "774586009", dose: 250 }] },
+    confidence: {}, evidence: {},
+    tick: ["medications[0].drug", "medications[0].dose",
+           "medications[1].drug", "medications[1].dose"],
+    unfilled: [], transcript: "paracetamol 500, amoxicillin 250",
+  };
+  const same = { medications: [{ drug: "777067000", dose: 500 }, { drug: "774586009", dose: 250 }] };
+  assert.deepEqual(mustTick(rows, new Set(), same), rows.tick,
+    "every value of every row is owed its own tick");
+  assert.deepEqual(mustTick(rows, new Set(["medications[0].drug"]), same),
+    ["medications[0].dose", "medications[1].drug", "medications[1].dose"],
+    "ticking one value of one row does not tick the rest of the prescription");
+  const edited = { medications: [{ drug: "777067000", dose: 650 }, { drug: "774586009", dose: 250 }] };
+  assert.deepEqual(mustTick(rows, new Set(), edited),
+    ["medications[0].drug", "medications[1].drug", "medications[1].dose"],
+    "a dose typed over is the person's number, and only that one");
+  const shorter = { medications: [{ drug: "777067000", dose: 500 }] };
+  assert.deepEqual(mustTick(rows, new Set(), shorter),
+    ["medications[0].drug", "medications[0].dose"],
+    "a row the person deleted is owed nothing, and its ticks do not slide onto another row");
+  assert.equal(at(same, "medications[1].drug"), "774586009");
+  assert.equal(at(same, "medications[9].drug"), undefined);
+  assert.equal(at(same, "medications"), same.medications);
+  checks += 7;
+}
+
 // Nothing in the renderer still refuses numbers by type.
 assert.ok(!read("web/src/scribe/session.ts").includes("export function narrative"));
 checks += 1;
@@ -68,15 +101,26 @@ const session: ScribeSession = {
   drafts: [
     { instrument: "phc.inst.consult-scribe", operation: "phc.op.consult-document",
       values: { history: "fever for three days", assessment: "URTI",
-                diagnosis: [{ code: "Acute upper respiratory tract infection" }] },
-      confidence: { history: 0, assessment: 0, diagnosis: 0 },
-      evidence: { history: "fever for three days", assessment: "URTI", diagnosis: "URTI" },
-      tick: [], unfilled: [],
+                diagnosis: [{ condition: "297142003", clinical_status: "active",
+                              verification_status: "unconfirmed" }] },
+      confidence: { history: 0, assessment: 0, "diagnosis[0].condition": 0,
+                    "diagnosis[0].clinical_status": 0,
+                    "diagnosis[0].verification_status": 0 },
+      evidence: { history: "fever for three days", assessment: "URTI",
+                  "diagnosis[0].condition": "swollen foot",
+                  "diagnosis[0].clinical_status": "swollen foot",
+                  "diagnosis[0].verification_status": "swollen foot" },
+      tick: ["diagnosis[0].condition", "diagnosis[0].clinical_status",
+             "diagnosis[0].verification_status"],
+      unfilled: [],
       transcript: "Good morning. Fever for three days." },
     { instrument: "phc.inst.consult-scribe", operation: "phc.op.rx-prescribe",
-      values: { medications: [{ medication: "Paracetamol 650 mg", dosage_instruction: "SOS" }] },
-      confidence: { medications: 0 },
-      evidence: { medications: "Paracetamol 650 mg SOS" }, tick: [], unfilled: [],
+      values: { medications: [{ drug: "777067000", dose: 650, dose_unit: "mg",
+                               route: "26643006", frequency: "229799001",
+                               duration: 3, duration_unit: "d" }] },
+      confidence: { "medications[0].drug": 0, "medications[0].dose": 0 },
+      evidence: { "medications[0].drug": "Paracetamol", "medications[0].dose": "650" },
+      tick: ["medications[0].drug", "medications[0].dose"], unfilled: [],
       transcript: "" },
   ],
 };

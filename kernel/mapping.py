@@ -37,6 +37,7 @@ The grammar
       ignored: [<link_id>, ...]        # answers deliberately not stored
       records:
         - resource: <one of writes>
+          per_row: <link_id>           # a repeating GROUP, one row per repeat
           per_item: <link_id>          # a repeating structured answer, one row per item
           per_question: [<link_id>]    # one row per answered question
           fields:
@@ -62,6 +63,27 @@ duties a convention about which role bundle a person logs in with.
 `{question: unit}` is the point of the exercise: the unit comes from
 `styling_metadata.phc.unit` on the question, so it is written once, next to the
 range that validates it, and no adapter repeats it.
+
+`per_row` versus `per_item`
+---------------------------
+They look alike and they are not the same thing, which is the whole of this
+module's part in replacing `structured`.
+
+`per_item` reads a STRUCTURED answer. The questionnaire declares no sub schema
+for one, so the keys `{item: ...}` names are unlintable and whatever arrives in
+them is written. That is how a diagnosis column came to hold free text.
+
+`per_row` reads a repeating GROUP. The group declares its sub questions, so a
+row is an ordinary payload over a smaller form: `{answer: dose}` and
+`{answer_code: drug}` resolve against the ROW, through exactly the same
+sources, the same lint and the same single validating constructor as a top
+level answer. Nothing about a row is checked less than a form.
+
+One consequence is worth stating because it is a refusal rather than a
+convenience: a per_row record reads the row and nothing else. `{answer: X}`
+where X is a top level question is refused by lint rather than quietly reading
+a row key that is not there. A record that genuinely needs both wants a second
+record, or a source that does not exist yet.
 
 When a record is written
 ------------------------
@@ -157,7 +179,7 @@ ANSWER_CODING_FACTS = {"answer_code": "code",
                        "answer_code_display": "display"}
 QUESTION_FACTS = ("link_id", "answer") + tuple(CODING_FACTS)
 LINK_LISTS = ("joined", "note")
-RECORD_KEYS = ("resource", "per_item", "per_question", "fields")
+RECORD_KEYS = ("resource", "per_row", "per_item", "per_question", "fields")
 MAPPING_KEYS = ("records", "ignored")
 _COLUMN = re.compile(r"^[a-z_][a-z0-9_]*$")
 
@@ -179,6 +201,23 @@ def items(payload, link_id):
         return []
     listed = value if isinstance(value, list) else [value]
     return [i if isinstance(i, dict) else {"code": str(i)} for i in listed]
+
+
+def rows(payload, link_id):
+    """A repeating group's answer as a list of row payloads.
+
+    Unlike `items` above, a row that is not a mapping is DROPPED rather than
+    read as `{code: <it>}`. The difference is the point: a structured answer
+    had no declared shape, so a bare string was the only thing a renderer
+    could send and salvaging it was right. A group declares its sub questions,
+    so a bare string is a renderer that lost the row, and the validator has
+    already refused it.
+    """
+    value = payload.get(link_id)
+    if _blank(value):
+        return []
+    listed = value if isinstance(value, list) else [value]
+    return [dict(row) for row in listed if isinstance(row, dict)]
 
 
 def _first(context, keys):
@@ -301,6 +340,23 @@ def records(op, payload, actor=None):
     payload = dict(payload or {})
     out = []
     for record in op.get("mapping") or []:
+        # The bound questions this record's answer coding sources need, so
+        # _value never opens a questionnaire. Compiled in, and JSON able,
+        # because the compiled mapping travels to the renderer.
+        bound = record.get("questions") or {}
+        if record.get("per_row"):
+            # One record row per group row, and the row IS the payload. Every
+            # source below it therefore behaves identically to the top level,
+            # including _row's refusal to write a row whose coded answer is
+            # absent: a medicine with no drug code is no medication_request,
+            # not an uncoded one, and it does not borrow the drug from the
+            # line above it.
+            for given in rows(payload, record["per_row"]):
+                context = {"questions": bound} if bound else {}
+                made = _row(record, given, context, actor)
+                if made is not None:
+                    out.append((record["resource"], made))
+            continue
         if record.get("per_item"):
             contexts = items(payload, record["per_item"])
         elif record.get("per_question"):
@@ -309,10 +365,6 @@ def records(op, payload, actor=None):
                         if not _blank(payload.get(q["link_id"]))]
         else:
             contexts = [{}]
-        # The bound questions this record's answer coding sources need, so
-        # _value never opens a questionnaire. Compiled in, and JSON able,
-        # because the compiled mapping travels to the renderer.
-        bound = record.get("questions") or {}
         for context in contexts:
             if bound:
                 context = dict(context, questions=bound)
@@ -327,7 +379,14 @@ def records(op, payload, actor=None):
 # --------------------------------------------------------------------------
 
 def _lint_source(source, where, record, questions, fail):
-    """Check one source dict. Returns the link_ids it consumes."""
+    """Check one source dict. Returns the link_ids it consumes.
+
+    `questions` is what an `{answer: ...}` resolves against: the whole form for
+    an ordinary record, and one group's sub questions for a per_row record. The
+    narrowing is the check: a per_row record naming a top level question is
+    refused, because at evaluation time it would read a key the row does not
+    have and write nothing, silently.
+    """
     if not isinstance(source, dict) or len(source) != 1:
         fail("%s: a source is one of %s" % (where, ", ".join(SOURCES)))
         return set()
@@ -387,6 +446,13 @@ def _lint_source(source, where, record, questions, fail):
                 fail("%s: '%s' is not a question on this form" % (where, link_id))
         return set(arg)
     if kind == "json":
+        if record.get("per_row"):
+            # `payload` means the whole payload. In a per_row record it would
+            # be one row, so the word would be a lie and the column would hold
+            # something other than what the atom says.
+            fail("%s: json reads the whole payload, which a per_row record "
+                 "does not have" % where)
+            return set()
         if arg != "payload":
             fail("%s: json takes 'payload' and nothing else" % where)
         return set(questions)          # the blob keeps every answer
@@ -427,9 +493,26 @@ def _lint_record(record, index, writes, questions, fail):
              % (where, resource))
     where = "record %d (%s)" % (index, resource)
 
-    if record.get("per_item") and record.get("per_question"):
-        fail("%s: per_item and per_question are alternatives, not both" % where)
+    kinds = [k for k in ("per_row", "per_item", "per_question") if record.get(k)]
+    if len(kinds) > 1:
+        fail("%s: %s are alternatives, not both"
+             % (where, " and ".join(kinds)))
     used = set()
+    if record.get("per_row"):
+        link_id = record["per_row"]
+        group = questions.get(link_id)
+        if group is None:
+            fail("%s: per_row '%s' is not a question on this form" % (where, link_id))
+        elif not validate.is_row_group(group):
+            fail("%s: per_row '%s' is type '%s'%s, so it holds no rows. A "
+                 "repeating group is type 'group' with repeats true."
+                 % (where, link_id, group.get("type"),
+                    "" if group.get("repeats") else " and does not repeat"))
+        else:
+            # From here on every source in this record resolves against the
+            # group's own sub questions and nothing else.
+            questions = validate.row_questions(group)
+        used.add(link_id)
     if record.get("per_item"):
         link_id = record["per_item"]
         if link_id not in questions:
@@ -509,6 +592,18 @@ def compile_records(fm, schema):
         if link_id in used:
             fail("ignored: '%s' is also mapped; it is one or the other" % link_id)
 
+    # One link_id means one question. A repeating group's sub question shares
+    # the namespace with every other question on the form, and a name used
+    # twice makes every lookup in this file ambiguous: `{answer: dose}` in a
+    # per_row record and `{answer: dose}` at the top level would resolve to
+    # whichever question `walk` yielded last, so a column could be filled from
+    # a different question than the atom names. Refused here rather than
+    # handled, because there is no reading of a duplicate name that is useful.
+    seen = [q["link_id"] for q in validate.walk(schema["questions"])]
+    for link_id in sorted({k for k in seen if seen.count(k) > 1}):
+        fail("'%s' is the link_id of more than one question on this form, so a "
+             "source naming it could mean either" % link_id)
+
     # The failure this catches is the quiet one: a required answer that no
     # record stores and nobody declared they were dropping.
     for link_id, question in questions.items():
@@ -539,8 +634,17 @@ def _compile_record(record, questions, terminology_=None):
     CARE pays a database read plus an HTTP round trip per bound field per
     write; this pays none. kernel/terminology.py says more about why.
     """
+    # No narrowing to a per_row group's own sub questions here, and that is a
+    # deletion rather than an omission. It was written, and then a mutation
+    # proved it could not fail: `questions` is flat over the whole form, so a
+    # sub question is in it under its own link_id and the narrowed lookup
+    # returned the identical question. The only case where the two could
+    # differ is a link_id used twice on one form, and compile_records now
+    # refuses that outright, which is a rule that CAN fail. A safeguard that
+    # cannot fail reads like protection and is not.
     return {
         "resource": record["resource"],
+        "per_row": record.get("per_row"),
         "per_item": record.get("per_item"),
         "per_question": [_compile_question(questions[link_id], terminology_)
                          for link_id in record.get("per_question") or []] or None,

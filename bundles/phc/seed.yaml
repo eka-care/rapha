@@ -143,7 +143,9 @@ threads:
         surface: mcp
         payload:
           medications:
-            - {medication: Amoxicillin 500mg, dosage_instruction: 1 cap TDS x 5 days}
+            - {drug: "774586009", dose: 500, dose_unit: "mg",
+               route: "26643006", frequency: "229798009",
+               duration: 5, duration_unit: "d"}
 
   # Prescribed, waiting at the pharmacy.
   - id: enc-005
@@ -162,10 +164,22 @@ threads:
          code: "8867-4", code_system: "http://loinc.org", code_display: "Heart rate",
          value: 92, unit: "/min", unit_system: "http://unitsofmeasure.org"}
       - {resource: notes, text: "Fever three days, no red flags on examination."}
-      - {resource: medication_request, medication: Paracetamol 500mg,
-         dosage_instruction: 1 tab TDS x 3 days, status: active}
-      - {resource: medication_request, medication: ORS sachet,
-         dosage_instruction: 1 sachet after each loose stool, status: active}
+      # A prescription line is five columns now, not a sentence, and the
+      # codes are the value sets' own. Oral rehydration salts are advised in
+      # the plan narrative and not prescribed here, because this build cannot
+      # code them: the medicine value set is six primary level essential
+      # medicines and it says in the file that it is not a formulary.
+      - {resource: medication_request,
+         medication: "777067000", medication_system: "http://snomed.info/sct",
+         medication_display: "Acetaminophen only product",
+         dose: 500, dose_unit: "mg", dose_unit_system: "http://unitsofmeasure.org",
+         route: "26643006", route_system: "http://snomed.info/sct",
+         route_display: "Oral route",
+         frequency: "229798009", frequency_system: "http://snomed.info/sct",
+         frequency_display: "Three times daily",
+         duration: 3, duration_unit: "d",
+         duration_unit_system: "http://unitsofmeasure.org",
+         intent: order, status: active}
     audit:
       - operation: phc.op.patient-register
         actor: "user:frontdesk"
@@ -181,13 +195,20 @@ threads:
           history: Fever three days, loose stools since yesterday.
           examination: Hydrated, chest clear, abdomen soft.
           assessment: Fever three days, no red flags on examination.
+          diagnosis:
+            # Coded as a clinical finding, with the clinician's own
+            # verification status rather than a literal that asserted every
+            # diagnosis. See catalogue/ops/phc.op.consult-document.md.
+            - {condition: "297142003", clinical_status: active,
+               verification_status: unconfirmed}
           plan: Paracetamol and oral rehydration, return if it worsens.
       - operation: phc.op.rx-prescribe
         actor: "user:mo"
         payload:
           medications:
-            - {medication: Paracetamol 500mg, dosage_instruction: 1 tab TDS x 3 days}
-            - {medication: ORS sachet, dosage_instruction: 1 sachet after each loose stool}
+            - {drug: "777067000", dose: 500, dose_unit: "mg",
+               route: "26643006", frequency: "229798009",
+               duration: 3, duration_unit: "d"}
 
   # Dispensed and closed. Stands nowhere; the line is complete.
   - id: enc-006
@@ -207,10 +228,22 @@ threads:
          code: "8867-4", code_system: "http://loinc.org", code_display: "Heart rate",
          value: 92, unit: "/min", unit_system: "http://unitsofmeasure.org"}
       - {resource: notes, text: "Fever three days, no red flags on examination."}
-      - {resource: medication_request, medication: Paracetamol 500mg,
-         dosage_instruction: 1 tab TDS x 3 days, status: active}
-      - {resource: medication_request, medication: ORS sachet,
-         dosage_instruction: 1 sachet after each loose stool, status: active}
+      # A prescription line is five columns now, not a sentence, and the
+      # codes are the value sets' own. Oral rehydration salts are advised in
+      # the plan narrative and not prescribed here, because this build cannot
+      # code them: the medicine value set is six primary level essential
+      # medicines and it says in the file that it is not a formulary.
+      - {resource: medication_request,
+         medication: "777067000", medication_system: "http://snomed.info/sct",
+         medication_display: "Acetaminophen only product",
+         dose: 500, dose_unit: "mg", dose_unit_system: "http://unitsofmeasure.org",
+         route: "26643006", route_system: "http://snomed.info/sct",
+         route_display: "Oral route",
+         frequency: "229798009", frequency_system: "http://snomed.info/sct",
+         frequency_display: "Three times daily",
+         duration: 3, duration_unit: "d",
+         duration_unit_system: "http://unitsofmeasure.org",
+         intent: order, status: active}
       - {resource: medication_dispense, medication: Paracetamol 500mg,
          quantity: "1", status: completed}
       - {resource: medication_dispense, medication: ORS sachet,
@@ -234,13 +267,20 @@ threads:
           history: Fever three days, loose stools since yesterday.
           examination: Hydrated, chest clear, abdomen soft.
           assessment: Fever three days, no red flags on examination.
+          diagnosis:
+            # Coded as a clinical finding, with the clinician's own
+            # verification status rather than a literal that asserted every
+            # diagnosis. See catalogue/ops/phc.op.consult-document.md.
+            - {condition: "297142003", clinical_status: active,
+               verification_status: unconfirmed}
           plan: Paracetamol and oral rehydration, return if it worsens.
       - operation: phc.op.rx-prescribe
         actor: "user:mo"
         payload:
           medications:
-            - {medication: Paracetamol 500mg, dosage_instruction: 1 tab TDS x 3 days}
-            - {medication: ORS sachet, dosage_instruction: 1 sachet after each loose stool}
+            - {drug: "777067000", dose: 500, dose_unit: "mg",
+               route: "26643006", frequency: "229798009",
+               duration: 3, duration_unit: "d"}
       - operation: phc.op.pharmacy-dispense
         actor: "user:pharmacist"
         payload:

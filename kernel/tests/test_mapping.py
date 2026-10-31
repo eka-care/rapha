@@ -27,10 +27,24 @@ PAYLOADS = {
     "phc.op.abha-link": {"method": "link_existing", "consent_given": True,
                          "abha_number": "12-0000-0000-0000"},
     "phc.op.vitals-record": {"systolic": 118, "diastolic": 76, "pulse": 80},
-    "phc.op.consult-document": {"assessment": "Viral fever",
-                                "diagnosis": [{"code": "A99"}]},
-    "phc.op.rx-prescribe": {"medications": [{"medication": "Paracetamol 500mg",
-                                             "dosage_instruction": "1 tab TDS"}]},
+    # Two diagnosis rows, and the second one is the point of the type change.
+    # "A99" used to be an acceptable diagnosis here, because `structured` had
+    # no sub schema and nothing validated it anywhere. Each row is now four
+    # bound answers, and the second row is `refuted`: a finding the patient
+    # denied, recorded without being asserted, which is invariant I6 and was
+    # unexpressible when the mapping wrote `{const: confirmed}` on every row.
+    "phc.op.consult-document": {
+        "assessment": "Viral fever",
+        "diagnosis": [
+            {"condition": "44054006", "clinical_status": "active",
+             "verification_status": "confirmed", "onset": "2024-03-01"},
+            {"condition": "297142003", "clinical_status": "active",
+             "verification_status": "refuted"},
+        ]},
+    "phc.op.rx-prescribe": {
+        "medications": [{"drug": "777067000", "dose": 500, "dose_unit": "mg",
+                         "route": "26643006", "frequency": "229798009",
+                         "duration": 5, "duration_unit": "d"}]},
     "phc.op.lab-order": {"investigations": [{"code": "CBC"}]},
     # The analyte is a LOINC code now and not the word a technician typed, and
     # the unit must be the one LOINC reports that analyte in. See
@@ -58,10 +72,25 @@ GOLDEN = {
     "phc.op.abha-link": [
         ("patient", {"abha_number": "12-0000-0000-0000"}),
     ],
+    # One condition row per diagnosis row, each carrying three codings and
+    # the system each came from. The second row has no onset, which is a
+    # column absent rather than a column holding an empty string.
     "phc.op.consult-document": [
         ("encounter", {"status": "in_progress"}),
         ("notes", {"text": "Assessment: Viral fever"}),
-        ("condition", {"code": "A99", "verification_status": "confirmed"}),
+        ("condition", {"code": "44054006", "code_system": "http://snomed.info/sct",
+                       "code_display": "Type 2 diabetes mellitus",
+                       "clinical_status": "active",
+                       "clinical_status_system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+                       "verification_status": "confirmed",
+                       "verification_status_system": "http://terminology.hl7.org/CodeSystem/condition-ver-status",
+                       "onset": "2024-03-01"}),
+        ("condition", {"code": "297142003", "code_system": "http://snomed.info/sct",
+                       "code_display": "Foot swelling",
+                       "clinical_status": "active",
+                       "clinical_status_system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+                       "verification_status": "refuted",
+                       "verification_status_system": "http://terminology.hl7.org/CodeSystem/condition-ver-status"}),
     ],
     "phc.op.household-visit": [
         ("encounter", {"status": "in_progress"}),
@@ -100,10 +129,22 @@ GOLDEN = {
         ("inventory_item", {"code": "Paracetamol 500mg", "quantity": "-9",
                             "status": "issued"}),
     ],
+    # A prescription line, as five checked answers rather than one sentence.
     "phc.op.rx-prescribe": [
-        ("medication_request", {"medication": "Paracetamol 500mg",
-                                "dosage_instruction": "1 tab TDS",
-                                "status": "active"}),
+        ("medication_request", {"medication": "777067000",
+                                "medication_system": "http://snomed.info/sct",
+                                "medication_display": "Acetaminophen only product",
+                                "dose": "500", "dose_unit": "mg",
+                                "dose_unit_system": "http://unitsofmeasure.org",
+                                "route": "26643006", "route_system": "http://snomed.info/sct",
+                                "route_display": "Oral route",
+                                "frequency": "229798009",
+                                "frequency_system": "http://snomed.info/sct",
+                                "frequency_display": "Three times daily",
+                                "duration": "5", "duration_unit": "d",
+                                "duration_unit_system": "http://unitsofmeasure.org",
+                                "status": "active",
+                                "intent": "order"}),
     ],
     # The code is the question's bound LOINC concept and not its link_id, and
     # each coding spans the three columns a FHIR Coding has. Nothing here can
@@ -194,6 +235,16 @@ SCHEMA = {"questions": [
      "styling_metadata": {"phc": {"unit": "mm[Hg]"}}},
     {"link_id": "note", "text": "Note", "type": "text"},
     {"link_id": "drugs", "text": "Drugs", "type": "structured", "repeats": True},
+    # A repeating group, with nothing required inside it: a required sub
+    # question would have to be mapped or listed under `ignored` by every
+    # test below, which would be a fixture about fixtures.
+    {"link_id": "medicines", "text": "Medicines", "type": "group",
+     "repeats": True, "styling_metadata": {"phc": {"row": "medicine"}},
+     "questions": [
+         {"link_id": "pick", "text": "Pick", "type": "choice",
+          "answer_value_set": "medication-code"},
+         {"link_id": "amount", "text": "Amount", "type": "decimal"},
+     ]},
 ]}
 
 
@@ -332,6 +383,63 @@ def test_an_answer_coding_source_needs_a_question_that_binds_its_answer():
                                      "code": {"answer_code": "nonsense"}}}],
              "ignored": ["drugs", "note"]}
     assert "is not a question on this form" in failures(worse), failures(worse)
+
+
+def test_per_row_needs_a_question_that_actually_holds_rows():
+    """`per_row` reads a repeating group, and only a repeating group.
+
+    A structured answer has no declared sub questions, so a per_row record
+    over one would lint every source against nothing and write whatever
+    arrived: the exact behaviour per_row exists to replace. A plain group does
+    not repeat, so it has no rows at all.
+    """
+    for link_id, says in (("drugs", "holds no rows"),
+                          ("note", "holds no rows"),
+                          ("nonsense", "is not a question on this form")):
+        bad = {"records": [{"resource": "observation", "per_row": link_id,
+                            "fields": {"created_by": {"actor": "id"},
+                                       "value": {"const": 1}}}],
+               "ignored": ["note", "drugs", "systolic"]}
+        said = failures(bad)
+        assert says in said, (link_id, said)
+
+
+def test_a_per_row_record_reads_its_own_row_and_nothing_else():
+    """A source in a per_row record names a sub question of that group.
+
+    Naming a top level question would read a key the row does not have, so
+    the column lands null and nothing says why. Refused at build time rather
+    than discovered as a blank column in a district report.
+    """
+    bad = {"records": [{"resource": "observation", "per_row": "medicines",
+                        "fields": {"created_by": {"actor": "id"},
+                                   "value": {"answer": "systolic"}}}],
+           "ignored": ["note", "drugs", "systolic"]}
+    said = failures(bad)
+    assert "'systolic' is not a question on this form" in said, said
+    # And the sub question of its own group is accepted.
+    good = {"records": [{"resource": "observation", "per_row": "medicines",
+                         "fields": {"created_by": {"actor": "id"},
+                                    "value": {"answer": "amount"},
+                                    "code": {"answer_code": "pick"}}}],
+            "ignored": ["note", "drugs", "systolic"]}
+    assert failures(good) == "", failures(good)
+
+
+def test_one_link_id_means_one_question():
+    """A name used twice makes every source in this file ambiguous.
+
+    A repeating group's sub questions share the namespace with the rest of the
+    form, so `{answer: dose}` could mean the row's or the form's, and the
+    lookup would resolve to whichever one `walk` yielded last. There is no
+    useful reading of a duplicate, so it is refused rather than disambiguated.
+    """
+    clash = {"questions": list(SCHEMA["questions"]) + [
+        {"link_id": "amount", "text": "Amount again", "type": "decimal"}]}
+    _, bad = mapping.compile_records(
+        {"writes": ["observation"], "mapping": GOOD}, clash)
+    said = " | ".join(bad)
+    assert "'amount' is the link_id of more than one question" in said, said
 
 
 def test_a_source_that_needs_a_context_it_does_not_have_fails_the_build():

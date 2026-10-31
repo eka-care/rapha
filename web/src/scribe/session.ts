@@ -95,6 +95,10 @@ export type Applied = {
 export function apply(draft: ScribeDraft | null, payload: Payload): Applied {
   const out: Applied = { fill: {}, held: [], refused: [] };
   for (const [link_id, value] of Object.entries(draft?.values ?? {})) {
+    // A repeating group's value is the whole list of rows, so it is held or
+    // filled as one thing. Half merging a heard list into a typed one would
+    // mean a row whose drug the doctor typed and whose dose the recording
+    // supplied, with no way to tell which was which.
     if (typed(payload[link_id])) out.held.push({ link_id, value });
     else out.fill[link_id] = value;
   }
@@ -107,8 +111,32 @@ export function apply(draft: ScribeDraft | null, payload: Payload): Applied {
  *  list without ever being ticked. */
 export function mustTick(draft: ScribeDraft | null, ticked: Set<string>, payload: Payload): string[] {
   return (draft?.tick ?? []).filter(
-    (id) => !ticked.has(id) && JSON.stringify(payload[id]) === JSON.stringify(draft!.values[id]),
+    (id) => !ticked.has(id) && JSON.stringify(at(payload, id)) === JSON.stringify(at(draft!.values, id)),
   );
+}
+
+/** One value a draft addressed, out of a payload.
+ *
+ *  A top level answer is a key. A value inside a repeating group is
+ *  `medications[1].dose`, because a tick is owed per value per row: a draft
+ *  that heard five medicines owes five drug ticks, and one tick on the
+ *  question would commit four unread rows.
+ *
+ *  Reading an id that does not resolve gives undefined, which is what an
+ *  unanswered field gives, so a draft and a payload that disagree about
+ *  whether a row exists do not accidentally match: the draft's value is
+ *  defined and the payload's is not.
+ */
+const ROW_ID = /^([A-Za-z_][A-Za-z0-9_]*)\[(\d+)\]\.([A-Za-z_][A-Za-z0-9_]*)$/;
+
+export function at(bag: Record<string, unknown>, id: string): unknown {
+  const found = ROW_ID.exec(id);
+  if (!found) return bag[id];
+  const listed = bag[found[1]];
+  if (!Array.isArray(listed)) return undefined;
+  const row = listed[Number(found[2])];
+  if (!row || typeof row !== "object") return undefined;
+  return (row as Record<string, unknown>)[found[3]];
 }
 
 /** The operation a doctor filled from a recording last time, at this station.

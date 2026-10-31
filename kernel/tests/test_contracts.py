@@ -111,6 +111,11 @@ def test_voice_and_scribe_instruments_read_back_and_commit_by_tap():
 _UNTICKED = {"string", "text", "url", "structured"}
 _STRUCTURAL = {"group", "display"}
 
+# How many rows of a repeating group this check fills. Two and not one, on
+# purpose: with one row, a draft that collapsed every row into the first would
+# still pass, and collapsing rows is the failure a repeating group adds.
+_ROWS = 2
+
 
 def _say(field):
     """Something a person could plausibly have said into this field, by type.
@@ -188,15 +193,36 @@ def test_every_non_text_value_a_recording_fills_comes_back_owing_a_tick():
                     f"{iid}/{op}/{f['link_id']}: a {f['type']} is neither free text nor ticked"
             # Not just the type table: the draft the kernel actually builds for
             # this operation names every one of those fields in `tick`.
-            answers = {f["link_id"]: {"value": _say(f), "confidence": 1.0,
-                                      "evidence": "said so"} for f in discrete}
+            # Addressed exactly as a recording would address them: a top
+            # level question by its link_id, and a question inside a repeating
+            # group once per row, by row. A repeating group multiplies this
+            # rule rather than exempting anything from it, so every field of
+            # every row is in `answers` and every one of them must come back
+            # owed a tick of its own.
+            answers = {}
+            for f in discrete:
+                said = {"value": _say(f), "confidence": 1.0, "evidence": "said so"}
+                if f["row_of"]:
+                    for row in range(_ROWS):
+                        answers[fill.row_id(f["row_of"], row, f["link_id"])] = said
+                else:
+                    answers[f["link_id"]] = said
             if not answers:
                 continue
             draft = fill.build_draft(op, schema, answers, "said so",
                                      instrument=iid, today=date(2026, 1, 2))
             assert draft, f"{iid}/{op}: nothing coerced, so this check proved nothing"
-            assert set(draft["values"]) == set(answers), \
-                f"{iid}/{op}: {set(answers) - set(draft['values'])} did not coerce"
+            # The values a draft carries are addressed one way at the top level
+            # and another inside a row, so the comparison is against the ids
+            # the draft itself owes a tick for, plus the rows it built.
+            groups = {f["row_of"] for f in discrete if f["row_of"]}
+            assert set(draft["values"]) == \
+                {f["link_id"] for f in discrete if not f["row_of"]} | groups, \
+                f"{iid}/{op}: {sorted(draft['values'])} is not what was said"
+            for group in groups:
+                assert len(draft["values"][group]) == _ROWS, \
+                    f"{iid}/{op}/{group}: {_ROWS} rows were said and " \
+                    f"{len(draft['values'][group])} came back; rows were collapsed"
             assert set(draft["tick"]) == set(answers), \
                 f"{iid}/{op}: heard but not owed a tick: {set(answers) - set(draft['tick'])}"
             seen += len(answers)

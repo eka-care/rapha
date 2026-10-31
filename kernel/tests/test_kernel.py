@@ -124,6 +124,17 @@ def consulted():
 
 
 VITALS = {"systolic": 122, "diastolic": 78, "pulse": 74}
+# One valid prescription row and one valid diagnosis row, and both must stay
+# valid: a repeating group is validated per row now, so a half filled row is a
+# denial for a reason that has nothing to do with the rule a check is about.
+# Written out here rather than per test so that a new sub question breaks one
+# line instead of eight. The codes are the value sets' own.
+RX = {"medications": [{"drug": "774586009", "dose": 500, "dose_unit": "mg",
+                       "route": "26643006", "frequency": "229798009",
+                       "duration": 5, "duration_unit": "d"}]}
+RX_EDITED = {"medications": [dict(RX["medications"][0], dose=250)]}
+DX = [{"condition": "44054006", "clinical_status": "active",
+       "verification_status": "confirmed"}]
 
 
 # --------------------------------------------------------------------------
@@ -312,7 +323,7 @@ def test_a_critical_but_in_range_value_raises_a_stored_flag():
 
 def test_a_proposal_is_judged_again_at_confirm_and_not_when_it_was_made():
     s = consulted()
-    payload = {"medications": [{"drug": "amoxicillin", "dose": "500mg"}]}
+    payload = dict(RX)
     d, prop = proposals.propose(s, BUNDLE, "phc.op.rx-prescribe", thread=T, payload=payload,
                                 caps={"rx.prescribe"}, actor="agent")
     assert d and d.reason == "proposed" and prop.status == "pending"
@@ -327,8 +338,8 @@ def test_a_proposal_is_judged_again_at_confirm_and_not_when_it_was_made():
 
 def test_confirming_writes_once_and_leaves_both_payloads_on_the_record():
     s = consulted()
-    proposed = {"medications": [{"drug": "amoxicillin", "dose": "500mg"}]}
-    edited = {"medications": [{"drug": "amoxicillin", "dose": "250mg"}]}
+    proposed = dict(RX)
+    edited = dict(RX_EDITED)
     _, prop = proposals.propose(s, BUNDLE, "phc.op.rx-prescribe", thread=T,
                                 payload=proposed, caps={"rx.prescribe"}, actor="agent")
     d, done = proposals.confirm(s, BUNDLE, prop, caps={"rx.prescribe"}, actor="mo",
@@ -344,7 +355,7 @@ def test_confirming_writes_once_and_leaves_both_payloads_on_the_record():
 def test_a_confirmed_proposal_cannot_be_confirmed_twice():
     s = consulted()
     _, prop = proposals.propose(s, BUNDLE, "phc.op.rx-prescribe", thread=T,
-                                payload={"medications": [{"drug": "x"}]},
+                                payload=dict(RX),
                                 caps={"rx.prescribe"}, actor="agent")
     _, done = proposals.confirm(s, BUNDLE, prop, caps={"rx.prescribe"}, actor="mo")
     d, _ = proposals.confirm(s, BUNDLE, done, caps={"rx.prescribe"}, actor="mo")
@@ -355,7 +366,7 @@ def test_a_confirmed_proposal_cannot_be_confirmed_twice():
 def test_rejecting_writes_nothing_and_stays_on_the_record():
     s = consulted()
     _, prop = proposals.propose(s, BUNDLE, "phc.op.rx-prescribe", thread=T,
-                                payload={"medications": [{"drug": "x"}]},
+                                payload=dict(RX),
                                 caps={"rx.prescribe"}, actor="agent")
     done = proposals.reject(s, prop, actor="mo", reason="allergy on file")
     assert done.status == "rejected" and "medication_request" not in s.rows
@@ -367,7 +378,7 @@ def test_a_capability_the_caller_lacks_is_denied_and_audited_on_both_surfaces():
     for surface, call in (("mcp", proposals.propose), ("rendered", proposals.commit)):
         s = consulted()
         out = call(s, BUNDLE, "phc.op.rx-prescribe", thread=T,
-                   payload={"medications": [{"drug": "x"}]}, caps={"vitals.record"},
+                   payload=dict(RX), caps={"vitals.record"},
                    actor="nurse")
         d = out[0] if isinstance(out, tuple) else out
         assert not d and "missing capability" in d.reason, surface
@@ -698,7 +709,7 @@ def test_a_thread_view_is_the_shape_the_renderer_was_promised():
     import json
     s = consulted()
     proposals.propose(s, BUNDLE, "phc.op.rx-prescribe", thread=T,
-                      payload={"medications": [{"drug": "x"}]},
+                      payload=dict(RX),
                       caps={"rx.prescribe"}, actor="agent")
     ref = _refs(T)[0]
     view = state.thread_view(s, ref, WF, OPS, caps={"patient.find", "rx.prescribe"},

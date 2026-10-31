@@ -16,7 +16,7 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   actorOf, agentLine, clock, fmt, header, messages, queueViewFor, summariesFor,
@@ -24,10 +24,19 @@ import {
 } from "./messages.ts";
 import { firstOperation, isAsk, rows } from "./search.ts";
 import { blankRow, itemFields, toRow } from "./structured.ts";
+import { isRowGroup, rowQuestions, walk } from "./validate.ts";
+import { optionsFrom, type ValueSet } from "./valuesets.ts";
 import type { Catalogue, Operation, Questionnaire, ThreadView, ViewDecl, ViewResult } from "./types";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const read = (p: string) => readFileSync(root + p, "utf8");
+// The value sets the real screens read, loaded the way this check loads
+// everything else: off disk, not from a copy of what they should contain.
+const SETS: Record<string, ValueSet> = Object.fromEntries(
+  readdirSync(root + "terminology").filter((f) => f.endsWith(".json"))
+    .map((f) => [f.replace(/\.json$/, ""), JSON.parse(read(`terminology/${f}`)) as ValueSet]),
+);
+const options = (q: Parameters<typeof optionsFrom>[0]) => optionsFrom(q, SETS);
 const cat = JSON.parse(read("catalogue/catalogue.json")) as Catalogue;
 
 const schema = (id: string | undefined): Questionnaire | null => {
@@ -261,13 +270,17 @@ print(json.dumps(declarations.load().operations))
 );
 for (const [id, op] of Object.entries(mapped)) cat.operations[id] = op;
 
+// Two questions, not four. A diagnosis and a prescription are repeating
+// GROUPS now: their sub questions are declared on the questionnaire, with
+// types and value sets, so the form reads them from there and `itemFields`
+// has nothing to say about either. What is left here is the two questions
+// still typed `structured`, which is exactly what this list is for: when
+// those two become groups it empties and this block goes with them.
 for (const [id, link_id, expected] of [
-  ["phc.op.rx-prescribe", "medications", ["medication", "dosage_instruction"]],
   ["phc.op.lab-order", "investigations", ["code"]],
   // Two records, both per_item, and the second names the same keys: one field
   // each, not four.
   ["phc.op.pharmacy-dispense", "dispenses", ["medication", "quantity"]],
-  ["phc.op.consult-document", "diagnosis", ["code"]],
 ] as [string, string, string[]][]) {
   const op = cat.operations[id];
   assert.ok(op, `${id} is not in the catalogue`);
@@ -282,20 +295,52 @@ for (const [id, link_id, expected] of [
 assert.deepEqual(itemFields(cat.operations["phc.op.vitals-record"], "medications"), []);
 assert.deepEqual(itemFields(undefined, "medications"), []);
 
+// A repeating group's question has no item fields at all, by either route:
+// its shape is on the questionnaire and `per_item` is not what reads it.
+for (const [id, link_id] of [["phc.op.rx-prescribe", "medications"],
+                             ["phc.op.consult-document", "diagnosis"]] as [string, string][]) {
+  assert.deepEqual(itemFields(cat.operations[id], link_id), [],
+    `${id}/${link_id} is a repeating group; its fields are declared on the form`);
+}
+
+// And the form draws them from the declaration, with the value set each bound
+// answer is drawn from behind the picker. This is where the empty dropdown
+// was: a bound choice declares no answer_option, so until `options()` existed
+// every one of these drew "Choose" and nothing else.
+for (const [id, link_id, expected] of [
+  ["phc.schema.rx-v1", "medications",
+   ["drug", "dose", "dose_unit", "route", "frequency", "duration", "duration_unit"]],
+  ["phc.schema.consult-v1", "diagnosis",
+   ["condition", "clinical_status", "verification_status", "onset"]],
+] as [string, string, string[]][]) {
+  const found = schema(id);
+  assert.ok(found, `${id} is not a questionnaire`);
+  const group = walk(found!.questions).find((q) => q.link_id === link_id);
+  assert.ok(group && isRowGroup(group), `${id}/${link_id} is not a repeating group`);
+  assert.deepEqual([...rowQuestions(group!).keys()], expected, id);
+  for (const sub of rowQuestions(group!).values()) {
+    if (sub.type !== "choice") continue;
+    assert.ok(options(sub).length, `${id}/${sub.link_id}: a choice with nothing to choose`);
+    for (const o of options(sub)) {
+      assert.ok(o.display && o.display !== o.value,
+        `${id}/${sub.link_id}: ${o.value} is offered as its own code, which nobody reads`);
+    }
+  }
+}
+
 // A row the kernel sent as a bare string keeps its text where mapping.items()
 // would have looked for it, so opening a proposal never loses a line.
-const rxFields = itemFields(cat.operations["phc.op.rx-prescribe"], "medications");
-assert.deepEqual(toRow("Amoxicillin 500mg", rxFields), { medication: "Amoxicillin 500mg" });
-assert.deepEqual(toRow({ medication: "A", dosage_instruction: "B" }, rxFields),
-  { medication: "A", dosage_instruction: "B" });
+const orderFields = itemFields(cat.operations["phc.op.lab-order"], "investigations");
+assert.deepEqual(toRow("CBC", orderFields), { code: "CBC" });
+assert.deepEqual(toRow({ code: "CBC" }, orderFields), { code: "CBC" });
 assert.deepEqual(toRow("CBC", []), { code: "CBC" });
-assert.equal(blankRow({ medication: "", dosage_instruction: "  " }), true);
+assert.equal(blankRow({ medication: "", quantity: "  " }), true);
 assert.equal(blankRow({ medication: "A" }), false);
 
 // And a card reads one back with the names on it rather than as a run-on
 // string. This is the whole difference between a record and a sentence.
-assert.equal(fmt([{ medication: "Amoxicillin 500mg", dosage_instruction: "1 cap TDS" }]),
-  "Medication: Amoxicillin 500mg, Dosage instruction: 1 cap TDS");
+assert.equal(fmt([{ medication: "Amoxicillin 500mg", quantity: "10" }]),
+  "Medication: Amoxicillin 500mg, Quantity: 10");
 assert.equal(fmt([{ code: "CBC" }, { code: "RBS" }]), "CBC; RBS");
 assert.equal(fmt("plain"), "plain");
 

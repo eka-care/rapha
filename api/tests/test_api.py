@@ -185,8 +185,12 @@ def test_the_summary_view_is_the_thread_panel_declared():
     titles = [s["title"] for s in body["rows"]]
     assert titles[0] == "Visit" and "Audit trail" in titles
     prescription = [s for s in body["rows"] if s["title"] == "Prescription"][0]
-    assert len(prescription["rows"]) == 2
-    assert set(prescription["rows"][0]) == {"medication", "dosage_instruction", "status"}
+    assert len(prescription["rows"]) == 1
+    # The five answers a prescription line is made of, drawn as the displays
+    # the value sets gave them rather than as the codes stored beside them.
+    assert set(prescription["rows"][0]) == {
+        "medication_display", "dose", "dose_unit", "frequency_display",
+        "route_display", "duration", "duration_unit", "status"}
     assert client.get("/api/views/phc.view.visit-summary").status_code == 400
 
 

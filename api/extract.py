@@ -8,6 +8,13 @@ the model answers rather than asked of it:
 - a link_id the field list does not hold is dropped;
 - no key means no answer. The caller shows the transcript and the keypad.
 
+A field inside a repeating group carries `row_of`, and an answer to one must
+say which row it belongs to. The evidence rule is unchanged and it is now the
+rule that governs a row: every value of every row needs its own span, so a row
+the transcript does not support loses its answers one at a time and ends up
+empty, which `api/fill.py` drops. A row is never completed from a neighbour
+and never merged into one.
+
 Run: python3 -m api.extract
 """
 from __future__ import annotations
@@ -15,6 +22,8 @@ from __future__ import annotations
 import json
 import os
 import re
+
+from api import fill
 
 MODEL = "claude-opus-5"
 
@@ -27,6 +36,11 @@ SYSTEM = (
     "one of its options verbatim. Write values in English, except free text fields "
     "(type text or string), which keep the spoken language. Dates as spoken. "
     "confidence is 0 to 1: how clearly the words state this value."
+    " A field with a `row_of` belongs to a repeating group, where one row is "
+    "one medicine or one condition: answer it once per row and set `row` to "
+    "that row's number, counting from 0 in the order the transcript names "
+    "them. Keep a row's answers under the same `row`. Leave out a field a row "
+    "does not state rather than repeating the value from another row."
 )
 
 TOOL = {
@@ -41,6 +55,10 @@ TOOL = {
                 "value": {},
                 "confidence": {"type": "number"},
                 "evidence": {"type": "string"},
+                "row": {"type": "integer", "description":
+                        "which row of its repeating group this answer is in, "
+                        "counting from 0. Required for a field with a row_of, "
+                        "and left out for every other field."},
             },
             "required": ["link_id", "value", "confidence", "evidence"],
         }}},
@@ -63,7 +81,8 @@ def extract(fields, transcript, *, client=None, model=MODEL):
             return {}
         import anthropic
         client = anthropic.Anthropic()
-    brief = [{k: f.get(k) for k in ("link_id", "text", "description", "type", "unit", "options")}
+    brief = [{k: f.get(k) for k in ("link_id", "text", "description", "type",
+                                    "unit", "options", "row_of")}
              for f in fields]
     message = client.messages.create(
         model=model, max_tokens=4000, system=SYSTEM, tools=[TOOL],
@@ -71,7 +90,7 @@ def extract(fields, transcript, *, client=None, model=MODEL):
         messages=[{"role": "user", "content": json.dumps(
             {"fields": brief, "transcript": transcript}, ensure_ascii=False)}])
 
-    known = {f["link_id"] for f in fields}
+    known = {f["link_id"]: f for f in fields}
     heard = _norm(transcript)
     out = {}
     for block in message.content:
@@ -79,7 +98,10 @@ def extract(fields, transcript, *, client=None, model=MODEL):
             continue
         for a in (block.input or {}).get("answers") or []:
             link_id, evidence = a.get("link_id"), str(a.get("evidence") or "")
-            if link_id not in known or link_id in out:
+            if link_id not in known:
+                continue
+            ident = _ident(known[link_id], a)
+            if ident in out:
                 continue
             if not evidence.strip() or _norm(evidence) not in heard:
                 continue
@@ -87,9 +109,25 @@ def extract(fields, transcript, *, client=None, model=MODEL):
                 confidence = max(0.0, min(1.0, float(a.get("confidence"))))
             except (TypeError, ValueError):
                 confidence = 0.0
-            out[link_id] = {"value": a.get("value"), "confidence": confidence,
-                            "evidence": evidence}
+            out[ident] = {"value": a.get("value"), "confidence": confidence,
+                          "evidence": evidence}
     return out
+
+
+def _ident(field, answer):
+    """The id this answer is filed under: row addressed, or the bare link_id.
+
+    A row field whose answer names no row keeps its bare link_id and is
+    therefore dropped by `api/fill.py`, which names it in `unfilled`. That is
+    deliberate: the alternative is choosing a row for it, and a dose on a
+    medicine nobody identified goes on whichever medicine was first. Dropped
+    and named beats placed and plausible.
+    """
+    group = field.get("row_of")
+    row = answer.get("row")
+    if not group or not isinstance(row, int) or isinstance(row, bool) or row < 0:
+        return field["link_id"]
+    return fill.row_id(group, row, field["link_id"])
 
 
 def demo():
@@ -126,6 +164,44 @@ def demo():
         "evidence matches ignoring case and spacing, and a later bad answer does not replace it"
     assert stub.asked["model"] == MODEL
     assert "140 over 90" in stub.asked["messages"][0]["content"]
+
+    # A repeating group. Two rows, each answer carrying its own span, and the
+    # three refusals: a row answer whose span is not in the transcript, a
+    # second answer for a row and field already filled, and a row field with
+    # no row at all.
+    rx = [{"link_id": "drug", "text": "Medicine", "type": "choice",
+           "unit": None, "options": ["777067000", "774586009"],
+           "row_of": "medications", "required": True},
+          {"link_id": "dose", "text": "Dose", "type": "decimal", "unit": None,
+           "options": [], "row_of": "medications", "required": True}]
+    said = "Paracetamol 650 twice a day, and amoxicillin 500 three times."
+    stub = Stub([
+        {"link_id": "drug", "value": "777067000", "row": 0, "confidence": 0.9,
+         "evidence": "Paracetamol"},
+        {"link_id": "dose", "value": 650, "row": 0, "confidence": 0.9,
+         "evidence": "650"},
+        {"link_id": "drug", "value": "774586009", "row": 1, "confidence": 0.9,
+         "evidence": "amoxicillin"},
+        {"link_id": "dose", "value": 500, "row": 1, "confidence": 0.9,
+         "evidence": "500"},
+        {"link_id": "dose", "value": 250, "row": 2, "confidence": 0.9,
+         "evidence": "metronidazole 250 at night"},
+        {"link_id": "dose", "value": 999, "row": 0, "confidence": 0.9,
+         "evidence": "650"},
+        {"link_id": "dose", "value": 325, "confidence": 0.9, "evidence": "500"},
+    ])
+    got = extract(rx, said, client=stub)
+    assert set(got) == {"medications[0].drug", "medications[0].dose",
+                        "medications[1].drug", "medications[1].dose",
+                        "dose"}, got
+    assert got["medications[0].dose"]["value"] == 650, \
+        "a second answer for a row and field already filled does not replace it"
+    assert "medications[2].dose" not in got, \
+        "a row answer with no span in the transcript is dropped, not kept empty"
+    assert got["dose"]["value"] == 325, \
+        "a row field with no row keeps its bare id, so the draft drops it by name"
+    assert "row_of" in stub.asked["messages"][0]["content"], \
+        "the model is told which fields are rows"
 
     saved = os.environ.pop("ANTHROPIC_API_KEY", None)
     try:

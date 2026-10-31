@@ -285,7 +285,7 @@ def thread_with_an_order():
               "phone": "9876511111", "village": "Tadipatri", "category": "ncd"}),
             ("phc.op.vitals-record", {"systolic": 118, "diastolic": 76, "pulse": 80}),
             ("phc.op.consult-document",
-             {"assessment": "Anaemia suspected", "diagnosis": [{"code": "Anaemia"}]}),
+             {"assessment": "Anaemia suspected"}),
             ("phc.op.lab-order", {"investigations": [{"code": "Haemoglobin"}]})):
         decision = proposals.commit(store, BUNDLE, op_id, thread=thread,
                                     payload=payload, caps=CAPS, actor=TECH)

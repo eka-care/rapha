@@ -17,13 +17,41 @@ input: phc.schema.rx-v1
 writes: [medication_request]
 mapping:
   records:
+    # One MedicationRequest per medicine row. A medicine is a drug, a dose, a
+    # route, a frequency and a course length, and all five are columns rather
+    # than one `dosage_instruction` string.
+    #
+    # What this replaces squashed the whole dosage into `{item:
+    # [dosage_instruction, dose]}`, which meant a prescription could not be
+    # counted, could not be checked against stock by strength, and reached
+    # ABDM as a sentence rather than a Dosage. The drug column held free text
+    # for the same reason the diagnosis column did.
+    #
+    # Every coded field is resolved per row, and kernel/mapping._row refuses a
+    # row whose coded answer is missing. So a medicine with no route is no row
+    # at all rather than a half coded one, and it cannot inherit the route of
+    # the medicine above it.
     - resource: medication_request
-      per_item: medications
+      per_row: medications
       fields:
         created_by: {actor: id}
-        medication: {item: [medication, drug, code]}
-        dosage_instruction: {item: [dosage_instruction, dose]}
+        medication: {answer_code: drug}
+        medication_system: {answer_code_system: drug}
+        medication_display: {answer_code_display: drug}
+        dose: {answer: dose}
+        dose_unit: {answer_code: dose_unit}
+        dose_unit_system: {answer_code_system: dose_unit}
+        route: {answer_code: route}
+        route_system: {answer_code_system: route}
+        route_display: {answer_code_display: route}
+        frequency: {answer_code: frequency}
+        frequency_system: {answer_code_system: frequency}
+        frequency_display: {answer_code_display: frequency}
+        duration: {answer: duration}
+        duration_unit: {answer_code: duration_unit}
+        duration_unit_system: {answer_code_system: duration_unit}
         status: {const: active}
+        intent: {const: order}
 emits: [rx.confirmed]
 surfaces: [rendered, mcp]
 verified:

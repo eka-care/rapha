@@ -23,9 +23,16 @@ PAYLOADS = {
                          "abha_number": "12-0000-0000-0000"},
     "phc.op.vitals-record": {"systolic": 118, "diastolic": 76, "pulse": 80},
     "phc.op.consult-document": {"assessment": "Viral fever",
-                                "diagnosis": [{"code": "A99"}]},
-    "phc.op.rx-prescribe": {"medications": [{"medication": "Paracetamol 500mg",
-                                             "dosage_instruction": "1 tab TDS"}]},
+                                "diagnosis": [
+                                    {"condition": "44054006",
+                                     "clinical_status": "active",
+                                     "verification_status": "confirmed"}]},
+    "phc.op.rx-prescribe": {"medications": [{"drug": "777067000",
+                                             "dose": 500, "dose_unit": "mg",
+                                             "route": "26643006",
+                                             "frequency": "229798009",
+                                             "duration": 5,
+                                             "duration_unit": "d"}]},
     "phc.op.lab-order": {"investigations": [{"code": "CBC"}]},
     # The analyte is the LOINC code its question binds to, and the unit is the
     # one LOINC reports it in: the free text this used to be is now refused

@@ -14,10 +14,107 @@
     {
       "link_id": "medications",
       "text": "Medications",
-      "type": "structured",
-      "structured_type": "medication_request",
+      "type": "group",
+      "repeats": true,
       "required": true,
-      "repeats": true
+      "styling_metadata": {
+        "phc": {
+          "short": "Medicines",
+          "row": "medicine",
+          "help": "One row per medicine. A medicine is a drug, a dose, a route, how often and for how long, and every one of those is checked. A row missing any of them is refused rather than stored half coded."
+        }
+      },
+      "questions": [
+        {
+          "link_id": "drug",
+          "text": "Medicine",
+          "type": "choice",
+          "answer_value_set": "medication-code",
+          "required": true,
+          "styling_metadata": {
+            "phc": {
+              "short": "Medicine",
+              "help": "The medicine, as a SNOMED CT product with no strength and no form in it. The strength is the dose answer below, so the two cannot disagree. The list is a starter set of primary level essential medicines and is not this facility's formulary."
+            }
+          }
+        },
+        {
+          "link_id": "dose",
+          "text": "Dose",
+          "type": "decimal",
+          "required": true,
+          "styling_metadata": {
+            "phc": {
+              "short": "Dose",
+              "help": "How much, as a number. No limit is checked here, because no authoritative dose range was available to check against and an invented one would be worse than none."
+            }
+          }
+        },
+        {
+          "link_id": "dose_unit",
+          "text": "Dose unit",
+          "type": "choice",
+          "answer_value_set": "dose-unit",
+          "required": true,
+          "styling_metadata": {
+            "phc": {
+              "short": "Unit",
+              "help": "The unit the dose is in. A separate list from the course length, so a dose cannot be given in weeks."
+            }
+          }
+        },
+        {
+          "link_id": "route",
+          "text": "Route",
+          "type": "choice",
+          "answer_value_set": "medication-route",
+          "required": true,
+          "styling_metadata": {
+            "phc": {
+              "short": "Route",
+              "help": "How it is taken. A member of FHIR's own route list."
+            }
+          }
+        },
+        {
+          "link_id": "frequency",
+          "text": "Frequency",
+          "type": "choice",
+          "answer_value_set": "medication-frequency",
+          "required": true,
+          "styling_metadata": {
+            "phc": {
+              "short": "How often",
+              "help": "How many times a day, as the SNOMED concept ABDM's own example uses. It says the number of times and nothing else: no timing, no relation to meals and no 'as required'."
+            }
+          }
+        },
+        {
+          "link_id": "duration",
+          "text": "Course length",
+          "type": "integer",
+          "required": true,
+          "styling_metadata": {
+            "phc": {
+              "short": "For",
+              "help": "How long the course runs, as a whole number."
+            }
+          }
+        },
+        {
+          "link_id": "duration_unit",
+          "text": "Course length unit",
+          "type": "choice",
+          "answer_value_set": "duration-unit",
+          "required": true,
+          "styling_metadata": {
+            "phc": {
+              "short": "Unit",
+              "help": "The unit the course length is in."
+            }
+          }
+        }
+      ]
     }
   ]
 }

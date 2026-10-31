@@ -24,12 +24,30 @@ mapping:
       fields:
         created_by: {actor: id}
         text: {note: [history, examination, assessment, plan]}
+    # One Condition per diagnosis row, and every coded part of it resolved
+    # from the row's own answer through the value set that answer binds to.
+    #
+    # What this replaces was `per_item: diagnosis` with `code: {item: [code,
+    # text]}` and `verification_status: {const: confirmed}`. Two defects, and
+    # the second is the dangerous one. The code column held whatever text a
+    # renderer put in a free text row, because a structured answer has no
+    # declared shape and nothing validated one anywhere. And every diagnosis
+    # was stored as CONFIRMED by a literal, which is invariant I6 inverted:
+    # "patient denies chest pain" became a confirmed chest pain, and a scribe's
+    # guess became a settled fact. Both are now answers the doctor gives, and
+    # `refuted` and `unconfirmed` are the codes that say so.
     - resource: condition
-      per_item: diagnosis
+      per_row: diagnosis
       fields:
         created_by: {actor: id}
-        code: {item: [code, text]}
-        verification_status: {const: confirmed}
+        code: {answer_code: condition}
+        code_system: {answer_code_system: condition}
+        code_display: {answer_code_display: condition}
+        clinical_status: {answer_code: clinical_status}
+        clinical_status_system: {answer_code_system: clinical_status}
+        verification_status: {answer_code: verification_status}
+        verification_status_system: {answer_code_system: verification_status}
+        onset: {answer: onset}
 emits: [consult.documented]
 surfaces: [rendered, mcp]
 verified:

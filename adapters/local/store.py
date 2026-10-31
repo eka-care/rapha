@@ -84,10 +84,30 @@ TABLES = {
     "observation": ("id", "encounter", "category", "code", "code_system",
                     "code_display", "value", "unit", "unit_system",
                     "created_by", "created_date"),
-    "condition": ("id", "encounter", "code", "verification_status",
-                  "created_by", "created_date"),
+    # A diagnosis is a coded condition, a clinical status, a verification
+    # status and an onset, each of the three codes carrying the system it came
+    # from. Flat for the reason observation is flat: a district count of a
+    # condition is a WHERE on one column.
+    "condition": ("id", "encounter", "code", "code_system", "code_display",
+                  "clinical_status", "clinical_status_system",
+                  "verification_status", "verification_status_system",
+                  "onset", "created_by", "created_date"),
     "notes": ("id", "encounter", "text", "created_by", "created_date"),
-    "medication_request": ("id", "encounter", "medication", "dosage_instruction",
+    # A prescription line is five answers, not a sentence. `dosage_instruction`
+    # is gone: it held the dose and the frequency as prose, so neither could be
+    # counted and neither reached ABDM as a Dosage.
+    "medication_request": ("id", "encounter", "medication", "medication_system",
+                           "medication_display", "dose", "dose_unit",
+                           "dose_unit_system", "route", "route_system",
+                           "route_display", "frequency", "frequency_system",
+                           "frequency_display", "duration", "duration_unit",
+                           "duration_unit_system",
+                           # R4 makes MedicationRequest.intent required and
+                           # fixes nothing, so it is declared in the atom as a
+                           # constant and stored, rather than hard-coded in
+                           # kernel/fhir.py where the projection would be
+                           # deciding what a prescription is.
+                           "intent",
                            "status", "created_by", "created_date"),
     "medication_dispense": ("id", "encounter", "medication", "quantity", "status",
                             "created_by", "created_date"),

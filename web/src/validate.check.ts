@@ -13,6 +13,16 @@ import { enabled, prune, raisedFlags, validate, walk } from "./validate.ts";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const load = (id: string) => JSON.parse(readFileSync(`${root}questionnaires/${id}.json`, "utf8"));
 
+// One valid row of each group, so a case can be about one thing wrong rather
+// than about six fields missing.
+const RX = {
+  drug: "777067000", dose: 500, dose_unit: "mg", route: "26643006",
+  frequency: "229798009", duration: 5, duration_unit: "d",
+};
+const DX = {
+  condition: "44054006", clinical_status: "active", verification_status: "confirmed",
+};
+
 const CASES: [string, Record<string, unknown>][] = [
   ["phc.schema.vitals-v1", {}],
   ["phc.schema.vitals-v1", { systolic: 140, diastolic: 90, pulse: 78 }],
@@ -38,6 +48,23 @@ const CASES: [string, Record<string, unknown>][] = [
   ["phc.schema.register-v1", { name: "A", age: 41, sex: "female", phone: "9", village: "V", capture_consent: "yes" }],
   ["phc.schema.register-v1", { name: "A", age: 41, sex: "female", phone: "9", village: "V", capture_consent: false }],
   ["phc.schema.consult-v1", { assessment: "viral fever", capture_stop: true }],
+  // Repeating groups. Every one of these used to be accepted in silence,
+  // because `type: structured` had no sub schema and neither validator looked
+  // inside the answer. They are the rows a doctor actually gets wrong.
+  ["phc.schema.rx-v1", {}],
+  ["phc.schema.rx-v1", { medications: [] }],
+  ["phc.schema.rx-v1", { medications: "Paracetamol 500 TDS" }],
+  ["phc.schema.rx-v1", { medications: ["Paracetamol 500 TDS"] }],
+  ["phc.schema.rx-v1", { medications: [{ drug: "777067000" }] }],
+  ["phc.schema.rx-v1", { medications: [RX, { ...RX, dose: "a lot" }] }],
+  ["phc.schema.rx-v1", { medications: [RX, { ...RX, duration: 1.5 }] }],
+  ["phc.schema.rx-v1", { medications: [{ ...RX, dosage_instruction: "1 tab TDS" }] }],
+  ["phc.schema.rx-v1", { medications: [RX, RX] }],
+  ["phc.schema.rx-v1", { medications: [RX], drug: "777067000" }],
+  ["phc.schema.consult-v1", { assessment: "fever", diagnosis: [] }],
+  ["phc.schema.consult-v1", { assessment: "fever", diagnosis: [DX] }],
+  ["phc.schema.consult-v1", { assessment: "fever", diagnosis: [{ onset: "2026-01-01" }] }],
+  ["phc.schema.consult-v1", { assessment: "fever", diagnosis: [DX, { condition: "A99" }] }],
 ];
 
 const py = `

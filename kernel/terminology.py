@@ -82,6 +82,8 @@ import json
 import pathlib
 from typing import Optional, Protocol, Sequence
 
+from catalogue import validate
+
 ROOT = pathlib.Path(__file__).parents[1]
 CACHE = ROOT / "terminology"
 
@@ -396,7 +398,39 @@ def answer_problems(schema, payload, terminology: Optional[Terminology] = None):
     until now.
     """
     t = terminology or LOCAL
-    questions = {q["link_id"]: q for q in _walk(schema.get("questions") or [])}
+    problems = []
+    # A repeating group's answer is a list of rows, and each row is a payload
+    # over that group's own sub questions. So the rules below run once per row
+    # with the row as the payload, and the row number is in the sentence.
+    #
+    # This is where a repeating group multiplies the risk rather than adding
+    # to it: one unbound code used to be one bad row, and now one unbound code
+    # is one bad row out of five on a prescription a pharmacist reads.
+    for link_id, group in validate.row_groups(schema).items():
+        rows = payload.get(link_id)
+        if not isinstance(rows, list):
+            continue
+        questions = validate.row_questions(group)
+        for index, row in enumerate(rows):
+            if not isinstance(row, dict):
+                continue
+            problems += ["%s[%d].%s" % (link_id, index, line)
+                         for line in _problems(questions, row, t)]
+    inside = set()
+    for group in validate.row_groups(schema).values():
+        inside |= set(validate.row_questions(group))
+    questions = {q["link_id"]: q for q in _walk(schema.get("questions") or [])
+                 if q["link_id"] not in inside}
+    return problems + _problems(questions, payload, t)
+
+
+def _problems(questions, payload, t):
+    """The two terminology rules over one flat set of answers.
+
+    One flat set, which is either the payload or one row of a repeating group:
+    the rules are identical and a row is a payload over fewer questions, so
+    there is one implementation and a row cannot be checked less than the form.
+    """
     problems = []
     for link_id, question in questions.items():
         answer = payload.get(link_id)

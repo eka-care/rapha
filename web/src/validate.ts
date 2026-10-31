@@ -51,9 +51,115 @@ function cast(type: string, v: unknown): number | null {
   return null;
 }
 
+/** Does this question hold a list of rows? A `group` that repeats. Mirrors
+ *  catalogue/validate.is_row_group. */
+export const isRowGroup = (q: Question): boolean =>
+  q.type === "group" && Boolean(q.repeats);
+
+/** Every repeating group on this form, by link_id. */
+export function rowGroups(schema: Questionnaire): Map<string, Question> {
+  return new Map(walk(schema.questions).filter(isRowGroup).map((q) => [q.link_id, q]));
+}
+
+/** One repeating group's sub questions, by link_id. */
+export function rowQuestions(group: Question): Map<string, Question> {
+  return new Map(walk(group.questions ?? []).map((q) => [q.link_id, q]));
+}
+
+/** What one row of this group is called, in a sentence a clinician reads. */
+export const rowLabel = (group: Question): string => phcOf(group).row ?? "row";
+
+/** Type, choice and range failures for one answered value. `where` says which
+ *  row it was in and is empty at the top level. */
+function answerProblems(q: Question, given: unknown, where: string, override: string): Problem[] {
+  const link_id = where + q.link_id;
+  let value = given;
+  const numeric = NUMERIC.has(q.type);
+  if (numeric) {
+    const n = cast(q.type, value);
+    if (n === null) return [{ link_id, message: `${link_id} must be ${q.type}` }];
+    value = n;
+  } else if (q.type === "boolean" && typeof value !== "boolean") {
+    return [{ link_id, message: `${link_id} must be boolean` }];
+  } else if (q.type === "choice") {
+    const allowed = (q.answer_option ?? []).map((o) => o.value);
+    if (allowed.length && !allowed.includes(value as string)) {
+      const sorted = [...allowed].sort();
+      return [{
+        link_id,
+        message: `${link_id} must be one of [${sorted.map((s) => `'${s}'`).join(", ")}]`,
+      }];
+    }
+  }
+
+  // The range rule. A value outside physiological range blocks the commit
+  // and requires an explicit override carrying a reason. The override is
+  // recorded, not waived.
+  const rng: Range | undefined = phcOf(q).range;
+  if (rng && numeric) {
+    const n = value as number;
+    if (!(rng.low <= n && n <= rng.high)) {
+      if (override) return [];
+      return [{
+        link_id,
+        message: `${link_id} is ${py(n, q.type)}, outside ${py(rng.low, "raw")} to ${py(rng.high, "raw")}. ` +
+          "Enter a reason to override, or correct the value.",
+      }];
+    }
+  }
+  return [];
+}
+
+/** Every failure in one repeating group's answer, row by row. The row number
+ *  is in every sentence: "medications is invalid" does not say which line. */
+function rowProblems(link_id: string, group: Question, payload: Payload, override: string): Problem[] {
+  const subs = rowQuestions(group);
+  const label = rowLabel(group);
+  const value = payload[link_id];
+  const empty = value === undefined || value === null || value === "" ||
+    (Array.isArray(value) && !value.length);
+  if (empty) return group.required ? [{ link_id, message: `${link_id} is required` }] : [];
+  if (!Array.isArray(value)) {
+    return [{ link_id, message: `${link_id} is a list of rows, one per ${label}` }];
+  }
+  const problems: Problem[] = [];
+  value.forEach((row, index) => {
+    const where = `${link_id}[${index}].`;
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      problems.push({
+        link_id,
+        message: `${link_id}[${index}] is not a ${label}: a ${label} is a set of answers, not a single value`,
+      });
+      return;
+    }
+    const given = row as Record<string, unknown>;
+    for (const [sub_id, q] of subs) {
+      const has = sub_id in given && answered(given[sub_id]);
+      if (q.required && !has) {
+        problems.push({ link_id, message: `${where}${sub_id} is required` });
+        continue;
+      }
+      if (!has) continue;
+      problems.push(...answerProblems(q, given[sub_id], where, override).map(
+        (p) => ({ link_id, message: p.message })));
+    }
+    for (const extra of Object.keys(given).filter((k) => !subs.has(k)).sort()) {
+      problems.push({ link_id, message: `${where}${extra} is not a question on this ${label}` });
+    }
+  });
+  return problems;
+}
+
 export function validate(schema: Questionnaire, payload: Payload): Problem[] {
-  const questions = walk(schema.questions);
-  const byId = new Map(questions.map((q) => [q.link_id, q]));
+  const groups = rowGroups(schema);
+  const inside = new Set<string>();
+  for (const group of groups.values()) for (const k of rowQuestions(group).keys()) inside.add(k);
+  // A repeating group's sub questions are answered inside its rows and never
+  // at the top level, so they are not top level questions here either. The
+  // server says the same, and this file exists to say the same thing.
+  const byId = new Map(walk(schema.questions)
+    .filter((q) => !inside.has(q.link_id) && !groups.has(q.link_id))
+    .map((q) => [q.link_id, q]));
   const problems: Problem[] = [];
   const override = String(payload["override_reason"] ?? "").trim();
 
@@ -64,50 +170,15 @@ export function validate(schema: Questionnaire, payload: Payload): Problem[] {
       continue;
     }
     if (!has) continue;
+    problems.push(...answerProblems(q, payload[link_id], "", override));
+  }
 
-    let value: unknown = payload[link_id];
-    const numeric = NUMERIC.has(q.type);
-    if (numeric) {
-      const n = cast(q.type, value);
-      if (n === null) {
-        problems.push({ link_id, message: `${link_id} must be ${q.type}` });
-        continue;
-      }
-      value = n;
-    } else if (q.type === "boolean" && typeof value !== "boolean") {
-      problems.push({ link_id, message: `${link_id} must be boolean` });
-      continue;
-    } else if (q.type === "choice") {
-      const allowed = (q.answer_option ?? []).map((o) => o.value);
-      if (allowed.length && !allowed.includes(value as string)) {
-        const sorted = [...allowed].sort();
-        problems.push({
-          link_id,
-          message: `${link_id} must be one of [${sorted.map((s) => `'${s}'`).join(", ")}]`,
-        });
-        continue;
-      }
-    }
-
-    // The range rule. A value outside physiological range blocks the commit
-    // and requires an explicit override carrying a reason. The override is
-    // recorded, not waived.
-    const rng: Range | undefined = phcOf(q).range;
-    if (rng && numeric) {
-      const n = value as number;
-      if (!(rng.low <= n && n <= rng.high)) {
-        if (override) continue;
-        problems.push({
-          link_id,
-          message: `${link_id} is ${py(n, q.type)}, outside ${py(rng.low, "raw")} to ${py(rng.high, "raw")}. ` +
-            "Enter a reason to override, or correct the value.",
-        });
-      }
-    }
+  for (const [link_id, group] of groups) {
+    problems.push(...rowProblems(link_id, group, payload, override));
   }
 
   const unknown = Object.keys(payload)
-    .filter((k) => !byId.has(k) && k !== "override_reason")
+    .filter((k) => !byId.has(k) && !groups.has(k) && k !== "override_reason")
     .sort();
   for (const k of unknown) problems.push({ link_id: k, message: `${k} is not a question on this form` });
   return problems;
@@ -118,9 +189,24 @@ export function validate(schema: Questionnaire, payload: Payload): Problem[] {
  *  an action elsewhere. */
 export function raisedFlags(schema: Questionnaire, payload: Payload): string[] {
   const out = new Set<string>();
+  // A repeating group's sub questions are answered in rows, so looking for
+  // them in the payload finds nothing. Flattened with their row's value, the
+  // way catalogue/validate.flags() does.
+  const seen: { q: Question; v: unknown }[] = [];
   for (const q of walk(schema.questions)) {
+    if (isRowGroup(q)) {
+      for (const row of (Array.isArray(payload[q.link_id]) ? payload[q.link_id] : []) as unknown[]) {
+        if (!row || typeof row !== "object") continue;
+        for (const [sub_id, sub] of rowQuestions(q)) {
+          seen.push({ q: sub, v: (row as Record<string, unknown>)[sub_id] });
+        }
+      }
+      continue;
+    }
+    seen.push({ q, v: payload[q.link_id] });
+  }
+  for (const { q, v } of seen) {
     const phc = phcOf(q);
-    const v = payload[q.link_id];
     if (!phc.flags || v === undefined || v === null || v === "") continue;
     // A question with `flags` and no `critical` band is a consent: it has no
     // physiological range to be outside of, and it raises its flag when the
@@ -192,7 +278,14 @@ export function prune(schema: Questionnaire, payload: Payload): Payload {
   // enable_when), so clearing it would build a form that cannot be committed
   // and will not say why. A questionnaire that declares one both required and
   // conditional is contradicting itself, and this is the side to err on.
-  const questions = walk(schema.questions).filter((q) => !q.required);
+  const inside = new Set<string>();
+  for (const group of rowGroups(schema).values()) {
+    for (const k of rowQuestions(group).keys()) inside.add(k);
+  }
+  // A sub question's link_id is not a payload key, so pruning on one would
+  // delete a top level answer that happens to share its name.
+  const questions = walk(schema.questions)
+    .filter((q) => !q.required && !inside.has(q.link_id));
   let out = payload;
   for (;;) {
     const drop = questions.filter((q) => q.link_id in out && !enabled(q, out));

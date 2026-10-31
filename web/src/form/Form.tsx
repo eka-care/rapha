@@ -8,7 +8,8 @@
  */
 import type { Operation, Payload, Question, Questionnaire } from "../types";
 import { blankRow, itemFields, toRow, type ItemField } from "../structured";
-import { enabled, labelOf, phcOf, prune, validate, raisedFlags, rangeBlocked, walk } from "../validate";
+import { options } from "../declarations";
+import { enabled, isRowGroup, labelOf, phcOf, prune, rowQuestions, validate, raisedFlags, rangeBlocked, walk } from "../validate";
 
 export { validate, rangeBlocked, raisedFlags };
 
@@ -65,12 +66,16 @@ function Widget({
         </label>
       );
     case "choice":
+      // The values the form declared, or the codes of the value set this
+      // question bound its answer to. The option's label is the display the
+      // terminology gave the code, because nobody reads 229799001; the value
+      // posted is still the code, so what is stored is what was confirmed.
       return (
         <select className="f-in" value={str} disabled={disabled} autoFocus={autoFocus}
                 onChange={(e) => set(e.target.value || undefined)}>
           <option value="">Choose</option>
-          {(q.answer_option ?? []).map((o) => (
-            <option key={o.value} value={o.value}>{o.value}</option>
+          {options(q).map((o) => (
+            <option key={o.value} value={o.value}>{o.display}</option>
           ))}
         </select>
       );
@@ -154,9 +159,11 @@ function Structured({
   );
 }
 
-function Add({ disabled, onClick }: { disabled?: boolean; onClick: () => void }) {
+function Add({ disabled, onClick, what }: { disabled?: boolean; onClick: () => void; what?: string }) {
   return (
-    <button type="button" className="cq" disabled={disabled} onClick={onClick}>Add another</button>
+    <button type="button" className="cq" disabled={disabled} onClick={onClick}>
+      {what ? `Add another ${what}` : "Add another"}
+    </button>
   );
 }
 
@@ -206,7 +213,94 @@ export function Form({
   // whichever question clears every skip check first.
   let focused = false;
 
+  /** One sub value of one row of a repeating group. The row's own index is in
+   *  the id, so the problem, the words it was heard from and the tick it is
+   *  owed all belong to this value and not to the question. */
+  const setRow = (gid: string, index: number, sub: string, v: unknown) => {
+    const listed = Array.isArray(value[gid]) ? [...(value[gid] as unknown[])] : [];
+    while (listed.length <= index) listed.push({});
+    const row = { ...((listed[index] ?? {}) as Record<string, unknown>) };
+    if (v === undefined) delete row[sub];
+    else row[sub] = v;
+    listed[index] = row;
+    onChange(prune(schema, { ...value, [gid]: listed }));
+  };
+
+  const dropRow = (gid: string, index: number) => {
+    const listed = (Array.isArray(value[gid]) ? [...(value[gid] as unknown[])] : [])
+      .filter((_, j) => j !== index);
+    const next = { ...value };
+    if (listed.length) next[gid] = listed;
+    else delete next[gid];
+    onChange(prune(schema, next));
+  };
+
+  /** A repeating group: one block per row, one labelled widget per sub
+   *  question. Nothing here is specific to a diagnosis or a medicine; the sub
+   *  questions, their types and their value sets are all declared.
+   *
+   *  An empty row is DRAWN and not stored. So a form nobody has typed into
+   *  says "medications is required", which is what is wrong, rather than
+   *  naming seven fields of a row that does not exist yet.
+   */
+  const rowsOf = (q: Question) => {
+    const stored = Array.isArray(value[q.link_id]) ? (value[q.link_id] as unknown[]) : [];
+    const drawn = stored.length ? stored : [{}];
+    const subs = [...rowQuestions(q).values()];
+    const mine = problems.filter((p) => p.link_id === q.link_id);
+    return (
+      <fieldset className="f-group" key={q.link_id}>
+        <legend>{q.text}</legend>
+        {q.description && <div className="f-hint">{q.description}</div>}
+        {phcOf(q).help && <div className="f-hint">{phcOf(q).help}</div>}
+        {drawn.map((row, i) => {
+          const given = (row ?? {}) as Record<string, unknown>;
+          return (
+            <div className="f-item" key={i}>
+              <span className="f-item-n">{i + 1}</span>
+              {subs.map((sub) => {
+                const id = `${q.link_id}[${i}].${sub.link_id}`;
+                const bad = mine.filter((p) => p.message.startsWith(`${id} `));
+                const heard = evidence?.[id];
+                const score = confidence?.[id];
+                const unsure = score !== undefined && score < SURE;
+                return (
+                  <label className={`f-sub${bad.length ? " bad" : ""}${unsure ? " unsure" : ""}`}
+                         key={sub.link_id}>
+                    <span>{labelOf(sub)}{phcOf(sub).unit ? ` (${phcOf(sub).unit})` : ""}</span>
+                    <Widget q={sub} op={op} ids={`${ids}-${q.link_id}-${i}`}
+                            value={given[sub.link_id]}
+                            onChange={(v) => setRow(q.link_id, i, sub.link_id, v)}
+                            disabled={disabled} />
+                    {unsure && <span className="f-hint unsure">{unsureHint(score ?? 0)}</span>}
+                    {heard && <span className="f-hint heard">“{heard}”</span>}
+                    {ticks?.need.includes(id) && (
+                      <span className="f-check">
+                        <input type="checkbox" checked={false} onChange={() => ticks.onTick(id)} />
+                        <span>Checked against what was said</span>
+                      </span>
+                    )}
+                    {bad.map((b) => <span className="f-bad" key={b.message}>{b.message}</span>)}
+                  </label>
+                );
+              })}
+              {stored.length > 1 && (
+                <button type="button" className="cq" disabled={disabled}
+                        onClick={() => dropRow(q.link_id, i)}>Remove</button>
+              )}
+            </div>
+          );
+        })}
+        <Add disabled={disabled} what={phcOf(q).row ?? "row"}
+             onClick={() => onChange(prune(schema, { ...value, [q.link_id]: [...drawn, {}] }))} />
+        {mine.filter((p) => p.message === `${q.link_id} is required`)
+             .map((p) => <div className="f-bad" key={p.message}>{p.message}</div>)}
+      </fieldset>
+    );
+  };
+
   const field = (q: Question) => {
+    if (isRowGroup(q)) return rowsOf(q);
     if (q.type === "group") {
       return (
         <fieldset className="f-group" key={q.link_id}>

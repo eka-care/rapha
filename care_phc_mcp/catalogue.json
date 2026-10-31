@@ -828,7 +828,35 @@
           "options": null,
           "required": false,
           "text": "Diagnosis",
-          "type": "structured"
+          "type": "group"
+        },
+        {
+          "link_id": "condition",
+          "options": null,
+          "required": true,
+          "text": "Condition",
+          "type": "choice"
+        },
+        {
+          "link_id": "clinical_status",
+          "options": null,
+          "required": true,
+          "text": "Clinical status",
+          "type": "choice"
+        },
+        {
+          "link_id": "verification_status",
+          "options": null,
+          "required": true,
+          "text": "How sure",
+          "type": "choice"
+        },
+        {
+          "link_id": "onset",
+          "options": null,
+          "required": false,
+          "text": "Since",
+          "type": "date"
         },
         {
           "link_id": "plan",
@@ -1335,7 +1363,56 @@
           "options": null,
           "required": true,
           "text": "Medications",
-          "type": "structured"
+          "type": "group"
+        },
+        {
+          "link_id": "drug",
+          "options": null,
+          "required": true,
+          "text": "Medicine",
+          "type": "choice"
+        },
+        {
+          "link_id": "dose",
+          "options": null,
+          "required": true,
+          "text": "Dose",
+          "type": "decimal"
+        },
+        {
+          "link_id": "dose_unit",
+          "options": null,
+          "required": true,
+          "text": "Dose unit",
+          "type": "choice"
+        },
+        {
+          "link_id": "route",
+          "options": null,
+          "required": true,
+          "text": "Route",
+          "type": "choice"
+        },
+        {
+          "link_id": "frequency",
+          "options": null,
+          "required": true,
+          "text": "Frequency",
+          "type": "choice"
+        },
+        {
+          "link_id": "duration",
+          "options": null,
+          "required": true,
+          "text": "Course length",
+          "type": "integer"
+        },
+        {
+          "link_id": "duration_unit",
+          "options": null,
+          "required": true,
+          "text": "Course length unit",
+          "type": "choice"
         }
       ],
       "id": "phc.op.rx-prescribe",
@@ -1642,8 +1719,13 @@
         },
         {
           "fields": [
-            "medication",
-            "dosage_instruction",
+            "medication_display",
+            "dose",
+            "dose_unit",
+            "frequency_display",
+            "route_display",
+            "duration",
+            "duration_unit",
             "status"
           ],
           "resource": "medication_request",

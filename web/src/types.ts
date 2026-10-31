@@ -28,6 +28,12 @@ export type Question = {
   required?: boolean;
   repeats?: boolean;
   answer_option?: { value: string }[];
+  /** The value set this question's ANSWER is drawn from, when the answer
+   *  carries the concept. A question that binds one declares no
+   *  `answer_option`: the codes live in the value set and writing them into
+   *  the questionnaire would be the same list twice. See declarations.ts for
+   *  where the options a picker draws come from instead. */
+  answer_value_set?: string;
   structured_type?: string;
   /** Ask this question only when every condition holds. In the questionnaires
    *  since they were written, in no code until now; catalogue/validate.py does
