@@ -59,6 +59,30 @@ OUT = ROOT / "terminology"
 SERVER = "https://tx.fhir.org/r4"
 LOINC = "http://loinc.org"
 UCUM = "http://unitsofmeasure.org"
+SNOMED = "http://snomed.info/sct"
+THO = "http://terminology.hl7.org/CodeSystem"
+
+# The three ways a concept is confirmed, and which servers answer which. One
+# resolver per kind rather than one clever one: a LOINC concept carries example
+# units, a SNOMED concept carries a release version and a branch it must be
+# inside, a published FHIR value set carries the whole list, and a UCUM symbol
+# is a grammar expression rather than a list entry. Conflating them is how a
+# unit would end up with a LOINC version written beside it.
+RESOLVERS = ("loinc", "snomed", "valueset", "ucum")
+
+# Where a medicine list may legitimately come from. Not a formulary: see the
+# `source` on the medication-code seed and the sign-off it still needs.
+NLEM = ("India's National List of Essential Medicines 2022, the report of the "
+        "Standing National Committee on Medicines, Ministry of Health and "
+        "Family Welfare, read 2026-10-31 from "
+        "https://icmr.gov.in/icmrobject/custom_data/"
+        "1720338777_report_nlem_2022_f_website.pdf. The report marks every "
+        "medicine with its level of healthcare, P for primary, S for "
+        "secondary, T for tertiary, and only P medicines are seeded.")
+
+NRCES_EX = ("the NRCeS India FHIR R4 implementation guide's own OPConsultRecord "
+            "example, Bundle-OPConsultNote-example-05, read 2026-10-31 through "
+            "the abdm-docs server's get_fhir_example")
 
 # NEDL is the primary source for WHICH tests a primary health centre runs, and
 # LOINC is the primary source for what each code means. Both are cited per
@@ -130,6 +154,242 @@ SEEDS = {
                        "leucocyte count above." % NEDL},
         },
     },
+
+    # ---------------------------------------------------------------- Condition
+    #
+    # Three value sets, because a diagnosis is three answers: what was found,
+    # whether the patient has it now, and how sure the clinician is. The second
+    # and third are FHIR's own published value sets and nothing about them is
+    # anybody's choice, which is why their concepts are not listed here: the
+    # `valueset` resolver takes whatever the server expands, so this file
+    # cannot hold a stale subset of a standard list.
+    "condition-clinical-status": {
+        "title": "Whether a condition is current",
+        "system": "%s/condition-clinical" % THO,
+        "resolve": "valueset",
+        "valueset": "http://hl7.org/fhir/ValueSet/condition-clinical",
+        "binding": "a questionnaire question's `answer_value_set`, when the "
+                   "answer carries the concept",
+        "source": "The FHIR R4 published value set "
+                  "http://hl7.org/fhir/ValueSet/condition-clinical, expanded "
+                  "through tx.fhir.org. Taken whole: Condition.clinicalStatus "
+                  "is required to be a code from this list, so a subset would "
+                  "be this product narrowing a standard it does not own.",
+    },
+    "condition-verification-status": {
+        "title": "How sure a condition is",
+        "system": "%s/condition-ver-status" % THO,
+        "resolve": "valueset",
+        "valueset": "http://hl7.org/fhir/ValueSet/condition-ver-status",
+        "binding": "a questionnaire question's `answer_value_set`, when the "
+                   "answer carries the concept",
+        "source": "The FHIR R4 published value set "
+                  "http://hl7.org/fhir/ValueSet/condition-ver-status, expanded "
+                  "through tx.fhir.org. This is invariant I6's mechanism: a "
+                  "denied finding is `refuted` and a scribe's guess is "
+                  "`unconfirmed`, so neither is stored as a settled fact and "
+                  "neither is dropped. Before this existed the consultation "
+                  "atom wrote `verification_status: {const: confirmed}` on "
+                  "every diagnosis, which asserted every one of them.",
+    },
+    "condition-code": {
+        "title": "Conditions this build can code",
+        "system": SNOMED,
+        "resolve": "snomed",
+        # Every concept is checked to be inside SNOMED's Clinical finding
+        # branch, which is the whole of CARE's own diagnosis binding and the
+        # plan's. A code that is a route or a product fails the seed.
+        "member_of": "%s?fhir_vs=isa/404684003" % SNOMED,
+        "binding": "a questionnaire question's `answer_value_set`, when the "
+                   "answer carries the concept",
+        "source": "NOT A PRIMARY HEALTH CENTRE DIAGNOSIS LIST, and must not be "
+                  "read as one. These are the clinical findings that appear in "
+                  "%s, which is the only source for a condition code this "
+                  "build could resolve. No authoritative list of the "
+                  "conditions an Indian primary health centre records was "
+                  "reachable, and inventing one is forbidden: a diagnosis list "
+                  "presented as a formulary decides what a clinician can say. "
+                  "So the list is short on purpose and the designed fallback "
+                  "stands, which is that an uncoded diagnosis is narrative "
+                  "text and the note still reaches ABDM. NEEDS SIGN-OFF from a "
+                  "named clinical officer, against a published list, before "
+                  "this is a picker anybody uses." % NRCES_EX,
+        "concepts": {
+            "297142003": {
+                "why": "Foot swelling. Published as a Condition in %s, where "
+                       "it is the chief complaint of the visit." % NRCES_EX},
+            "46635009": {
+                "why": "Diabetes mellitus type 1. Published as a Condition in "
+                       "%s, under Medical History with a clinical status of "
+                       "recurrence." % NRCES_EX},
+            "44054006": {
+                "why": "Diabetes mellitus type 2. Published as a Condition in "
+                       "%s, under Medical History. The display stored is the "
+                       "one the server returns rather than the one the example "
+                       "prints, because a display that disagrees with the "
+                       "terminology is not storable here." % NRCES_EX},
+        },
+    },
+    # ------------------------------------------------------- MedicationRequest
+    #
+    # A medicine is a drug, a dose, a route, a frequency and a duration, and
+    # each of those is its own answer. The drug concept is deliberately the
+    # SNOMED product with no strength and no form in it ("only product"),
+    # because the strength IS the dose answer and the form follows the route.
+    # Binding a clinical drug like "Amoxicillin 500 mg oral capsule" would say
+    # the same thing twice and let the two disagree.
+    "medication-code": {
+        "title": "Medicines this build can code",
+        "system": SNOMED,
+        "member_of": "%s?fhir_vs=isa/763158003" % SNOMED,
+        "resolve": "snomed",
+        "binding": "a questionnaire question's `answer_value_set`, when the "
+                   "answer carries the concept",
+        "source": "A STARTER SET, NOT A FORMULARY. Every medicine here is "
+                  "marked P, primary level of healthcare, in %s. It is short "
+                  "because the report publishes the level of care only in its "
+                  "annexures of changes, so these are the primary level "
+                  "medicines that document could be read to confirm, not the "
+                  "whole of the primary level list. No dose limit, no "
+                  "indication and no interaction is stated here and none may "
+                  "be inferred from the list. NEEDS SIGN-OFF: a facility "
+                  "formulary approved by a named medical officer, which is "
+                  "also what the `rx.prescribe` capability's own qualifier has "
+                  "been waiting for." % NLEM,
+        "concepts": {
+            "777067000": {
+                "why": "Paracetamol. %s, Annexure 3.3, section 2.1 non-opioid "
+                       "analgesics, antipyretics and nonsteroidal "
+                       "anti-inflammatory medicines, level of healthcare "
+                       "P,S,T. SNOMED International's preferred term is the "
+                       "United States name, acetaminophen; the Indian "
+                       "preferred term needs the SNOMED CT India extension, "
+                       "which needs the MLDS licence this build does not "
+                       "hold." % NLEM},
+            "776654009": {
+                "why": "Mefenamic acid. %s, Annexure 3.3, section 2.1, level "
+                       "of healthcare P,S,T." % NLEM},
+            "774586009": {
+                "why": "Amoxicillin. %s, Annexure 3.3, section 6.2.1 "
+                       "beta-lactam antibacterials, level of healthcare "
+                       "P,S,T." % NLEM},
+            "774448003": {
+                "why": "Albendazole. %s, Annexure 3.3, section 6.1.1 "
+                       "intestinal anthelminthics, level of healthcare "
+                       "P,S,T." % NLEM},
+            "776713006": {
+                "why": "Metformin. %s, Annexure 3.3, section 18.4.1 insulins "
+                       "and other antidiabetic agents, level of healthcare "
+                       "P,S,T." % NLEM},
+            "775195004": {
+                "why": "Chlorpheniramine. %s, Annexure 3.3, level of "
+                       "healthcare P,S,T. The section heading above this row "
+                       "in the extracted text is not legible enough to quote, "
+                       "so it is not quoted." % NLEM},
+        },
+    },
+    "medication-route": {
+        "title": "Routes of administration",
+        "system": SNOMED,
+        "member_of": "http://hl7.org/fhir/ValueSet/route-codes",
+        "resolve": "snomed",
+        "binding": "a questionnaire question's `answer_value_set`, when the "
+                   "answer carries the concept",
+        "source": "Members of the FHIR R4 published value set "
+                  "http://hl7.org/fhir/ValueSet/route-codes, each confirmed to "
+                  "be in it through tx.fhir.org. A subset and not the whole "
+                  "list, because that list runs to several hundred routes "
+                  "including intrathecal and suprachoroidal ones, and a picker "
+                  "offering those at a health centre is a picker nobody can "
+                  "use. Choosing which routes a health centre administers by "
+                  "is a product decision rather than a clinical claim: no "
+                  "route here says anything about a drug, a dose or an "
+                  "indication.",
+        "concepts": {
+            "26643006": {"why": "Oral."},
+            "78421000": {"why": "Intramuscular."},
+            "47625008": {"why": "Intravenous."},
+            "34206005": {"why": "Subcutaneous."},
+            "6064005": {"why": "Topical."},
+            "37161004": {"why": "Rectal."},
+            "54485002": {"why": "Ophthalmic."},
+            "46713006": {"why": "Nasal."},
+            "447694001": {"why": "Respiratory tract, which is what an inhaler "
+                                 "and a nebuliser are."},
+        },
+    },
+    "medication-frequency": {
+        "title": "How often a medicine is taken",
+        "system": SNOMED,
+        "member_of": "%s?fhir_vs=isa/307438009" % SNOMED,
+        "resolve": "snomed",
+        "binding": "a questionnaire question's `answer_value_set`, when the "
+                   "answer carries the concept",
+        "source": "Children of SNOMED CT 307438009, Frequency per day, each "
+                  "confirmed to be inside it through tx.fhir.org. SNOMED "
+                  "rather than FHIR's own timing abbreviations because %s "
+                  "codes its dosage instruction with SNOMED, and a frequency "
+                  "ABDM's own example cannot read is a frequency this product "
+                  "should not emit. The parent concept itself is not seeded: "
+                  "the server reports it notSelectable, and 'frequency per "
+                  "day' is not a frequency. Nothing here invents a schedule: "
+                  "each concept means exactly the number of times a day it "
+                  "names and no more, so it carries no timing, no 'as "
+                  "required' and no relation to meals." % NRCES_EX,
+        "concepts": {
+            "229797004": {"why": "Once a day."},
+            "229799001": {"why": "Twice a day. The concept %s publishes as "
+                                 "MedicationRequest.dosageInstruction."
+                                 "additionalInstruction." % NRCES_EX},
+            "229798009": {"why": "Three times a day."},
+            "307439001": {"why": "Four times a day."},
+        },
+    },
+    # ------------------------------------------- the two unit sets a dose needs
+    #
+    # Separate from ucum-units, and from each other, for one reason: a single
+    # unit value set lets a prescriber give a dose in weeks. UCUM is a grammar
+    # rather than a list, so a value set over it is always a chosen subset, and
+    # these two are chosen by what the question is asking for.
+    "dose-unit": {
+        "title": "Units a dose is given in",
+        "system": UCUM,
+        "resolve": "ucum",
+        "binding": "a questionnaire question's `answer_value_set`, when the "
+                   "answer carries the concept",
+        "source": "UCUM symbols, each confirmed through tx.fhir.org "
+                  "CodeSystem/$validate-code against the UCUM code system. "
+                  "Deliberately separate from duration-unit: one unit value "
+                  "set across both would let a dose be two weeks.",
+        "concepts": {
+            "mg": {"why": "Milligram, how a tablet strength is written.",
+                   "display": "milligram"},
+            "mL": {"why": "Millilitre, how an oral liquid is measured.",
+                   "display": "millilitre"},
+            "{tablet}": {
+                "why": "One tablet. A UCUM annotation, which is a real UCUM "
+                       "expression and not a free text escape: the braces are "
+                       "the grammar's own way of carrying a unit that has no "
+                       "dimension. A prescription written in tablets is how a "
+                       "health centre dispenses, and refusing it would push "
+                       "the count into a text box.",
+                "display": "tablet"},
+        },
+    },
+    "duration-unit": {
+        "title": "Units a course length is given in",
+        "system": UCUM,
+        "resolve": "ucum",
+        "binding": "a questionnaire question's `answer_value_set`, when the "
+                   "answer carries the concept",
+        "source": "UCUM symbols, each confirmed through tx.fhir.org "
+                  "CodeSystem/$validate-code against the UCUM code system.",
+        "concepts": {
+            "d": {"why": "Day.", "display": "day"},
+            "wk": {"why": "Week.", "display": "week"},
+            "mo": {"why": "Month.", "display": "month"},
+        },
+    },
 }
 
 
@@ -158,8 +418,107 @@ def lookup(code, system=LOINC):
     return out
 
 
-def build(slug):
-    spec = SEEDS[slug]
+def _get(path, params):
+    url = "%s/%s?%s" % (SERVER, path, urllib.parse.urlencode(params))
+    request = urllib.request.Request(url, headers={"Accept": "application/fhir+json"})
+    with urllib.request.urlopen(request, timeout=90) as answer:
+        return json.loads(answer.read().decode())
+
+
+def _parameters(blob):
+    """A FHIR Parameters resource as a plain dict of the names we read."""
+    out = {}
+    for parameter in blob.get("parameter", []):
+        name = parameter.get("name")
+        for key in ("valueBoolean", "valueString", "valueUri", "valueCode"):
+            if key in parameter:
+                out[name] = parameter[key]
+                break
+    return out
+
+
+def member(valueset, code, system):
+    """Whether the server agrees this code is in this value set.
+
+    The point of the exercise for a SNOMED binding. A code's display proves it
+    exists; it does not prove it is the KIND of thing the question asks for,
+    and the two failures look identical in a file. 26643006 is a real SNOMED
+    code with a believable display and it is a route of administration, so a
+    diagnosis value set holding it would read as correct. Asking the server
+    whether it is inside the Clinical finding branch is what catches that, and
+    it is the same filter CARE binds its own diagnosis field to.
+    """
+    blob = _get("ValueSet/$validate-code",
+                {"url": valueset, "system": system, "code": code})
+    found = _parameters(blob)
+    if blob.get("resourceType") == "OperationOutcome":
+        raise SystemExit("FAIL %s: %s" % (code, [i.get("diagnostics")
+                                                 for i in blob.get("issue", [])]))
+    return bool(found.get("result")), found
+
+
+def ucum(code):
+    """A UCUM symbol, confirmed against the UCUM code system.
+
+    UCUM is a grammar rather than a code list, so there is nothing to expand
+    and no display to read off: `$validate-code` answers whether the symbol
+    parses, and the symbol is its own printable form. The plain words beside
+    it in this file are a label for a picker and are declared in the seed,
+    which is said so in the generated file rather than left to look like the
+    server's answer.
+    """
+    blob = _get("CodeSystem/$validate-code", {"url": UCUM, "code": code})
+    found = _parameters(blob)
+    if not found.get("result"):
+        raise SystemExit("FAIL %s is not a UCUM symbol: %s"
+                         % (code, found.get("message")))
+    return found.get("version") or "?"
+
+
+def published(valueset):
+    """Every concept of a published FHIR value set, by code, from the server.
+
+    Recursive, because an expansion is a tree: condition-clinical nests
+    `recurrence` and `relapse` under `active`, and reading only the top level
+    would drop four of the seven codes while looking like it had read them all.
+    """
+    blob = _get("ValueSet/$expand", {"url": valueset, "count": 500})
+    if blob.get("resourceType") == "OperationOutcome":
+        raise SystemExit("FAIL %s: %s" % (valueset, [i.get("diagnostics")
+                                                     for i in blob.get("issue", [])]))
+    out = {}
+
+    def walk(contains):
+        for concept in contains:
+            if concept.get("abstract") or concept.get("inactive"):
+                continue
+            out[concept["code"]] = {"display": concept.get("display") or "",
+                                    "system": concept.get("system")}
+            walk(concept.get("contains") or [])
+
+    walk(blob.get("expansion", {}).get("contains") or [])
+    if not out:
+        raise SystemExit("FAIL %s expanded to nothing" % valueset)
+    return out, blob.get("version") or "?"
+
+
+def _write(slug, spec, concepts, verified):
+    blob = {
+        "slug": slug,
+        "title": spec["title"],
+        "system": spec["system"],
+        "binding": spec["binding"],
+        "generated": "2026-10-31",
+        "source": spec["source"],
+        "verified": verified,
+        "concepts": concepts,
+    }
+    path = OUT / ("%s.json" % slug)
+    path.write_text(json.dumps(blob, indent=2) + "\n")
+    print("wrote %s, %d concepts" % (path.relative_to(ROOT), len(concepts)))
+
+
+def build_loinc(slug, spec):
     concepts, versions = {}, set()
     for code in sorted(spec["concepts"]):
         found = lookup(code, spec["system"])
@@ -181,20 +540,107 @@ def build(slug):
                 "tx.fhir.org" % (found.get("version") or "?"))
         concepts[code] = concept
         print("ok   %-9s %s  [%s]" % (code, found["display"], unit or "no unit"))
-    blob = {
-        "slug": slug,
-        "title": spec["title"],
-        "system": spec["system"],
-        "binding": spec["binding"],
-        "generated": "2026-10-31",
-        "source": spec["source"],
-        "verified": "confirmed against LOINC %s through tx.fhir.org"
-                    % ", ".join(sorted(versions)),
-        "concepts": concepts,
-    }
-    path = OUT / ("%s.json" % slug)
-    path.write_text(json.dumps(blob, indent=2) + "\n")
-    print("wrote %s, %d concepts" % (path.relative_to(ROOT), len(concepts)))
+    _write(slug, spec, concepts,
+           "confirmed against LOINC %s through tx.fhir.org" % ", ".join(sorted(versions)))
+
+
+def build_snomed(slug, spec):
+    """A SNOMED binding: every code's display from the server, and every code
+    confirmed to be inside the branch the question is asking about.
+
+    Both halves are needed and neither is enough. The display catches a code
+    that means something else; the branch catches a code that means the right
+    thing in the wrong dimension, which is the one that reads as correct.
+    """
+    inside = spec["member_of"]
+    concepts, versions = {}, set()
+    for code in sorted(spec["concepts"]):
+        ok, found = member(inside, code, spec["system"])
+        if not ok:
+            raise SystemExit("FAIL %s is not in %s: %s"
+                             % (code, inside, found.get("message")))
+        display = found.get("display")
+        if not display:
+            raise SystemExit("FAIL %s: the server returned no display" % code)
+        version = found.get("version") or "?"
+        versions.add(version)
+        concepts[code] = {
+            "display": display,
+            "verified": "confirmed in value set %s, SNOMED CT release %s, "
+                        "through tx.fhir.org" % (inside, version),
+            "why": spec["concepts"][code]["why"],
+        }
+        print("ok   %-14s %-46s in %s" % (code, display, inside))
+    _write(slug, spec, concepts,
+           "every concept confirmed to be in %s, SNOMED CT release %s, through "
+           "tx.fhir.org" % (inside, ", ".join(sorted(versions))))
+
+
+def build_valueset(slug, spec):
+    """A published FHIR value set, taken whole.
+
+    No `concepts` in the seed, on purpose: the list is the standard's and this
+    file must not be able to hold a stale subset of it. What the seed chooses
+    is which value set, and that is a binding decision rather than a clinical
+    one.
+    """
+    if spec.get("concepts"):
+        raise SystemExit("FAIL %s: a published value set is taken whole, so "
+                         "the seed may not list concepts" % slug)
+    found, version = published(spec["valueset"])
+    concepts = {}
+    for code in sorted(found):
+        if found[code]["system"] != spec["system"]:
+            raise SystemExit("FAIL %s: %s is from %s, not %s. One code system "
+                             "per cached value set."
+                             % (slug, code, found[code]["system"], spec["system"]))
+        concepts[code] = {
+            "display": found[code]["display"],
+            "verified": "expanded from the published value set %s, version %s, "
+                        "through tx.fhir.org" % (spec["valueset"], version),
+            "why": "a code of the published value set %s; this product chose "
+                   "the binding and not the list" % spec["valueset"],
+        }
+        print("ok   %-18s %s" % (code, found[code]["display"]))
+    _write(slug, spec, concepts,
+           "expanded whole from the published value set %s, version %s, "
+           "through tx.fhir.org" % (spec["valueset"], version))
+
+
+def build_ucum(slug, spec):
+    concepts, versions = {}, set()
+    for code in sorted(spec["concepts"]):
+        version = ucum(code)
+        versions.add(version)
+        declared = spec["concepts"][code]
+        concepts[code] = {
+            # The printable symbol IS the code in UCUM, which is why
+            # kernel/fhir.py fills Quantity.unit and Quantity.code from one
+            # column. The words are a picker label declared in the seed, said
+            # so here so that nobody reads them as the server's answer.
+            "display": declared["display"],
+            "display_source": "a label declared in scripts/seed_terminology.py; "
+                              "UCUM publishes no display, the symbol is the code",
+            "verified": "confirmed as a UCUM %s symbol through tx.fhir.org "
+                        "CodeSystem/$validate-code" % version,
+            "why": declared["why"],
+        }
+        print("ok   %-10s %s" % (code, declared["display"]))
+    _write(slug, spec, concepts,
+           "every symbol confirmed against UCUM %s through tx.fhir.org"
+           % ", ".join(sorted(versions)))
+
+
+BUILDERS = {"loinc": build_loinc, "snomed": build_snomed,
+            "valueset": build_valueset, "ucum": build_ucum}
+
+
+def build(slug):
+    spec = SEEDS[slug]
+    resolve = spec.get("resolve", "loinc")
+    if resolve not in RESOLVERS:
+        raise SystemExit("no resolver %r; have %s" % (resolve, ", ".join(RESOLVERS)))
+    BUILDERS[resolve](slug, spec)
 
 
 def main():

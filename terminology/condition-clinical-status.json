@@ -1,0 +1,46 @@
+{
+  "slug": "condition-clinical-status",
+  "title": "Whether a condition is current",
+  "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+  "binding": "a questionnaire question's `answer_value_set`, when the answer carries the concept",
+  "generated": "2026-10-31",
+  "source": "The FHIR R4 published value set http://hl7.org/fhir/ValueSet/condition-clinical, expanded through tx.fhir.org. Taken whole: Condition.clinicalStatus is required to be a code from this list, so a subset would be this product narrowing a standard it does not own.",
+  "verified": "expanded whole from the published value set http://hl7.org/fhir/ValueSet/condition-clinical, version 4.0.1, through tx.fhir.org",
+  "concepts": {
+    "active": {
+      "display": "Active",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/condition-clinical, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/condition-clinical; this product chose the binding and not the list"
+    },
+    "inactive": {
+      "display": "Inactive",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/condition-clinical, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/condition-clinical; this product chose the binding and not the list"
+    },
+    "recurrence": {
+      "display": "Recurrence",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/condition-clinical, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/condition-clinical; this product chose the binding and not the list"
+    },
+    "relapse": {
+      "display": "Relapse",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/condition-clinical, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/condition-clinical; this product chose the binding and not the list"
+    },
+    "remission": {
+      "display": "Remission",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/condition-clinical, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/condition-clinical; this product chose the binding and not the list"
+    },
+    "resolved": {
+      "display": "Resolved",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/condition-clinical, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/condition-clinical; this product chose the binding and not the list"
+    },
+    "unknown": {
+      "display": "Unknown",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/condition-clinical, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/condition-clinical; this product chose the binding and not the list"
+    }
+  }
+}

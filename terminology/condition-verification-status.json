@@ -1,0 +1,41 @@
+{
+  "slug": "condition-verification-status",
+  "title": "How sure a condition is",
+  "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status",
+  "binding": "a questionnaire question's `answer_value_set`, when the answer carries the concept",
+  "generated": "2026-10-31",
+  "source": "The FHIR R4 published value set http://hl7.org/fhir/ValueSet/condition-ver-status, expanded through tx.fhir.org. This is invariant I6's mechanism: a denied finding is `refuted` and a scribe's guess is `unconfirmed`, so neither is stored as a settled fact and neither is dropped. Before this existed the consultation atom wrote `verification_status: {const: confirmed}` on every diagnosis, which asserted every one of them.",
+  "verified": "expanded whole from the published value set http://hl7.org/fhir/ValueSet/condition-ver-status, version 4.0.1, through tx.fhir.org",
+  "concepts": {
+    "confirmed": {
+      "display": "Confirmed",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/condition-ver-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/condition-ver-status; this product chose the binding and not the list"
+    },
+    "differential": {
+      "display": "Differential",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/condition-ver-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/condition-ver-status; this product chose the binding and not the list"
+    },
+    "entered-in-error": {
+      "display": "Entered in Error",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/condition-ver-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/condition-ver-status; this product chose the binding and not the list"
+    },
+    "provisional": {
+      "display": "Provisional",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/condition-ver-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/condition-ver-status; this product chose the binding and not the list"
+    },
+    "refuted": {
+      "display": "Refuted",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/condition-ver-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/condition-ver-status; this product chose the binding and not the list"
+    },
+    "unconfirmed": {
+      "display": "Unconfirmed",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/condition-ver-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/condition-ver-status; this product chose the binding and not the list"
+    }
+  }
+}

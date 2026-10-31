@@ -1,0 +1,29 @@
+{
+  "slug": "duration-unit",
+  "title": "Units a course length is given in",
+  "system": "http://unitsofmeasure.org",
+  "binding": "a questionnaire question's `answer_value_set`, when the answer carries the concept",
+  "generated": "2026-10-31",
+  "source": "UCUM symbols, each confirmed through tx.fhir.org CodeSystem/$validate-code against the UCUM code system.",
+  "verified": "every symbol confirmed against UCUM 2.2 through tx.fhir.org",
+  "concepts": {
+    "d": {
+      "display": "day",
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "Day."
+    },
+    "mo": {
+      "display": "month",
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "Month."
+    },
+    "wk": {
+      "display": "week",
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "Week."
+    }
+  }
+}

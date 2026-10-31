@@ -1,0 +1,26 @@
+{
+  "slug": "condition-code",
+  "title": "Conditions this build can code",
+  "system": "http://snomed.info/sct",
+  "binding": "a questionnaire question's `answer_value_set`, when the answer carries the concept",
+  "generated": "2026-10-31",
+  "source": "NOT A PRIMARY HEALTH CENTRE DIAGNOSIS LIST, and must not be read as one. These are the clinical findings that appear in the NRCeS India FHIR R4 implementation guide's own OPConsultRecord example, Bundle-OPConsultNote-example-05, read 2026-10-31 through the abdm-docs server's get_fhir_example, which is the only source for a condition code this build could resolve. No authoritative list of the conditions an Indian primary health centre records was reachable, and inventing one is forbidden: a diagnosis list presented as a formulary decides what a clinician can say. So the list is short on purpose and the designed fallback stands, which is that an uncoded diagnosis is narrative text and the note still reaches ABDM. NEEDS SIGN-OFF from a named clinical officer, against a published list, before this is a picker anybody uses.",
+  "verified": "every concept confirmed to be in http://snomed.info/sct?fhir_vs=isa/404684003, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+  "concepts": {
+    "297142003": {
+      "display": "Foot swelling",
+      "verified": "confirmed in value set http://snomed.info/sct?fhir_vs=isa/404684003, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Foot swelling. Published as a Condition in the NRCeS India FHIR R4 implementation guide's own OPConsultRecord example, Bundle-OPConsultNote-example-05, read 2026-10-31 through the abdm-docs server's get_fhir_example, where it is the chief complaint of the visit."
+    },
+    "44054006": {
+      "display": "Type 2 diabetes mellitus",
+      "verified": "confirmed in value set http://snomed.info/sct?fhir_vs=isa/404684003, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Diabetes mellitus type 2. Published as a Condition in the NRCeS India FHIR R4 implementation guide's own OPConsultRecord example, Bundle-OPConsultNote-example-05, read 2026-10-31 through the abdm-docs server's get_fhir_example, under Medical History. The display stored is the one the server returns rather than the one the example prints, because a display that disagrees with the terminology is not storable here."
+    },
+    "46635009": {
+      "display": "Type 1 diabetes mellitus",
+      "verified": "confirmed in value set http://snomed.info/sct?fhir_vs=isa/404684003, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Diabetes mellitus type 1. Published as a Condition in the NRCeS India FHIR R4 implementation guide's own OPConsultRecord example, Bundle-OPConsultNote-example-05, read 2026-10-31 through the abdm-docs server's get_fhir_example, under Medical History with a clinical status of recurrence."
+    }
+  }
+}

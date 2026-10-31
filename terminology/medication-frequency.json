@@ -1,0 +1,31 @@
+{
+  "slug": "medication-frequency",
+  "title": "How often a medicine is taken",
+  "system": "http://snomed.info/sct",
+  "binding": "a questionnaire question's `answer_value_set`, when the answer carries the concept",
+  "generated": "2026-10-31",
+  "source": "Children of SNOMED CT 307438009, Frequency per day, each confirmed to be inside it through tx.fhir.org. SNOMED rather than FHIR's own timing abbreviations because the NRCeS India FHIR R4 implementation guide's own OPConsultRecord example, Bundle-OPConsultNote-example-05, read 2026-10-31 through the abdm-docs server's get_fhir_example codes its dosage instruction with SNOMED, and a frequency ABDM's own example cannot read is a frequency this product should not emit. The parent concept itself is not seeded: the server reports it notSelectable, and 'frequency per day' is not a frequency. Nothing here invents a schedule: each concept means exactly the number of times a day it names and no more, so it carries no timing, no 'as required' and no relation to meals.",
+  "verified": "every concept confirmed to be in http://snomed.info/sct?fhir_vs=isa/307438009, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+  "concepts": {
+    "229797004": {
+      "display": "Once daily",
+      "verified": "confirmed in value set http://snomed.info/sct?fhir_vs=isa/307438009, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Once a day."
+    },
+    "229798009": {
+      "display": "Three times daily",
+      "verified": "confirmed in value set http://snomed.info/sct?fhir_vs=isa/307438009, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Three times a day."
+    },
+    "229799001": {
+      "display": "Twice a day",
+      "verified": "confirmed in value set http://snomed.info/sct?fhir_vs=isa/307438009, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Twice a day. The concept the NRCeS India FHIR R4 implementation guide's own OPConsultRecord example, Bundle-OPConsultNote-example-05, read 2026-10-31 through the abdm-docs server's get_fhir_example publishes as MedicationRequest.dosageInstruction.additionalInstruction."
+    },
+    "307439001": {
+      "display": "Four times daily",
+      "verified": "confirmed in value set http://snomed.info/sct?fhir_vs=isa/307438009, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Four times a day."
+    }
+  }
+}

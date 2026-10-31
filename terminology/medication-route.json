@@ -1,0 +1,56 @@
+{
+  "slug": "medication-route",
+  "title": "Routes of administration",
+  "system": "http://snomed.info/sct",
+  "binding": "a questionnaire question's `answer_value_set`, when the answer carries the concept",
+  "generated": "2026-10-31",
+  "source": "Members of the FHIR R4 published value set http://hl7.org/fhir/ValueSet/route-codes, each confirmed to be in it through tx.fhir.org. A subset and not the whole list, because that list runs to several hundred routes including intrathecal and suprachoroidal ones, and a picker offering those at a health centre is a picker nobody can use. Choosing which routes a health centre administers by is a product decision rather than a clinical claim: no route here says anything about a drug, a dose or an indication.",
+  "verified": "every concept confirmed to be in http://hl7.org/fhir/ValueSet/route-codes, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+  "concepts": {
+    "26643006": {
+      "display": "Oral route",
+      "verified": "confirmed in value set http://hl7.org/fhir/ValueSet/route-codes, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Oral."
+    },
+    "34206005": {
+      "display": "Subcutaneous route",
+      "verified": "confirmed in value set http://hl7.org/fhir/ValueSet/route-codes, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Subcutaneous."
+    },
+    "37161004": {
+      "display": "Rectal route",
+      "verified": "confirmed in value set http://hl7.org/fhir/ValueSet/route-codes, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Rectal."
+    },
+    "447694001": {
+      "display": "Respiratory tract route",
+      "verified": "confirmed in value set http://hl7.org/fhir/ValueSet/route-codes, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Respiratory tract, which is what an inhaler and a nebuliser are."
+    },
+    "46713006": {
+      "display": "Nasal route",
+      "verified": "confirmed in value set http://hl7.org/fhir/ValueSet/route-codes, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Nasal."
+    },
+    "47625008": {
+      "display": "Intravenous route",
+      "verified": "confirmed in value set http://hl7.org/fhir/ValueSet/route-codes, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Intravenous."
+    },
+    "54485002": {
+      "display": "Ophthalmic route",
+      "verified": "confirmed in value set http://hl7.org/fhir/ValueSet/route-codes, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Ophthalmic."
+    },
+    "6064005": {
+      "display": "Topical route",
+      "verified": "confirmed in value set http://hl7.org/fhir/ValueSet/route-codes, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Topical."
+    },
+    "78421000": {
+      "display": "Intramuscular route",
+      "verified": "confirmed in value set http://hl7.org/fhir/ValueSet/route-codes, SNOMED CT release http://snomed.info/sct/900000000000207008/version/20250201, through tx.fhir.org",
+      "why": "Intramuscular."
+    }
+  }
+}

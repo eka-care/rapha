@@ -1,0 +1,29 @@
+{
+  "slug": "dose-unit",
+  "title": "Units a dose is given in",
+  "system": "http://unitsofmeasure.org",
+  "binding": "a questionnaire question's `answer_value_set`, when the answer carries the concept",
+  "generated": "2026-10-31",
+  "source": "UCUM symbols, each confirmed through tx.fhir.org CodeSystem/$validate-code against the UCUM code system. Deliberately separate from duration-unit: one unit value set across both would let a dose be two weeks.",
+  "verified": "every symbol confirmed against UCUM 2.2 through tx.fhir.org",
+  "concepts": {
+    "mL": {
+      "display": "millilitre",
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "Millilitre, how an oral liquid is measured."
+    },
+    "mg": {
+      "display": "milligram",
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "Milligram, how a tablet strength is written."
+    },
+    "{tablet}": {
+      "display": "tablet",
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "One tablet. A UCUM annotation, which is a real UCUM expression and not a free text escape: the braces are the grammar's own way of carrying a unit that has no dimension. A prescription written in tablets is how a health centre dispenses, and refusing it would push the count into a text box."
+    }
+  }
+}
