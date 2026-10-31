@@ -52,13 +52,13 @@ threads:
               village: Bhagwanpur, category: general,
               abha_number: "12-3456-7890-1234"}
     rows:
-      - {resource: observation, category: vital-signs,
+      - {resource: observation, status: final, category: vital-signs,
          code: "8480-6", code_system: "http://loinc.org", code_display: "Systolic blood pressure",
          value: 186, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, category: vital-signs,
+      - {resource: observation, status: final, category: vital-signs,
          code: "8462-4", code_system: "http://loinc.org", code_display: "Diastolic blood pressure",
          value: 112, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, category: vital-signs,
+      - {resource: observation, status: final, category: vital-signs,
          code: "8867-4", code_system: "http://loinc.org", code_display: "Heart rate",
          value: 92, unit: "/min", unit_system: "http://unitsofmeasure.org"}
       # What the handover and its reply wrote. handover.raised is derived from
@@ -103,13 +103,13 @@ threads:
               village: Sonpur, category: general,
               abha_number: "12-3456-7890-5678"}
     rows:
-      - {resource: observation, category: vital-signs,
+      - {resource: observation, status: final, category: vital-signs,
          code: "8480-6", code_system: "http://loinc.org", code_display: "Systolic blood pressure",
          value: 118, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, category: vital-signs,
+      - {resource: observation, status: final, category: vital-signs,
          code: "8462-4", code_system: "http://loinc.org", code_display: "Diastolic blood pressure",
          value: 76, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, category: vital-signs,
+      - {resource: observation, status: final, category: vital-signs,
          code: "8867-4", code_system: "http://loinc.org", code_display: "Heart rate",
          value: 92, unit: "/min", unit_system: "http://unitsofmeasure.org"}
       - {resource: notes, text: "Fever three days, no red flags on examination."}
@@ -154,13 +154,13 @@ threads:
     patient: {name: Sunita Bai, age: 27, sex: female, phone: "9800000005",
               village: Rampur, category: general}
     rows:
-      - {resource: observation, category: vital-signs,
+      - {resource: observation, status: final, category: vital-signs,
          code: "8480-6", code_system: "http://loinc.org", code_display: "Systolic blood pressure",
          value: 118, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, category: vital-signs,
+      - {resource: observation, status: final, category: vital-signs,
          code: "8462-4", code_system: "http://loinc.org", code_display: "Diastolic blood pressure",
          value: 76, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, category: vital-signs,
+      - {resource: observation, status: final, category: vital-signs,
          code: "8867-4", code_system: "http://loinc.org", code_display: "Heart rate",
          value: 92, unit: "/min", unit_system: "http://unitsofmeasure.org"}
       - {resource: notes, text: "Fever three days, no red flags on examination."}
@@ -218,13 +218,13 @@ threads:
               village: Rampur, category: general,
               abha_number: "12-3456-7890-9012"}
     rows:
-      - {resource: observation, category: vital-signs,
+      - {resource: observation, status: final, category: vital-signs,
          code: "8480-6", code_system: "http://loinc.org", code_display: "Systolic blood pressure",
          value: 118, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, category: vital-signs,
+      - {resource: observation, status: final, category: vital-signs,
          code: "8462-4", code_system: "http://loinc.org", code_display: "Diastolic blood pressure",
          value: 76, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, category: vital-signs,
+      - {resource: observation, status: final, category: vital-signs,
          code: "8867-4", code_system: "http://loinc.org", code_display: "Heart rate",
          value: 92, unit: "/min", unit_system: "http://unitsofmeasure.org"}
       - {resource: notes, text: "Fever three days, no red flags on examination."}
@@ -303,10 +303,10 @@ threads:
     same_patient_as: enc-003
     minutes_ago: 129600          # ninety days, so the timeline has a gap in it
     rows:
-      - {resource: observation, category: vital-signs,
+      - {resource: observation, status: final, category: vital-signs,
          code: "8480-6", code_system: "http://loinc.org", code_display: "Systolic blood pressure",
          value: 148, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, category: vital-signs,
+      - {resource: observation, status: final, category: vital-signs,
          code: "8462-4", code_system: "http://loinc.org", code_display: "Diastolic blood pressure",
          value: 94, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
       - {resource: notes, text: "Raised pressure on two readings. Advised salt reduction, review in three months."}

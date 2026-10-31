@@ -90,13 +90,13 @@ threads:
                   panel: bmp}
       - {resource: specimen, code: venous-blood, status: available,
          created_by: "user:phlebotomist"}
-      - {resource: observation, category: laboratory, code: glucose, value: 412,
+      - {resource: observation, status: preliminary, category: laboratory, code: glucose, value: 412,
          unit: mg/dL, created_by: "user:technologist"}
-      - {resource: observation, category: laboratory, code: creatinine, value: 2.4,
+      - {resource: observation, status: preliminary, category: laboratory, code: creatinine, value: 2.4,
          unit: mg/dL, created_by: "user:technologist"}
-      - {resource: observation, category: laboratory, code: sodium, value: 131,
+      - {resource: observation, status: preliminary, category: laboratory, code: sodium, value: 131,
          unit: mmol/L, created_by: "user:technologist"}
-      - {resource: observation, category: laboratory, code: potassium, value: 6.8,
+      - {resource: observation, status: preliminary, category: laboratory, code: potassium, value: 6.8,
          unit: mmol/L, created_by: "user:technologist"}
       - {resource: diagnostic_report, code: bmp, status: preliminary,
          created_by: "user:technologist"}
@@ -133,11 +133,11 @@ threads:
                   panel: cbc}
       - {resource: specimen, code: venous-blood, status: available,
          created_by: "user:phlebotomist"}
-      - {resource: observation, category: laboratory, code: haemoglobin, value: 9.1,
+      - {resource: observation, status: preliminary, category: laboratory, code: haemoglobin, value: 9.1,
          unit: g/dL, created_by: "user:technologist"}
-      - {resource: observation, category: laboratory, code: wbc, value: 7.2,
+      - {resource: observation, status: preliminary, category: laboratory, code: wbc, value: 7.2,
          unit: 10*3/uL, created_by: "user:technologist"}
-      - {resource: observation, category: laboratory, code: platelets, value: 188,
+      - {resource: observation, status: preliminary, category: laboratory, code: platelets, value: 188,
          unit: 10*3/uL, created_by: "user:technologist"}
       - {resource: diagnostic_report, code: cbc, status: preliminary,
          created_by: "user:technologist"}
@@ -178,11 +178,11 @@ threads:
                   panel: cbc}
       - {resource: specimen, code: venous-blood, status: available,
          created_by: "user:phlebotomist"}
-      - {resource: observation, category: laboratory, code: haemoglobin, value: 11.2,
+      - {resource: observation, status: preliminary, category: laboratory, code: haemoglobin, value: 11.2,
          unit: g/dL, created_by: "user:technologist"}
-      - {resource: observation, category: laboratory, code: wbc, value: 6.4,
+      - {resource: observation, status: preliminary, category: laboratory, code: wbc, value: 6.4,
          unit: 10*3/uL, created_by: "user:technologist"}
-      - {resource: observation, category: laboratory, code: platelets, value: 233,
+      - {resource: observation, status: preliminary, category: laboratory, code: platelets, value: 233,
          unit: 10*3/uL, created_by: "user:technologist"}
       - {resource: diagnostic_report, code: cbc, status: preliminary,
          created_by: "user:technologist"}
@@ -223,13 +223,13 @@ threads:
                   panel: bmp}
       - {resource: specimen, code: venous-blood, status: available,
          created_by: "user:phlebotomist"}
-      - {resource: observation, category: laboratory, code: glucose, value: 104,
+      - {resource: observation, status: preliminary, category: laboratory, code: glucose, value: 104,
          unit: mg/dL, created_by: "user:technologist"}
-      - {resource: observation, category: laboratory, code: creatinine, value: 1.0,
+      - {resource: observation, status: preliminary, category: laboratory, code: creatinine, value: 1.0,
          unit: mg/dL, created_by: "user:technologist"}
-      - {resource: observation, category: laboratory, code: sodium, value: 140,
+      - {resource: observation, status: preliminary, category: laboratory, code: sodium, value: 140,
          unit: mmol/L, created_by: "user:technologist"}
-      - {resource: observation, category: laboratory, code: potassium, value: 4.3,
+      - {resource: observation, status: preliminary, category: laboratory, code: potassium, value: 4.3,
          unit: mmol/L, created_by: "user:technologist"}
       - {resource: diagnostic_report, code: bmp, status: preliminary,
          created_by: "user:technologist"}

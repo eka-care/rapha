@@ -26,6 +26,20 @@ mapping:
         code: {question: link_id}
         value: {question: answer}
         unit: {question: unit}
+        # `preliminary`, which is R4's own word for a value recorded and not
+        # yet verified. It matches the report this same operation writes
+        # below, and it stops matching by itself: `lab.op.result-verify` is a
+        # separate operation a separate person performs, and until they do,
+        # these values are not verified. They were published as `final`
+        # anyway until 2026-10-31, because kernel/fhir.py chose the status.
+        #
+        # They stay `preliminary` after verification too, and that is a named
+        # limit rather than an oversight: a mapping cannot address an existing
+        # row, so verification writes a second report row and cannot reach
+        # these. A stale `preliminary` says the value may change, which is
+        # merely out of date; a `final` on an unverified value says a second
+        # person stood behind it. Only one of those is a false claim.
+        status: {const: preliminary}
     - resource: diagnostic_report
       fields:
         created_by: {actor: id}

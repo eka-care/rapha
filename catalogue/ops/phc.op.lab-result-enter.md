@@ -42,6 +42,11 @@ mapping:
         value: {answer: value}
         unit: {answer_code: unit}
         unit_system: {answer_code_system: unit}
+        # `preliminary`, matching the report below and R4's own meaning: a
+        # value recorded and not yet verified. A health centre has no
+        # verification station, so nothing here will ever move it, and a
+        # status that says "this may change" is the honest one to be stuck on.
+        status: {const: preliminary}
     # The report stays, and keeps a narrative conclusion. The narrative is now
     # one the technician wrote rather than a number reformatted as prose.
     - resource: diagnostic_report

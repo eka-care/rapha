@@ -28,6 +28,13 @@ mapping:
         value: {question: answer}
         unit: {question: unit}
         unit_system: {question: unit_system}
+        # R4's Observation.status, declared here because how settled a reading
+        # is belongs to the operation that takes it and not to the FHIR
+        # projection. `final` for a vital sign: there is no second pair of
+        # eyes on a blood pressure and none is owed one, the value is range
+        # checked on this form, and a value heard rather than typed is owed a
+        # tick before it can reach this row at all.
+        status: {const: final}
 emits: [vitals.recorded, vitals.flagged]
 surfaces: [rendered, mcp]
 verified:

@@ -252,7 +252,12 @@ def check_ranges_are_per_analyte():
     rows = {r["code"]: r for r in store.rows["observation"]}
     assert rows["potassium"] == {"created_by": A_TECH, "category": "laboratory",
                                  "code": "potassium", "value": 6.8,
-                                 "unit": "mmol/L", "_thread": T}
+                                 "unit": "mmol/L", "_thread": T,
+                                 # R4's Observation.status. `preliminary`
+                                 # because nobody has verified it yet, which
+                                 # is what the report row below also says and
+                                 # what the projection used to contradict.
+                                 "status": "preliminary"}
     assert set(rows) == {"glucose", "creatinine", "sodium", "potassium"}, \
         "the unanswered CBC analytes are no row, not an empty row"
     assert store.rows["diagnostic_report"][0]["status"] == "preliminary"

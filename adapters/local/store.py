@@ -81,8 +81,14 @@ TABLES = {
     # it, and the display is part of what was recorded: a value set that
     # renames a concept next year must not silently restate what a nurse
     # wrote this year.
+    # `status` is R4's own required Observation.status, stored rather than
+    # chosen at the projection. It is the certainty of the value: a result a
+    # technician has keyed and nobody has verified is `preliminary`, and a
+    # nurse's range-checked reading is `final`. kernel/fhir.py published
+    # `final` for every observation until 2026-10-31, which made an unverified
+    # laboratory value read as a settled one to every consumer of the record.
     "observation": ("id", "encounter", "category", "code", "code_system",
-                    "code_display", "value", "unit", "unit_system",
+                    "code_display", "value", "unit", "unit_system", "status",
                     "created_by", "created_date"),
     # A diagnosis is a coded condition, a clinical status, a verification
     # status and an onset, each of the three codes carrying the system it came

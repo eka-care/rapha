@@ -112,7 +112,8 @@ GOLDEN = {
                          "code_system": "http://loinc.org",
                          "code_display": "Hemoglobin [Mass/volume] in Blood",
                          "value": "9.4", "unit": "g/dL",
-                         "unit_system": "http://unitsofmeasure.org"}),
+                         "unit_system": "http://unitsofmeasure.org",
+                         "status": "preliminary"}),
         ("diagnostic_report", {"code": "718-7",
                                "code_system": "http://loinc.org",
                                "conclusion": "repeat on a fresh sample",
@@ -156,17 +157,20 @@ GOLDEN = {
                          "code_system": "http://loinc.org",
                          "code_display": "Systolic blood pressure",
                          "value": "118", "unit": "mm[Hg]",
-                         "unit_system": "http://unitsofmeasure.org"}),
+                         "unit_system": "http://unitsofmeasure.org",
+                         "status": "final"}),
         ("observation", {"category": "vital-signs", "code": "8462-4",
                          "code_system": "http://loinc.org",
                          "code_display": "Diastolic blood pressure",
                          "value": "76", "unit": "mm[Hg]",
-                         "unit_system": "http://unitsofmeasure.org"}),
+                         "unit_system": "http://unitsofmeasure.org",
+                         "status": "final"}),
         ("observation", {"category": "vital-signs", "code": "8867-4",
                          "code_system": "http://loinc.org",
                          "code_display": "Heart rate",
                          "value": "80", "unit": "/min",
-                         "unit_system": "http://unitsofmeasure.org"}),
+                         "unit_system": "http://unitsofmeasure.org",
+                         "status": "final"}),
     ],
 }
 
@@ -215,7 +219,10 @@ def test_the_unit_comes_from_the_questionnaire_and_is_written_nowhere_else():
         "code_system": "http://loinc.org",
         "code_display": "Oxygen saturation in Arterial blood",
         "value": 97, "unit": "%",
-        "unit_system": "http://unitsofmeasure.org"})], rows
+        "unit_system": "http://unitsofmeasure.org",
+        # R4's Observation.status, declared by the operation rather
+        # than chosen by the FHIR projection.
+        "status": "final"})], rows
 
 
 def test_every_write_operation_in_the_bundle_declares_a_mapping():
@@ -290,7 +297,10 @@ def test_the_author_lands_on_every_row_and_never_stands_in_for_an_answer():
         "code": "2708-6", "code_system": "http://loinc.org",
         "code_display": "Oxygen saturation in Arterial blood",
         "value": 97, "unit": "%",
-        "unit_system": "http://unitsofmeasure.org"})], rows
+        "unit_system": "http://unitsofmeasure.org",
+        # R4's Observation.status, declared by the operation rather
+        # than chosen by the FHIR projection.
+        "status": "final"})], rows
     # An author is not an answer: a payload that produced nothing is still no
     # row, not a row carrying only its author.
     assert mapping.records(op, {}, actor="user:nurse") == []

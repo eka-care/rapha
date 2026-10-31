@@ -192,6 +192,39 @@ RESOURCE_TYPE = {
 CODE, CODE_SYSTEM, CODE_DISPLAY = "code", "code_system", "code_display"
 UNIT, UNIT_SYSTEM = "unit", "unit_system"
 
+# Every stored column a projection below copies VERBATIM into a FHIR `code`
+# element, and the value set R4 binds that element to.
+#
+# `code` in the FHIR sense, not a CodeableConcept: a bare token from a fixed
+# list, with no system column beside it, so none of the three binding forms in
+# kernel/terminology.py applies and nothing validated these. Three of them
+# were already being copied through from an operation's `{const: ...}`, which
+# is a literal somebody typed; `scripts/check_verification.py` is what now
+# holds each one against the cached published list, at build time, before a
+# gateway gets the chance.
+#
+# A column is in this table because a projection copies it, which is why
+# `encounter.status` and `diagnostic_report.status` are NOT here: `encounter()`
+# translates its stored workflow state into an R4 code rather than copying it,
+# and no projection reads a diagnostic_report row at all. Both of those are
+# stated as rules with checks on them, because the day a projection starts
+# copying one verbatim is the day a workflow word becomes a FHIR code.
+#
+# Keyed by (table, column) rather than by column, because `status` means a
+# different list on each resource and one of the three systems below is in a
+# different namespace from the other two.
+STATUS_BINDING = {
+    ("observation", "status"): "observation-status",
+    ("medication_request", "status"): "medicationrequest-status",
+    ("medication_request", "intent"): "medicationrequest-intent",
+}
+
+# The columns a projection reads from a row and does NOT copy into a FHIR
+# `code` element, so that a check can tell "no binding was declared" from
+# "this is deliberately not a FHIR code". `encounter.status` is this build's
+# own workflow state, translated by `encounter()` below.
+TRANSLATED_STATUS = {("encounter", "status")}
+
 
 def _urn(seed):
     """A stable urn:uuid for a row id.
@@ -262,16 +295,37 @@ def _concept(row, code=CODE, system=CODE_SYSTEM, display=CODE_DISPLAY):
 def observation(row, *, subject, encounter, performer=None):
     """One observation row as a FHIR R4 Observation.
 
-    `status` is `final`, because there is one path to a stored row and it goes
-    through the guard with a person's tap on it. A proposal is not a row, so
-    there is nothing here that could be `preliminary`: the unconfirmed state
-    lives on the proposal, in the kernel, and never reaches the store. That is
-    invariant I4 in the shape the standard already has, with nothing invented.
+    `status` is the row's own answer and never a literal here. It used to be
+    `final`, on the argument that there is one path to a stored row and it
+    goes through the guard with a person's tap on it. That argument is about
+    whether a row EXISTS, and `Observation.status` is about whether its value
+    is settled, which is a different question with a different answer.
+
+    The two come apart in the laboratory, where this build already has the
+    second pair of eyes: `lab.op.result-enter` writes the values and the
+    report it writes with them says `preliminary`, and `lab.op.result-verify`
+    is a separate operation a separate person performs. So between those two
+    taps every keyed value was published to ABDM as `final` while the report
+    carrying them said `preliminary`. R4 has the word for that state and this
+    file was overriding it.
+
+    A row with no status is refused rather than given one. R4 makes the
+    element required (1..1) and this file may not decide how settled somebody
+    else's measurement is; the operation that writes the row declares it, and
+    `scripts/check_verification.py` holds every declared literal against the
+    published list.
     """
+    status = row.get("status")
+    if not status:
+        raise KeyError(
+            "observation row %r carries no status, and R4 requires "
+            "Observation.status. The operation that writes the row declares "
+            "it; this file may not choose how settled a measurement is."
+            % row.get("id"))
     out = {
         "resourceType": "Observation",
         "id": row["id"],
-        "status": "final",
+        "status": status,
         "subject": {"reference": subject},
         "encounter": {"reference": encounter},
     }
@@ -693,6 +747,7 @@ def demo():
     row = {"id": "obs-1", "category": "vital-signs", "code": "8480-6",
            "code_system": LOINC, "code_display": "Systolic blood pressure",
            "value": "140", "unit": "mm[Hg]", "unit_system": UCUM,
+           "status": "final",
            "created_by": "user:nurse", "created_date": "2026-10-31T09:14:00+00:00"}
     obs = observation(row, subject="urn:uuid:p", encounter="urn:uuid:e",
                       performer="urn:uuid:n")
@@ -706,12 +761,28 @@ def demo():
     assert obs["status"] == "final" and obs["category"][0]["coding"][0]["code"] \
         == "vital-signs"
 
+
     uncoded = observation({"id": "o2", "code": "Haemoglobin", "value": "9.4",
-                           "unit": "g/dL"},
+                           "unit": "g/dL", "status": "preliminary"},
                           subject="urn:uuid:p", encounter="urn:uuid:e")
     assert "coding" not in uncoded["code"] and uncoded["code"]["text"] == "Haemoglobin", \
         "a code with no system is text, never a resolvable coding"
     assert uncoded["valueQuantity"] == {"value": 9.4, "unit": "g/dL"}, uncoded
+    # The status is the row's, not this file's. A keyed laboratory value that
+    # nobody has verified is `preliminary` and is published as `preliminary`.
+    assert uncoded["status"] == "preliminary", uncoded
+    try:
+        observation({"id": "o3", "code": "x", "value": "1"},
+                    subject="urn:uuid:p", encounter="urn:uuid:e")
+    except KeyError:
+        pass
+    else:
+        raise AssertionError("an observation with no status was given one here")
+    # And the three columns a projection copies verbatim into a FHIR `code`
+    # element each name the published list R4 binds that element to.
+    assert set(STATUS_BINDING) == {("observation", "status"),
+                                   ("medication_request", "status"),
+                                   ("medication_request", "intent")}, STATUS_BINDING
 
     assert _urn("obs-1") == _urn("obs-1") and _urn("obs-1") != _urn("obs-2")
     assert sorted(sections("WellnessRecord"))[:2] == ["BodyMeasurement",
