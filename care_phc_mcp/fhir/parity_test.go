@@ -96,10 +96,21 @@ type answer struct {
 // would still show up, because only one engine would drop it.
 type stub struct {
 	tables map[string][]map[string]string
+	thread string
 }
 
 func (s stub) Select(resource string, thread *string, where store.Query,
 	fields []string, limit int) ([]map[string]string, error) {
+	// THE THREAD HAS TO BE PASSED, AND IT HAS TO BE THIS ONE. Not a join:
+	// this stub implements none, and the join is the adapter's. It is the
+	// narrower fact that a document is about ONE VISIT, and a Document that
+	// read the store without saying which visit would publish one patient's
+	// rows inside another patient's record. Found by mutation: this check
+	// ignored the argument, and a Go Document that passed nothing passed the
+	// whole gate.
+	if thread == nil || *thread != s.thread {
+		return nil, nil
+	}
 	var out []map[string]string
 	for _, row := range s.tables[resource] {
 		keep := true
@@ -158,7 +169,7 @@ func TestTheProjectionAnswersForTheParityCheck(t *testing.T) {
 			}
 			wanted = append(wanted, want)
 		}
-		made, err := Document(stub{cases.Rows[one.Case]}, one.Thread, one.Profile,
+		made, err := Document(stub{cases.Rows[one.Case], one.Thread}, one.Thread, one.Profile,
 			wanted, one.Now, one.IdentifierSystem)
 		documents = append(documents, held(made, err))
 	}

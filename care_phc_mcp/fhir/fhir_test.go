@@ -142,7 +142,7 @@ func TestEverySectionACallerMayAskForIsDeclaredByItsProfile(t *testing.T) {
 		"patient": {{"id": "pat-1", "name": "Sunita Devi"}},
 		"notes": {{"id": "n1", "text": "seen and advised",
 			"created_by": "user:ravi", "created_date": "2026-10-31T09:20:00+00:00"}},
-	}}
+	}, "enc-1"}
 	_, err := Document(rows, "enc-1", "OPConsultRecord",
 		[]Want{{Slice: "NotASlice", Queries: []Query{{Resource: "notes"}}}},
 		"2026-10-31T10:05:00+00:00", "")
@@ -179,7 +179,7 @@ func TestADocumentAboutNobodyIsRefused(t *testing.T) {
 	rows := stub{map[string][]map[string]string{
 		"encounter": {{"id": "enc-2"}},
 		"notes":     {{"id": "n2", "text": "a note"}},
-	}}
+	}, "enc-2"}
 	_, err := Document(rows, "enc-2", "WellnessRecord",
 		[]Want{{Slice: "DocumentReference", Queries: []Query{{Resource: "notes"}}}},
 		"2026-10-31T10:05:00+00:00", "")
@@ -193,7 +193,7 @@ func TestASectionWithNoProjectionIsRefusedRatherThanServedByTheNearestOne(t *tes
 		"encounter":       {{"id": "enc-3"}},
 		"patient":         {{"id": "pat-3"}},
 		"service_request": {{"id": "sr-1"}},
-	}}
+	}, "enc-3"}
 	if _, has := Projections["service_request"]; has {
 		t.Skip("pick a resource with no projection")
 	}

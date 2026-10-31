@@ -1865,12 +1865,23 @@ class RowsOnly:
     engines were wrong. A `document()` that dropped its `where` instead of
     passing it through would still show up, because only one engine would
     drop it.
+
+    THE THREAD HAS TO BE PASSED, AND IT HAS TO BE THIS ONE. That is not the
+    join either: it is the narrower fact that a document is about ONE VISIT,
+    so a `document()` that read the store without saying which visit would
+    publish one patient's rows inside another patient's record. FOUND BY
+    MUTATION, and it is the property this check's first pass missed: both
+    stubs ignored the argument, so a Go `Document` that passed no thread at
+    all passed the whole gate with 843 ok.
     """
 
-    def __init__(self, tables):
+    def __init__(self, tables, thread):
         self.tables = tables
+        self.thread = thread
 
     def select(self, resource, *, thread, where, fields, limit=50):
+        if thread != self.thread:
+            return []
         out = []
         for row in self.tables.get(resource) or []:
             keep = True
@@ -2133,7 +2144,7 @@ def python_projection(cases):
                                         for q in section["queries"]]
         try:
             made = fhir.document(
-                RowsOnly(cases["rows"][one["case"]]), one["thread"],
+                RowsOnly(cases["rows"][one["case"]], one["thread"]), one["thread"],
                 profile=one["profile"], sections_wanted=wanted, now=one["now"],
                 **({"identifier_system": one["identifier_system"]}
                    if one["identifier_system"] else {}))
@@ -2365,10 +2376,10 @@ def projection_parity(tmp):
             attachment = entry["resource"]["content"][0]["attachment"]
             assert base64.b64decode(attachment["data"]).decode("utf-8").strip(), \
                 attachment
-    ok("the projection: the document this bundle DECLARES names both authors "
-       "its rows carry, publishes one resource per group row with no code "
-       "borrowed from the row above, carries the narrative's own words, and "
-       "every reference in it resolves inside it")
+    ok("the projection: the document this bundle DECLARES is asked of ONE "
+       "visit, names both authors its rows carry, publishes one resource per "
+       "group row with no code borrowed from the row above, carries the "
+       "narrative's own words, and every reference in it resolves inside it")
 
 
 # --------------------------------------------------------------------------
