@@ -6,11 +6,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, currentRole, useAsync } from "../api";
 import { ask } from "../ask";
+import { createLabel, firstOperation } from "../search";
 import { load as loadDeclarations, questionnaire } from "../declarations";
 import { keep, type Recent } from "../loops";
 import { header, queueViewFor, type Ctx, type Said } from "../messages";
 import { Boundary, Failed, Loading } from "../parts";
 import { Encounter } from "../screens/Encounter";
+import { Desk } from "../screens/Desk";
 import { ListScreen } from "../screens/ListScreen";
 import { Patient } from "../screens/Patient";
 import { Roles } from "../screens/Settings";
@@ -26,6 +28,7 @@ type Route =
   | { kind: "view"; id: string }
   | { kind: "thread"; id: string }
   | { kind: "patient"; id: string }
+  | { kind: "desk" }
   | { kind: "settings" }
   | { kind: "notfound"; id: string };
 
@@ -35,6 +38,7 @@ function parse(hash: string): Route {
   if (head === "views" && id) return { kind: "view", id };
   if (head === "patients" && id) return { kind: "patient", id };
   if (head === "settings") return { kind: "settings" };
+  if (head === "desk") return { kind: "desk" };
   if (!head || head === "today") return { kind: "today" };
   // A second segment under an unrecognised first one is a malformed route,
   // not a bare view id. Guessing is how an empty thread id once reached the
@@ -192,7 +196,13 @@ export function App() {
     }
   };
 
-  const title = titleFor(route, navViews);
+  // The desk is titled by the operation it commits through, which is a
+  // declaration's word and not this file's. Every other route is titled the
+  // way it always was.
+  const deskOp = catalogue.operations?.[firstOperation(catalogue, facility.data?.bundle.workflow) ?? ""];
+  const title = route.kind === "desk"
+    ? (deskOp?.title ?? createLabel(catalogue, facility.data?.bundle.workflow))
+    : titleFor(route, navViews);
 
   return (
     <div className="app">
@@ -206,6 +216,8 @@ export function App() {
         open={drawer}
         onGo={go}
         onNew={() => setKhojOpen(true)}
+        onDesk={() => go("#/desk")}
+        deskLabel={createLabel(catalogue, facility.data?.bundle.workflow)}
         onSettings={() => go("#/settings")}
         onCloseDrawer={() => setDrawer(false)}
       />
@@ -260,6 +272,15 @@ export function App() {
                 {route.kind === "patient" && (
                   <Patient id={route.id} cat={catalogue} onOpenThread={(t) => go(`#/threads/${t}`)} />
                 )}
+                {route.kind === "desk" && (
+                  <Desk
+                    cat={catalogue}
+                    decl={queueViewFor(catalogue, facility.data?.bundle.workflow)}
+                    workflow={facility.data?.bundle.workflow}
+                    client={api}
+                    onOpenThread={(t) => { reload(); go(`#/threads/${t}`); }}
+                  />
+                )}
                 {route.kind === "settings" && (
                   <Roles
                     client={api} cat={catalogue}
@@ -300,11 +321,11 @@ export function App() {
             const first = shownRecents[0]?.id ?? liveThreads[0];
             if (first) { go(`#/threads/${first}`); onSay(first, q); }
           }}
-          onCreate={async () => {
-            const t = await api.openThread({});
-            reload();
-            go(`#/threads/${t.id}`);
-          }}
+          /* A search miss goes to the desk, not straight to an empty visit.
+             The palette searches today's line; the desk searches the whole
+             register and the patient directory, so "no matching patient" in
+             here is not yet an answer about whether this person exists. */
+          onCreate={() => go("#/desk")}
         />
       )}
     </div>

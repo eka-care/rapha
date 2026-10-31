@@ -5,6 +5,7 @@
  *  ApiError is never blank and never says "something went wrong".
  */
 import { useCallback, useEffect, useState } from "react";
+import type { Resolution } from "./desk";
 import type { Catalogue, Facility, Questionnaire, SubjectView, ThreadView, ViewResult } from "./types";
 
 export const API_BASE =
@@ -116,6 +117,14 @@ export const api = {
     req<{ valueset: string; concepts: { value: string; display: string; system: string }[] }>(
       `/valuesets/${encodeURIComponent(slug)}/?limit=${limit}`),
   facility: () => req<Facility>("/facility/"),
+  /** Who might this be: this centre's own register and the patient directory,
+   *  asked together and answered together. Always 200, even with no directory
+   *  and no socket: the body says whether the directory was reachable and the
+   *  local half is always there. So the desk's one failure mode is "nobody
+   *  matched", which is a sentence, and never a screen that says the search
+   *  broke when half of it worked. */
+  patients: (q: string, limit = 8) =>
+    req<Resolution>(`/patients/search/?q=${encodeURIComponent(q)}&limit=${limit}`),
   view: (id: string, thread?: string) =>
     req<ViewResult>(`/views/${id}/${thread ? `?thread=${encodeURIComponent(thread)}` : ""}`),
   thread: (id: string) => req<ThreadView>(`/threads/${id}/`),

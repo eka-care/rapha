@@ -15,7 +15,7 @@ const ICON: Record<string, IconName> = {
 };
 
 export function Sidebar({
-  facility, views, route, recents, counts, open, onGo, onNew, onSettings, onCloseDrawer,
+  facility, views, route, recents, counts, open, onGo, onNew, onDesk, deskLabel, onSettings, onCloseDrawer,
 }: {
   facility?: Facility;
   views: ViewDecl[];
@@ -25,6 +25,15 @@ export function Sidebar({
   open: boolean;
   onGo: (hash: string) => void;
   onNew: () => void;
+  /** The front desk: one box over this centre's register and the patient
+   *  directory. The button that used to open the palette twice now opens the
+   *  desk once, because "new" at a front desk means a person and not a
+   *  conversation. */
+  onDesk: () => void;
+  /** What that button says. The declared verb of the operation the desk
+   *  commits through, so a health centre reads "Register" and a laboratory
+   *  reads "Accession" with nothing here knowing either word. */
+  deskLabel: string;
   onSettings: () => void;
   onCloseDrawer: () => void;
 }) {
@@ -40,9 +49,9 @@ export function Sidebar({
       </div>
 
       <div className="sb-pad">
-        <button className="sb-btn" onClick={onNew}>
+        <button className="sb-btn" onClick={onDesk}>
           <Icon name="plus" className="i sm" />
-          New chat
+          {deskLabel}
         </button>
       </div>
       <div className="sb-pad" style={{ paddingTop: 0 }}>

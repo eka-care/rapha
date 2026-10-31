@@ -64,6 +64,37 @@ export const ABHA_PENDING = "abha.pending";
  */
 export const ABHA_LINKED = "abha.linked";
 
+/** Whether a commit panel runs the national identity journey before it shows
+ *  its form, and the one rule that decides it.
+ *
+ *  Lifted out of form/Panel.tsx, where it was an expression, because it is
+ *  the single most expensive decision this product makes and nothing could
+ *  test it there: Panel.tsx reaches a stylesheet through the journey it
+ *  mounts, so no check that runs under plain node can import it. An
+ *  expression nothing can run is an expression a hurried edit can invert
+ *  while every word a reader would grep for stays exactly where it was. That
+ *  mutation was run against this repository and no check moved.
+ *
+ *  `found` is the whole of it. A patient the desk has already found arrives
+ *  with their values, and running the journey on top would ask them for a one
+ *  time password to tell the screen what is already on it. That is NHA's own
+ *  test of whether the ABHA step is in the right place -- a registration with
+ *  an ABHA must cost FEWER keystrokes than one without, not the same -- and
+ *  it is the main thing standing between this product and a paper register.
+ *
+ *  `reviewing` is a proposal, where the plain form is right: a proposal is a
+ *  payload somebody else produced, and re-running a national identity journey
+ *  is not how you read one.
+ */
+export function runsJourney(
+  operation: string,
+  emits: string[] | undefined,
+  at: { reviewing: boolean; found: boolean },
+): boolean {
+  if (at.reviewing || at.found) return false;
+  return operation === ABHA_OP || (emits ?? []).includes(ABHA_PENDING);
+}
+
 /** GET /abha/config. The server names the environment; the browser does not
  *  choose it and no credential is in here. */
 export type AbhaConfig = {

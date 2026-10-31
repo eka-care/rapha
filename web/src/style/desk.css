@@ -1,0 +1,96 @@
+/* The front desk, as docs/reference/front-desk/front-desk.html draws option A:
+ * one wide field with the hits directly under it, and nothing else on screen
+ * until it has to be.
+ *
+ * Read on a desk with a keyboard, so the column is capped rather than run to
+ * the width of a monitor: a hit row whose name sits at the far left and whose
+ * key sits 900px away at the far right is two rows, not one. It still holds
+ * together in a narrow window, because a clerk's window is whatever size they
+ * left it.
+ *
+ * Colour: none of its own. In this system colour means clinical risk, and
+ * nobody on this screen has been assessed yet. The selected row is carried by
+ * the accent, which is selection and not severity, exactly as the sidebar's
+ * current item is. Values are style/tokens.css's.
+ */
+
+.desk { max-width: 620px; padding-bottom: 32px; }
+
+/* The bar above already carries the operation's declared title, so this says
+   what the box does rather than saying the title a second time. */
+.desk-s {
+  margin: 0 0 14px; font-size: 13px; color: var(--color-text-secondary);
+  max-width: 52ch;
+}
+
+/* The one field. Big, because it is the only thing the clerk touches while a
+   patient is talking to them, and round, which is the mockup's own shape. */
+.desk-box {
+  width: 100%; min-height: 52px; padding: 0 20px;
+  font-family: var(--font-sans); font-size: 17px;
+  color: var(--color-text-primary); background: var(--color-bg-surface);
+  border: 1.5px solid var(--color-border-control); border-radius: var(--radius-pill);
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+.desk-box::placeholder { color: var(--color-text-tertiary); }
+/* The border answers the mouse; the ring answers the keyboard. The box has
+   focus from the moment the screen opens and the clerk may never touch a
+   mouse at all, so the keyboard's indicator is the one that must be loud. */
+.desk-box:focus { border-color: var(--color-accent); outline: none; }
+.desk-box:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* What the directory said, when it could not be asked. A sentence and not an
+   error page: the local half of the search still answered, and a clerk whose
+   patient is in that half must not be told the search failed. */
+.desk-note {
+  margin-top: 10px; padding: 9px 13px; font-size: 12.5px;
+  color: var(--color-warning); background: var(--color-warning-soft);
+  border: 1px solid var(--color-warning-border); border-radius: var(--radius-md);
+}
+
+.desk-hits { display: grid; gap: 4px; margin-top: 10px; }
+
+.desk-hit {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  min-height: 56px; padding: 9px 13px; cursor: pointer;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-lg);
+  transition: var(--duration-fast) var(--ease-out);
+}
+/* Dashed, because this row is not a person yet. The same grammar the queue
+   row uses for a label the kernel guessed: a dashed edge never means somebody
+   decided something. */
+.desk-hit.fresh { border-style: dashed; }
+.desk-hit:hover { background: var(--color-bg-subtle); }
+/* The selection, which is where the keyboard is. It is on screen whether or
+   not a mouse is anywhere near, because the whole design is that it is not. */
+.desk-hit[data-active="true"] {
+  border-color: var(--color-accent); background: var(--color-bg-selected);
+}
+
+.desk-hit-b { min-width: 0; flex: 1; }
+.desk-hit-n {
+  display: block; font-size: 14px; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.desk-hit-m {
+  display: block; margin-top: 1px; font-size: 11.5px;
+  color: var(--color-text-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* The key that takes this row. Written on the row and not behind a hover,
+   because a clerk learning the keyboard reads it while reading the name. */
+.desk-hit-k {
+  flex: 0 0 auto; font-family: var(--font-mono); font-size: 11px;
+  color: var(--color-text-tertiary);
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-sm);
+  padding: 2px 7px;
+}
+.desk-hit[data-active="true"] .desk-hit-k {
+  color: var(--color-accent); border-color: var(--color-accent);
+}
+
+.desk-empty {
+  padding: 18px 13px; font-size: 13px; color: var(--color-text-tertiary);
+}

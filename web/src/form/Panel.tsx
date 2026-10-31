@@ -19,7 +19,7 @@
  *  single client call below are the same ones the modal uses.
  */
 import { useId, useMemo, useState } from "react";
-import { ABHA_OP, ABHA_PENDING, demographicsFrom, payloadFor, type AbhaOutcome } from "../abha/sdk";
+import { ABHA_PENDING, demographicsFrom, payloadFor, runsJourney, type AbhaOutcome } from "../abha/sdk";
 import { Journey } from "../abha/Journey";
 import { ApiError, type Client } from "../api";
 import { Form, labelled, validate } from "./Form";
@@ -42,7 +42,7 @@ const IRREVERSIBLE = "irreversible";
 const FROM_ABHA = "From ABHA";
 
 export function OperationPanel({
-  op, thread, client, proposal, draft, instruments, inline, mobile, seed, onDone, onCancel,
+  op, thread, client, proposal, draft, instruments, inline, mobile, seed, found, onDone, onCancel,
 }: {
   op: Operation;
   thread: string;
@@ -55,6 +55,26 @@ export function OperationPanel({
    *  registration: the identifier is known, so asking for the journey a second
    *  time would be asking the patient for a second one time password. */
   seed?: Payload;
+  /** Where the seed came from, when it did not come from the ABHA journey.
+   *
+   *  The front desk seeds this form from somebody it FOUND: a row this centre
+   *  already holds, or a profile the patient directory suggested. Those
+   *  values are not ABHA's and must not say they are, so the chip under each
+   *  field is this sentence instead. `evidence` is the field the match was
+   *  made on, which kernel/directory.py puts beside every suggested value for
+   *  exactly this reading, and `confidence` is the kernel's own cap -- it sits
+   *  under the form's SURE threshold on purpose, so a directory match draws
+   *  unconfirmed and gets read rather than waved through.
+   *
+   *  Supplying a seed at all is also what stops the identity journey running:
+   *  spending a one time password to learn what is already on the screen is
+   *  the registration-costs-as-much-with-ABHA-as-without anti-goal, and it is
+   *  NHA's own test of whether the ABHA step is in the right place. */
+  found?: {
+    source: string;
+    evidence?: Record<string, string>;
+    confidence?: Record<string, number>;
+  };
   /** Drawn inside the thread rather than over it. No Cancel: there is nothing
    *  to close, the card is the conversation. */
   inline?: boolean;
@@ -84,12 +104,12 @@ export function OperationPanel({
   /** Per link_id, how sure the instrument that produced the value was. A
    *  value under 0.9 draws the field as unconfirmed. Typing over a value
    *  clears its entry: a number a person typed is not a heard number. */
-  const [heard, setHeard] = useState<Record<string, number>>(draft?.confidence ?? {});
+  const [heard, setHeard] = useState<Record<string, number>>(draft?.confidence ?? found?.confidence ?? {});
   /** Which fields came back from the ABHA journey rather than off the keyboard.
    *  Marked on the form the same way an instrument's values are, and cleared
    *  field by field the moment somebody types over one. */
   const [fromAbha, setFromAbha] = useState<Record<string, string>>(() =>
-    Object.fromEntries(Object.keys(seed ?? {}).map((id) => [id, FROM_ABHA])),
+    Object.fromEntries(Object.keys(seed ?? {}).map((id) => [id, found?.source ?? FROM_ABHA])),
   );
   /** The identifier this screen's journey produced, handed to whoever opens
    *  the next panel. Never committed from here: registration does not write an
@@ -143,7 +163,10 @@ export function OperationPanel({
    *  demographics; on the link panel, the identifier. The order is the point:
    *  a clerk should not type a name and a mobile that ABDM already holds. */
   const registration = !!op.emits?.includes(ABHA_PENDING);
-  const mountsJourney = !proposal && !seed && (op.id === ABHA_OP || registration);
+  // The rule itself lives in abha/sdk.ts, where a check can run it. See
+  // runsJourney for why: inverting it here is invisible to every text check
+  // and costs a patient a one time password they did not need to spend.
+  const mountsJourney = runsJourney(op.id, op.emits, { reviewing: !!proposal, found: !!seed });
   const showForm = !mountsJourney || journeyDone;
   const invalidate = () => {
     setConfirmed(false);           // an edit invalidates a confirm, always
@@ -333,7 +356,7 @@ export function OperationPanel({
           problems={tried ? problems : []}
           confidence={{ ...(proposal?.confidence ?? {}), ...heard }}
           sources={fromAbha}
-          evidence={draft?.evidence}
+          evidence={draft?.evidence ?? found?.evidence}
           ticks={{ need: unticked, ticked, onTick: (id) => setTicked((s) => new Set(s).add(id)) }}
           disabled={busy}
         />}

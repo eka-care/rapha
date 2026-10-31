@@ -8,6 +8,7 @@ import "./style/shell.css";
 import "./style/cards.css";
 import "./style/home.css";
 import "./style/queue.css";
+import "./style/desk.css";
 import "./style/chat.css";
 import "./style/composer.css";
 import "./style/parts.css";
