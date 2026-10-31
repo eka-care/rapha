@@ -42,11 +42,15 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	carephc "github.com/eka-care/care_phc_mcp"
+	"github.com/eka-care/care_phc_mcp/proposals"
+	"github.com/eka-care/care_phc_mcp/questionnaire"
 	"github.com/eka-care/care_phc_mcp/store"
+	"github.com/eka-care/care_phc_mcp/terminology"
 )
 
 // The two prefixes api/main.py mounts the one router under: /api is what the
@@ -72,6 +76,11 @@ type kernel struct {
 	routes   []string
 
 	store *store.SQLite
+
+	// The loaded bundle's operations, which is narrower than the embedded
+	// catalogue-wide set, and the write path over them.
+	operations map[string]carephc.Operation
+	write      *proposals.Bundle
 }
 
 // ---------------------------------------------------------------------------
@@ -354,22 +363,25 @@ var served = []struct {
 	{"/facility", ""},
 	{"/catalogue", "G3 serves the compiled catalogue"},
 	{"/operations", "G3 serves the compiled catalogue"},
-	{"/operations/{op_id}/commit", "G2 serves the guard, and the audit row before execute"},
-	{"/operations/{op_id}/propose", "G2 serves the guard"},
-	{"/proposals/{proposal_id}", "G2 serves proposals"},
-	{"/proposals/{proposal_id}/confirm", "G2 judges a proposal again at confirm"},
-	{"/proposals/{proposal_id}/reject", "G2 serves proposals"},
+	{"/operations/{op_id}/commit", ""},
+	{"/operations/{op_id}/propose", ""},
+	{"/proposals/{proposal_id}", ""},
+	{"/proposals/{proposal_id}/confirm", ""},
+	{"/proposals/{proposal_id}/reject", ""},
 	{"/roles", "G7 serves a facility's own role combinations"},
 	{"/roles/{role}", "G7 serves a facility's own role combinations"},
-	{"/threads", "G6 serves threads, the station line and the flags"},
-	{"/threads/{thread_id}", "G6 serves threads, the station line and the flags"},
+	{"/threads", ""},
+	{"/threads/{thread_id}", ""},
 	{"/subjects/{subject_id}", "G6 serves the spine: one subject, every visit"},
 	{"/questionnaires", "G3 serves questionnaire validation and fill"},
 	{"/valuesets/{slug}", "G4 serves the terminology seam"},
 	{"/queue", "G6 serves the declared views"},
 	{"/views/{view_id}", "G6 serves the declared views"},
-	{"/khoj", "G2 serves the ask-and-search surface"},
-	{"/agent/say", "G2 serves the ask-and-search surface; this spelling is deprecated"},
+	// The guard is served; the planner behind these two is agent/turn.py and
+	// is a port of its own. Said as the slice rather than left reading as
+	// though G2 had covered it.
+	{"/khoj", "the ask-and-search planner behind it is agent/turn.py, not the guard"},
+	{"/agent/say", "the ask-and-search planner behind it is agent/turn.py, not the guard; this spelling is deprecated"},
 	{"/patients/search", "G1 does not reach Eka's patient directory"},
 	{"/patients/pending", "G1 does not reach Eka's patient directory"},
 	{"/patients/publish", "G1 does not reach Eka's patient directory"},
@@ -397,6 +409,13 @@ func (k *kernel) mount() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", k.index)
 	for _, prefix := range prefixes {
+		// Anything under a prefix that no route below claims is FastAPI's own
+		// 404, not the root route. Without this a path the Python 404s fell
+		// through to k.index and answered 200 with a healthy-looking service
+		// description, which is the worst of the three possible answers.
+		mux.Handle(prefix+"/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			detail(w, http.StatusNotFound, "Not Found")
+		}))
 		seen := map[string]bool{}
 		for _, route := range served {
 			if route.slice == "" {
@@ -413,6 +432,7 @@ func (k *kernel) mount() http.Handler {
 		// Registered last so they win over any subtree above them.
 		mux.HandleFunc(prefix+"/whoami", k.whoami)
 		mux.HandleFunc(prefix+"/facility", k.facility_)
+		k.mountGuard(mux, prefix)
 	}
 	return eitherSpelling(mux)
 }
@@ -440,9 +460,36 @@ func main() {
 			"%q. Recompile it with PHC_BUNDLE=%s python3 -m kernel.declarations, "+
 			"or run this check with PHC_BACKEND=python.", want, cat.Manifest.ID, want)
 	}
-	if len(cat.Workflows) != 1 {
-		log.Fatalf("%s declares %d workflows; api/main.py's WORKFLOW is the one "+
-			"a bundle has", cat.Manifest.ID, len(cat.Workflows))
+	// The typed workflow, the compiled mapping and each atom's own JSON. Not
+	// part of Load, because cmd/mcp builds a tool list and has no business
+	// failing on a mapping it will never evaluate.
+	if err := cat.LoadDeclarations(); err != nil {
+		log.Fatal(err)
+	}
+
+	// The declarations the guard reads that do NOT live in catalogue.json:
+	// the questionnaires an operation's validator is loaded from, and the
+	// offline value sets a coding is checked against. Read from the tree, as
+	// the port plan says ("the Go engine reads them; it does not restate
+	// them"), relative to PHC_ROOT or the working directory.
+	//
+	// Loud on failure, and that is guard step 1's fail-closed rule reaching
+	// as far back as startup: a kernel that cannot load a questionnaire
+	// cannot validate a payload, and a kernel that cannot validate a payload
+	// must not serve a write.
+	root := os.Getenv("PHC_ROOT")
+	if root == "" {
+		root = "."
+	}
+	schemas, err := questionnaire.Load(filepath.Join(root, "questionnaires"))
+	if err != nil {
+		log.Fatalf("the questionnaires did not load, so no write could be "+
+			"validated: %v\n\nSet PHC_ROOT to the repository root, or run from it.", err)
+	}
+	terms, err := terminology.Load(filepath.Join(root, "terminology"))
+	if err != nil {
+		log.Fatalf("the value sets did not load, so no coding could be "+
+			"checked: %v\n\nSet PHC_ROOT to the repository root, or run from it.", err)
 	}
 
 	// PHC_STORE names the seam, and there is one adapter behind it: `local`,
@@ -451,13 +498,13 @@ func main() {
 	if which := os.Getenv("PHC_STORE"); which != "" && which != "local" {
 		log.Fatalf("PHC_STORE=%q is not an adapter. There is one: local.", which)
 	}
-	path := os.Getenv("PHC_DB")
-	if path == "" {
-		path = "phc.sqlite3"
+	dbPath := os.Getenv("PHC_DB")
+	if dbPath == "" {
+		dbPath = "phc.sqlite3"
 	}
-	rows, err := store.Open(path)
+	rows, err := store.Open(dbPath)
 	if err != nil {
-		log.Fatalf("could not open %s: %v", path, err)
+		log.Fatalf("could not open %s: %v", dbPath, err)
 	}
 	defer rows.Close()
 
@@ -465,8 +512,11 @@ func main() {
 	k.facility = chosen(cat, "")
 	k.withheld = withheldBy(cat, k.facility)
 	k.without = absent(cat, k.facility)
-	for id := range cat.Workflows {
-		k.workflow = id
+	k.workflow = cat.Workflow.ID
+	k.operations = cat.BundleOperations()
+	k.write = &proposals.Bundle{
+		Catalogue: cat, Operations: k.operations, Workflow: cat.Workflow,
+		Schemas: schemas, Terms: terms, Withheld: k.withheld,
 	}
 
 	k.caps = append([]string(nil), cat.Vocabulary.Capabilities...)
