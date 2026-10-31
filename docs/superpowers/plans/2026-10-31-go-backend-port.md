@@ -170,6 +170,13 @@ Each is finished when the gate is green and the named checks pass against Go.
   The nine original slices were drawn from the kernel and the API; the
   planner is neither, which is how it went unnamed. Nothing can retire the
   Python while a route no slice owns still answers 501.
+- **G8c. Codification.** `kernel/codification.py`, the seam that turns spoken
+  words into suggested codes. **Added 2026-10-31, after G5,** for the same
+  reason G8b was: no slice owned it. It is the only product caller of the
+  terminology package's semantic tags, which is how G5 found it. Its Go
+  counterpart decides whether an uncached value set is an error or simply a
+  set with no categories; today the Python raises and the Go returns nothing,
+  and no Go caller reads it either way.
 - **G9. Retire the Python.** Only on the owner's word, and only when every
   check passes against Go.
 
