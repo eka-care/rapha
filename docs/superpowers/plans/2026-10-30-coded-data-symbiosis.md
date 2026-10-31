@@ -340,8 +340,48 @@ confirmation is dead on arrival in an OPD. The rule:
       **This step contradicts I4 below, and follows the table in section 1
       instead.** See the note under I4. Also NOT done: no candidate is drawn
       on a screen, and no request has been made against the live service.
-- [ ] **6. Proposal and confirmation path.** I4 and I6 as checks. Mutation:
-      make a suggestion commit without a person and confirm FAIL.
+- [x] **6. Proposal and confirmation path.** **Half built 2026-10-31**, and
+      the halves are named rather than averaged.
+      **Built: certainty on every coded thing this build emits, not only on a
+      diagnosis.** `Observation.status` was a literal `final` in
+      `kernel/fhir.py` and is now the row's own column, declared by the
+      operation that writes it: `preliminary` for a keyed laboratory value and
+      `final` for a nurse's range-checked vital sign. That was a live defect,
+      not a tidy-up: the DiagnosticReport written in the same operation said
+      `preliminary` while every value inside it was published as `final`. A
+      row with no status is refused rather than given one. Three published
+      FHIR status lists are cached with their provenance, and every literal
+      any operation can store into a FHIR `code` element is now held against
+      the list R4 binds that element to, at build time.
+      **Built: I6 written down resource by resource, including where it is not
+      kept.** Kept on Condition. Not keepable on Observation, which has no
+      verificationStatus, no clinicalStatus and no negation element in R4, so
+      an observation row carrying a certainty is REFUSED rather than published
+      without it. Not applicable to a MedicationRequest, whose certainty R4
+      carries in `intent`, which is why no certainty question was added to the
+      prescription form. A family history finding cannot be recorded at all
+      and is refused on all three of resource, section and concept.
+      **Built: the four honest cases, each its own check.** A refuted finding,
+      an unconfirmed guess, a historical finding with its onset, and a family
+      history finding that is refused. The first three travel as three
+      different codes in one document, and that document passes the tier one
+      structural validator with no findings.
+      **NOT built: the provenance of a code.** A person picking a code, a
+      person accepting a suggestion and a code arriving in a bundle are
+      indistinguishable in the record, because only the first can happen here:
+      nothing draws a candidate on a screen and Eka is asked for the
+      transcript only. R4's answer when they can is the `Provenance` resource
+      and no extension; the shape, and the two tripwires that fail the day
+      either route opens, are in the architecture document's section 12 item
+      16.
+      **NOT built: the mutation this step asked for.** "Make a suggestion
+      commit without a person" is not expressible: a `Candidate` has no path
+      into a payload, so there is nothing to mutate. What is proved instead is
+      that no module between an answer and a published resource can even NAME
+      a verification status, so a machine cannot write one.
+      Checks: `scripts/check_verification.py`, 18. Mutations: 9 of 9 caught,
+      and one of them exposed a hole in the check itself, which is recorded at
+      the foot of that file.
 - [ ] **7. Bundle seam for `OPConsultRecord`**, validated against the NRCES
       profile. **Half built 2026-10-31**: the profile is in `kernel/fhir.py`
       with its eight published section codes, the Condition and
@@ -396,6 +436,20 @@ certification, though not Monday.
   no interaction is stated anywhere, and none may be inferred from the list.
   This is also the sign-off the `rx.prescribe` capability's own qualifier has
   been waiting for since it was declared.
+- **A verified laboratory value stays `preliminary` for ever.** A mapping
+  cannot address an existing row, so `lab.op.result-verify` writes a second
+  report row and cannot reach the observations the technician keyed. The
+  honest direction to be stuck in: a stale `preliminary` says the value may
+  change, and a `final` on an unverified value says a second person stood
+  behind it. Moving it needs an update path on the Store or an amendment
+  resource, and both are decisions rather than code.
+- **A family history finding cannot be recorded.** No resource (FHIR's home
+  for it is `FamilyMemberHistory`, and `Condition` has no element naming a
+  family member, so a family history stored as a Condition is a condition OF
+  THE PATIENT), no section code (NRCeS publishes none for the OPConsultRecord
+  `FamilyHistory` slice and no example populating it), and no concept (none is
+  in the condition value set). It is refused on all three and checked on all
+  three.
 - **SNOMED displays are United States English.** Paracetamol is stored with
   the display "Acetaminophen only product", because that is SNOMED
   International's preferred term and the display comes from the terminology

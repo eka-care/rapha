@@ -1199,6 +1199,131 @@ holds it, including the case where nothing at all was coded, and the
 narrative-only bundle passes the tier one structural validator with no
 findings.
 
+**12. "A proposal is not a row, so there is nothing here that could be
+`preliminary`" was the wrong question answered confidently.** That sentence
+was `kernel/fhir.observation()`'s own docstring, and on its strength the
+projection wrote `status: "final"` into every Observation it produced. The
+argument is about whether a ROW EXISTS, which a tap settles.
+`Observation.status` is about whether its VALUE IS SETTLED, which a tap does
+not.
+
+The two come apart in the laboratory, where this build already has the second
+pair of eyes it needs to tell them apart. `lab.op.result-enter` writes the
+values and writes a DiagnosticReport beside them with `status: preliminary`.
+`lab.op.result-verify` is a separate operation that a separate person performs,
+enforced against the audit trail. So between those two taps, the report said
+preliminary and every value inside it was published under the patient's ABHA
+number as `final`.
+
+Fixed rather than reported, because it is the whole subject of the module that
+found it: `Observation.status` is now a stored column the operation declares,
+`preliminary` for a keyed laboratory value and `final` for a nurse's
+range-checked vital sign, and a row with no status is refused rather than
+given one. `scripts/check_verification.py` holds it, and the regenerated
+WellnessRecord passes the tier one structural validator with no findings.
+
+They stay `preliminary` after verification. A mapping cannot address an
+existing row, so verification writes a second report row and cannot reach the
+observations. A stale `preliminary` says the value may change, which is merely
+out of date; a `final` on an unverified value says a second person stood
+behind it. Only one of those is a false claim, so the honest one is the one to
+be stuck on. Moving it needs either an update path on the Store or an
+amendment resource, and both are decisions rather than code.
+
+**13. Invariant I6 is kept on one resource of the four this build emits, and
+the plan does not say so.** I6 reads "A negated, hypothetical, family or
+historical finding is stored with that status, never dropped and never
+asserted", and the plan's section 4 says FHIR already has the fields. It has
+them on `Condition`. It does not have them anywhere else:
+
+- `Condition`: kept. `verificationStatus` is a required clinician answer and
+  `clinicalStatus` plus an onset carry the historical case.
+- `Observation`: not kept and not keepable. R4's Observation has no
+  `verificationStatus`, no `clinicalStatus` and no negation element at all.
+  FHIR's own answer is that a finding whose certainty matters is a Condition,
+  so an observation row carrying a certainty is now REFUSED rather than
+  published without it. Dropping it would be the exact failure the invariant
+  exists to prevent.
+- `MedicationRequest`: not applicable, and nothing was invented to make it
+  look applicable. A medicine is not a finding. R4 carries a request's
+  certainty in `intent`, which separates a `proposal`, a suggestion from
+  someone with no authority to make it happen, from an `order`, a demand and
+  an authorisation; that element is already stored. R4's negation for a
+  request is `doNotPerform`, which no form here asks for.
+- `DocumentReference`: not applicable. A narrative attachment asserts nothing
+  coded; the doubt is in the clinician's own words.
+
+**A family history finding cannot be recorded by this build at all.** FHIR's
+home for it is `FamilyMemberHistory`, which carries the relationship.
+`Condition` has no element naming a family member, so a family history stored
+as a Condition is a condition OF THE PATIENT. The OPConsultRecord profile does
+declare a `FamilyHistory` section slice, and NRCeS publishes no code for that
+slice and no example populating it, so `kernel/fhir.py` declares it nowhere
+and `document()` refuses it. And no "family history of" concept is in the
+condition value set. All three are checked, so the day somebody assumes
+otherwise the build says so.
+
+**14. `lab.op.result-verify` stores a word R4 does not have into a FHIR
+status, and nothing has noticed because nothing publishes it.** The operation
+writes `status: {answer: decision}` into `diagnostic_report.status`, and the
+form's two choices are `verified` and `rejected`. Neither is a code of
+`http://hl7.org/fhir/ValueSet/diagnostic-report-status`, whose ten codes are
+registered, partial, preliminary, final, amended, corrected, appended,
+cancelled, entered-in-error and unknown. `final` is defined as "complete and
+verified by an authorized person", which is exactly what the pathologist did.
+
+Reported rather than fixed, and deliberately. The stored word is also the
+laboratory's own workflow state: `lab.op.report-release` is gated on a row
+with status `verified`, and the seed carries `rejected` rows. Renaming it is a
+workflow change with a flag derivation and a precondition behind it, and
+`rejected` has no obvious R4 equivalent (`cancelled` is "not started or not
+completed", which is not what a rejection means). It is latent rather than
+shipping because `kernel/fhir.PROJECTIONS` has no `diagnostic_report` entry at
+all, so a laboratory report reaches no document today. Adding that projection
+and fixing this are one piece of work. `scripts/check_verification.py` fails
+the moment somebody binds the column, which is the first thing that work would
+do.
+
+**15. Coded data, decision 4: "Eka's scribe output. Both the bundle and the
+transcript."** The code asks for the transcript only. `api/scribe.py` says so
+in its own doctrine section, `TEMPLATES` requests `transcript_template` with
+`codification_needed: False`, and no bundle has ever been read. That is the
+conservative half of the decision and it is the half that is built.
+
+It matters here because it is one of the three ways a code was supposed to
+reach this product, and it is why the third has no field in the record. See 16.
+
+**16. The three provenance routes are one route, so no provenance field was
+built.** A code was to arrive three ways: a person picks it, a person accepts
+a suggestion, or it arrives in a bundle. Only the first can happen here.
+Nothing draws a candidate on a screen, which
+`web/src/scribe/scribe.check.ts` asserts from the renderer's side and
+`scripts/check_verification.py` now asserts from the kernel's, so no person
+can accept a suggestion. And Eka is asked for the transcript only, per 15, so
+no bundle arrives.
+
+What R4 offers, for when they do. Nothing on Condition, Observation or
+MedicationRequest can say that a machine produced the content and a person
+validated it: `Condition.recorder` and `Condition.asserter` reference a
+person, `Observation.performer` references a person or an organisation, and
+`MedicationRequest.reported[x]` means secondhand rather than machine made. The
+standard's answer is the `Provenance` resource, whose `agent.who` may
+reference a Device and whose `agent.type` is bound to the published value set
+`http://hl7.org/fhir/ValueSet/provenance-agent-type` (thirteen codes including
+`author`, `verifier` and `assembler`, expanded from tx.fhir.org on
+2026-10-31). The three routes are then one Practitioner agent typed `author`;
+a Device agent typed `author` beside a Practitioner agent typed `verifier`;
+and the same pair plus a `Provenance.entity` with role `source` naming the
+incoming bundle. **No extension is needed for any of it**, which is the part
+worth writing down, because the obvious wrong answer is a custom extension on
+Condition.
+
+Not built, because a column with one reachable value and two that nothing can
+write is scaffolding. Both tripwires fail the day a route opens, and each
+names what then has to arrive with it. Whether to open either is the owner's
+call: route 2 needs the renderer to draw candidates, which is a screen
+decision, and route 3 needs Eka asked for its bundle, which is decision 4.
+
 **And one bug, fixed here rather than reported.** `Store.audit` is documented
 as oldest first and could not deliver it. `AuditRecord.at` is ISO 8601 to the
 second, so two decisions on one thread inside the same second tied on `at`, and
