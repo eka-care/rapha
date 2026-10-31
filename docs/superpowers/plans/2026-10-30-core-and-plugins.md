@@ -393,17 +393,62 @@ unskipped.
       Also: a documentation sweep of `RUNNING.md` (9 lines) and
       `kernel/ARCHITECTURE.md` (:38, :77).
 
-- [ ] **Step 2. Declare the plugins, all on, no loader, no off map.**
-      `plugins/<id>/plugin.yaml` for the five candidates, `plugins:` in
-      `bundles/phc/bundle.yaml`, `Manifest.plugins`, `Vocabulary.plugins`, and
-      R1/R2/R3 from §2. Nothing changes behaviour.
-      **Acceptance, which is the whole point of the step:** with the off map
-      empty, the effective capability set for every role in
-      `bundles/phc/bundle.yaml` is byte identical to `vocab.BUNDLES[role]`
-      today, and `compile_json(BUNDLE)` differs from the pre-plugin compile only
-      by the added `plugins` key. `bundles/lab/bundle.yaml` gains nothing.
-      **Mutation:** pre-populate the off map with any plugin, or mark one
-      `always: false` and have `caller()` subtract it by default. Must FAIL.
+- [x] **Step 2. Declare the plugins, and the facility shapes, with the
+      subtraction wired. Done, 2026-10-31, differently from the plan above.**
+
+      Built: `plugins:` and `facilities:` in `bundles/phc/bundle.yaml`,
+      `kernel/plugins.py` (resolution and lint), `facility:`/`withheld` on
+      `declarations.Bundle`, the one subtraction in `api/main.py caller()`,
+      `withheld=` on `guard.evaluate` so a denial names the capability and the
+      plugin, `PHC_FACILITY`, and `scripts/check_plugins.py` (24 checks) plus
+      four more over a real socket in `scripts/e2e.py`. Gate at 670 ok.
+
+      Five plugins over the sixteen capabilities this bundle already declares,
+      each claimed exactly once, `baseline` always on. Three shapes:
+      `all-plugins`, `no-laboratory`, `consulting-room-only`.
+
+      **Four deliberate differences from the plan, each with its reason.**
+
+      - **No `plugins/<id>/plugin.yaml`, and no loader.** This step is the
+        composition half, which the 2026-09-15 spec puts in `bundle.yaml`, and
+        nothing yet needs the packaging half: no plugin contributes routes, a
+        surface or store behaviour until Step 4. A directory per plugin with
+        nothing in it is scaffolding.
+      - **No `Manifest.plugins` and no `Vocabulary.plugins`.** Nothing consumes
+        them. Putting plugin ids into `catalogue.json` adds words the renderer
+        may never type and needs `ui.check.ts` to grow for a screen that does
+        not exist. The shape is served live at `GET /facility` instead, which
+        is where the Go server and the renderer already read from. This is the
+        one to revisit first when the admin screen arrives, and §12's
+        contradiction 25 is the cost of not having it.
+      - **The lint is in `kernel/plugins.py`, not `catalogue/vocab.py
+        problems()`.** The rule worth having needs the workflow declarations,
+        which `vocab.py` cannot see, and splitting the lint over two files is a
+        rule nobody maintains. `vocab.py` is untouched.
+      - **No `instruments:` key and no R2.** See §12 contradiction 26: R2 has
+        nothing to range over until the three capture capabilities exist.
+
+      **And one rule the plan did not ask for, which is the reason this is
+      more than a switch.** A facility whose choice means no operation it may
+      still perform can raise a workflow step's `done_when`, where that step
+      has no `applies_when` to skip it, fails the build: every patient would
+      wait at that station forever. A step that CAN be skipped is the mechanism
+      rather than the bug, which is how a centre with no laboratory has no
+      laboratory queue, and both halves are proved.
+
+      **Acceptance, met:** `compile_json(BUNDLE)` is byte identical across all
+      three shapes, with every plugin on no role loses a capability, and
+      `bundles/lab/bundle.yaml` gained nothing.
+      **Mutations: 34 of 34 caught.** One hole they found in the new checks: no
+      assertion covered a misspelt `PHC_FACILITY`, and an unrecognised shape
+      resolves to no declaration and withholds nothing, so a typo ran the whole
+      facility. Fixed and asserted.
+
+      **Not done from this step, and still owed:** the per user `OFF` map, the
+      `PUT/GET /users/{user}/plugins` routes and the composition audit line
+      against thread `facility`. A facility level choice and a per user one are
+      the same subtraction through the same function; what is missing is who
+      may change it and where it is written down. That is Step 5.
 
 - [ ] **Step 3. Move `_scrub` and `api/fill.py` to the core.** Two small moves
       that remove the two cross-plugin dependencies named in §6, before any

@@ -1455,6 +1455,61 @@ wrote, not a rule, and a bundle that listed a template first would make
 "Antenatal visit" the headline advice at every visit. A fifth template makes
 this worse and there is no cap that knows the difference.
 
+**23. `catalogue/build.py` and `kernel/declarations.py` disagree, in
+comments, about who narrows the compiled catalogue.** `compile_catalogue()`
+says "the next step, kernel/declarations.write_catalogue, narrows these three
+keys to the bundle whose manifest it writes beside them, so the file the Go
+server embeds describes one facility and not a merged one". `write_catalogue()`
+says the opposite, and explains why at length: `capabilities`, `bundles` and
+`states` stay the union, because the Go server embeds every bundle's atoms and
+narrows at runtime by asking the kernel. The second comment is right and the
+code does what it says. The first is wrong, and it matters here because this
+module's whole mechanism is that the compiled artifact is one copy and the
+narrowing happens live. Reported rather than edited: both comments are the
+architect's prose.
+
+**24. The spine and plugins spec's `off:` key cannot be written in YAML.**
+The spec names the bundle key `off` and the shape was written that way first.
+YAML 1.1 reads a bare `off` as the boolean false, so `off: [orders]` parses as
+a mapping key named `False` and the facility silently withholds nothing. The
+built key is `without`, and `kernel/plugins.py` refuses the `off` spelling by
+name so the next person does not lose an afternoon to it.
+
+**25. The role editor offers a capability this facility will refuse.**
+`web/src/grants.ts inert()` decides whether a grant does anything from the
+workflow alone: a capability some step draws is grantable. It knows nothing
+about which plugins the facility runs, so at a centre with the laboratory off
+the grid still offers `lab.order` as a live switch, an administrator grants it,
+and the guard then refuses every use of it with a sentence about a plugin.
+`inert()` has the information it needs nowhere: the withheld map is served at
+`GET /facility` and is not in `catalogue.json`. Reported rather than fixed,
+because the fix is a renderer change on a screen nobody asked for yet, and
+because putting plugin ids into `catalogue.json` adds words the renderer may
+never type.
+
+**26. The plan's own R2 cannot be built at the step that specifies it.**
+`docs/superpowers/plans/2026-10-30-core-and-plugins.md` section 2 requires
+every plugin to carry one `capability:` and requires R2, the handover rule,
+over a plugin's `instruments:`. The three things with no off switch, the
+scribe, the voice instruments and the agent, are exactly the three with no
+capability, and giving them one is that plan's Step 2 second half. So at Step
+2's first half there is no plugin that can own an instrument, R2 has nothing to
+range over, and an `instruments:` key would be a key nothing uses. It is not
+built, and that is a sequencing fact rather than a refusal: R2 arrives with
+`capture.voice`, `capture.scribe` and `agent.ask`.
+
+**27. Two stations share one `done_when`, so the line stopping rule can be
+satisfied from somewhere nobody expects.** `phc.op.household-visit` stands at
+`community` and emits `consult.documented`, which is also the doctor's step's
+`done_when`. The new lint asks whether anything a centre may still do raises a
+step's flag, and it deliberately does not ask where that thing stands, because
+this case is the bundle's own intent. The consequence is that a facility which
+switched off `encounter.document` would pass the rule, because a household
+survey raises the same flag, and a visit would read as a documented
+consultation on the strength of a survey. Unreachable today: `encounter.document`
+sits in the always on floor. It becomes reachable the moment somebody moves it
+out, and nothing would say so.
+
 **And one hole the mutations found, in the gate rather than in this
 module.** Deleting the line that runs a check from `scripts/check.sh` left
 the gate green with 549 oks, and nothing anywhere said a check had gone
