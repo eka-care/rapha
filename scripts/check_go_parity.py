@@ -2705,6 +2705,22 @@ def _workflow_frontmatter():
 
 
 @functools.lru_cache(maxsize=None)
+def _catalogue_capabilities():
+    """The capabilities catalogue.json carries at its TOP LEVEL, which is the
+    union over every bundle in the tree and not the loaded bundle's own.
+
+    Read from the file rather than from a route on purpose: GET /catalogue
+    substitutes the loaded bundle's list for exactly this key, because serving
+    the union would hand the only account the browser can be six laboratory
+    capabilities a health centre does not declare. So the wider set is
+    UNREACHABLE over the wire, and a check that wanted to prove a route is not
+    using it has to read the file.
+    """
+    with open(ROOT / "catalogue" / "catalogue.json") as f:
+        return sorted(json.load(f)["capabilities"])
+
+
+@functools.lru_cache(maxsize=None)
 def _catalogue_operations():
     """The CATALOGUE-WIDE operations, which is what
     kernel/declarations.load() hands plugins.lint(): `ops =
@@ -3043,7 +3059,17 @@ def roles(shape, python, go):
     # would let a health centre's role editor grant laboratory capabilities
     # this bundle does not declare, to the only account the browser can be.
     whole = get(go, PREFIX + "/facility")["capabilities"]
-    wider = sorted(set(get(go, PREFIX + "/catalogue")["capabilities"]) - set(whole))
+    # The capabilities the embedded catalogue carries for OTHER bundles. This
+    # is the case that matters and the one a first pass did not write: a word
+    # that is in NEITHER list is refused by an engine validating against
+    # either one, so a check that only tries a typo compares two engines
+    # agreeing about nothing. A word that is in the file's union and not in
+    # this bundle's own is refused only by an engine that validates against
+    # the right one of the two.
+    wider = sorted(set(_catalogue_capabilities()) - set(whole))
+    assert wider, (
+        "catalogue.json's capability union is this bundle's own, so the "
+        "over-grant it was narrowed to prevent cannot be reached from here")
     refusals = [
         ("not an administrator", PREFIX + "/roles/" + role,
          {"X-PHC-Role": next(r for r in sorted(presets)
@@ -3052,18 +3078,44 @@ def roles(shape, python, go):
         ("no such role", PREFIX + "/roles/surgeon", {}, {"capabilities": []}),
         ("not a capability of this bundle", PREFIX + "/roles/" + role, {},
          {"capabilities": [sorted(whole)[0] + ".typo"]}),
+        ("a capability the embedded catalogue carries for ANOTHER bundle",
+         PREFIX + "/roles/" + role, {}, {"capabilities": [wider[0]]}),
+        ("every capability another bundle declares, at once",
+         PREFIX + "/roles/" + role, {}, {"capabilities": wider}),
     ]
     for label, path, head, body in refusals:
         py = call(python, path, method="PUT", headers=head, body=body)
         gone = call(go, path, method="PUT", headers=head, body=body)
         assert py == gone, (label, py, gone)
         assert py[0] != 200, (label, py)
-    ok("%s: and the three ways a save is refused -- not an administrator, no "
-       "such role, and a word that is not one of this bundle's %d "
-       "capabilities -- answer identically on both engines%s"
-       % (shape, len(whole),
-          ", including the %d the embedded catalogue carries for OTHER "
-          "bundles" % len(wider) if wider else ""))
+    ok("%s: and the %d ways a save is refused answer identically on both "
+       "engines: not an administrator, no such role, a word that is no "
+       "capability at all, and any of the %d the embedded catalogue carries "
+       "for OTHER bundles but this one's %d do not include"
+       % (shape, len(refusals), len(wider), len(whole)))
+
+    # And a role saved with NOTHING, which is a deviation and not an absence.
+    # Compared because the two are one byte apart on the wire -- [] and null --
+    # and a role editor reading null concludes that a facility which deviated
+    # all the way to nothing has not deviated at all, then restores the
+    # preset on its next unrelated save.
+    empty = {}
+    for name, base in (("python", python), ("go", go)):
+        empty[name] = call(base, PREFIX + "/roles/" + role, method="PUT",
+                           body={"capabilities": []})
+    assert empty["python"] == empty["go"], empty
+    py_back = get(python, PREFIX + "/roles")
+    go_back = get(go, PREFIX + "/roles")
+    assert py_back == go_back, (
+        "a role saved with nothing reads differently\npython: %s\ngo:     %s"
+        % (json.dumps(py_back["overrides"], sort_keys=True),
+           json.dumps(go_back["overrides"], sort_keys=True)))
+    assert go_back["overrides"][role] == [], go_back["overrides"]
+    assert get(go, PREFIX + "/whoami", header)["capabilities"] == [], \
+        "a role saved with nothing still holds something"
+    ok("%s: and a role saved with NOTHING reads back as a deviation holding an "
+       "empty list rather than as no deviation at all, identically in both "
+       "engines, and its caller then holds nothing" % shape)
 
 
 def compare(shape, python, go):
