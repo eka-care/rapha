@@ -32,6 +32,12 @@ administration. Who you are is decided by a line in a web request. Every
 "this is refused" proof in the system is a proof about a program nobody can
 actually log in to.
 
+One concrete consequence, found while porting the backend to Go: the route
+that serves the compiled rules answers anyone, without even naming a role,
+while every neighbouring route refuses an unknown one. What it returns
+includes every role's full list of permissions. Harmless while there is no
+login at all. It stops being harmless on the day there is one.
+
 **Needed:** a decision on how staff sign in. This is a build job, not a
 decision only you can make, but it has not been built.
 

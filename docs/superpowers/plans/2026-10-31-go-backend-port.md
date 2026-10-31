@@ -91,13 +91,25 @@ Each is finished when the gate is green and the named checks pass against Go.
 - **G3. Validation and fill.** Questionnaire validation, repeating groups, row
   addressing, bound choices, and the tick: every non-text value a recording
   fills is owed a per-field confirmation.
-- **G4. Terminology.** A coding that cannot be constructed unvalidated, the
-  three binding forms, the offline value sets.
-- **G5. Mapping and the record projection.** Rows per group row, the author on
+- **G4. Views, state, the spine and the seed.** The declared views, the
+  metrics, the patient spine and the seeded demo day.
+
+  **Brought forward from sixth place on 2026-10-31, after G3.** Two of the
+  three acceptance tests are blocked on exactly this and on nothing else:
+  `scripts/check_live.py` reports 0 of 16 because its first `ok` sits after a
+  facility capture needing `GET /views/{id}` and `GET /subjects/{id}`, and
+  `scripts/e2e.py main()` reports 1 of 49 because it opens on `GET /queue`.
+  Until this slice lands, every later slice can only be measured by the
+  differential check, which compares two engines against each other and
+  cannot see the pair drifting together. Restoring the socket checks as a
+  measure is worth more than the original order.
+- **G5. Terminology.** A coding that cannot be constructed unvalidated, the
+  three binding forms, the offline value sets. `GET /valuesets/{slug}` is
+  already routed, from G3, because a bound choice with nothing to choose is an
+  empty dropdown; what is left is the rest of `kernel/terminology.py`.
+- **G6. Mapping and the record projection.** Rows per group row, the author on
   each, and the three OPConsultRecord slices this build fills, plus the
   narrative fallback.
-- **G6. Views, state and metrics.** The station line, the flags, the declared
-  views and the dashboard.
 - **G7. Plugins.** A facility's shape as one list of what it does not run,
   subtracted once, denied and never hidden.
 - **G8. The outbox.** Durable, nothing lost, nothing sent twice, nothing
