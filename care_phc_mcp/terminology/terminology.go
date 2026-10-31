@@ -188,6 +188,16 @@ func (c *Cache) Bound(slug string, code any) (Coding, error) {
 	return Coding{system: set.system, code: text, display: display, valueset: slug}, nil
 }
 
+// Codes is every code this value set holds, sorted. For a check and for a
+// picker, not for the write path: a caller that wants one code wants Bound.
+func (c *Cache) Codes(slug string) []string {
+	set, found := c.sets[slug]
+	if !found {
+		return nil
+	}
+	return append([]string(nil), set.order...)
+}
+
 // Concept is the raw cached concept behind a code, for the facts a Coding has
 // no field for. Today that is one fact: the unit LOINC reports an analyte in.
 //
