@@ -54,6 +54,40 @@ const (
 // unit. The field name is CARE's, verbatim.
 const UnitOf = "unit_of"
 
+// AnswerValueSet is where a question says which value set its ANSWER is drawn
+// from: the third binding form. The FHIR questionnaire field name, verbatim,
+// because CARE has it too and this is the one place the two models should not
+// diverge. Named here rather than spelled into a sentence, because the
+// Python interpolates the same constant into the refusal a caller reads
+// (kernel/terminology.answer_coding) and two spellings of one field name is
+// how the two engines start disagreeing about what the declaration is called.
+const AnswerValueSet = "answer_value_set"
+
+// Terminology is the seam, the Go side of kernel/terminology.Terminology:
+// small enough that a local file and a real terminology server both satisfy
+// it, and narrow enough that a check can pass a stand-in.
+//
+// That last part is the point, and it is the Python's stated reason for the
+// seam existing at all: CARE replaces `validate_valueset` with the identity
+// function for its whole suite (care/utils/tests/base.py:19), so its
+// guarantee is never exercised in CI. Here the terminology is an argument, so
+// a check hands over a fake rather than rewriting a package global.
+//
+// Validate is on the write path and must work with no network. Expand is for
+// a picker and may be poorer offline than online.
+type Terminology interface {
+	Validate(valueset string, code any) bool
+	Concepts(valueset string) map[string]map[string]any
+	Tags(valueset string) []string
+	Expand(valueset, query string, count int) ([]Coding, error)
+	Bound(valueset string, code any) (Coding, error)
+}
+
+// The local cache is one implementation behind that seam, and today the only
+// one. Asserted at compile time rather than in prose: an argument that drops
+// off the interface should stop the build here and not at a caller.
+var _ Terminology = (*Cache)(nil)
+
 // Coding is one code from one code system, vouched for by one value set.
 // Immutable from outside this package: the fields are the identity of a
 // clinical fact and nothing may rewrite one in place.
@@ -82,6 +116,24 @@ func (c Coding) Fact(which string) string {
 	return ""
 }
 
+// ToFHIR is this coding as a FHIR R4 Coding element.
+//
+// `system` is always present, unlike CARE's (care/emr/resources/common/
+// coding.py makes it optional while `code` is required). A code without a
+// system is meaningless in FHIR R4 and unexportable to ABDM, so it cannot be
+// absent here: the value set carries it and every Coding came from one.
+//
+// The display is omitted when the cache recorded none, which is the Python's
+// `if self.display`. A key present and empty is not the same document: ABDM's
+// validator reads an empty display as a display.
+func (c Coding) ToFHIR() map[string]any {
+	out := map[string]any{"system": c.system, "code": c.code}
+	if c.display != "" {
+		out["display"] = c.display
+	}
+	return out
+}
+
 // Cache is the local value sets, by slug.
 type Cache struct {
 	dir   string
@@ -94,6 +146,7 @@ type valueSet struct {
 	system   string
 	concepts map[string]map[string]any
 	order    []string
+	tags     []string
 }
 
 // Load reads every cached value set under dir.
@@ -148,6 +201,19 @@ func Load(dir string) (*Cache, error) {
 			}
 		}
 		sort.Strings(set.order)
+		// `semantic_tags` is optional and its absence is not a failure: the
+		// Python's `.get("semantic_tags") or []` says so, and twelve of the
+		// fourteen cached value sets here declare none. Order is the FILE'S
+		// order and not sorted, because the declaration's order is the
+		// declaration's business and sorting it would be this engine having
+		// an opinion about a list it only reads.
+		if declared, ok := blob["semantic_tags"].([]any); ok {
+			for _, tag := range declared {
+				if text, ok := tag.(string); ok {
+					set.tags = append(set.tags, text)
+				}
+			}
+		}
 		cache.sets[set.slug] = set
 		cache.known = append(cache.known, set.slug)
 	}
@@ -257,6 +323,35 @@ func (c *Cache) Concepts(slug string) map[string]map[string]any {
 	return out
 }
 
+// Tags is the ontology semantic tags this value set's concepts carry.
+//
+// Declared in the file, under `semantic_tags`, beside the sentence that says
+// what was confirmed and what was not. Empty for a value set that is not a
+// branch of an ontology with semantic tags, which is every one here that is
+// not SNOMED: a UCUM symbol and a FHIR status code have no semantic tag and
+// never will.
+//
+// Nil for a value set nothing caches, the same way Concepts is, and that is a
+// DIVERGENCE said out loud rather than hidden: kernel/terminology.tags goes
+// through the same _load as everything else and therefore RAISES for an
+// uncached slug, while the one caller of it (kernel/codification's accepted
+// tags) reads an empty list as "this code system has no categories". So a
+// caller here owes Known() first, exactly as the expansion route does, and
+// nothing in this package may read Tags without it. Reported to the owner
+// with the slice rather than papered over with an error return that no
+// present caller would read.
+//
+// Read here rather than in a codification module for the ordinary reason:
+// what the categories of a code system are called is the terminology's
+// business, and no engine module may type one.
+func (c *Cache) Tags(slug string) []string {
+	set, found := c.sets[slug]
+	if !found {
+		return nil
+	}
+	return append([]string(nil), set.tags...)
+}
+
 // Codes is every code this value set holds, sorted. For a check and for a
 // picker, not for the write path: a caller that wants one code wants Bound.
 func (c *Cache) Codes(slug string) []string {
@@ -285,6 +380,54 @@ func (c *Cache) Concept(slug string, code any) (map[string]any, error) {
 	return out, nil
 }
 
+// QuestionCodings is the bound codings one questionnaire question declares,
+// by fact name: the FIRST TWO of the three binding forms, both resolved from
+// the question's own declaration.
+//
+//	code   the question's own concept, bound to CodeBinding. Declared as a
+//	       bare code and not a triple: the system comes from the value set
+//	       and the display comes from the cache, so neither can be retyped
+//	       wrongly. CARE declares all three per field and its displays are
+//	       free text as a result.
+//	unit   the quantity's unit, bound to UnitBinding. Read from
+//	       styling_metadata.phc.unit, which is where it already lives, next
+//	       to the range that validates it. Not moved and not duplicated.
+//
+// Both optional, and an absent one is absent rather than empty: a question
+// that binds nothing gets nothing back, and a mapping source that reads a
+// fact nothing declared fails rather than writing a null.
+//
+// WHEN THIS RUNS, AND WHY THE GO ENGINE IS NOT THE ONE THAT USUALLY RUNS IT.
+// In the Python this is BUILD time: kernel/mapping._compile_question calls it
+// once per question per build and keeps only the resolved facts, which land
+// in catalogue.json's compiled `mapping` and are what this engine reads. So
+// the Go serving path does not resolve these two forms, it re-checks a
+// resolved one (mapping.boundFact) before a column is written, which is the
+// write-path half of invariant I1. This function is the other half, read out
+// of the declarations rather than out of the compiled artifact, so that a
+// questionnaire whose declared code or unit its value set does not hold is a
+// failure a check can see on this side of the port too. Nothing on the hot
+// path calls it, deliberately: the cache is the authority and it does not
+// change between builds, so a per-write lookup would buy nothing and cost a
+// map walk on every row.
+func QuestionCodings(q questionnaire.Question, t Terminology) (map[string]Coding, error) {
+	out := map[string]Coding{}
+	for _, form := range []struct{ fact, slug, declared string }{
+		{"code", CodeBinding, q.Code},
+		{"unit", UnitBinding, q.Unit},
+	} {
+		if form.declared == "" {
+			continue
+		}
+		coding, err := t.Bound(form.slug, form.declared)
+		if err != nil {
+			return nil, err
+		}
+		out[form.fact] = coding
+	}
+	return out, nil
+}
+
 // AnswerBinding is the value set this question's ANSWER is drawn from, or "".
 func AnswerBinding(q questionnaire.Question) string {
 	return strings.TrimSpace(q.AnswerValueSet)
@@ -299,8 +442,8 @@ func AnswerBinding(q questionnaire.Question) string {
 func (c *Cache) AnswerCoding(q questionnaire.Question, answer any) (Coding, error) {
 	slug := AnswerBinding(q)
 	if slug == "" {
-		return Coding{}, fmt.Errorf("question %s declares no answer_value_set, "+
-			"so its answer carries no concept", pyval.Repr(q.LinkID))
+		return Coding{}, fmt.Errorf("question %s declares no %s, so its answer "+
+			"carries no concept", pyval.Repr(q.LinkID), AnswerValueSet)
 	}
 	if pyval.IsUnanswered(answer) {
 		return Coding{}, fmt.Errorf("question %s was not answered, so there is "+
