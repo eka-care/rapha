@@ -29,14 +29,17 @@ cmd/api/main.go).
 """
 from __future__ import annotations
 
+import datetime
 import functools
 import json
 import os
 import pathlib
 import re
+import subprocess
 import sys
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 
 ROOT = pathlib.Path(__file__).parents[1]
@@ -55,7 +58,12 @@ SHAPES = ("all-plugins", "no-laboratory", "consulting-room-only")
 # for with a bare GET and no state. Each is asked under both prefixes, because
 # /api and /api/v1/phc are one router in the Python and two mounts in the Go,
 # and that is exactly the kind of difference a diff should catch.
-SERVED = ("/whoami", "/facility")
+SERVED = ("/whoami", "/facility", "/catalogue", "/operations",
+          "/questionnaires")
+# And the one served read route that needs a path parameter, so it cannot join
+# the loop above. Compared by valuesets() below, over every slug a question in
+# this bundle actually binds its answer to, derived from the forms on disk.
+SERVED_TEMPLATED = ("/valuesets",)
 # The write path, which cannot be compared that way: every one of these needs
 # a thread, most need a payload, and three of them need a proposal that a
 # previous call issued. They are compared by walk() below, which runs the same
@@ -255,6 +263,106 @@ def coder():
         chosen[question["link_id"]] = dict(blob["concepts"][code])
         return code
     return pick
+
+
+def bound_slugs():
+    """Every value set a question in this bundle binds its ANSWER to.
+
+    Walked rather than listed, because a bound sub question of a repeating
+    group is where the empty dropdown was, and because a value set added to a
+    form has to arrive here without anybody editing this file.
+    """
+    found = set()
+    cat = json.loads((ROOT / "catalogue" / "catalogue.json").read_text())
+    for op_id in cat["manifest"]["operations"]:
+        slug = cat["operations"][op_id].get("input")
+        if not slug:
+            continue
+        for question in validate_walk(schema(slug)["questions"]):
+            if question.get("answer_value_set"):
+                found.add(question["answer_value_set"])
+    assert found, "no question binds an answer, so this proves nothing"
+    return sorted(found)
+
+
+def valuesets(shape, python, go):
+    """GET /valuesets/{slug}, every bound slug, and what the parameters do.
+
+    Nothing about any expansion is written here. The slugs come off the forms,
+    and the queries come off whatever the first expansion answered, so a value
+    set that is renamed or re-coded moves this check with it.
+    """
+    asked = 0
+    for slug in bound_slugs():
+        for spelling in ("", "/"):
+            for tail in ("", "?limit=200", "?limit=1", "?limit=0",
+                         "?limit=100000"):
+                at = "%s/valuesets/%s%s%s" % (PREFIX, slug, spelling, tail)
+                py = get(python, at)
+                gone = get(go, at)
+                assert py == gone, "%s\npython: %s\ngo:     %s" % (
+                    at, json.dumps(py, sort_keys=True),
+                    json.dumps(gone, sort_keys=True))
+                asked += 1
+        # The `q` parameter, which api/main.py says exists and nothing calls.
+        # Asked with a word taken from this value set's own first display and
+        # with one taken from its code, so the filter is exercised on both
+        # halves of the Python's test rather than on a word typed here.
+        body = get(python, "%s/valuesets/%s" % (PREFIX, slug))
+        words = [body["concepts"][0]["display"].split()[0],
+                 body["concepts"][0]["value"][:3], "nothing anybody declared"]
+        for word in words:
+            at = "%s/valuesets/%s?q=%s" % (PREFIX, slug,
+                                           urllib.parse.quote(word))
+            py = get(python, at)
+            gone = get(go, at)
+            assert py == gone, "%s\npython: %s\ngo:     %s" % (
+                at, json.dumps(py, sort_keys=True),
+                json.dumps(gone, sort_keys=True))
+            asked += 1
+    # A value set nothing caches. The Python raises UnboundCoding and answers
+    # 404 with its own sentence, which interpolates the cache DIRECTORY, so
+    # this also holds the two engines to the same path on the wire.
+    missing = "%s/valuesets/%s" % (PREFIX, "-".join(sorted(bound_slugs()))[:60])
+    py = call(python, missing)
+    gone = call(go, missing)
+    assert py == gone, "%s\npython: %s\ngo:     %s" % (missing, py, gone)
+    assert py[0] == 404 and "is cached in" in py[1]["detail"], py
+    ok("%s: %d expansions of %d bound value sets are identical, the cap and "
+       "the unused q parameter included, and an uncached slug refuses the same "
+       "way in both" % (shape, asked + 1, len(bound_slugs())))
+
+
+def forms(shape, python, go):
+    """The forms, and the one property of that list that is not a comparison.
+
+    GET /questionnaires/ is deliberately NOT narrowed by the caller's
+    capabilities: a form is a bundle's declaration, and the renderer labels an
+    OLD audit row with the questionnaire of whatever operation wrote it, so a
+    narrowed list would strip the label off a card a colleague left behind.
+    Held here by asking as a role that holds almost nothing and diffing that
+    against the demo account's answer, in both engines.
+    """
+    served = {}
+    for role in ("frontdesk", "demo"):
+        header = {"X-PHC-Role": role}
+        py = get(python, PREFIX + "/questionnaires", header)
+        gone = get(go, PREFIX + "/questionnaires", header)
+        assert py == gone, "%s\npython: %s\ngo:     %s" % (
+            role, json.dumps(py, sort_keys=True),
+            json.dumps(gone, sort_keys=True))
+        served[role] = sorted(py["questionnaires"])
+    assert served["frontdesk"] == served["demo"], served
+    # And the caller really is narrower, so the line above is not two
+    # identical callers agreeing.
+    narrow = get(go, PREFIX + "/whoami", {"X-PHC-Role": "frontdesk"})
+    whole = get(go, PREFIX + "/whoami", {"X-PHC-Role": "demo"})
+    assert len(narrow["capabilities"]) < len(whole["capabilities"]), (narrow, whole)
+    ok("%s: both engines serve the same %d forms to a clerk holding %d "
+       "capabilities and to the demo account holding %d, because a form is a "
+       "declaration and not a facility's choice"
+       % (shape, len(served["demo"]), len(narrow["capabilities"]),
+          len(whole["capabilities"])))
 
 
 def both(shape, db_dir):
@@ -617,6 +725,94 @@ def s_the_state_emit(walk, codes):
             "withdrawn consent lowers a flag the store cannot lower")
 
 
+def a_row_group(slug):
+    """(the group's link_id, its sub questions) for the first repeating group
+    this form declares, or (None, None).
+
+    Derived, so the scenarios below name no field: a form that renames its
+    group or reorders its questions moves them with it.
+    """
+    for question in validate_walk(schema(slug)["questions"]):
+        if question.get("type") == "group" and question.get("repeats"):
+            return question["link_id"], list(validate_walk(question["questions"]))
+    return None, None
+
+
+def q_of(subs, slug):
+    """The sub question that binds `slug`, which coder() needs so that a unit
+    answer can follow the analyte it is the unit of."""
+    return next(q for q in subs if q.get("answer_value_set") == slug)
+
+
+def s_a_row_is_addressed_by_number(walk, codes):
+    """Row addressing, and the four shapes it refuses.
+
+    The row number has to be in every sentence, because "medications is
+    invalid" does not tell a prescriber which line to fix. And a sub
+    question's link_id arriving at the TOP level is an unknown key rather
+    than an answer for row zero: a renderer that sent it has lost the row it
+    belonged to, and folding it in would put a dose on the wrong medicine.
+    """
+    registered(walk, codes)
+    walk.commit("document a consultation", "phc.op.consult-document",
+                filled("phc.schema.consult-v1", codes, every=True), "demo")
+    slug, op = "phc.schema.rx-v1", "phc.op.rx-prescribe"
+    group, subs = a_row_group(slug)
+    assert group and subs, "%s declares no repeating group" % slug
+    good = filled(slug, codes)
+    row = dict(good[group][0])
+    first = subs[0]["link_id"]
+
+    walk.commit("a row field sent at the top level instead of in its row", op,
+                dict(good, **{first: row[first]}), "demo")
+    walk.commit("the group answered with one row rather than a list of rows",
+                op, {group: row}, "demo")
+    walk.commit("a row that is a single value and not a set of answers", op,
+                {group: [row, row[first]]}, "demo")
+    walk.commit("three rows, the second missing a required answer and the "
+                "third carrying one the form never asked", op,
+                {group: [row,
+                         {k: v for k, v in row.items() if k != first},
+                         dict(row, **{"%s_nobody_declared" % group: "x"})]},
+                "demo")
+    walk.panel("the panel after four refusals addressed by row")
+    walk.commit("two rows, both whole", op, {group: [row, dict(row)]}, "demo")
+    walk.panel("the panel after a prescription of two")
+    return ("a row is addressed by number, a row field with no row is refused "
+            "rather than folded into the first row, and every sentence says "
+            "which row")
+
+
+def s_a_bound_choice_is_constrained_per_row(walk, codes):
+    """The third binding form, in the SECOND row.
+
+    s_a_code_outside_its_value_set already breaks row zero. This breaks a
+    later row, which is the case a per-question check would pass: the first
+    row is legal and the refusal has to name the second.
+    """
+    registered(walk, codes)
+    walk.commit("document a consultation", "phc.op.consult-document",
+                filled("phc.schema.consult-v1", codes, every=True), "demo")
+    slug, op = "phc.schema.rx-v1", "phc.op.rx-prescribe"
+    group, subs = a_row_group(slug)
+    bound = next(q for q in subs if q.get("answer_value_set"))
+    # A code from ANOTHER value set this form binds, so it is a real code and
+    # the only thing wrong with it is which list it is on. Never a literal.
+    elsewhere = next(q["answer_value_set"] for q in subs
+                     if q.get("answer_value_set")
+                     and q["answer_value_set"] != bound["answer_value_set"])
+    good = filled(slug, codes)
+    row = dict(good[group][0])
+    wrong = dict(row, **{bound["link_id"]: codes(elsewhere, q_of(subs, elsewhere))})
+    walk.commit("two rows, the second naming a code from the wrong value set",
+                op, {group: [row, wrong]}, "demo")
+    walk.panel("the panel after a code from the wrong list")
+    walk.commit("two rows, both coded from the lists they bind", op,
+                {group: [row, dict(row)]}, "demo")
+    walk.panel("the panel after two coded rows")
+    return "a bound choice is constrained in every row, not only the first"
+
+
 SCENARIOS = (
     s_seven_steps,
     s_denials_are_audited,
@@ -631,6 +827,8 @@ SCENARIOS = (
     s_a_plugin_that_is_off,
     s_repeating_groups_fan_out,
     s_a_code_outside_its_value_set,
+    s_a_row_is_addressed_by_number,
+    s_a_bound_choice_is_constrained_per_row,
     s_the_state_emit,
 )
 
@@ -777,6 +975,258 @@ def properties(shape, scenario, walk):
             % (shape, scenario.__name__, decisions))
 
 
+# --------------------------------------------------------------------------
+# fill: the one half of this slice that is on no route
+# --------------------------------------------------------------------------
+#
+# api/fill.py is reached through the scribe, and the scribe is G8, so the two
+# engines' fill cannot be diffed over a socket the way everything else here is.
+# It is diffed as a PAIR OF PROGRAMS instead: this file writes a file of
+# inputs, each engine answers it, and the two answers are compared. Nothing
+# about either answer is written down, which is the same rule the rest of this
+# check is built on.
+#
+# The Go side is care_phc_mcp/fill/parity_test.go, a test that asserts nothing
+# and exists only as the transport. Why a test and not a third command or a new
+# route is in that file's own comment.
+#
+# RUN ONCE AND NOT PER SHAPE, SAID OUT LOUD
+# -----------------------------------------
+# fill takes no facility input. It reads the questionnaire an operation names
+# and the offline terminology cache, and a facility's shape reaches neither, so
+# three runs would be one run counted three times. The shape dependent half of
+# this slice IS compared per shape: it is the validator, and it reaches the
+# socket through the write path above.
+#
+# A HEARD VALUE IS AN INPUT AND AN INPUT MAY BE WRITTEN HERE
+# ----------------------------------------------------------
+# What a recogniser heard is not a declaration, so the phrases below are typed:
+# "one forty", "haan", "15 December", "31 February". They are what somebody
+# says, and no file in this repository declares them. What is NOT typed is any
+# answer: which of them coerce accepts, what it becomes, and which ids owe a
+# tick all come off the two engines. The legal values and the options a phrase
+# is matched against are read off the forms and the value sets.
+
+TODAY = "2026-09-16"
+
+
+def heard(field):
+    """Phrases to try against one field. Derived where a declaration has one
+    (its own options, its own displays) and spoken where it does not."""
+    tries = ["", "   ", "nothing anybody declared"]
+    options = field.get("options") or []
+    labels = field.get("labels") or {}
+    if options:
+        tries += [options[0], " %s " % options[-1]]
+    for code in sorted(labels):
+        if labels[code]:
+            tries += [labels[code], "  %s  " % labels[code].upper()]
+            break
+    kind = field["type"]
+    tries += {
+        "integer": ["140", "140.5", 140, 140.0, "one forty"],
+        "decimal": ["12.5", 12.5, "12", "twelve"],
+        "quantity": ["12.5", 12.5, "12", "twelve"],
+        "boolean": ["yes", "no", "haan", "nahi", "1", "0", "maybe", True, False],
+        "date": ["today", "yesterday", "2026-08-01", "15 August", "August 15",
+                 "15 December", "31 February", "32 August", "15 Smarch"],
+        "dateTime": ["today", "2026-08-01", "15 August", "31 February"],
+        "time": ["  09:00  ", 12],
+        "string": ["  a phrase  ", 12],
+        "text": ["  a phrase  ", 12],
+        "url": ["  https://example.invalid/x  ", 12],
+        "structured": [[{"a": 1}], [1], []],
+    }.get(kind, ["  a phrase  "])
+    return tries
+
+
+def legal(field):
+    """One phrase this field can hold, from its own declaration where it has
+    one. Used to answer every question of a form at once."""
+    options = field.get("options") or []
+    if options:
+        return options[0]
+    return {"integer": "1", "decimal": "1.5", "quantity": "1.5",
+            "boolean": "yes", "date": "today", "dateTime": "today",
+            "time": "09:00", "structured": [{"a": 1}]}.get(
+                field["type"], "a phrase")
+
+
+def fill_cases():
+    """The inputs both engines are asked, built from the forms on disk."""
+    from api import fill as filler
+    cat = json.loads((ROOT / "catalogue" / "catalogue.json").read_text())
+    slugs = []
+    for op_id in sorted(cat["manifest"]["operations"]):
+        slug = cat["operations"][op_id].get("input")
+        if slug and slug not in slugs:
+            slugs.append(slug)
+    cases = {"questionnaires": str(QUESTIONNAIRES),
+             "terminology": str(ROOT / "terminology"),
+             "today": TODAY, "flatten": slugs, "coerce": [], "drafts": []}
+    for slug in slugs:
+        fields = filler.flatten(schema(slug))
+        for field in fields:
+            for value in heard(field):
+                cases["coerce"].append({"slug": slug,
+                                        "link_id": field["link_id"],
+                                        "value": value})
+        # One draft per form: every answerable question answered, the row ones
+        # addressed to row zero, a SECOND row numbered 7 by the extractor so
+        # the renumbering has something to do, and the two shapes that must be
+        # dropped rather than guessed at.
+        answers, n = [], 0
+        for field in fields:
+            n += 1
+            ident = field["link_id"]
+            if field["row_of"]:
+                ident = filler.row_id(field["row_of"], 0, field["link_id"])
+            answers.append({"id": ident, "value": legal(field),
+                            # Spread either side of api/fill.CAP, so the cap
+                            # is exercised without this file naming it.
+                            "confidence": round(0.5 + 0.05 * (n % 11), 2),
+                            "evidence": "said %s" % field["link_id"]})
+        for field in fields:
+            if field["row_of"]:
+                answers.append({"id": filler.row_id(field["row_of"], 7,
+                                                    field["link_id"]),
+                                "value": legal(field), "confidence": 0.61,
+                                "evidence": "second %s" % field["link_id"]})
+                # The row field with NO row number. Dropped, never folded into
+                # row zero, which is the rule this whole slice turns on.
+                answers.append({"id": field["link_id"], "value": legal(field),
+                                "confidence": 0.95, "evidence": "rowless"})
+            else:
+                # And a top level field addressed into a group it is not in.
+                answers.append({"id": filler.row_id("nobody_declared_this", 0,
+                                                    field["link_id"]),
+                                "value": legal(field), "confidence": 0.95,
+                                "evidence": "wrong group"})
+        cases["drafts"].append({"slug": slug, "operation": "x.op",
+                                "instrument": "i",
+                                "transcript": "a transcript",
+                                "answers": answers})
+    assert cases["coerce"] and cases["drafts"], cases["flatten"]
+    return cases
+
+
+def python_fill(cases):
+    from api import fill as filler
+    today = datetime.date.fromisoformat(cases["today"])
+    out = {"flatten": {}, "coerce": [], "drafts": []}
+    for slug in cases["flatten"]:
+        out["flatten"][slug] = filler.flatten(schema(slug))
+    for one in cases["coerce"]:
+        by = {f["link_id"]: f for f in filler.flatten(schema(one["slug"]))}
+        held, value = filler.coerce(by[one["link_id"]], one["value"], today)
+        out["coerce"].append({"ok": held, "value": value})
+    for one in cases["drafts"]:
+        answers = {a["id"]: {"value": a["value"],
+                             "confidence": a["confidence"],
+                             "evidence": a["evidence"]}
+                   for a in one["answers"]}
+        out["drafts"].append(filler.build_draft(
+            one["operation"], schema(one["slug"]), answers, one["transcript"],
+            instrument=one["instrument"], today=today))
+    # Round tripped through JSON, because that is what the Go answer arrives
+    # as and a tuple or a date would compare unequal for the wrong reason.
+    return json.loads(json.dumps(out))
+
+
+def go_fill(cases, tmp):
+    cases_at = os.path.join(tmp, "fill-cases.json")
+    answers_at = os.path.join(tmp, "fill-answers.json")
+    with open(cases_at, "w") as f:
+        json.dump(cases, f)
+    done = subprocess.run(
+        ["go", "test", "./fill/", "-run", "TestFillAnswersForTheParityCheck",
+         "-count=1"],
+        cwd=str(backend.GO_MODULE), capture_output=True, text=True,
+        env=dict(os.environ, PHC_FILL_CASES=cases_at,
+                 PHC_FILL_ANSWERS=answers_at))
+    if done.returncode != 0 or not os.path.exists(answers_at):
+        raise SystemExit("\nthe Go engine could not answer the fill cases:\n\n%s%s\n"
+                         % (done.stdout[-4000:], done.stderr[-2000:]))
+    with open(answers_at) as f:
+        return json.load(f)
+
+
+def fill_parity(tmp):
+    # api/fill.TICK_TYPES, read rather than retyped: which answer types are
+    # read back and ticked is the Python's declaration, and the Go is held to
+    # it by the comparison below rather than by a list in this file.
+    from api.fill import TICK_TYPES
+    cases = fill_cases()
+    py = python_fill(cases)
+    gone = go_fill(cases, tmp)
+
+    for slug in cases["flatten"]:
+        assert py["flatten"][slug] == gone["flatten"][slug], (
+            "%s: the two engines flatten it differently\npython: %s\ngo:     %s"
+            % (slug, json.dumps(py["flatten"][slug], sort_keys=True),
+               json.dumps(gone["flatten"][slug], sort_keys=True)))
+    ok("fill: %d forms flatten identically, every bound choice carrying the "
+       "codes and the displays its value set holds"
+       % len(cases["flatten"]))
+
+    for one, a, b in zip(cases["coerce"], py["coerce"], gone["coerce"]):
+        assert a == b, ("coerce %s.%s of %r: python %s, go %s"
+                        % (one["slug"], one["link_id"], one["value"], a, b))
+    # And the phrases really did both things, so the line above is not two
+    # engines agreeing that everything was refused.
+    held = [a for a in py["coerce"] if a["ok"]]
+    assert held and len(held) < len(py["coerce"]), len(held)
+    ok("fill: %d heard phrases coerce identically in both engines, %d of them "
+       "accepted and %d refused" % (len(py["coerce"]), len(held),
+                                    len(py["coerce"]) - len(held)))
+
+    for one, a, b in zip(cases["drafts"], py["drafts"], gone["drafts"]):
+        assert a == b, ("the draft for %s differs\npython: %s\ngo:     %s"
+                        % (one["slug"], json.dumps(a, sort_keys=True),
+                           json.dumps(b, sort_keys=True)))
+
+    # The two properties of a draft that are properties and not comparisons.
+    # Two engines can agree and still both be wrong: comparing a `tick` list
+    # proves they match, not that it holds a tick per row addressed id.
+    ticked = rowed = 0
+    for one, draft in zip(cases["drafts"], py["drafts"]):
+        if not draft:
+            continue
+        owed = set(draft["tick"])
+        # Which keys hold ROWS, read off the flattened form: a key is a
+        # repeating group when some question says it is inside it. Not "every
+        # value that is a list", which also catches a `structured` answer and
+        # was the first spelling of this loop.
+        groups = {f["row_of"] for f in py["flatten"][one["slug"]] if f["row_of"]}
+        for ident, value in draft["values"].items():
+            if ident not in groups or not isinstance(value, list):
+                continue
+            for index, row in enumerate(value):
+                rowed += 1
+                for link_id in row:
+                    at = "%s[%d].%s" % (ident, index, link_id)
+                    field = next(f for f in py["flatten"][one["slug"]]
+                                 if f["link_id"] == link_id)
+                    if field["type"] in TICK_TYPES:
+                        assert at in owed, (
+                            "%s: %s filled a %s and is owed no tick"
+                            % (one["slug"], at, field["type"]))
+                        ticked += 1
+        # A row field answered with NO row number was dropped, and the drop is
+        # visible: it is in `unfilled` and its value is in no row.
+        for field in py["flatten"][one["slug"]]:
+            if not field["row_of"]:
+                continue
+            assert field["link_id"] in draft["unfilled"], (
+                "%s: %s was answered with no row and was not dropped"
+                % (one["slug"], field["link_id"]))
+            assert field["link_id"] not in draft["values"], draft["values"]
+    assert ticked and rowed, (ticked, rowed)
+    ok("fill: %d drafts are identical in both engines, and %d non text values "
+       "across %d rows each come back owing a tick under their own row "
+       "addressed id" % (len(cases["drafts"]), ticked, rowed))
+
+
 def main():
     # The Go binary is built once, loudly, before anything is compared: a
     # build failure here must not read as a route mismatch.
@@ -784,6 +1234,10 @@ def main():
     ok("the Go backend builds: %s" % binary.relative_to(ROOT))
 
     with tempfile.TemporaryDirectory() as tmp:
+        # fill first, because it needs no server and a difference there is
+        # cheaper to read than one found after three pairs of kernels have
+        # been started.
+        fill_parity(tmp)
         for shape in SHAPES:
             started = both(shape, tmp)
             try:
@@ -866,6 +1320,11 @@ def compare(shape, python, go):
     ok("%s: X-PHC-Role narrows both engines identically for 4 roles, and both "
        "refuse a role the bundle does not declare with a 400" % shape)
 
+    # --- the forms and the value sets behind their bound choices, which are
+    # the rest of what a screen asks a clinician. See forms() and valuesets().
+    forms(shape, python, go)
+    valuesets(shape, python, go)
+
     # --- the write path. The guard, over two real sockets, as a sequence
     # rather than as a set of shapes. See write_path.
     write_path(shape, python, go)
@@ -878,7 +1337,7 @@ def compare(shape, python, go):
         # The templated ones cannot be asked without an id; the prefix is
         # enough, because the Go mounts a subtree.
         path = route.split("{")[0].rstrip("/")
-        if path.endswith(tuple(SERVED)):
+        if path.endswith(tuple(SERVED) + SERVED_TEMPLATED):
             continue
         if path[len(PREFIX):].startswith(WRITE_PATH):
             continue
