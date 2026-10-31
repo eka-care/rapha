@@ -32,7 +32,6 @@ import (
 	carephc "github.com/eka-care/care_phc_mcp"
 	"github.com/eka-care/care_phc_mcp/guard"
 	"github.com/eka-care/care_phc_mcp/kstate"
-	"github.com/eka-care/care_phc_mcp/proposals"
 	"github.com/eka-care/care_phc_mcp/pyval"
 	"github.com/eka-care/care_phc_mcp/store"
 )
@@ -460,5 +459,3 @@ func (k *kernel) mountGuard(mux *http.ServeMux, prefix string) {
 	mux.HandleFunc(prefix+"/proposals/{proposal_id}/confirm", only(http.MethodPost, k.confirm))
 	mux.HandleFunc(prefix+"/proposals/{proposal_id}/reject", only(http.MethodPost, k.reject))
 }
-
-var _ = proposals.Now

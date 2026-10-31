@@ -138,6 +138,47 @@ def _middle(question):
     return int(middle) if question["type"] == "integer" else round(middle, 1)
 
 
+def _outside_the_critical_band(question):
+    """A number inside the physiological range and outside the critical one.
+
+    Both bands are the question's own, so this moves when a declaration does,
+    and the point of it is guard step 7: a critical but IN RANGE value commits
+    and raises a stored flag. An out of range value never gets that far, the
+    validator blocks it.
+    """
+    band, outer = _phc(question).get("critical"), _phc(question).get("range")
+    if not band or not outer:
+        return None
+    middle = (band["high"] + outer["high"]) / 2
+    if not (outer["low"] <= middle <= outer["high"]) or band["low"] <= middle <= band["high"]:
+        return None
+    return int(middle) if question["type"] == "integer" else round(middle, 1)
+
+
+def critical(slug, codes):
+    """A payload for this form with one answer critical and in range.
+
+    Returns (payload, the flag that answer declares) or (None, None) for a
+    form that declares no critical band at all, so a bundle without one skips
+    the scenario rather than asserting against nothing.
+    """
+    payload = filled(slug, codes)
+    for question in validate_walk(schema(slug)["questions"]):
+        value = _outside_the_critical_band(question)
+        flag = _phc(question).get("flags")
+        if value is None or not flag or question["link_id"] not in payload:
+            continue
+        return dict(payload, **{question["link_id"]: value}), flag
+    return None, None
+
+
+def validate_walk(questions):
+    for question in questions:
+        yield question
+        for inner in validate_walk(question.get("questions") or []):
+            yield inner
+
+
 def _answer(question, codes):
     """One legal answer to one question, from the question's own declaration.
 
@@ -546,6 +587,36 @@ def s_a_code_outside_its_value_set(walk, codes):
     return "an answer outside its value set is refused before anything is written"
 
 
+def s_the_state_emit(walk, codes):
+    """Guard step 7, which is the one step no other scenario reaches: a flag
+    the store holds because no resource can answer it.
+
+    Two kinds, both from the declarations. A critical but IN RANGE reading
+    raises its question's own flag; an out of range one never gets here
+    because the validator blocks it. And a consent is three stored flags the
+    workflow composes a fourth from, which is what a consent has to be: the
+    store can raise a flag and cannot lower one, and a consent that cannot be
+    withdrawn is not a consent.
+    """
+    walk.open()
+    consented = dict(filled("phc.schema.register-v1", codes),
+                     capture_consent=True)
+    walk.commit("register with the consent read out at the desk",
+                "phc.op.patient-register", consented, "frontdesk")
+    walk.panel("the panel once the patient has consented")
+    payload, flag = critical("phc.schema.vitals-v1", codes)
+    assert payload and flag, ("no question in this bundle declares a critical "
+                              "band with a flag, so this scenario proves nothing")
+    walk.commit("record a critical but in-range reading", "phc.op.vitals-record",
+                payload, "nurse")
+    walk.panel("the panel after a critical reading")
+    walk.commit("the doctor stops the recording", "phc.op.capture-withdraw",
+                filled("phc.schema.capture-withdraw-v1", codes), "demo")
+    walk.panel("the panel after the consent was withdrawn")
+    return ("a stored flag is raised by the answer that declares it, and a "
+            "withdrawn consent lowers a flag the store cannot lower")
+
+
 SCENARIOS = (
     s_seven_steps,
     s_denials_are_audited,
@@ -560,6 +631,7 @@ SCENARIOS = (
     s_a_plugin_that_is_off,
     s_repeating_groups_fan_out,
     s_a_code_outside_its_value_set,
+    s_the_state_emit,
 )
 
 
