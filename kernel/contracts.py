@@ -796,8 +796,16 @@ CATALOGUE_KEYS = ("capabilities", "bundles", "states", "operations")
 # capability, role and state words. They are carried UNRESOLVED, so the
 # compiled catalogue stays byte identical across every facility shape of one
 # bundle and the shape is still chosen at runtime by PHC_FACILITY.
+# `mapping` is which answer becomes which column, per operation, compiled by
+# kernel/mapping.py. It was deliberately absent from the compiled artifact
+# while nothing outside the kernel wrote rows; kernel/mapping.py's own
+# docstring says to add it "when an out of process consumer needs one", and
+# the Go backend's write path is that consumer. Carried per operation and
+# already resolved: the `question:` codings are bound at build time, so what
+# travels is plain JSON and the engine that reads it re-checks every code
+# against the same value set before it fills a column.
 BUNDLE_KEYS = ("manifest", "workflows", "views", "instruments", "metrics",
-               "scribe", "plugins", "facilities", "vocabulary")
+               "scribe", "plugins", "facilities", "vocabulary", "mapping")
 
 
 def compiled_keys() -> Iterable[str]:

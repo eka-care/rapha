@@ -740,7 +740,19 @@ def compile_json(bundle):
     belongs there and nowhere else."""
     return {
         "manifest": dataclasses.asdict(bundle.manifest),
-        "workflows": {k: dataclasses.asdict(v) for k, v in bundle.workflows.items()},
+        # `state_order` is the order the workflow DECLARED its state rules in,
+        # carried as a list because the dict cannot carry it: write_catalogue
+        # dumps catalogue.json with sort_keys=True, so by the time a second
+        # engine reads `states` the order is alphabetical. The order is not
+        # decoration. kernel/state._true evaluates `all_of` against the flags
+        # already known, and kernel/tests/test_contracts.py pins that a rule
+        # references only earlier flags, so alphabetically `abha.pending`
+        # cannot see `registered` and `capture.consented` cannot see
+        # `capture.declined`. An engine deriving flags from the sorted dict
+        # gets a visit that is never pending an ABHA and is consented to
+        # ambient capture after the patient declined.
+        "workflows": {k: dict(dataclasses.asdict(v), state_order=list(v.states))
+                      for k, v in bundle.workflows.items()},
         "views": {k: dataclasses.asdict(v) for k, v in bundle.views.items()},
         "instruments": {k: dataclasses.asdict(v) for k, v in bundle.instruments.items()},
         "metrics": {k: dataclasses.asdict(v) for k, v in bundle.metrics.items()},
@@ -750,6 +762,11 @@ def compile_json(bundle):
         "plugins": bundle.plugins,
         "facilities": bundle.facilities,
         "vocabulary": bundle.vocabulary,
+        # Which answer becomes which column, per operation that writes one.
+        # See kernel/contracts.BUNDLE_KEYS for why this is in the artifact now
+        # and was not before.
+        "mapping": {op_id: op["mapping"] for op_id, op in bundle.operations.items()
+                    if op.get("mapping")},
     }
 
 
