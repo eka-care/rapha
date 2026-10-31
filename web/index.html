@@ -3,18 +3,27 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <!-- The typeface the design is set in. theme.css falls back to system-ui,
-         so the workspace is legible with no network; it is simply not the
-         designer's drawing.
+    <!-- The typefaces the design is set in. tokens.css falls back to
+         system-ui, so the workspace is legible with no network; it is simply
+         not the designer's drawing.
 
-         Atkinson Hyperlegible Next (UI) and Atkinson Hyperlegible Mono
-         (readout) replace Inter: both are the Braille Institute's 2025
-         release, SIL OFL, drawn specifically for character disambiguation at
-         low acuity (tailed l, a 0 that cannot be an O). Noto Sans Devanagari
-         is the co-script, for a patient's name written in it. -->
+         Geist (interface), Newsreader (display) and Geist Mono (anything
+         counted or timed) are the Eka Developers system's own three, from the
+         artifacts of 2026-10-31. Noto Sans Devanagari is the co-script, for a
+         patient's name written in it, and belongs to no design system.
+
+         WHAT WAS HERE BEFORE, AND WHY IT IS WORTH KNOWING. This file loaded
+         Atkinson Hyperlegible Next and Atkinson Hyperlegible Mono, chosen for
+         character disambiguation at low acuity. tokens.css never named them:
+         it asked for Inter, which was not loaded either, so every screen has
+         in fact rendered in the operating system's own face since September.
+         Nobody has seen either typeface. The accessibility argument for
+         Atkinson is real and is recorded in the design spec as an open
+         question; it is not being silently discarded here, because it was
+         never in effect to discard. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600&family=Atkinson+Hyperlegible+Mono:wght@400;500&family=Noto+Sans+Devanagari:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,420&family=Noto+Sans+Devanagari:wght@400;500&display=swap" rel="stylesheet" />
     <title>Workspace</title>
   </head>
   <body>
