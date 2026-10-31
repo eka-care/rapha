@@ -120,20 +120,30 @@ def mcp(base, thread):
         [str(binary)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL, text=True,
         env=dict(os.environ, CARE_BASE_URL=base))
+    # The MCP SDK serves each request in its own goroutine, so a reply may
+    # arrive before an earlier one: the vitals call asks the kernel over HTTP
+    # and khoj asks it too, and whichever answers first is written first. So
+    # read until every id asked for has come back, never stopping at the last
+    # one sent. Stopping there dropped reply 3 whenever 4 overtook it, which
+    # failed this assertion about one run in three.
+    wanted = {x["id"] for x in lines if "id" in x}
     replies = {}
     try:
         proc.stdin.write("\n".join(json.dumps(x) for x in lines) + "\n")
         proc.stdin.flush()
-        for _ in lines:  # one reply per request; the notification answers nothing
+        # Bounded, so a server that never answers an id fails the assertion
+        # below rather than hanging here. Generous: the cap is only reached
+        # when something is wrong, and a stray log line costs one read.
+        for _ in range(20 * len(lines)):
+            if wanted <= set(replies):
+                break
             line = proc.stdout.readline()
-            if not line:
+            if not line:  # the server closed stdout: nothing more is coming
                 break
             if line.startswith("{"):
                 reply = json.loads(line)
                 if "id" in reply:
                     replies[reply["id"]] = reply
-            if 4 in replies:
-                break
     finally:
         proc.stdin.close()
         proc.wait(timeout=10)
