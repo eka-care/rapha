@@ -352,19 +352,24 @@ def lint(manifest, ops, decls, ops_dir=OPS):
       from the base, so it can only break when the base's binding does, and
       a bound choice with no cached value set draws an empty dropdown rather
       than failing.
-    A required answer that goes nowhere is NOT checked here, and that is
-    deliberate. kernel/mapping.py already refuses an operation with a
-    required question that no record stores and nobody declared they were
-    dropping, and it runs over a generated atom and its generated form like
-    any other. A second copy of that rule here would be a rule asserted
-    twice, which is a rule nobody maintains; `scripts/check_templates.py`
-    proves the existing one reaches a template instead.
     - a template claiming a station or a capability that is not declared: one
       the bundle does not load, one no scribe instrument may fill, or one the
       workflow does not offer at its own station. All three are a template
       that exists and can never be reached.
-    - a narrowing that records nothing, and a generated file that has been
-      edited by hand.
+    - a narrowing that records nothing, a narrowing of a narrowing, a
+      duplicate, a missing word a clinician reads, an unknown key, and a
+      generated file that has been edited by hand.
+
+    What it deliberately does NOT refuse
+    ------------------------------------
+    A required answer that goes nowhere. kernel/mapping.py already refuses an
+    operation with a required question that no record stores and that nobody
+    declared they were dropping, and it runs over a generated atom and its
+    generated form exactly as over a hand written one. A second copy of that
+    rule here would be a rule asserted twice, which is a rule nobody
+    maintains, and it could not be made to fail: narrowing removes a question
+    rather than orphaning one. `scripts/check_templates.py` proves the
+    existing rule reaches a template instead.
     """
     from kernel import terminology
 
