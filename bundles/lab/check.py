@@ -446,21 +446,17 @@ def check_views_and_metrics():
 
 def e2e():
     sys.path.insert(0, str(ROOT / "scripts"))
-    import e2e as h   # reuse: call, free_port, wait_for, rows
+    import backend     # which backend answers; see scripts/backend.py
+    import e2e as h    # reuse: call, rows
 
     db = os.path.join(tempfile.mkdtemp(), "lab.sqlite3")
-    port = h.free_port()
-    base = "http://127.0.0.1:%d" % port
-    log = os.path.join(os.path.dirname(db), "api.log")
-    handle = open(log, "w")
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "api.main:app", "--host", "127.0.0.1",
-         "--port", str(port)], cwd=str(ROOT), stdout=handle, stderr=subprocess.STDOUT,
-        env=dict(os.environ, PHC_DB=db, PHC_BUNDLE="lab"))
+    server = backend.launch(db, bundle="lab",
+                            log=os.path.join(os.path.dirname(db), "api.log"))
+    base = server.base
     try:
-        h.wait_for(base, proc, log)
         assert h.call(base, "/facility/")["bundle"]["id"] == "lab"
-        ok("the API starts as a laboratory: PHC_BUNDLE=lab, no other change")
+        ok("the %s API starts as a laboratory: PHC_BUNDLE=lab, no other change"
+           % server.backend)
 
         t = h.call(base, "/threads/", {"token": "L-1"})["id"]
         assert h.call(base, "/threads/%s/?role=pathologist" % t)["actions"] == []
@@ -578,12 +574,7 @@ def e2e():
 
         mcp_tools(base)
     finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-        handle.close()
+        server.close()
 
 
 def mcp_tools(base):

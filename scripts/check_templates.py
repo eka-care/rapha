@@ -652,6 +652,56 @@ ok("every one of the %d check scripts in scripts/ is named in scripts/check.sh, 
    "so a check cannot be dropped from the gate in silence, this file aside"
    % len(SCRIPTS))
 
+# ---------------------------------------------------------------------------
+# 11. One place decides which backend a socket check launches.
+# ---------------------------------------------------------------------------
+#
+# Here for the same reason section 10 is: it is an assertion about the shape
+# of the check suite rather than about one module, and this is where the
+# mutation that asked for it was run.
+#
+# Six places used to start a kernel on a port, each with its own
+# `[sys.executable, "-m", <the server>, <the app>, ...]`. They were
+# parameterised by port, database, bundle and facility shape and by nothing
+# else, so which LANGUAGE answered was a constant spelled six times. The Go
+# port's acceptance test is that those checks pass against Go unmodified
+# except for which backend they launch, so the constant became
+# scripts/backend.py and the six sites became callers of it.
+#
+# What this refuses is the seventh. A check that grew its own launch again
+# would pass on Python and silently never run against Go, and the gate would
+# be green either way: the failure is invisible by construction, which is
+# what makes it worth an assertion rather than a convention.
+# Spelled in halves on purpose. Written whole, these literals make this file
+# its own first failure: the scan reads every .py in the tree and this is one
+# of them. Section 10 above had to carve out an exception about itself for a
+# reason it could not avoid; this one can, so it does.
+LAUNCH = ("-m", "uvi" + "corn")     # how a Python kernel is started by hand
+APP = "api.main" + ":app"
+LAUNCHER = ROOT / "scripts" / "backend.py"
+assert LAUNCHER.exists(), "scripts/backend.py is the one launcher and is gone"
+# Every Python file in the tree, minus the launcher itself and the throwaway
+# copies under .claude. `api/run.sh` is not here: starting the service by hand
+# is not a check and has no backend to choose.
+OWN = []
+for path in sorted(ROOT.rglob("*.py")):
+    if any(part in (".claude", "prototypes", "node_modules", ".git", "web")
+           for part in path.parts):
+        continue
+    if path == LAUNCHER:
+        continue
+    body = path.read_text()
+    # Both halves of the launch, so a file that merely names the server in a
+    # sentence (adapters/local/store.py's docstring does) is not accused.
+    if all(part in body for part in LAUNCH) and APP in body:
+        OWN.append(str(path.relative_to(ROOT)))
+assert not OWN, (
+    "%r start a kernel on a port by hand. The backend a socket check launches "
+    "is scripts/backend.py's decision (PHC_BACKEND), and a launch written out "
+    "here runs against Python whatever that says." % OWN)
+ok("no check starts a kernel on a port by hand: scripts/backend.py is the one "
+   "place that decides, so PHC_BACKEND reaches every socket check at once")
+
 print("ok   the doctor's templates: %d checks passed" % checks)
 
 # ---------------------------------------------------------------------------

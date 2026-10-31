@@ -198,33 +198,16 @@ def llm_over_a_socket():
 # Needs the socket.
 # --------------------------------------------------------------------------
 
-def free_port():
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
 def serve(db):
-    """uvicorn on a free port with its own database. Returns (proc, base)."""
-    port = free_port()
-    env = dict(os.environ, PHC_DB=db)
-    env.pop("ANTHROPIC_API_KEY", None)  # the live half exercises the router
-    log = open(db + ".log", "w")
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "api.main:app", "--port", str(port),
-         "--host", "127.0.0.1", "--log-level", "warning"],
-        cwd=str(ROOT), env=env, stdout=log, stderr=subprocess.STDOUT)
-    base = "http://127.0.0.1:%d" % port
-    for _ in range(100):
-        if proc.poll() is not None:
-            sys.exit("the API died on startup:\n%s" % pathlib.Path(db + ".log").read_text())
-        try:
-            urllib.request.urlopen(base + "/", timeout=1).read()
-            return proc, base
-        except Exception:
-            time.sleep(0.2)
-    proc.kill()
-    sys.exit("the API never came up:\n%s" % pathlib.Path(db + ".log").read_text())
+    """A kernel on a free port with its own database. Returns (server, base).
+
+    Which backend answers is scripts/backend.py's decision; ANTHROPIC_API_KEY
+    is dropped because the live half exercises the router.
+    """
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import backend
+    server = backend.launch(db, drop=("ANTHROPIC_API_KEY",))
+    return server, server.base
 
 
 def live(base):
@@ -310,10 +293,9 @@ if __name__ == "__main__":
     else:
         llm_over_a_socket()
         with tempfile.TemporaryDirectory() as tmp:
-            proc, base = serve(os.path.join(tmp, "live.sqlite3"))
+            server, base = serve(os.path.join(tmp, "live.sqlite3"))
             try:
                 live(base)
             finally:
-                proc.terminate()
-                proc.wait(timeout=10)
+                server.close()
     print("ok   agent live: %d checks, and none of them committed anything" % ran)

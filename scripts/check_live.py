@@ -46,6 +46,10 @@ import urllib.request
 
 ROOT = pathlib.Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import backend                                                       # noqa: E402
+
 PREFIX = "/api/v1/phc"
 SHAPES = ("all-plugins", "no-laboratory")
 
@@ -62,34 +66,19 @@ def ok(what):
 # asking a kernel
 # ---------------------------------------------------------------------------
 
-def free_port():
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
 class OverASocket:
-    """A real uvicorn on a real port, running one facility shape."""
+    """A real kernel on a real port, running one facility shape.
+
+    Which backend answers is scripts/backend.py's decision and not this
+    file's: PHC_BACKEND picks Python or Go and these screens cannot tell.
+    """
 
     def __init__(self, shape, db):
-        self.port = free_port()
-        self.base = "http://127.0.0.1:%d" % self.port
-        self.log = pathlib.Path(db).with_suffix(".log")
-        self.handle = open(self.log, "w")
-        self.proc = subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "api.main:app", "--host", "127.0.0.1",
-             "--port", str(self.port)], cwd=str(ROOT),
-            stdout=self.handle, stderr=subprocess.STDOUT,
-            env=dict(os.environ, PHC_DB=db, PHC_BUNDLE="phc", PHC_FACILITY=shape))
-        for _ in range(150):
-            if self.proc.poll() is not None:
-                sys.exit("the API died on startup:\n%s" % self.log.read_text())
-            try:
-                urllib.request.urlopen(self.base + "/", timeout=1).read()
-                return
-            except Exception:
-                time.sleep(0.2)
-        sys.exit("the API never came up:\n%s" % self.log.read_text())
+        self.server = backend.launch(
+            db, bundle="phc", facility=shape,
+            log=pathlib.Path(db).with_suffix(".log"))
+        self.base = self.server.base
+        self.port = self.server.port
 
     def get(self, path, expect=200):
         req = urllib.request.Request(self.base + PREFIX + path, method="GET",
@@ -104,12 +93,7 @@ class OverASocket:
         return json.loads(raw) if raw else {}
 
     def close(self):
-        self.proc.terminate()
-        try:
-            self.proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            self.proc.kill()
-        self.handle.close()
+        self.server.close()
 
 
 class InProcess:

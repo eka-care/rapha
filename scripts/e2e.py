@@ -29,6 +29,10 @@ import urllib.request
 
 ROOT = pathlib.Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import backend                                                       # noqa: E402
+
 PREFIX = "/api/v1/phc"  # the MCP server's prefix; /api is the same router
 checks = 0
 
@@ -40,9 +44,7 @@ def ok(what):
 
 
 def free_port():
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+    return backend.free_port()
 
 
 def call(base, path, body=None, method=None, expect=200):
@@ -62,18 +64,6 @@ def call(base, path, body=None, method=None, expect=200):
     assert status == expect, "%s %s: expected %s, got %s %s" % (
         req.method, path, expect, status, parsed)
     return parsed
-
-
-def wait_for(base, proc, log):
-    for _ in range(100):
-        if proc.poll() is not None:
-            sys.exit("the API died on startup:\n%s" % pathlib.Path(log).read_text())
-        try:
-            urllib.request.urlopen(base + "/", timeout=1).read()
-            return
-        except Exception:
-            time.sleep(0.2)
-    sys.exit("the API never came up:\n%s" % pathlib.Path(log).read_text())
 
 
 def rows(db, sql, params=()):
@@ -459,17 +449,10 @@ def facility_shape():
     same operation is also called over HTTP and has to be refused by name.
     """
     db = os.path.join(tempfile.mkdtemp(), "shape.sqlite3")
-    port = free_port()
-    base = "http://127.0.0.1:%d" % port
-    log = os.path.join(os.path.dirname(db), "api.log")
-    handle = open(log, "w")
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "api.main:app", "--host", "127.0.0.1",
-         "--port", str(port)], cwd=str(ROOT), stdout=handle, stderr=subprocess.STDOUT,
-        env=dict(os.environ, PHC_DB=db, PHC_BUNDLE="phc",
-                 PHC_FACILITY="no-laboratory"))
+    server = backend.launch(db, bundle="phc", facility="no-laboratory",
+                            log=os.path.join(os.path.dirname(db), "api.log"))
+    base = server.base
     try:
-        wait_for(base, proc, log)
         facility = call(base, "/facility/")
         assert facility["bundle"]["id"] == "phc", facility["bundle"]
         assert facility["facility"] == "no-laboratory", facility["facility"]
@@ -518,12 +501,7 @@ def facility_shape():
         ok("and called anyway over the wire it is refused, names the plugin in "
            "the audit row, and writes no row: %s" % denied["detail"])
     finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-        handle.close()
+        server.close()
 
 
 def lab_separation():
@@ -538,16 +516,10 @@ def lab_separation():
     from bundles.lab.check import ACCESSION, SPECIMEN, RESULT, VERIFY
 
     db = os.path.join(tempfile.mkdtemp(), "lab.sqlite3")
-    port = free_port()
-    base = "http://127.0.0.1:%d" % port
-    log = os.path.join(os.path.dirname(db), "api.log")
-    handle = open(log, "w")
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "api.main:app", "--host", "127.0.0.1",
-         "--port", str(port)], cwd=str(ROOT), stdout=handle, stderr=subprocess.STDOUT,
-        env=dict(os.environ, PHC_DB=db, PHC_BUNDLE="lab"))
+    server = backend.launch(db, bundle="lab",
+                            log=os.path.join(os.path.dirname(db), "api.log"))
+    base = server.base
     try:
-        wait_for(base, proc, log)
         facility = call(base, "/facility/")
         assert facility["bundle"]["id"] == "lab"
         # The laboratory's own words, not the health centre's, all the way out
@@ -611,28 +583,17 @@ def lab_separation():
                         "AND status='verified'", (t,)) == [("user:pathologist",)]
         ok("a second pair of eyes verifies it, and the row says whose")
     finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-        handle.close()
+        server.close()
 
 
 def main():
     db = os.path.join(tempfile.mkdtemp(), "e2e.sqlite3")
-    port = free_port()
-    base = "http://127.0.0.1:%d" % port
-    log = os.path.join(os.path.dirname(db), "api.log")
-    handle = open(log, "w")
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "api.main:app",
-         "--host", "127.0.0.1", "--port", str(port)],
-        cwd=str(ROOT), stdout=handle, stderr=subprocess.STDOUT,
-        env=dict(os.environ, PHC_DB=db, PHC_BUNDLE="phc"))
+    server = backend.launch(db, bundle="phc",
+                            log=os.path.join(os.path.dirname(db), "api.log"))
+    base = server.base
     try:
-        wait_for(base, proc, log)
-        ok("the API starts and seeds %s" % os.path.basename(db))
+        ok("the %s API starts and seeds %s"
+           % (server.backend, os.path.basename(db)))
 
         # --- both spellings of every path, with no redirect in between
         assert call(base, "/queue")["kind"] == "queue"
@@ -765,12 +726,7 @@ def main():
         # is refused by nothing but the surface rule if it is refused at all.
         mcp(base, register(base, "Agent Test", "T-91"))
     finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-        handle.close()
+        server.close()
 
     # The same bundle, a different facility, on its own kernel. Before the
     # second bundle, because this is the one that would say a facility's shape
