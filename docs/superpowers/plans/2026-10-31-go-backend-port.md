@@ -119,6 +119,43 @@ Each is finished when the gate is green and the named checks pass against Go.
   three binding forms, the offline value sets. `GET /valuesets/{slug}` is
   already routed, from G3, because a bound choice with nothing to choose is an
   empty dropdown; what is left is the rest of `kernel/terminology.py`.
+
+  **Landed 2026-10-31.** The invariant is carried as a SHAPE rather than as a
+  sentinel, because Go cannot make a struct literal illegal from another
+  package: `Coding`'s fields are unexported, no method takes a pointer
+  receiver, and a coding built anywhere else is the zero value that
+  `kernel/mapping`'s own refusal then stops. That shape is held by a test in
+  an EXTERNAL test package, because a check that could write the struct would
+  be proving the opposite of what it claims.
+
+  The three binding forms are read out of the questionnaires rather than out
+  of the compiled artifact. Two of them are build time in the Python, so
+  `catalogue.json` already carries them resolved and the Go serving path only
+  re-checks one before a column is written; `QuestionCodings` is the other
+  half, and it is what fails if a declared code or unit drifts from its value
+  set on this side of the port.
+
+  `scripts/check_go_parity.py` gained the SECOND terminology rule, which no
+  scenario reached: a unit that is in its value set and is simply not the one
+  that analyte is reported in. Both answers are legal alone and the pair is
+  nonsense, which is the case a per-answer check passes. Two of the three
+  shapes withhold the laboratory, so the check says which of the two things
+  it compared in each shape rather than letting a capability denial stand in
+  for the unit rule.
+
+  **Three things this slice could not prove, and did not pretend to.** The
+  `display` key is omitted when the cache records none — every one of the 87
+  cached concepts declares one, so the branch is unreachable and writing the
+  display unconditionally passes the whole gate. The ORDER of `semantic_tags`
+  is the file's, which nothing can see: both value sets that declare tags
+  declare them already sorted, and the one caller reads them as a set. And
+  the 200 expansion ceiling stays what it already was, unobservable against a
+  largest value set of nine concepts and awaiting the owner's decision.
+
+  `kernel/terminology.Coding.to_fhir()` has exactly one caller in the whole
+  tree, its own demo: `kernel/fhir.py` builds its codings from stored ROWS,
+  not from `Coding` objects. Carried into Go as `ToFHIR` because G6 is the
+  slice that fills those rows, and reported rather than deleted.
 - **G6. Mapping and the record projection.** Rows per group row, the author on
   each, and the three OPConsultRecord slices this build fills, plus the
   narrative fallback.

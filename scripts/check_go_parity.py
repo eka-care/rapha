@@ -283,6 +283,18 @@ def coder():
     return pick
 
 
+@functools.lru_cache(maxsize=None)
+def vocab(slug):
+    """One cached value set, as it is written on disk.
+
+    Read rather than asked of either engine, for the same reason the payloads
+    are generated: a value set is a DECLARATION, and a check that learned an
+    analyte's reported unit from one of the two engines would be comparing an
+    engine against itself.
+    """
+    return json.loads((ROOT / "terminology" / ("%s.json" % slug)).read_text())
+
+
 def bound_slugs():
     """Every value set a question in this bundle binds its ANSWER to.
 
@@ -885,6 +897,108 @@ def s_a_code_outside_its_value_set(walk, codes):
     return "an answer outside its value set is refused before anything is written"
 
 
+def a_unit_rule():
+    """(operation, form, the unit question, the question it is the unit of)
+    for the first form in this bundle that declares `unit_of`, or four Nones.
+
+    Derived, so nothing below names a form, a field, an analyte or a unit. The
+    rule is "an answer declared `unit_of` another is the unit that other
+    answer's concept is reported in", and the only honest place to prove it is
+    on whichever question actually declares it.
+    """
+    cat = declared()
+    for op_id in cat["manifest"]["operations"]:
+        slug = cat["operations"][op_id].get("input")
+        if not slug:
+            continue
+        questions = list(validate_walk(schema(slug)["questions"]))
+        for question in questions:
+            other = _phc(question).get("unit_of")
+            if not other:
+                continue
+            peer = next((q for q in questions if q["link_id"] == other), None)
+            if peer is not None and peer.get("answer_value_set"):
+                return op_id, slug, question, peer
+    return None, None, None, None
+
+
+def s_a_unit_must_be_the_analytes_own(walk, codes):
+    """The SECOND terminology rule, which the other scenarios never reach.
+
+    s_a_code_outside_its_value_set breaks the first rule: a code no value set
+    holds. This breaks the second with a code that IS in its value set and is
+    simply not this analyte's unit, which is the case a per-answer check
+    passes: both answers are legal on their own and the pair is nonsense. A
+    haemoglobin of 12 is a normal haemoglobin in g/dL and a nonsense one in
+    mg/dL, and nothing in a payload said which until this rule.
+    """
+    op, slug, unit_q, peer_q = a_unit_rule()
+    assert op, ("no question in this bundle declares %s, so this scenario "
+                "proves nothing" % "unit_of")
+    registered(walk, codes)
+    walk.commit("document a consultation", "phc.op.consult-document",
+                filled("phc.schema.consult-v1", codes, every=True), "demo")
+    walk.commit("order a laboratory test", "phc.op.lab-order",
+                filled("phc.schema.lab-order-v1", codes), "demo")
+
+    right = filled(slug, codes)
+    picked = right[peer_q["link_id"]]
+    reported = (vocab(peer_q["answer_value_set"])["concepts"]
+                .get(str(picked), {}).get("unit"))
+    assert reported, ("%s is cached with no unit, so the rule cannot be "
+                      "broken deliberately" % picked)
+    assert right[unit_q["link_id"]] == reported, (
+        "the filler did not answer %s with the unit %s is reported in"
+        % (unit_q["link_id"], picked))
+    # A REAL unit, out of the same value set the unit question binds, whose
+    # only fault is that it is not the one this analyte is reported in. Never
+    # a literal, and never a code from somewhere else: that would fail the
+    # FIRST rule and prove nothing new.
+    elsewhere = [code for code in sorted(vocab(unit_q["answer_value_set"])["concepts"])
+                 if code != reported]
+    assert elsewhere, ("%s holds one unit, so a wrong one cannot be picked"
+                       % unit_q["answer_value_set"])
+    wrong = dict(right, **{unit_q["link_id"]: elsewhere[0]})
+
+    # Whether this SHAPE runs the laboratory at all. Two of the three
+    # withhold it, and there the two engines are compared refusing for a
+    # capability rather than for a unit, which is a real comparison and is
+    # NOT the unit rule. So the claim below says which of the two ran rather
+    # than letting one stand in for the other.
+    capability = declared()["operations"][op].get("capability")
+    mine = get(walk.base, PREFIX + "/whoami",
+               walk.headers("demo"))["capabilities"]
+    held = capability in mine
+
+    # The wrong one first: the operation declares `not lab.resulted`, so a
+    # result that landed would close the door on the second attempt.
+    _, refused = walk.commit(
+        "enter the result in a real unit that is not that analyte's",
+        op, wrong, "demo")
+    walk.panel("the panel after a value and a unit that disagree")
+    if held:
+        # The refusal has to be ABOUT the pair, and every word checked for
+        # here was derived above: the unit that was sent, the analyte that was
+        # picked, and the unit that analyte is reported in. A refusal that
+        # merely said "invalid" would pass a diff and tell a technician
+        # nothing.
+        said = json.dumps(refused)
+        for word in (str(wrong[unit_q["link_id"]]), str(picked), str(reported)):
+            assert word in said, (
+                "the refusal does not name %r, so it does not say which of "
+                "the two answers to correct: %s" % (word, said))
+    walk.commit("enter the same result in the unit the analyte is reported in",
+                op, right, "demo")
+    walk.panel("the panel after a value and its own unit")
+    if not held:
+        return ("this shape runs no laboratory, so the unit rule is reached "
+                "by neither engine and both refuse for the capability "
+                "instead")
+    return ("a value and its unit are one checked thing: a unit that is not "
+            "the analyte's own is refused even though it is a real unit, and "
+            "the refusal names both answers")
+
+
 def s_the_state_emit(walk, codes):
     """Guard step 7, which is the one step no other scenario reaches: a flag
     the store holds because no resource can answer it.
@@ -1108,6 +1222,7 @@ SCENARIOS = (
     s_a_plugin_that_is_off,
     s_repeating_groups_fan_out,
     s_a_code_outside_its_value_set,
+    s_a_unit_must_be_the_analytes_own,
     s_a_row_is_addressed_by_number,
     s_a_bound_choice_is_constrained_per_row,
     s_the_state_emit,
