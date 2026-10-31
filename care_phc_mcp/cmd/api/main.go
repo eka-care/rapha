@@ -58,6 +58,7 @@ import (
 	"sync"
 
 	carephc "github.com/eka-care/care_phc_mcp"
+	"github.com/eka-care/care_phc_mcp/planner"
 	"github.com/eka-care/care_phc_mcp/plugins"
 	"github.com/eka-care/care_phc_mcp/proposals"
 	"github.com/eka-care/care_phc_mcp/questionnaire"
@@ -114,6 +115,11 @@ type kernel struct {
 	// catalogue-wide set, and the write path over them.
 	operations map[string]carephc.Operation
 	write      *proposals.Bundle
+
+	// The spoken names for a questionnaire field, which is the planner's own
+	// vocabulary behind POST /khoj. Read from the tree at startup, like the
+	// questionnaires and the value sets, and never restated here.
+	spoken planner.SpokenFields
 }
 
 // ---------------------------------------------------------------------------
@@ -526,11 +532,15 @@ var served = []struct {
 	{"/valuesets/{slug}", ""},
 	{"/queue", ""},
 	{"/views/{view_id}", ""},
-	// The guard is served; the planner behind these two is agent/turn.py and
-	// is a port of its own. Said as the slice rather than left reading as
-	// though G2 had covered it.
-	{"/khoj", "the ask-and-search planner behind it is agent/turn.py, not the guard"},
-	{"/agent/say", "the ask-and-search planner behind it is agent/turn.py, not the guard; this spelling is deprecated"},
+	// The ask-and-search turn, which G8b brought: the deterministic router of
+	// agent/planner.py and the ordering, carding and wording of
+	// agent/turn.py, over the same guard on the same machine surface. The one
+	// half NOT here is that module's llm backend, which would need a network
+	// call and an SDK; package planner refuses it by name rather than
+	// planning with the router under it. /agent/say is the deprecated
+	// spelling and delegates, exactly as the Python's does.
+	{"/khoj", ""},
+	{"/agent/say", ""},
 	// The LOCAL half of kernel/directory.py: the register this facility
 	// already holds, and the rows no registry has seen. The vendor behind the
 	// seam is not here and nothing in Go reads a credential, so a search
@@ -605,6 +615,12 @@ func (k *kernel) mount() http.Handler {
 		mux.HandleFunc(prefix+"/subjects/{subject_id}", only(http.MethodGet, k.subject))
 		mux.HandleFunc(prefix+"/patients/search", only(http.MethodGet, k.patientSearch))
 		mux.HandleFunc(prefix+"/patients/pending", only(http.MethodGet, k.patientPending))
+		// The composer's endpoint, and its deprecated spelling, which
+		// api/main.py serves by delegating to the same function. One handler,
+		// so this spelling has no logic of its own to drift out of step with
+		// the other.
+		mux.HandleFunc(prefix+"/khoj", only(http.MethodPost, k.khoj))
+		mux.HandleFunc(prefix+"/agent/say", only(http.MethodPost, k.khoj))
 		k.mountGuard(mux, prefix)
 	}
 	return eitherSpelling(mux)
@@ -664,6 +680,14 @@ func main() {
 		log.Fatalf("the value sets did not load, so no coding could be "+
 			"checked: %v\n\nSet PHC_ROOT to the repository root, or run from it.", err)
 	}
+	// And the planner's own field vocabulary behind POST /khoj, read from the
+	// same tree for the same reason. Loud on failure: a planner that quietly
+	// lost this still answers, and what it answers is a thinner payload that
+	// reads as the utterance never having said the value.
+	spokenFields, err := planner.LoadSpoken(root)
+	if err != nil {
+		log.Fatalf("%v\n\nSet PHC_ROOT to the repository root, or run from it.", err)
+	}
 
 	// PHC_STORE names the seam, and there is one adapter behind it: `local`,
 	// the SQLite file. Refused by name for the reason api/main.py refuses it,
@@ -696,7 +720,7 @@ func main() {
 	}
 
 	k := &kernel{cat: cat, bundle: cat.Manifest.ID, store: rows,
-		overrides: map[string][]string{}}
+		overrides: map[string][]string{}, spoken: spokenFields}
 	k.facility = plugins.Chosen(cat, "")
 	k.withheld = plugins.Withheld(cat, k.facility)
 	k.without = plugins.Absent(cat, k.facility)
