@@ -254,7 +254,16 @@ func (b *Bundle) write(s Store, op carephc.Operation, thread string,
 		ids = append(ids, id)
 	}
 	for _, flag := range b.Raised(op, payload) {
-		if err := s.RaiseFlag(thread, flag, actor); err != nil {
+		// NO ACTOR, and that is copied rather than improved.
+		// kernel/proposals._write calls store.raise_flag(thread, flag) with
+		// two arguments, so every flag the guard raises lands with created_by
+		// NULL. The adapter's own seed passes one (adapters/local/store.py
+		// seed()), and the `{actor: id}` mapping source exists precisely
+		// because rows landing with created_by null made "who did this" a
+		// question only the audit could answer. The same gap is open on this
+		// path and closing it here would be this engine inventing an answer
+		// the reference does not give.
+		if err := s.RaiseFlag(thread, flag, ""); err != nil {
 			return nil, err
 		}
 	}

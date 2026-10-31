@@ -311,11 +311,15 @@ func Actions(wf *carephc.Workflow, operations map[string]carephc.Operation,
 	known, caps map[string]bool, stationFilter string, actorGiven bool,
 	actor string, performersGiven bool,
 	performers map[string]map[string]bool) []carephc.Operation {
+	// LAST step wins for a station, FIRST for an operation's seat, and that
+	// asymmetry is the Python's: kernel/state.actions builds `order` with a
+	// dict comprehension, which overwrites, and `seat` with setdefault, which
+	// does not. bundles/phc gives every station one step so nothing turns on
+	// it here, and a bundle that draws one station twice would sort
+	// differently in the two engines if this were tidied up.
 	order := map[string]int{}
 	for i, step := range wf.Steps {
-		if _, seen := order[step.Station]; !seen {
-			order[step.Station] = i
-		}
+		order[step.Station] = i
 	}
 	seat := map[string]int{}
 	for _, step := range wf.Steps {

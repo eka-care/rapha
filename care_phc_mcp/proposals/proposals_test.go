@@ -191,6 +191,50 @@ func TestARefusalIsAuditedAndTouchesNothing(t *testing.T) {
 	}
 }
 
+// A FLAG THE GUARD RAISES CARRIES NO AUTHOR, which is the Python's behaviour
+// and not an improvement on it.
+//
+// kernel/proposals._write calls store.raise_flag(thread, flag), so created_by
+// is NULL on every flag the write path raises, while the adapter's own seed
+// passes an actor and every clinical row carries one through the `{actor: id}`
+// mapping source. Pinned here because nothing else can see it: a thread_flag
+// row never reaches the wire, so the differential check cannot compare it and
+// this engine filling the column would be a silent divergence that read as an
+// improvement.
+func TestAFlagTheGuardRaisesCarriesNoAuthor(t *testing.T) {
+	b, s, thread := loaded(t)
+	register := b.Operations["phc.op.patient-register"]
+	consented := map[string]any{}
+	for k, v := range registration {
+		consented[k] = v
+	}
+	consented["capture_consent"] = true
+	if d, err := b.Commit(s, register, thread, consented,
+		caps(register.Capability), caps(), "user:clerk", false, ""); err != nil || !d.Allowed {
+		t.Fatalf("registration: %v %v", d.Reason, err)
+	}
+	raised, err := s.StoredFlags(thread)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !raised["capture.agreed"] {
+		t.Fatalf("the consent raised nothing: %v", raised)
+	}
+	rows, err := s.Select("thread_flag", &thread, nil, nil, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) == 0 {
+		t.Fatal("no thread_flag row")
+	}
+	for _, row := range rows {
+		if row["created_by"] != "" {
+			t.Fatalf("a flag the guard raised named %q as its author; "+
+				"kernel/proposals._write passes none", row["created_by"])
+		}
+	}
+}
+
 // ONE PROPOSAL WRITES ONE ROW. Counted at the store rather than inferred from
 // a flag, which is all a panel can show.
 func TestOneProposalWritesOneRow(t *testing.T) {
