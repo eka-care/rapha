@@ -191,6 +191,11 @@ if [ -d web/node_modules ]; then
   # and 1 as well as at the number somebody wrote them against.
   (cd web && node --experimental-strip-types src/agent.check.ts)
   echo "ok   web renderer typechecks and builds"
+  # The screens are live, not mocked: the real renderer modules run over what
+  # two real kernels answered, for two facility shapes of one bundle. Needs
+  # web/node_modules only for the strip-types run, and binds a port unless
+  # SKIP_E2E is set, in which case it drives the same routes in process.
+  python3 scripts/check_live.py
 else
   echo "warn web: run (cd web && npm install) to check the renderer"
 fi

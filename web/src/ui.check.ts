@@ -76,6 +76,13 @@ function vocabulary(): { word: string; kind: string }[] {
   }
   add("station", [...stations]);
   add("view title", Object.values(catalogue.views ?? {}).map((v) => (v as { title: string }).title));
+  // Which fields name a subject and which describe one is a view's own
+  // `columns:`. A screen that types one of them has decided what a patient is
+  // -- which is how the patient screen came to show age, sex and village at a
+  // bundle whose subject might be a specimen.
+  for (const v of Object.values(catalogue.views ?? {})) {
+    add("view column", (v as { columns?: string[] }).columns);
+  }
   return out;
 }
 
@@ -98,6 +105,13 @@ const IMPLEMENTED = [
   "event", "artifact", "handover", "task", "comment",          // THREAD_OBJECTS
   "scribe", "device", "constrained-voice", "spoken-prompt",    // INSTRUMENT_KINDS
   "queue", "summary", "dashboard", "tasklist",                 // view kinds
+  // loops.SortKey. The list screen's three sorts are the renderer's own, and
+  // "name" collides with this bundle's first declared queue column by
+  // accident, the same way "handover" collides with a capability. The LABEL on
+  // that sort is `decl.columns[0]`, never this word, which is what makes the
+  // collision harmless; the cost is that the renderer could now type "name"
+  // meaning the column and this would not catch it.
+  "recent", "name", "station",
 ];
 
 {
@@ -128,6 +142,104 @@ const IMPLEMENTED = [
   assert.deepEqual(offenders, [],
     "the renderer types a word only a declaration may put on screen:\n  " + offenders.join("\n  "));
   ok(`portability: no renderer file types any of this bundle's ${vocab.length} declared words`);
+}
+
+// ------------------------------------------- 1b. the kernel serves the words
+
+/** A screen may not be a second place where clinical truth lives, and the
+ *  longest running breach of that was the forms: `declarations.ts` compiled
+ *  questionnaires/*.json and terminology/*.json into the browser bundle with a
+ *  Vite glob, so what a form ASKED a clinician was the one thing on a screen
+ *  the kernel did not serve, and no facility could change a question without
+ *  rebuilding the browser. GET /questionnaires/ and GET /valuesets/{slug}
+ *  serve them now. These are the assertions that stop a glob coming back. */
+{
+  const reading: string[] = [];
+  for (const file of TSX) {
+    const body = code(readFileSync(file, "utf8"));
+    // A glob at all. There is no legitimate one left in this renderer: every
+    // declaration arrives over the API, and the one that did not was this.
+    if (/import\.meta\.glob/.test(body)) reading.push(`${rel(file)}: import.meta.glob`);
+    // Or a FILE under either declaration directory. The route literal
+    // "/questionnaires/" in api.ts names the same word and is the opposite of
+    // the thing being refused, so what counts is a literal that reaches for a
+    // file: one ending .json, or a glob pattern.
+    for (const dir of ["questionnaires", "terminology"]) {
+      const path = new RegExp(`["'\`][^"'\`]*${dir}/[^"'\`]*(\\.json|\\*)`);
+      if (path.test(body)) reading.push(`${rel(file)}: reads a file under ${dir}/`);
+    }
+  }
+  assert.deepEqual(reading, [],
+    "a renderer file reads a declaration off disk instead of from the kernel:\n  "
+    + reading.join("\n  "));
+  ok("live: no renderer file reads a questionnaire or a value set off disk");
+
+  const decl = code(readFileSync(join(SRC, "declarations.ts"), "utf8"));
+  assert.match(decl, /source\.questionnaires\(\)/, "the forms come from the route");
+  assert.match(decl, /source\.valueset\(slug\)/, "and a bound choice from the value set route");
+  const client = code(readFileSync(join(SRC, "api.ts"), "utf8"));
+  assert.match(client, /"\/questionnaires\/"/, "api.ts calls GET /questionnaires/");
+  assert.match(client, /\/valuesets\//, "api.ts calls GET /valuesets/{slug}");
+  // And the app waits for them, rather than drawing a form with no questions
+  // in it and filling them in later.
+  const app = code(readFileSync(join(SRC, "app", "App.tsx"), "utf8"));
+  assert.match(app, /loadDeclarations\(api\)/, "App loads the declarations");
+  assert.match(app, /decls\.loading/, "and does not draw a screen until they are there");
+  ok("live: the forms and the bound choices are fetched before the first screen draws");
+}
+
+// ------------------------------------ 1c. a screen decides nothing the kernel does
+
+/** Three places a screen had taken a decision back off the kernel. Each one
+ *  shipped, and each one is a different shape of the same mistake. */
+{
+  // The role editor. `inert()` decided whether a grant does anything from the
+  // workflow alone, so a centre with a plugin off still offered the switch and
+  // the guard refused every use of it. Contradiction 25.
+  const grants = code(readFileSync(join(SRC, "grants.ts"), "utf8"));
+  assert.match(grants, /export function inert\(cap: string, cat: Catalogue, facility: Withheld\)/,
+    "inert() is told what the facility withholds; it may not guess");
+  assert.match(grants, /export function inertReason\(cap: string, cat: Catalogue, facility: Withheld\)/,
+    "and so is the sentence that explains it");
+  assert.match(grants, /if \(facility\.withheld\[cap\]\) return true/,
+    "a withheld capability is dead, whatever the workflow draws");
+  const settings = code(readFileSync(join(SRC, "screens", "Settings.tsx"), "utf8"));
+  assert.match(settings, /inert\(cap, cat, facility\)/, "the editor passes it through");
+  assert.match(settings, /facility\.withheld\[cap\]/,
+    "and refuses a withheld capability even when no operation names it");
+  // No default: a facility argument that may be omitted is the old behaviour
+  // with a longer signature, and it is the centre that withholds something
+  // that would get it wrong.
+  assert.ok(!/facility: Withheld = /.test(grants),
+    "the withheld map has no default; 'nothing is withheld' must never be assumed");
+
+  // The patient screen. It chose three subject fields to show, which made it a
+  // second opinion about what a subject is; messages.header() already reads
+  // the queue view's own `columns:`.
+  const patient = code(readFileSync(join(SRC, "screens", "Patient.tsx"), "utf8"));
+  assert.match(patient, /header\(/, "the patient header is the declared rule, not a field list");
+  // The precise property: no screen reads a subject by a field name it typed.
+  // Not a count of literals -- the three tabs on this screen are the
+  // renderer's own and have nothing to do with a subject -- but any named
+  // read of the subject at all. `Object.entries(view.subject)` is fine: it
+  // shows whatever the kernel sent, in the kernel's order.
+  const named = TSX.filter((f) => /\/screens\//.test(f))
+    // `.id` is exempt, and only `.id`: it is the Store protocol's own primary
+    // key on every resource (kernel/contracts.py), not a word any bundle
+    // chose, and the thread screen needs it to link to the spine.
+    .filter((f) => /subject(\.(?!id\b)\w+|\[\s*["'`])/.test(code(readFileSync(f, "utf8"))))
+    .map(rel);
+  assert.deepEqual(named, [],
+    "a screen reads a subject by a field name it typed: " + named.join(", "));
+
+  // A summary section's rows. The renderer led with whichever of six field
+  // names it had typed out, so reordering the declaration changed nothing.
+  const view = code(readFileSync(join(SRC, "view", "View.tsx"), "utf8"));
+  assert.match(view, /describe\(r, section\.fields\)/,
+    "a row leads with the field the section declared first");
+  assert.match(view, /for \(const k of fields \?\? \[\]\)/,
+    "in the declared order, and from no other list");
+  ok("live: the role editor, the patient header and a summary row all read the kernel's decision");
 }
 
 // ------------------------------------------------------------ 2. the menus
