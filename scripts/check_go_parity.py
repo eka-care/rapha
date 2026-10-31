@@ -1672,6 +1672,110 @@ def fill_parity(tmp):
        "addressed id" % (len(cases["drafts"]), ticked, rowed))
 
 
+# --------------------------------------------------------------------------
+# the roll forward: a demo day that is not today any more
+# --------------------------------------------------------------------------
+
+def roll_forward(tmp):
+    """A stale demo day, walked forward by both engines, compared.
+
+    WHY THIS NEEDS ITS OWN PAIR OF KERNELS
+    --------------------------------------
+    Every queue view is `scope: today`, which is what a queue means, so a file
+    seeded on an earlier day draws an empty workspace. Both adapters move the
+    seeded threads forward in their CONSTRUCTOR, so the behaviour is
+    unreachable from a freshly seeded file: every other check in this
+    repository seeds today, the shift is zero days, and nothing runs. That
+    left the one function whose whole job is "the demo still works tomorrow"
+    with no check at all in either engine.
+
+    So a file is seeded, backdated whole days, and copied: one engine opens
+    each copy and the two queues are compared. Nothing about either queue is
+    written here. What IS asserted is the pair of properties a comparison
+    cannot see, because two engines that both did nothing would agree:
+
+      - the queue is not empty, which it would be if nothing moved;
+      - no row was pushed into the FUTURE, which is the clamp the Python's own
+        docstring promised and did not enforce until somebody noticed a wait
+        bar painting backwards out of its own row.
+
+    The number of days is derived from the backdating this function did, not
+    written down as an instant: there is no literal date anywhere in it.
+    """
+    import shutil
+    import sqlite3
+
+    from adapters.local.store import (KERNEL_RECORD, SEED_ACTOR, TABLES,
+                                      THREAD_COLUMN, DEFAULT_THREAD_COLUMN)
+
+    days = 3
+    seeded = os.path.join(tmp, "stale.sqlite3")
+    os.environ[backend.ENV] = backend.PYTHON
+    backend.launch(seeded, bundle="phc", facility="all-plugins").close()
+    os.environ.pop(backend.ENV, None)
+
+    # Backdate the WHOLE file by whole days, every date column of every table,
+    # so the demo day keeps its own internal order and its own times of day.
+    # The table list is the adapter's own, so a column added there is moved
+    # here without this function being edited.
+    conn = sqlite3.connect(seeded)
+    try:
+        before = conn.execute(
+            "SELECT COUNT(*) FROM encounter WHERE created_by = ?", [SEED_ACTOR]
+        ).fetchone()[0]
+        assert before, "the seed wrote no thread, so there is nothing to roll"
+        for table in TABLES:
+            column = KERNEL_RECORD.get(table, (None, "created_date"))[1]
+            conn.execute(
+                "UPDATE %s SET %s = replace(datetime(%s, ?), ' ', 'T') || '+00:00'"
+                " WHERE %s IS NOT NULL" % (table, column, column, column),
+                ["-%d days" % days])
+        conn.commit()
+        stale = conn.execute("SELECT MAX(created_date) FROM encounter"
+                             " WHERE created_by = ?", [SEED_ACTOR]).fetchone()[0]
+    finally:
+        conn.close()
+    today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+    assert stale[:10] < today, (stale, today)
+
+    started, queues = {}, {}
+    try:
+        for name in (backend.PYTHON, backend.GO):
+            copy = os.path.join(tmp, "stale-%s.sqlite3" % name)
+            shutil.copyfile(seeded, copy)
+            os.environ[backend.ENV] = name
+            started[name] = backend.launch(copy, bundle="phc",
+                                           facility="all-plugins",
+                                           env={"PHC_DIRECTORY": "absent"})
+            queues[name] = get(started[name].base, PREFIX + "/queue")
+        os.environ.pop(backend.ENV, None)
+        assert normalise(queues[backend.PYTHON]) == normalise(queues[backend.GO]), (
+            "a rolled-forward demo day differs\npython: %s\ngo:     %s"
+            % (json.dumps(normalise(queues[backend.PYTHON]), sort_keys=True),
+               json.dumps(normalise(queues[backend.GO]), sort_keys=True)))
+        now = datetime.datetime.now(datetime.timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%S+00:00")
+        for name, queue in queues.items():
+            assert queue["rows"], (
+                "%s: the demo day did not move, so the queue is empty a day "
+                "after the seed" % name)
+            for row in queue["rows"]:
+                assert row["opened_at"] <= now, (
+                    "%s: a rolled-forward row opens in the FUTURE (%s), which "
+                    "is what made a wait bar paint backwards"
+                    % (name, row["opened_at"]))
+                assert row["opened_at"][:10] == today, (
+                    "%s: a row the queue shows is not dated today: %s"
+                    % (name, row["opened_at"]))
+    finally:
+        for server in started.values():
+            server.close()
+        os.environ.pop(backend.ENV, None)
+    ok("the roll forward: a demo day %d days stale walks to today in both "
+       "engines, identically, with %d rows on the queue and none of them in "
+       "the future" % (days, len(queues[backend.GO]["rows"])))
+
+
 def main():
     # The Go binary is built once, loudly, before anything is compared: a
     # build failure here must not read as a route mismatch.
@@ -1683,6 +1787,10 @@ def main():
         # cheaper to read than one found after three pairs of kernels have
         # been started.
         fill_parity(tmp)
+        # Before the shapes, because it is the one pair of kernels that does
+        # not start from a file seeded today, and a difference here is cheaper
+        # to read than one found after three pairs have been started.
+        roll_forward(tmp)
         for shape in SHAPES:
             started = both(shape, tmp)
             try:
