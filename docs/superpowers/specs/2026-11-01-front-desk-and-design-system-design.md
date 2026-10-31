@@ -168,6 +168,20 @@ anybody else.
 - How the lotus is drawn. It must carry an accessible name and must not be the
   only way ABHA status is conveyed.
 
+## Open, and not an agent's call
+
+- **Atkinson Hyperlegible.** `web/index.html` loaded it, `tokens.css` asked for
+  Inter, and neither was ever used: every screen has rendered in the operating
+  system's own face since September. The design system says Geist, and that is
+  what now loads. But Atkinson was chosen for character disambiguation at low
+  acuity — a tailed l, a zero that cannot be an O — and a token number, a dose
+  and a blood pressure are exactly where a misread is clinical. Keeping Geist
+  for the interface and Atkinson Hyperlegible Mono for counted values would buy
+  most of that back. The owner decides.
+- **High-risk pregnancy as a declared programme**, with the clinical sign-off
+  already outstanding.
+- **A fingerprint reader on the desk**, which is a purchase.
+
 ## What is not in this work, and why
 
 - **High-risk pregnancy as a programme.** The declared categories are general,
