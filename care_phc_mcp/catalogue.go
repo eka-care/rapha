@@ -71,6 +71,10 @@ type Manifest struct {
 	Version string `json:"version"`
 	Title   string `json:"title"`
 	Khoj    Khoj   `json:"khoj"`
+	// Which operation atoms THIS bundle lists. The catalogue-wide
+	// `operations` key below holds every bundle's, because the file is
+	// embedded whole and narrowed at runtime, so this is the narrowing.
+	Operations []string `json:"operations"`
 }
 
 // Plugin is one entry of bundle.yaml's `plugins:`, carried through
@@ -141,6 +145,19 @@ type Catalogue struct {
 	Vocabulary Vocabulary        `json:"vocabulary"`
 	Views      map[string]View   `json:"views"`
 	Workflows  map[string]any    `json:"workflows"`
+
+	// Filled by LoadDeclarations, not by a tag. The one workflow a bundle
+	// has, typed, because the guard reads its steps and its state rules.
+	Workflow *Workflow `json:"-"`
+	// The compiled mapping and the operation atoms, unparsed. Kept raw for
+	// the reason ManifestRaw is: what is served or evaluated is the
+	// declaration the Python compiled, so a field added there arrives without
+	// being retyped in Go.
+	MappingRaw    map[string]json.RawMessage `json:"-"`
+	OperationsRaw map[string]json.RawMessage `json:"-"`
+	// Each atom as a thread panel draws it: the compiled operation with its
+	// mapping merged back in. See LoadDeclarations.
+	ActionJSON map[string]map[string]any `json:"-"`
 }
 
 func Load() (*Catalogue, error) {

@@ -18,11 +18,38 @@ import (
 // whose None values every reader treats as absent-or-empty, and
 // `where {field: "*"}` is spelled as "not null AND not empty" for that reason.
 func scanRows(rows *sql.Rows) ([]map[string]string, error) {
+	found, err := scanNullableRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]map[string]string, 0, len(found))
+	for _, row := range found {
+		flat := make(map[string]string, len(row))
+		for name, value := range row {
+			if text, ok := value.(string); ok {
+				flat[name] = text
+			} else {
+				flat[name] = ""
+			}
+		}
+		out = append(out, flat)
+	}
+	if len(out) == 0 {
+		return nil, nil
+	}
+	return out, nil
+}
+
+// scanNullableRows is the same read with the NULLs kept, for the one caller
+// that puts a row on the wire: a thread's `subject`, where the Python answers
+// null for an unfilled column and "" would be a different fact a renderer can
+// see.
+func scanNullableRows(rows *sql.Rows) ([]map[string]any, error) {
 	columns, err := rows.Columns()
 	if err != nil {
 		return nil, err
 	}
-	var out []map[string]string
+	var out []map[string]any
 	for rows.Next() {
 		cells := make([]any, len(columns))
 		holders := make([]sql.NullString, len(columns))
@@ -32,9 +59,13 @@ func scanRows(rows *sql.Rows) ([]map[string]string, error) {
 		if err := rows.Scan(cells...); err != nil {
 			return nil, err
 		}
-		row := make(map[string]string, len(columns))
+		row := make(map[string]any, len(columns))
 		for i, name := range columns {
-			row[name] = holders[i].String
+			if holders[i].Valid {
+				row[name] = holders[i].String
+			} else {
+				row[name] = nil
+			}
 		}
 		out = append(out, row)
 	}
@@ -84,6 +115,11 @@ func orEmptyList(l []string) []string {
 	}
 	return l
 }
+
+// RandomHex is exported because kernel/proposals.py mints its own ids with a
+// different shape from the adapter's, and there must not be two sources of
+// randomness in one binary.
+func RandomHex(n int) string { return randomHex(n) }
 
 func randomHex(n int) string {
 	b := make([]byte, (n+1)/2)

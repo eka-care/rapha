@@ -311,7 +311,7 @@ func TestAQueryOnAFieldThatDoesNotExistIsRefused(t *testing.T) {
 }
 
 // Every method on the interface is implemented, and the interface declares the
-// eleventh and twelfth the Python's protocol does not. The assertion is on the
+// eleventh, twelfth and thirteenth the Python's protocol does not. The assertion is on the
 // interface's own method set so a method added to the interface and not the
 // struct does not compile rather than failing here, and the names are listed
 // so a method SERVED and not DECLARED is visible.
@@ -323,18 +323,21 @@ func TestTheInterfaceDeclaresEveryMethodItServes(t *testing.T) {
 	}
 	sort.Strings(names)
 	want := []string{
-		"AppendAudit", "Audit", "Count", "OpenThread", "Proposals",
-		"PutProposal", "RaiseFlag", "RecordDirectoryID", "Select",
-		"StoredFlags", "Threads", "Write",
+		"AppendAudit", "Audit", "Count", "OpenThread", "Proposal",
+		"Proposals", "PutProposal", "RaiseFlag", "RecordDirectoryID",
+		"Select", "SelectNullable", "StoredFlags", "Threads", "Write",
 	}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("the interface declares %v, want %v", names, want)
 	}
-	// Ten of these are kernel/contracts.py's Store protocol. The two that are
-	// not are named in the interface's own comments and in the port plan:
-	// RecordDirectoryID (contradiction 29, called by kernel/directory.py) and
-	// OpenThread (called by api/main.py).
-	if len(names) != 12 {
-		t.Fatalf("%d methods: the protocol is ten and this serves two more", len(names))
+	// Ten of these are kernel/contracts.py's Store protocol. The four that
+	// are not are named in the interface's own comments: RecordDirectoryID
+	// (contradiction 29, called by kernel/directory.py), OpenThread and
+	// Proposal (both called by api/main.py), and SelectNullable, which is
+	// Select without the NULL flattening for the one row that goes on the
+	// wire. Proposal was found porting the guard: api/main.py's
+	// proposal_or_404 reads it and the protocol's docstring still says ten.
+	if len(names) != 14 {
+		t.Fatalf("%d methods: the protocol is ten and this serves four more", len(names))
 	}
 }

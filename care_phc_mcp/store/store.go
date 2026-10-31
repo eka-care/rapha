@@ -147,6 +147,62 @@ type AuditRecord struct {
 	Proposal  string         `json:"proposal"`
 }
 
+// MarshalJSON writes an AuditRecord as kernel/contracts.AuditRecord's
+// asdict() does. The two Optional fields go out as null rather than as the
+// empty string: `actor` is None on a line the guard filled with no actor, and
+// `proposal` is None on a decision that came from no proposal. An engine
+// answering "" where the reference answers null is a difference a renderer
+// can see, so the difference does not exist.
+func (r AuditRecord) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		ID        string         `json:"id"`
+		Thread    string         `json:"thread"`
+		Operation string         `json:"operation"`
+		Actor     *string        `json:"actor"`
+		Surface   string         `json:"surface"`
+		Payload   map[string]any `json:"payload"`
+		Outcome   string         `json:"outcome"`
+		At        string         `json:"at"`
+		Proposal  *string        `json:"proposal"`
+	}{r.ID, r.Thread, r.Operation, nullable(r.Actor), r.Surface,
+		orEmptyObject(r.Payload), r.Outcome, r.At, nullable(r.Proposal)})
+}
+
+// MarshalJSON writes a Proposal as kernel/contracts.Proposal's asdict() does:
+// three Optional fields as null, and `flags_raised` as an empty list rather
+// than null, which is what field(default_factory=list) gives.
+func (p Proposal) MarshalJSON() ([]byte, error) {
+	flags := p.FlagsRaised
+	if flags == nil {
+		flags = []string{}
+	}
+	return json.Marshal(struct {
+		ID           string         `json:"id"`
+		Thread       string         `json:"thread"`
+		Operation    string         `json:"operation"`
+		Payload      map[string]any `json:"payload"`
+		ProposedBy   *string        `json:"proposed_by"`
+		Surface      string         `json:"surface"`
+		Status       string         `json:"status"`
+		CreatedAt    string         `json:"created_at"`
+		FlagsRaised  []string       `json:"flags_raised"`
+		DecidedBy    *string        `json:"decided_by"`
+		DecidedAt    *string        `json:"decided_at"`
+		FinalPayload map[string]any `json:"final_payload"`
+	}{p.ID, p.Thread, p.Operation, orEmptyObject(p.Payload),
+		nullable(p.ProposedBy), p.Surface, p.Status, p.CreatedAt, flags,
+		nullable(p.DecidedBy), nullable(p.DecidedAt), p.FinalPayload})
+}
+
+// nullable is the empty string as None, for a field the Python declares
+// Optional.
+func nullable(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
 // Cond is one condition in the query grammar: either an equality, the "*"
 // present-and-not-empty form, or a range. kernel/contracts.py owns the
 // grammar; this is the Go spelling of what adapters/local/store.py._where
@@ -185,6 +241,12 @@ type Store interface {
 	Proposals(thread, status string) ([]Proposal, error)
 	AppendAudit(r AuditRecord) error
 	Audit(thread string) ([]AuditRecord, error)
+
+	Proposal(id string) (*Proposal, bool, error)
+
+	// The fourteenth. Select without the NULL flattening, for the one row
+	// that goes on the wire; see the method.
+	SelectNullable(resource string, thread *string, where Query, fields []string, limit int) ([]map[string]any, error)
 
 	// The eleventh. kernel/directory.py calls it; the protocol in
 	// kernel/contracts.py never declares it, and scripts/check_queues.py pins
@@ -432,6 +494,41 @@ func (s *SQLite) Select(resource string, thread *string, q Query, fields []strin
 	}
 	defer rows.Close()
 	return scanRows(rows)
+}
+
+// SelectNullable is Select with the NULLs kept rather than flattened to "".
+//
+// THE FOURTEENTH METHOD, and the fourth the protocol does not declare. It
+// exists for one caller: a thread's `subject` goes out over HTTP, and
+// adapters/local/store.py's select() answers None for an unfilled column
+// while scanRows here answers "". Those are different facts to a renderer
+// drawing "no ABHA number yet", so the lossy read stays for everything
+// internal and this is what the wire gets.
+func (s *SQLite) SelectNullable(resource string, thread *string, q Query, fields []string, limit int) ([]map[string]any, error) {
+	name, err := table(resource)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range fields {
+		if !hasColumn(resource, f) {
+			return nil, fmt.Errorf("%s has no field %q", resource, f)
+		}
+	}
+	clause, params, err := s.where(resource, thread, q)
+	if err != nil {
+		return nil, err
+	}
+	cols := "*"
+	if len(fields) > 0 {
+		cols = strings.Join(fields, ", ")
+	}
+	stmt := fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY created_date, id LIMIT ?", cols, name, clause)
+	rows, err := s.db.Query(stmt, append(params, limit)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanNullableRows(rows)
 }
 
 // Threads is the Store protocol's threads: every encounter in scope, newest
@@ -754,15 +851,37 @@ func (s *SQLite) PutProposal(p Proposal) error {
 // The tiebreak is rowid and not id, for the reason the Python's audit()
 // docstring gives: created_at is ISO 8601 to the second, so two proposals on
 // one thread inside the same second tie, and id is random hex.
+// Proposal is one proposal by id, and whether it was found. api/main.py's
+// proposal_or_404 calls it, and confirm's first refusal is built on it: an id
+// propose never issued is a 404, not a write.
+//
+// THE THIRTEENTH METHOD, and the third one the protocol does not declare.
+// kernel/contracts.py's Store declares ten and this is not among them, yet
+// adapters/local/store.py serves it and api/main.py calls it. Same family as
+// contradiction 29 and the same treatment: declared here, named as what it
+// is, because this interface's rule is that it declares every method it
+// serves. scripts/check_queues.py pins the KERNEL's off-protocol calls at one
+// and stays right, because this caller is the service rather than the kernel.
+func (s *SQLite) Proposal(id string) (*Proposal, bool, error) {
+	found, err := s.proposalsWhere("id = ?", []any{id}, "")
+	if err != nil || len(found) == 0 {
+		return nil, false, err
+	}
+	return &found[0], true, nil
+}
+
 func (s *SQLite) Proposals(thread, status string) ([]Proposal, error) {
-	stmt := "SELECT * FROM proposal WHERE thread = ?"
+	clause := "thread = ?"
 	params := []any{thread}
 	if status != "" {
-		stmt += " AND status = ?"
+		clause += " AND status = ?"
 		params = append(params, status)
 	}
-	stmt += " ORDER BY created_at, rowid"
-	rows, err := s.db.Query(stmt, params...)
+	return s.proposalsWhere(clause, params, " ORDER BY created_at, rowid")
+}
+
+func (s *SQLite) proposalsWhere(clause string, params []any, order string) ([]Proposal, error) {
+	rows, err := s.db.Query("SELECT * FROM proposal WHERE "+clause+order, params...)
 	if err != nil {
 		return nil, err
 	}
