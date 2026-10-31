@@ -62,6 +62,13 @@ python3 scripts/check_rx.py
 # travels as narrative text into an ABDM document. The last of those is proved
 # rather than asserted; it was written down twice and did not exist.
 python3 scripts/check_codification.py
+# A consultation leaves as an NRCeS OPConsultRecord: the section placement is
+# the bundle's own declaration rather than three callers' guesses, every
+# section code is held against the file that recorded where it was read from,
+# and the seven honest consultations each publish. Which bundles were put
+# through the ABDM tier one structural validator, and what that does not
+# prove, is in the file's docstring rather than in a commit message.
+python3 scripts/check_op_bundle.py
 # How sure anybody was, on every coded thing rather than only on a diagnosis.
 # Every status literal an operation stores is held against the published FHIR
 # list R4 binds that element to; no projection chooses a clinical certainty
