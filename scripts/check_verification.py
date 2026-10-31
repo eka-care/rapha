@@ -454,11 +454,11 @@ decision = proposals.commit(
              "diagnosis": DIAGNOSES}, caps=CAPS, actor=A_DOCTOR)
 assert decision, decision.reason
 
-doc = fhir.document(store, thread,
-                    profile="OPConsultRecord",
-                    sections_wanted={"ChiefComplaints": [("condition", {})],
-                                     "MedicalHistory": [("notes", {})]},
-                    now=NOW)
+# The placement is the bundle's declaration. It was typed here, and typed
+# differently in scripts/check_codification.py: a diagnosis went under Chief
+# complaints in one and the note under Medical History, which is one visit
+# filed two ways by two files that both looked right.
+doc = fhir.document(store, thread, now=NOW, **BUNDLE.documents["consultation"])
 BY_CODE = {e["resource"]["code"]["coding"][0]["code"]: e["resource"]
            for e in doc["entry"] if e["resource"]["resourceType"] == "Condition"}
 assert len(BY_CODE) == 3, sorted(BY_CODE)

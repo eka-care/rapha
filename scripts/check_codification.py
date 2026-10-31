@@ -347,10 +347,11 @@ assert "dengue" in notes[0]["text"].lower(), notes[0]["text"]
 ok("the finding this build cannot code is in the note, in the doctor's own "
    "words, attributed to the doctor")
 
-SECTIONS = {"MedicalHistory": [("condition", {})],
-            "DocumentReference": [("notes", {})]}
-doc = fhir.document(store, thread, profile="OPConsultRecord",
-                    sections_wanted=SECTIONS, now=NOW)
+# Where a row goes in a published document is the bundle's declaration, not
+# this file's choice. It was typed here, and typed differently in
+# scripts/check_verification.py, which is one visit filed two ways.
+CONSULTATION = BUNDLE.documents["consultation"]
+doc = fhir.document(store, thread, now=NOW, **CONSULTATION)
 kinds = [e["resource"]["resourceType"] for e in doc["entry"]]
 assert kinds[0] == "Composition", kinds
 assert "DocumentReference" in kinds and "Condition" in kinds, kinds
@@ -424,8 +425,7 @@ assert proposals.commit(bare, BUNDLE, "phc.op.consult-document",
                         caps=CAPS, actor=A_DOCTOR)
 assert bare.select("condition", thread=bare_thread, where={}, fields=[],
                    limit=5) == [], "this consultation coded nothing"
-only_words = fhir.document(bare, bare_thread, profile="OPConsultRecord",
-                           sections_wanted=SECTIONS, now=NOW)
+only_words = fhir.document(bare, bare_thread, now=NOW, **CONSULTATION)
 kinds = [e["resource"]["resourceType"] for e in only_words["entry"]]
 assert kinds.count("DocumentReference") == 1 and "Condition" not in kinds, kinds
 assert len(only_words["entry"][0]["resource"]["section"]) == 1, \
@@ -446,8 +446,7 @@ assert proposals.commit(empty, BUNDLE, "phc.op.patient-register",
 empty.write("notes", {"text": "   ", "created_by": A_DOCTOR,
                       "created_date": NOW}, thread=empty_thread)
 try:
-    fhir.document(empty, empty_thread, profile="OPConsultRecord",
-                  sections_wanted={"DocumentReference": [("notes", {})]}, now=NOW)
+    fhir.document(empty, empty_thread, now=NOW, **CONSULTATION)
 except KeyError as broke:
     assert "nothing to put in" in str(broke), broke
     ok("an empty narrative row publishes nothing, rather than an attachment "
