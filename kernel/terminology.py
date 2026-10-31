@@ -207,6 +207,9 @@ class Terminology(Protocol):
     def concepts(self, valueset: str) -> dict: ...
     # The cached concepts by code, for the facts a Coding has no field for.
 
+    def tags(self, valueset: str) -> Sequence[str]: ...
+    # The ontology semantic tags this value set's concepts carry, or empty.
+
     def expand(self, valueset: str, query: str, count: int) -> Sequence[Coding]: ...
 
     def bound(self, valueset: str, code: str) -> Coding: ...
@@ -263,6 +266,21 @@ class CachedTerminology:
         """The cached concepts behind a value set, by code. Read only: a copy,
         so a caller cannot edit the cache through it."""
         return {k: dict(v) for k, v in self._load(valueset)["concepts"].items()}
+
+    def tags(self, valueset):
+        """The ontology semantic tags this value set's concepts carry.
+
+        Declared in the file, under `semantic_tags`, beside the sentence that
+        says what was confirmed and what was not. Empty for a value set that
+        is not a branch of an ontology with semantic tags, which is every one
+        here that is not SNOMED: a UCUM symbol and a FHIR status code have no
+        semantic tag and never will.
+
+        Read here rather than in `kernel/codification.py` for the ordinary
+        reason: what the categories of a code system are called is the
+        terminology's business, and no engine module may type one.
+        """
+        return list(self._load(valueset).get("semantic_tags") or [])
 
     def expand(self, valueset, query="", count=20):
         blob = self._load(valueset)
