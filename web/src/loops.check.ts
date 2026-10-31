@@ -9,8 +9,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  cue, derivedStates, filterOptions, filterRows, keep, mine, offered, opensOnArrival,
-  records, RISK_TONE, sortOptions, sortRows, weigh,
+  carriedInto, cue, derivedStates, filterOptions, filterRows, keep, mine, offered,
+  opensOnArrival, records, RISK_TONE, sortOptions, sortRows, weigh,
 } from "./loops.ts";
 import type { Operation, QueueRow, SectionResult, ViewDecl } from "./types";
 
@@ -249,6 +249,50 @@ for (const wf of Object.values(cat.workflows ?? {}) as { states?: Record<string,
   ok(used.includes(RISK_TONE), "some declared view gives a flag the tone that means risk");
   ok(used.some((t) => t !== RISK_TONE),
      "and some flag has a quieter tone, so the queue is not all red");
+}
+
+// -- what one commit hands the next panel, and what it must never hand it ---
+//
+// A registration runs the ABHA journey and the journey hands back a national
+// identifier that registration itself does not write. Until this existed the
+// screen dropped it, and the clerk who opened the link panel next was shown
+// the journey again: a second one time password, to a handset the patient may
+// not be carrying, for a number the screen had been holding for minutes.
+//
+// Every case below is a property about somebody's permanent record, so none
+// of them is a text assertion. The function is run.
+{
+  const identifier = { abha_number: "12-3456-7890-1234" };
+  const asksForIt = [{ link_id: "abha_number" }, { link_id: "method" }];
+  const doesNot = [{ link_id: "systolic" }, { link_id: "diastolic" }];
+  const held = { thread: "enc-1", payload: identifier };
+
+  ok(JSON.stringify(carriedInto(held, "enc-1", asksForIt)) === JSON.stringify(identifier),
+     "the operation that asks for the identifier is given it, so nobody spends a second OTP");
+
+  // THE ONE THAT IS ABOUT A PERSON AND NOT ABOUT TIDINESS. Nothing merges two
+  // ABHA numbers; a patient carries that mistake permanently.
+  ok(carriedInto(held, "enc-2", asksForIt) === undefined,
+     "a value learned on one visit is NEVER offered on another patient's form");
+
+  ok(carriedInto(held, "enc-1", doesNot) === undefined,
+     "an operation that does not ask for it is not told; a payload key a form " +
+     "has no question for is a commit the kernel refuses");
+  ok(carriedInto(null, "enc-1", asksForIt) === undefined,
+     "nothing learned yet seeds nothing");
+
+  // An empty object is not the same answer as nothing. A seed, even an empty
+  // one, tells the panel this person has already been identified and
+  // suppresses the journey that is the only way to identify them.
+  ok(carriedInto({ thread: "enc-1", payload: {} }, "enc-1", asksForIt) === undefined,
+     "an empty seed is undefined, not {}, or the journey is suppressed with " +
+     "nothing to have suppressed it");
+
+  // Only the keys the form asks for travel, even when more was learned.
+  const extra = { thread: "enc-1", payload: { ...identifier, consent_given: true } };
+  ok(Object.keys(carriedInto(extra, "enc-1", [{ link_id: "abha_number" }]) ?? {}).join() === "abha_number",
+     "only what this form asks for travels; a consent is a person saying yes " +
+     "and is never carried from one screen to another");
 }
 
 console.log(`ok   ${checks} loop checks`);

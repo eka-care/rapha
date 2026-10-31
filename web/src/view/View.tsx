@@ -8,7 +8,7 @@
 import { Lotus } from "../abha/Lotus";
 import { ABHA_LINKED } from "../abha/sdk";
 import { Icon } from "../icons";
-import { displayFor, questionFor } from "../declarations";
+import { displayFor } from "../declarations";
 import { derivedStates, labelColumns, RISK_TONE } from "../loops";
 import { clock } from "../messages";
 import type {
@@ -31,7 +31,7 @@ export function View({ result, decl, workflow, onOpenThread }: {
         rows={(result.rows ?? []) as QueueRow[]}
         decl={decl}
         derived={derivedStates(workflow)}
-        labelCols={labelColumns(decl, questionFor)}
+        labelCols={labelColumns(decl)}
         onOpenThread={onOpenThread}
       />
     );
@@ -90,9 +90,8 @@ function labels(row: QueueRow, derived: Set<string>): { flag: string; risk: bool
 
 function Queue({ rows, decl, derived, labelCols, onOpenThread }: {
   rows: QueueRow[]; decl?: ViewDecl; derived: Set<string>;
-  /** The declared columns drawn as labels rather than as details. Which ones
-   *  those are is loops.labelColumns's answer, read off the questions the
-   *  kernel sent; this file is told nothing about what any of them means. */
+  /** The columns the VIEW declared as labels. This file is told which they
+   *  are and nothing about what any of them means. */
   labelCols: string[];
   onOpenThread?: (t: string) => void;
 }) {

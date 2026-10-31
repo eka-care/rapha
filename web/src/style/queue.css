@@ -79,7 +79,13 @@
 
 /* ----------------------------------------------------------------- the rows */
 
-.qlist { display: grid; gap: 2px; }
+/* Capped at a readable measure rather than run to the width of a monitor.
+   The mockup pushes the labels to the right of the ROW, and its row is a
+   column you can read across; on a 1440px screen the same rule put a name at
+   the far left and its own programme pill most of a screen away, which is two
+   things on one line pretending to be one. The chips above stay full width,
+   because a strip of chips is scanned and not read. */
+.qlist { display: grid; gap: 2px; max-width: 940px; }
 
 /* Phone first: the number and the time hold the top line with the name, and
    the labels take the line underneath. The name therefore never competes with

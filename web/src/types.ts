@@ -118,6 +118,18 @@ export type ViewDecl = {
    *  guess at a subject's shape. `/facility` sends a short form of a view
    *  without them; `/catalogue` sends them. */
   columns?: string[];
+  /** Which of those columns are LABELS rather than details: drawn as a pill
+   *  on the row and given a filter chip, instead of going into the line of
+   *  text under the name. A subset of `columns`, and the declaration lint
+   *  refuses a label this view does not carry.
+   *
+   *  It has to be said rather than worked out. This renderer draws a health
+   *  centre's line and a laboratory's bench from the same file and may not
+   *  know that one of the six columns is a national programme; it was briefly
+   *  inferred from whether the question that collects the answer was an
+   *  optional closed choice, which happened to pick the right column in this
+   *  bundle and would have picked a second one the moment another was added. */
+  labels?: string[];
   badges?: Record<string, string>;
   workflow?: string | null;
   group_by?: string | null;

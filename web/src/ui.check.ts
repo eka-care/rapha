@@ -471,51 +471,48 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
     .map((r) => r.selector);
   assert.deepEqual(hidden, [],
     "the number, the name or the risk label is hidden at some width: " + hidden.join(", "));
-  ok("queue: chips scroll in one line, every target is 44px, and nothing hides on hover");
+  // The line is read across: a name and its own labels have to stay within a
+  // measure a person can take in. Unbounded, a 1440px window put most of a
+  // screen between them.
+  const measure = /max-width:\s*(\d+)px/.exec(base(".qlist"));
+  assert.ok(measure, ".qlist runs to the full width of whatever window it is in");
+  assert.ok(Number(measure![1]) <= 1100,
+    `.qlist is capped at ${measure![1]}px, which is wider than a row can be read across`);
+  ok("queue: chips scroll in one line, every target is 44px, nothing hides on hover, and the row keeps a measure");
 
   // -- the programme ------------------------------------------------------
   //
   // The mockup draws the patient's programme as a monochrome pill and gives
-  // it a filter chip, and the view now declares the column it comes from. The
-  // whole difficulty is that the view declares SIX columns and says which is
-  // which about none of them: it does not say "category is the programme",
-  // and it must not have to, because the renderer may not learn that word.
+  // it a filter chip. Which column that is, is the VIEW's own answer: it
+  // declares `labels:` beside `columns:`, and the renderer draws exactly
+  // those and asks nothing.
   //
-  // So the distinction is read off the question that collects the answer: a
-  // column whose question offers a closed set and does not require one is an
-  // enrolment a person may not have, and everything else describes them.
-  // Both halves are asserted here against the COMPILED questionnaires, so a
-  // bundle that changes its mind fails this rather than quietly losing the
-  // pill.
-  const loopsSrc = loops;
-  assert.match(loopsSrc, /if \(!q \|\| q\.required\) return false;/,
-    "a REQUIRED column is a description of a person, not a programme they may not be on");
-  assert.match(loopsSrc, /!!q\.answer_option\?\.length \|\| !!q\.answer_value_set/,
-    "and a label column's answers are a closed set, or the chips are one per village");
-  assert.match(view, /labelColumns\(decl, questionFor\)/,
-    "the row asks the rule, rather than deciding for itself which column is a label");
-  assert.match(list, /labelColumns\(decl, questionFor\)/, "and so do the chips");
+  // This was briefly inferred instead, from whether the question collecting
+  // the answer was an optional closed choice. It picked the right column in
+  // this bundle and would have picked a second one the moment another was
+  // declared. The guess is gone and so is the check that exercised it: a
+  // check for a rule nothing uses reads like cover.
+  assert.match(loops, /\(decl\?\.labels \?\? \[\]\)\.filter\(\(label\) => columns\.includes\(label\)\)/,
+    "the labels are the view's own, intersected with the columns it carries, " +
+    "and not worked out from anything");
+  assert.ok(!/required|answer_option|answer_value_set/.test(loops),
+    "loops.ts is still asking a questionnaire what a column means; the view says it now");
+  assert.match(view, /labelColumns\(decl\)/,
+    "the row asks the view, rather than deciding for itself which column is a label");
+  assert.match(list, /labelColumns\(decl\)/, "and so do the chips");
 
-  // Run the rule over the real declarations. This is the half a text check
-  // cannot do: it says the rule PICKS something out of this bundle, so a
-  // change that made it match nothing would fail here rather than render an
-  // empty region that looks deliberate.
-  const queueDecl = (catalogue.views ?? {})["phc.view.station-queue"] as { columns?: string[] };
-  const asked: Record<string, { required?: boolean; answer_option?: unknown[]; answer_value_set?: string }> = {};
-  for (const file of readdirSync(join(ROOT, "questionnaires"))) {
-    if (!file.endsWith(".json")) continue;
-    const form = JSON.parse(readFileSync(join(ROOT, "questionnaires", file), "utf8"));
-    for (const q of form.questions ?? []) asked[q.link_id] ??= q;
-  }
-  const picked = (queueDecl?.columns ?? []).filter((c) => {
-    const q = asked[c];
-    return q && !q.required && (!!(q.answer_option as unknown[])?.length || !!q.answer_value_set);
-  });
-  assert.equal(picked.length, 1,
-    "the label rule picks exactly one of this queue's declared columns; it picked " +
-    picked.length + " (" + picked.join(", ") + "). More than one and the row grows a " +
-    "pill nobody asked for; none and the programme the view was changed to carry " +
-    "never reaches a screen.");
+  // The declaration this bundle actually ships has to survive the trip: a
+  // label naming a column the view does not carry is refused by the
+  // declaration lint, so what reaches a screen is a real subset.
+  const queueDecl = (catalogue.views ?? {})["phc.view.station-queue"] as
+    { columns?: string[]; labels?: string[] };
+  assert.ok((queueDecl?.labels ?? []).length > 0,
+    "this bundle's queue declares no labels at all, so the programme the view " +
+    "was changed to carry never reaches a screen");
+  const stray = (queueDecl.labels ?? []).filter((l) => !(queueDecl.columns ?? []).includes(l));
+  assert.deepEqual(stray, [],
+    "a declared label names a column this view does not carry, so the row " +
+    "would draw a pill off a field no row has: " + stray.join(", "));
 
   // A word must not appear on the row twice: once as a pill and again in the
   // line underneath. That is the bug the detail line had the moment the sixth
@@ -524,13 +521,12 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
     "a label column is kept out of the detail line, or the row says the same word twice");
 
   // And the pill carries no colour. Red means a clinician should look sooner;
-  // a programme is not a risk. rules(queueCss) above already forbids the
-  // critical ink outside a `risk` selector, which covers the chip too.
+  // a programme is not a risk.
   const progChip = rules(queueCss).find((r) => r.selector === ".qtab.prog")?.body ?? "";
   assert.ok(progChip, ".qtab.prog is not styled, so a programme chip is indistinguishable from a station");
   assert.ok(!/--color-critical|--color-success|--color-warning/.test(progChip),
     "a programme chip carries a status colour, and a programme is not a status");
-  ok("queue: the programme is drawn from a declared column the rule picks, monochrome, once per row");
+  ok("queue: the pills are the columns the view declared as labels, monochrome, once per row");
 
   // -- the counts ----------------------------------------------------------
   //
@@ -549,6 +545,36 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.ok(!/result\.groups/.test(list),
     "the chips do not read the kernel's groups, which are one grouping and not these");
   ok("queue: every chip carries a count, computed from the rows in hand");
+
+  // -- and the screen is actually asking -----------------------------------
+  //
+  // loops.carriedInto is run against its own cases elsewhere. A correct rule
+  // nothing calls is the same bug one indirection further away, so: the
+  // encounter has to KEEP what a commit handed up, and every way of opening a
+  // panel has to go through the rule. Two call sites, and a second one added
+  // later without the seed would silently cost a patient an OTP again.
+  const enc = code(readFileSync(join(SRC, "screens", "Encounter.tsx"), "utf8"));
+  assert.match(enc, /onDone=\{\(got\) => \{\s*if \(got\) setCarried\(\{ thread: thread\.id, payload: got \}\)/,
+    "the encounter drops what the panel handed up, so the identifier a journey " +
+    "produced is lost and the next panel asks for a second one time password");
+  assert.match(enc, /carriedInto\(carried, thread\.id, walk\(questionnaire\(op\.input\)\?\.questions \?\? \[\]\)\)/,
+    "the encounter decides for itself what to carry instead of asking the rule");
+  // `op[,}]` was the first spelling of this and it counted NOTHING in the one
+  // case that matters: `setModal({ op })` puts a space between the name and
+  // the brace, so the unseeded call the check exists to find was the one
+  // shape it could not see, and the mutation that removed a seed passed. Any
+  // word boundary after `op` now, and the two counts are compared rather than
+  // either being trusted alone.
+  const opens = [...enc.matchAll(/setModal\(\{\s*op\b/g)].length;
+  const seeded = [...enc.matchAll(/setModal\(\{ op, seed: carry\(op\) \}\)/g)].length;
+  assert.ok(opens >= 2,
+    `this check found ${opens} ways to open a panel and there are at least two; ` +
+    "it is matching the wrong shape and would pass whatever the screen did");
+  assert.equal(seeded, opens,
+    `${opens - seeded} of ${opens} ways to open a panel do not carry what an ` +
+    "earlier commit learned, so which one costs an extra one time password " +
+    "depends on which button was pressed");
+  ok("thread: what a commit learned reaches the next panel that asks for it, by every route");
 }
 
 console.log(`\n${checks} checks passed`);

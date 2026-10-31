@@ -5,7 +5,7 @@
  *  disabled. So everything here is a question of weight, not permission.
  */
 
-import type { Operation, Question, QueueRow, SectionResult, ViewDecl, Workflow } from "./types";
+import type { Operation, QueueRow, SectionResult, ViewDecl, Workflow } from "./types";
 
 /** One filled button, everything else one level down.
  *
@@ -187,46 +187,73 @@ export function sortRows(rows: QueueRow[], key: SortKey, decl: Pick<ViewDecl, "c
   return key === "recent" ? sorted.reverse() : sorted;
 }
 
-/** Which of a view's declared columns are LABELS rather than details.
+/** What an earlier commit on a thread hands to the next panel opened on it.
  *
- *  A queue row draws most of its columns as a line of text under the name --
- *  who the person is -- and the mockup draws one of them as a pill on the
- *  right: the programme they are enrolled in. The view declares the columns
- *  and says nothing about which is which, so the distinction has to come from
- *  somewhere, and the only honest source is the form that collects the
- *  answer.
+ *  One thing does this today and it is the expensive one. A registration runs
+ *  the ABHA journey; the journey hands back a national identifier that
+ *  registration itself does not write, because the link operation does. The
+ *  panel produced it and handed it up, and the screen above dropped it, so
+ *  the clerk who opened the link panel next was shown the journey again and
+ *  the patient was asked to read a SECOND one time password off a handset to
+ *  say a number the screen had been holding for minutes. That is the cost the
+ *  whole front desk exists to remove, and it was being paid one screen later.
  *
- *  The rule, and what it rests on. A column is a label when its question
- *  offers a CLOSED set of answers and does not REQUIRE one. Both halves
- *  matter and both are the declaration's own words:
+ *  Two guards, and both are about somebody else's record rather than tidiness.
  *
- *    - Closed, because a filter chip over free text is a chip per village,
- *      and a line nobody can filter is a line nobody reads.
- *    - Not required, because that is how a declaration says a person may not
- *      have one. Everybody has a name, an age, a sex and a village, and those
- *      are required; nobody is obliged to be on a programme. An enrolment you
- *      may not have is not a description of you, and that is exactly the
- *      difference between a pill and a line of text.
+ *  THE THREAD. A value learned on one visit is offered only on that visit.
+ *  The screen holding it is not keyed by thread id, so walking from one
+ *  patient to the next reuses it, and an identifier kept loose would seed the
+ *  next person's form. One patient's ABHA number on another patient's record
+ *  is the anti-goal in the spec: nothing merges two, and the patient carries
+ *  the mistake permanently.
  *
- *  So this renderer still learns nothing about what the programmes ARE, or
- *  even that the column is a programme. It is told that one column is
- *  optional and closed, and it draws optional closed things as labels.
+ *  THE QUESTIONS. Filtered against the questionnaire the panel is about to
+ *  open rather than handed over whole, so the operation that ASKS for an
+ *  identifier gets it and the rest are not told. A payload key a form does
+ *  not ask for is a commit the kernel refuses, and nothing here may decide
+ *  which operation wants what.
  *
- *  THE COST, NAMED. A bundle that made its programme required would lose the
- *  pill and get a word in the detail line instead, and a bundle that added a
- *  second optional closed column would get a second pill without asking. The
- *  alternative was a view saying which of its columns are labels, which is a
- *  declaration that does not exist; this reads one that does.
+ *  Nothing is returned rather than an empty object, because an empty seed is
+ *  still a seed: it would tell the panel this person had already been
+ *  identified and suppress the journey that is the only way to identify them.
+ *  See abha/sdk.ts's runsJourney.
  */
-export function labelColumns(
-  decl: Pick<ViewDecl, "columns"> | undefined,
-  ask: (linkId: string) => Pick<Question, "required" | "answer_option" | "answer_value_set"> | null,
-): string[] {
-  return (decl?.columns ?? []).filter((column) => {
-    const q = ask(column);
-    if (!q || q.required) return false;
-    return !!q.answer_option?.length || !!q.answer_value_set;
-  });
+export function carriedInto(
+  carried: { thread: string; payload: Record<string, unknown> } | null,
+  thread: string,
+  questions: { link_id: string }[],
+): Record<string, unknown> | undefined {
+  if (!carried || carried.thread !== thread) return undefined;
+  const asks = new Set(questions.map((q) => q.link_id));
+  const useful = Object.entries(carried.payload).filter(([id]) => asks.has(id));
+  return useful.length ? Object.fromEntries(useful) : undefined;
+}
+
+/** Which of a view's columns are LABELS rather than details.
+ *
+ *  The view's own answer, and nothing worked out. A label is drawn as a pill
+ *  on the row and earns a filter chip; everything else goes into the line of
+ *  text under the name.
+ *
+ *  THIS USED TO BE A GUESS AND IT IS WORTH SAYING WHAT THE GUESS WAS, because
+ *  it was a good one and still wrong. A column whose question offered a
+ *  closed set of answers and did not require one was taken to be something a
+ *  person may or may not have, and therefore a label. That picked exactly the
+ *  right column in this bundle. It would have picked a second one the moment
+ *  a bundle declared another optional choice, and lost the pill entirely if a
+ *  centre made its programme compulsory -- neither of which anybody would
+ *  have been told about. The view says it outright now.
+ *
+ *  Intersected with `columns`, because a label is a column drawn differently
+ *  and not a second source of fields. The declaration lint refuses a label
+ *  naming a column the view does not carry, so this intersection should never
+ *  remove anything; it is here so that a renderer reading an older or
+ *  hand-edited catalogue draws fewer pills rather than reaching for a field
+ *  no row has.
+ */
+export function labelColumns(decl: Pick<ViewDecl, "columns" | "labels"> | undefined): string[] {
+  const columns = decl?.columns ?? [];
+  return (decl?.labels ?? []).filter((label) => columns.includes(label));
 }
 
 export type Filter = { flag: string } | { station: string } | { column: string; value: string } | null;

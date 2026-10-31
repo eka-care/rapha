@@ -3,7 +3,7 @@
  *  filter, sort and search are held per view for the session.
  */
 import { useMemo, useState } from "react";
-import { displayFor, questionFor } from "../declarations";
+import { displayFor } from "../declarations";
 import {
   filterOptions, filterRows, labelColumns, RISK_TONE, sortOptions, sortRows,
   type Filter, type SortKey,
@@ -48,7 +48,7 @@ export function ListScreen({ result, decl, workflow, onOpenThread }: {
    *  means clinical risk is allowed to carry colour. */
   const tabs = useMemo(() => {
     if (!isQueue) return [];
-    const { flags, stations, labels } = filterOptions(decl, rows, labelColumns(decl, questionFor));
+    const { flags, stations, labels } = filterOptions(decl, rows, labelColumns(decl));
     const made: { label: string; filter: Filter; n: number; risk?: boolean; prog?: boolean; sep?: boolean }[] = [
       { label: "All", filter: null, n: rows.length },
     ];

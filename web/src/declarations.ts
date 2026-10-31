@@ -81,17 +81,15 @@ export async function load(source: Source): Promise<{ forms: number; sets: numbe
 
 /** The first declared question anywhere that asks for this answer.
  *
- *  A queue view names its columns and says nothing about what any of them IS.
- *  The questionnaires do: the same `link_id` is a question somewhere, with a
- *  type, an option list and a `required`. So a screen that needs to know
- *  whether a column is a description of a person or an enrolment they may not
- *  have asks the form that collects it, rather than being told here.
+ *  Only `displayFor` below needs it, so it is not exported: a view says which
+ *  of its columns are labels, and nothing has to ask a questionnaire what a
+ *  column means any more.
  *
  *  First match wins across the forms. Two forms that ask for the same answer
  *  in two different shapes is a bundle contradicting itself, and picking one
  *  of them is a better failure than refusing to draw.
  */
-export function questionFor(linkId: string): Question | null {
+function questionFor(linkId: string): Question | null {
   for (const form of Object.values(forms)) {
     const found = walk(form.questions ?? []).find((q) => q.link_id === linkId);
     if (found) return found;

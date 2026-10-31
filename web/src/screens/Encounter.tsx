@@ -14,8 +14,9 @@ import { threadAsks } from "../agent";
 import type { Client } from "../api";
 import { OperationPanel } from "../form/Panel";
 import { questionnaire } from "../declarations";
+import { walk } from "../validate";
 import { Icon } from "../icons";
-import { weigh } from "../loops";
+import { carriedInto, weigh } from "../loops";
 import { agentLine, header, messages, queueViewFor, valuesOf, type Ctx, type Said } from "../messages";
 import type { Catalogue, Operation, Payload, ThreadView } from "../types";
 import { Composer } from "../thread/Composer";
@@ -48,6 +49,25 @@ export function Encounter({
   onOpenSubject: (subjectId: string) => void;
 }) {
   const [modal, setModal] = useState<{ op: Operation; seed?: Payload } | null>(null);
+  /** What a commit on this screen learned that a LATER panel will be asked
+   *  for again.
+   *
+   *  One thing does this today and it is the expensive one. A registration
+   *  runs the ABHA journey, and the journey hands back an identifier that
+   *  registration itself does not write -- the link operation does. Until now
+   *  the panel produced it, handed it up, and this screen dropped it on the
+   *  floor, so the clerk who opened the link panel next was shown the journey
+   *  again and the patient was asked to read a second one time password off a
+   *  handset to say a number the screen had held minutes earlier. That is the
+   *  exact cost the front desk exists to remove.
+   *
+   *  Kept with the thread it was learned on. This component is not keyed by
+   *  thread id, so walking from one visit to another reuses the instance, and
+   *  an identifier kept loose would be offered to the next patient's form.
+   *  One person's national health number on another person's record is not a
+   *  typo, it is the anti-goal: nothing merges two ABHA numbers and the
+   *  patient carries the mistake permanently. */
+  const [carried, setCarried] = useState<{ thread: string; payload: Payload } | null>(null);
   const [scribing, setScribing] = useState(false);
   const [drafts, setDrafts] = useState<Opened[]>([]);
   // The microphone is gated on the scribe instrument's own `requires:`, not a
@@ -57,6 +77,12 @@ export function Encounter({
     .map((i) => i as { kind?: string; requires?: string })
     .find((i) => i.kind === "scribe")?.requires;
   const consented = !consentFlag || (thread.flags ?? []).includes(consentFlag);
+
+  /** The rule itself is loops.carriedInto, where a check can run it: the
+   *  guard that keeps one patient's identifier off another patient's form is
+   *  not something to leave as an expression nothing can execute. */
+  const carry = (op: Operation): Payload | undefined =>
+    carriedInto(carried, thread.id, walk(questionnaire(op.input)?.questions ?? [])) as Payload | undefined;
 
   const head = useMemo(() => header(thread, queueViewFor(cat, thread.workflow)), [thread, cat]);
   const msgs = useMemo(() => messages(thread, ctx, said), [thread, ctx, said]);
@@ -117,7 +143,7 @@ export function Encounter({
                         <button
                           className={`prop${i === 0 ? " primary" : ""}`}
                           key={op.id}
-                          onClick={() => setModal({ op })}
+                          onClick={() => setModal({ op, seed: carry(op) })}
                         >
                           <Icon name={op.irreversibility === "irreversible" ? "lock" : "refer"} className="i sm" />
                           <span className="p-b">
@@ -167,7 +193,7 @@ export function Encounter({
           roles={Object.keys(cat.bundles ?? {})}
           asking={asking}
           onSay={onSay}
-          onAction={(op) => setModal({ op })}
+          onAction={(op) => setModal({ op, seed: carry(op) })}
           onStartScribe={() => setScribing(true)}
           micReason={consented ? undefined : "Capture consent is not recorded on this visit"}
           quick={
@@ -232,7 +258,11 @@ export function Encounter({
           <OperationPanel
             op={modal.op} thread={thread.id} client={client}
             instruments={cat.instruments} flags={thread.flags} seed={modal.seed}
-            onDone={() => { setModal(null); onChanged(); }}
+            onDone={(got) => {
+              if (got) setCarried({ thread: thread.id, payload: got });
+              setModal(null);
+              onChanged();
+            }}
             onCancel={() => setModal(null)}
           />
         </>
