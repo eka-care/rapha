@@ -277,23 +277,45 @@ confirmation is dead on arrival in an OPD. The rule:
       and binding an answer is a different mechanism from switching a type.
       Check: `scripts/check_vitals.py`, and the tier one validation recorded in
       `docs/superpowers/plans/2026-10-31-application-architecture.md` section 3.
-- [ ] **4. Replace `structured` with repeating groups** for diagnosis,
-      medications, investigations and dispense, per the table in 4. Check: a
-      repeat whose coding is outside its bound valueset is refused. Mutation:
-      bind diagnosis to the observation valueset instead and confirm FAIL.
-      **The binding half of this step is already built**, 2026-10-31:
-      `answer_value_set` works, resolves at write time through the one
-      validating constructor, and has three mapping sources and twenty nine
-      checks behind it, driven by the laboratory result's analyte. What is
-      left is the repeating group itself, which is the part that turns one
-      repeat into one resource. A repeat's bound coding uses the form that now
-      exists rather than needing a new one.
+- [x] **4. Replace `structured` with repeating groups.** Done 2026-10-31 for
+      **two of the four**: diagnosis and medications. Investigations and
+      dispense are still `structured` and the reason is not effort, it is that
+      neither has a value set anybody could confirm: a test catalogue for
+      `investigations` needs the diagnostic list bound as codes rather than as
+      the free text it is now, and `dispenses` can reuse the medicine value
+      set only once that list is a signed formulary rather than a starter set.
+      Both are named in the ceilings below.
+      What was built: each repeat is a list of rows over sub questions the
+      questionnaire declares, validated per row by both validators, every
+      coded answer resolved per row through the one validating constructor,
+      one record row per group row with its author, and one FHIR resource per
+      row. `per_row` in the mapping grammar is the one new form; a repeat's
+      bound coding uses `answer_value_set`, which already existed.
+      Checks: `scripts/check_rx.py`, 31. Mutations: 29 of 29 caught, plus one
+      run by hand against the live server, which is the one the original
+      wording asked for in a sharper form. Binding a diagnosis to the wrong
+      value set is not the dangerous mutation, because both codes are real and
+      both displays read correctly; what the seeder refuses is a code outside
+      the SNOMED **branch** the question asks about, confirmed by the server
+      rather than by the file, and seeding a route of administration into the
+      diagnosis list fails the seed.
+      The defect this step actually fixed was not the free text. It was
+      `verification_status: {const: confirmed}` on every diagnosis row, which
+      is I6 inverted: a finding the patient denied was stored and published as
+      a confirmed diagnosis.
 - [ ] **5. Codification seam plus stub.** Check: the whole PHC flow passes with
       the stub returning nothing.
 - [ ] **6. Proposal and confirmation path.** I4 and I6 as checks. Mutation:
       make a suggestion commit without a person and confirm FAIL.
 - [ ] **7. Bundle seam for `OPConsultRecord`**, validated against the NRCES
-      profile.
+      profile. **Half built 2026-10-31**: the profile is in `kernel/fhir.py`
+      with its eight published section codes, the Condition and
+      MedicationRequest projections it needs, and a check that the Composition
+      fills every path the profile digest requires. What is NOT done is
+      validating a generated bundle against the NRCeS validator, the way the
+      WellnessRecord was: that is a tier one run and it has not been made.
+      Until it has, "validated against the NRCES profile" is not a claim this
+      step may make.
 - [ ] **8. Doctor templates**, assembled from the catalogue, only now.
 
 Steps 1 to 3 are the Monday path and need no terminology server. Steps 5 to 7
@@ -324,6 +346,28 @@ certification, though not Monday.
 
 ## 8. Known ceilings
 
+- **No diagnosis list.** `terminology/condition-code.json` holds three
+  clinical findings, which are the ones NRCeS's own OPConsultRecord example
+  publishes. No authoritative list of the conditions an Indian primary health
+  centre records was reachable, and a diagnosis list decides what a clinician
+  can say, so none was invented. Until a named clinical officer supplies one,
+  diagnosis coding is the degraded mode below and the doctor's fallback is the
+  assessment narrative.
+- **No formulary.** `terminology/medication-code.json` holds six medicines,
+  each marked P for primary level of healthcare in India's National List of
+  Essential Medicines 2022. The report publishes the level of care only in its
+  annexures of changes, so those six are what that document could be read to
+  confirm, not the whole primary level list. No dose limit, no indication and
+  no interaction is stated anywhere, and none may be inferred from the list.
+  This is also the sign-off the `rx.prescribe` capability's own qualifier has
+  been waiting for since it was declared.
+- **SNOMED displays are United States English.** Paracetamol is stored with
+  the display "Acetaminophen only product", because that is SNOMED
+  International's preferred term and the display comes from the terminology
+  rather than from a caller. The Indian preferred term needs the SNOMED CT
+  India extension, which needs the MLDS Affiliate License this project does
+  not hold. A picker reading "Acetaminophen" to an Indian prescriber is a
+  usability problem with a licence in front of it, not a code problem.
 - The local terminology cache cannot answer `expand` over a full SNOMED branch.
   Until a real server is behind the seam, diagnosis picking is limited to codes
   we have cached, and the doctor's fallback is narrative text. This is a
