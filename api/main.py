@@ -204,6 +204,12 @@ def facility(request: Request):
             # what the bundle declares.
             "facility": BUNDLE.facility,
             "withheld": dict(sorted(BUNDLE.withheld.items())),
+            # The same fact in the bundle's own words, so a screen can say
+            # which thing this centre does not run rather than printing a
+            # plugin id at a clinician. The role editor reads it: a switch for
+            # a withheld capability is disabled with this title in the
+            # sentence, instead of being offered and then refused by the guard.
+            "without": dict(BUNDLE.without),
             "capabilities": sorted(vocab.CAPABILITIES),
             "views": [{"id": v.id, "kind": v.kind, "title": v.title,
                        "capability": v.capability} for v in BUNDLE.views.values()],
@@ -381,6 +387,34 @@ def patient_publish(request: Request, body: dict = Body(default={})):
         limit=max(1, min(int(body.get("limit") or 50), 200)))
     return {"published": report.published, "failed": report.failed,
             "reachable": report.reachable, "count": report.count}
+
+
+@router.get("/questionnaires")
+def questionnaires(request: Request):
+    """Every form this bundle's operations ask, by the slug an operation names.
+
+    Until this route existed the renderer read questionnaires/*.json through a
+    build time glob, which made the forms the one part of the screen that was
+    not served by the kernel: a facility could not change a form without a
+    rebuild of the browser bundle, and src/declarations.ts said so in its own
+    docstring.
+
+    Not narrowed by the caller's capabilities, on purpose. A form is a
+    bundle's declaration and not a facility's choice, and the renderer labels
+    an OLD audit row with the questionnaire of whatever operation wrote it, so
+    a narrowed list would quietly lose the labels on a card a colleague left
+    behind. What a facility narrows is which operations it offers, which is
+    already subtracted once in caller() and reaches the screen as
+    thread.actions. The guard is the enforcement; this is only the words on a
+    label.
+    """
+    caller(request)
+    out = {}
+    for op in BUNDLE.operations.values():
+        slug = op.get("input")
+        if slug and slug not in out:
+            out[slug] = validate.load(slug)
+    return {"questionnaires": out}
 
 
 @router.get("/valuesets/{slug}")

@@ -129,6 +129,21 @@ def withheld(manifest, facility=None):
     return out
 
 
+def absent(manifest, facility=None):
+    """{plugin id: its declared title} for the plugins this facility does not
+    run, in declaration order.
+
+    The same fact as `withheld()` read from the other end, and the only reason
+    it exists separately is that a screen has to be able to SAY it. `withheld`
+    answers "which capability is gone"; this answers "what is the thing this
+    centre does not run", in the words the bundle chose for it, so a renderer
+    can explain a switch it has disabled without typing a plugin's name.
+    """
+    plugins = declared(manifest)
+    return {pid: plugins[pid].get("title") or pid
+            for pid in off(manifest, facility)}
+
+
 def effective(caps, held_back):
     """`caps` minus what this facility withholds, order preserved.
 

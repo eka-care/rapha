@@ -81,6 +81,10 @@ class Bundle:
     # declares no facilities, which is what keeps bundles/lab untouched.
     facility: Optional[str] = None
     withheld: dict = dataclasses.field(default_factory=dict)
+    # The same fact in the words a person reads: {plugin id: its declared
+    # title} for what this centre does not run. Served at GET /facility so a
+    # screen can explain a switch it has disabled. See kernel/plugins.absent.
+    without: dict = dataclasses.field(default_factory=dict)
 
     def workflow(self, wid: Optional[str] = None) -> c.Workflow:
         if wid is None:
@@ -680,7 +684,8 @@ def load(bundle_id="phc", catalogue=None, facility=None):
         workflows=workflows, views=views, instruments=instruments, metrics=metrics,
         seed=seed, scribe=dict(manifest.get("scribe") or {}),
         documents=_documents(manifest), instruments_raw=raw_instruments,
-        facility=plugins.chosen(manifest, facility), withheld=held_back)
+        facility=plugins.chosen(manifest, facility), withheld=held_back,
+        without=plugins.absent(manifest, facility))
 
 
 def compile_json(bundle):

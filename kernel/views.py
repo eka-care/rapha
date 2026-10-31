@@ -136,7 +136,13 @@ def _summary(bundle, view, store, thread, caps):
             rows = store.audit(thread)
         else:
             raise ValueError(f"unknown section show '{section.show}'")
-        out.append({"title": section.title, "resource": section.resource, "rows": rows})
+        # `fields` travels with the rows. The declaration already narrows
+        # which columns a row carries, but not which of them a screen leads
+        # with, and the renderer was choosing that for itself from a list of
+        # six field names it had typed out. Sending the declared order makes
+        # that the bundle's decision, which is what the view atom was for.
+        out.append({"title": section.title, "resource": section.resource,
+                    "fields": list(section.fields), "rows": rows})
     return out
 
 

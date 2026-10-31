@@ -774,6 +774,12 @@ ROUTES = {
     "patient_publish": "POST /api/v1/phc/patients/publish/",   # facility.admin
     "view": "GET  /api/v1/phc/views/{id}/",
     "catalogue": "GET  /api/v1/phc/catalogue/",
+    # What every form asks, by the slug an operation names. The renderer
+    # read these off disk through a build time glob until this route
+    # existed, which left the forms the one part of a screen the kernel
+    # did not serve.
+    "questionnaires": "GET  /api/v1/phc/questionnaires/",
+    "valueset": "GET  /api/v1/phc/valuesets/{slug}/?q=",
 }
 
 
