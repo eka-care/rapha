@@ -100,6 +100,19 @@ python3 scripts/check_verification.py
 # the service in process as the SMALLEST shape; the socket half, driving the
 # real Go binary, is in scripts/e2e.py.
 PHC_FACILITY=consulting-room-only python3 scripts/check_plugins.py
+# Audio and national records wait for the line and never drop. Three separate
+# properties, each one proved by MAKING IT HAPPEN rather than by asserting the
+# code looks right: a real child process, against a real SQLite file, killed
+# with SIGKILL between claiming an item and sending it, between sending it and
+# writing the receipt, and in the middle of writing the receipt. Also: the
+# guard re-run at the moment of sending, with the audit row proved to be on
+# the trail before a byte leaves; a centre refusing to HOLD work for a plugin
+# it does not run; and what a queue row may contain, against the Aadhaar,
+# mobile and OTP rules. No socket and no call to Eka or ABDM, and the file's
+# docstring says what that leaves unproved.
+python3 scripts/check_queues.py
+python3 -m kernel.queues
+python3 -m adapters.local.spool
 # The connector behind the seam, against a stand-in transport fed the vendor's
 # own published response examples. No credential, no socket, no recording of a
 # live call, and the check says so in its docstring.

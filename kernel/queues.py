@@ -345,22 +345,25 @@ def backoff(attempts):
     return BACKOFF_SECONDS[min(attempts, len(BACKOFF_SECONDS)) - 1]
 
 
-def due(spool, *, now, withheld=None, limit=50, max_attempts=MAX_ATTEMPTS):
-    """Items ready to try, oldest first, with the ones not owed a try removed.
+def due(spool, *, now, limit=50, max_attempts=MAX_ATTEMPTS):
+    """Items ready to try, oldest first. Two reasons one is not: it has had
+    its limit of attempts, or it is still inside its backoff.
 
-    Four reasons an item in `ready` is not due: it has had its limit of
-    attempts, it is still inside its backoff, its capability is withheld at
-    this centre now, or it is not a kind this build knows. The first two are
-    about time and the third is about the facility; the third is here as well
-    as in `enqueue` because `enqueue` ran under whatever shape was configured
-    then.
+    Deliberately NOT a place that asks whether this centre may send the item.
+    Dropping a withheld item here was the first shape of this function and it
+    was wrong: kernel/plugins.py's doctrine is that a plugin that is off
+    DENIES AND DOES NOT HIDE, with the capability and the plugin named in an
+    audit row. An item filtered out here would instead sit in `ready` forever
+    with nothing written down, which is both hiding and the silent giving up
+    that this module is supposed to make impossible. So authorisation happens
+    in exactly one place, `permit`, and this function only answers "is a try
+    owed yet".
     """
     out = []
     for item in spool.items(state="ready", limit=max(limit * 4, limit)):
         if item.attempts >= max_attempts:
             continue
-        if refusal(kind=item.kind, operation=item.operation,
-                   capability=item.capability, withheld=withheld):
+        if item.kind not in QUEUE_KINDS:
             continue
         if item.attempts and not _waited(item.claimed_at, now,
                                          backoff(item.attempts)):
@@ -375,6 +378,115 @@ def stuck(spool, *, now, seconds=IN_FLIGHT_SECONDS, limit=200):
     """Items claimed and never settled: every crash mid-send lands here."""
     return [i for i in spool.items(state="sending", limit=limit)
             if _waited(i.claimed_at, now, seconds)]
+
+
+# --------------------------------------------------------------------------
+# The guard, re-run at the moment of sending
+# --------------------------------------------------------------------------
+
+# What a queue send is called on the audit line. The guard's own vocabulary
+# has `allowed`, and that is the right word: steps 1 to 4 passed and the
+# caller is about to do 5 to 7, which is exactly the situation. A new outcome
+# word would be a sixth thing every reader of the audit trail has to learn.
+QUEUE_SURFACE_NOTE = "queued"
+
+
+def permit_with_guard(store, bundle, *, caps, actor, at, withheld=None,
+                      surface=None, workflow=None):
+    """A `permit` for `pump()`: the guard, against the world as it is NOW.
+
+    `test_a_proposal_is_judged_again_at_confirm_and_not_when_it_was_made` is
+    the precedent and this is the same rule over a longer gap. The
+    capabilities, the facility's shape and the thread's own flags are read at
+    the moment of sending, not at the moment of queueing, so an item queued
+    under capabilities somebody has since lost does not go out.
+
+    WHICH GUARD STEPS THIS RE-RUNS, exactly, because overstating it would be
+    worse than not doing it:
+
+    - step 2, capability, and step 3, preconditions. Through
+      `catalogue.guard.visible`, which is the ONE predicate both enforcement
+      and the surfaces already read, including the `actor of` separation of
+      duties rule. Not re-implemented here, so it cannot drift.
+    - the plugin subtraction, by naming the plugin in the sentence the same
+      way `guard.evaluate` does, so an audit line is reconstructable against a
+      bundle.yaml that has since been edited.
+
+    What it does NOT re-run, and why:
+
+    - step 1, the payload schema. A queued item carries no payload. A
+      document's content is the rows in the Store, which were validated by
+      the guard when they were committed, and re-validating a projection
+      against a questionnaire is not a thing that means anything. Audio has
+      no payload at all; what it produces is a Draft, and a Draft goes through
+      the whole guard when a person taps it.
+    - step 4, the irreversibility rule, and the scope qualifier. Both are
+      about who may invoke an operation on which surface, and sending is not
+      invoking it: the operation already happened. An irreversible operation
+      that a person performed on the rendered surface does not become
+      un-performed because its document waited for a line.
+
+    THE AUDIT ROW IS WRITTEN BEFORE THE SEND, which is the guard's step order
+    and is not relaxed for a queue: `pump()` calls this before it claims, and
+    an allowed item is audited before a byte leaves. A denial is audited too,
+    naming the capability and, where there is one, the plugin.
+    """
+    from catalogue import guard
+    from kernel import proposals, state
+
+    flow = workflow or bundle.workflow()
+    held_back = dict(withheld if withheld is not None else (bundle.withheld or {}))
+    held = set(caps or ())
+
+    def permit(item):
+        op = (bundle.operations or {}).get(item.operation)
+        if op is None:
+            return _refused(store, item, at, actor,
+                            "%s is not an operation this kernel loads, so "
+                            "nothing may be sent for it" % item.operation)
+        why = refusal(kind=item.kind, operation=op["id"],
+                      capability=op["capability"], withheld=held_back)
+        if why:
+            # One sentence for a withheld plugin, from the same function
+            # `enqueue` uses, so admitting and sending cannot disagree about
+            # what this centre runs or about how it says so.
+            return _refused(store, item, at, actor, why)
+        if op["capability"] not in held:
+            return _refused(store, item, at, actor,
+                            "missing capability %s" % op["capability"])
+        flags = state.flags(store, item.thread, flow)
+        who = item.actor or actor
+        if not guard.visible(op, held, flags, actor=who,
+                             performers=state.performers(store, item.thread)):
+            return _refused(store, item, at, actor,
+                            "the preconditions for %s no longer hold on this "
+                            "visit" % op["id"])
+        # Allowed, and audited before anything is sent.
+        proposals.audit_row(store, {
+            "operation": op["id"], "actor": actor,
+            "surface": surface or guard.RENDERED,
+            "payload": {"queued": item.kind, "item": item.id, "key": item.key},
+            "outcome": "allowed"}, thread=item.thread, at=at)
+        return guard.Decision(True, "allowed", audit={})
+
+    return permit
+
+
+def _refused(store, item, at, actor, reason):
+    """One denial: the audit row first, then the decision.
+
+    Written here and not left to the caller for the reason the guard gives
+    for building the record itself: a denial nobody wrote down is a denial
+    that did not happen as far as anybody reading the trail can tell.
+    """
+    from catalogue import guard
+    from kernel import proposals
+
+    proposals.audit_row(store, {
+        "operation": item.operation, "actor": actor, "surface": guard.RENDERED,
+        "payload": {"queued": item.kind, "item": item.id, "key": item.key},
+        "outcome": "denied: %s" % reason}, thread=item.thread, at=at)
+    return guard.Decision(False, reason, audit={})
 
 
 # --------------------------------------------------------------------------
@@ -444,12 +556,15 @@ class Sweep:
         return len(self.sent)
 
 
-def pump(spool, senders, *, permit, bodies, now, withheld=None, limit=50,
+def pump(spool, senders, *, permit, bodies, now, limit=50,
          max_attempts=MAX_ATTEMPTS, delete=None):
     """One pass over what is due. The order of the steps is the design.
 
     `senders` is {kind: Sender}. `bodies` is callable(item) -> body, raising
-    `Unsendable`. `permit` is callable(item) -> an object with `.allowed` and
+    `Unsendable`. There is no `withheld` argument: which plugins this centre
+    runs is a question for `permit`, and one authorisation check in one place
+    is the whole reason `permit` exists. `permit` is callable(item) -> an
+    object with `.allowed` and
     `.reason`, which is `catalogue.guard.Decision`'s shape; it is given rather
     than built here so this module imports no guard, no bundle and no store,
     and so the audit row the guard writes is written by whoever owns the
@@ -470,13 +585,13 @@ def pump(spool, senders, *, permit, bodies, now, withheld=None, limit=50,
     6. Delete the recording, after the receipt and never before.
     """
     report = Sweep()
-    for item in due(spool, now=now, withheld=withheld, limit=limit,
-                    max_attempts=max_attempts):
+    for item in due(spool, now=now, limit=limit, max_attempts=max_attempts):
         decision = permit(item)
         if not getattr(decision, "allowed", False):
-            why = scrubbed(getattr(decision, "reason", "") or "refused")
-            spool.settle(item.id, state="refused", at=now, error=why)
-            report.refused.append((item.id, why))
+            reason = getattr(decision, "reason", "") or "refused"
+            spool.settle(item.id, state="refused", at=now,
+                         error=scrubbed(reason))
+            report.refused.append((item.id, scrubbed(reason)))
             continue
 
         claimed = spool.claim(item.id, at=now)
@@ -551,11 +666,16 @@ def _give_up(spool, report, item, now, why, max_attempts):
     "visible, not forever" requirement.
     """
     text = scrubbed(why)
+    # `error=scrubbed(...)` written out rather than `error=text`, and the same
+    # at every other call. scripts/check_queues.py reads the syntax tree and
+    # requires every `error=` reaching `settle()` to be literally a
+    # `scrubbed()` call or a constant string: a rule a machine can check is
+    # worth one repeated call, because a variable is a rule nobody can check.
     if item.attempts >= max_attempts:
-        spool.settle(item.id, state="failed", at=now, error=text)
+        spool.settle(item.id, state="failed", at=now, error=scrubbed(why))
         report.stopped.append((item.id, text))
     else:
-        spool.settle(item.id, state="ready", at=now, error=text)
+        spool.settle(item.id, state="ready", at=now, error=scrubbed(why))
         report.failed.append((item.id, text))
 
 
@@ -639,21 +759,27 @@ def sweep_audio(spool, *, now, delete, max_hold=None):
     if max_hold is None:
         from care_phc.connectors.scribe import base
         max_hold = base.AUDIO_MAX_HOLD_SECONDS
-    gone = []
+    # Every candidate is listed BEFORE any of them is settled. Settling moves
+    # an item into `failed`, which is one of the states being walked, so
+    # listing and settling in the same loop found the same recording twice and
+    # reported it deleted twice. The check caught it.
+    waiting = []
     for state in ("ready", "held", "failed"):
-        for item in spool.items(state=state, kind="audio", limit=500):
-            if not item.blob or not _waited(item.created_at, now, max_hold):
-                continue
-            try:
-                delete(item.blob)
-            except OSError:
-                continue
-            if state != "failed":
-                spool.settle(item.id, state="failed", at=now,
-                             error="the recording was held longer than the "
-                                   "retention backstop allows and was deleted "
-                                   "without being transcribed")
-            gone.append(item.id)
+        waiting += [i for i in spool.items(state=state, kind="audio", limit=500)
+                    if i.blob and _waited(i.created_at, now, max_hold)]
+
+    gone = []
+    for item in waiting:
+        try:
+            delete(item.blob)
+        except OSError:
+            continue
+        if item.state != "failed":
+            spool.settle(item.id, state="failed", at=now,
+                         error="the recording was held longer than the "
+                               "retention backstop allows and was deleted "
+                               "without being transcribed")
+        gone.append(item.id)
     return gone
 
 
@@ -761,11 +887,6 @@ def demo():
                    at=now, actor="user:mo")
     assert item.state == "ready" and item.attempts == 0
     assert [i.id for i in due(spool, now=now)] == [item.id]
-
-    # ---- the facility shape is read again when the item is looked at, not
-    # only when it was admitted
-    assert due(spool, now=now, withheld={"encounter.document": "baseline"}) == [], \
-        "an item outlived the shape that admitted it and was still due"
 
     # ---- the guard refuses at send time and nothing goes
     class Yes:

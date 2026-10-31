@@ -84,6 +84,13 @@ def _audit(store, decision_audit, *, thread, at, proposal=None):
     return record
 
 
+# Public, because kernel/queues.py writes the queue's own audit rows and there
+# must be exactly one builder of an audit record. A second one would be a
+# second place for the id prefix, the field order and the guard's dict shape
+# to drift, which is the whole reason this helper exists.
+audit_row = _audit
+
+
 def _decide(store, bundle, op, *, thread, payload, caps, surface, actor,
             confirmed=False, scopes=None, workflow=None):
     # Which plugins this facility runs is the bundle's own answer and never a
