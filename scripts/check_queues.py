@@ -38,6 +38,7 @@ Mutations this is built to fail under are listed at the bottom of the file.
 from __future__ import annotations
 
 import ast
+import atexit
 import json
 import os
 import pathlib
@@ -169,7 +170,14 @@ if len(sys.argv) > 1 and sys.argv[1].startswith("--crash="):
 # 1. The three properties, by killing a real process.
 # ==========================================================================
 
+# Removed on the way out WHATEVER happens, including a failed assertion.
+# Registered with atexit and not left to a line at the bottom of the file,
+# because this directory holds bytes standing in for consultation audio, and
+# the runs that leave it behind are exactly the runs nobody tidies up after: a
+# mutation run left 39 of these directories in the system temporary directory
+# before this was registered.
 WORK = tempfile.mkdtemp(prefix="phc-queue-check-")
+atexit.register(shutil.rmtree, WORK, ignore_errors=True)
 
 
 def one_audio_item(name, *, bytes_on_disk=True):
@@ -997,7 +1005,6 @@ assert off_protocol == {"directory.py": {"record_directory_id"}}, \
 ok("the kernel's only off-protocol Store call is still the one known hole "
    "(kernel/directory.py record_directory_id), so a second one fails the gate")
 
-shutil.rmtree(WORK, ignore_errors=True)
 print("ok   queues: %d checks" % checks)
 
 
