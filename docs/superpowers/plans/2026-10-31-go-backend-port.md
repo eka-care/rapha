@@ -213,6 +213,56 @@ Each is finished when the gate is green and the named checks pass against Go.
   sets.
 - **G7. Plugins.** A facility's shape as one list of what it does not run,
   subtracted once, denied and never hidden.
+
+  **Landed 2026-11-01.** The subtraction had already crossed, as five
+  unexported functions beside the routes in `cmd/api`, and `facility_shape()`
+  was 4 of 4 on it. What had not crossed is the half of `kernel/plugins.py`
+  that REFUSES, and the gap was measurable rather than theoretical:
+  `PHC_FACILITY` misspelt by one letter resolved to no declaration, no
+  declaration withheld nothing, and the Go kernel came up answering
+  `GET /facility` with the misspelt name and an empty `withheld`, serving
+  every laboratory tool to a centre meant to have no laboratory. The Python
+  refuses to load. So the five functions moved to `care_phc_mcp/plugins`,
+  where a test and the differential check can reach them, and `Lint` moved
+  with them; it runs at startup and is fatal, which is what
+  `kernel/declarations.load` raising `DeclarationError` means on this side.
+
+  **Every DECLARED shape is linted, not the chosen one.** That is the
+  Python's loop and it is the asymmetry this slice invites: a lint reading
+  only the shape this build runs passes at the centre that runs every plugin
+  and ships a narrowed one that stops the line.
+
+  Also served: `GET /roles` and `PUT /roles/{role}`, which the Go route table
+  had already marked G7's. A role editor is the one place a capability can be
+  ADDED to a caller after the bundle declared it, so it is the one place the
+  facility's subtraction can be stepped around. The override is what a caller
+  holds BEFORE the subtraction, never after, and a save is validated against
+  the loaded bundle's sixteen capabilities rather than the embedded file's
+  twenty-two. Both orders are indistinguishable at `all-plugins`, which is why
+  the check asserts them at every shape that withholds something and says the
+  claim is vacuous at the one that does not.
+
+  The four measures are unmoved and could not have moved: `check_live.py` is
+  16 of 16, `e2e.py main()` is 21 of 49 and still stops at `POST /khoj`, and
+  `facility_shape()` stays 4 of 4, still 14 tools to the no-laboratory centre.
+  89 parity checks became 102.
+
+  **A FOURTH SEAM THAT BELONGS TO NO SLICE: the SHAPE of a declaration is
+  linted only where the YAML is parsed.** Three of `plugins.lint`'s refusals
+  are about shape rather than content -- an unknown key on a plugin or a
+  facility, a declaration that is not a mapping, and the `off:` spelling YAML
+  1.1 reads as the boolean false -- and `kernel/declarations.compile_json`
+  writes only the known keys of `plugins:` and `facilities:` into
+  `catalogue.json` and drops the rest. So they have already been discarded by
+  the time any Go process can look, and nothing here pretends otherwise: the
+  parity check names them instead of carrying them. This is not a dependency
+  problem (`gopkg.in/yaml.v3` is already in `go.mod`); it is the question of
+  whether the Go kernel re-reads `bundles/<id>/bundle.yaml` or whether the
+  compile step stays the only place a declaration's shape is checked. It
+  matters at G9: retire the Python and a threshold typed into a facility
+  declaration is silently dropped by nothing and refused by nobody. Like the
+  planner, codification and the placement declaration before it, this was
+  found by the slice that bumped into it.
 - **G8. The outbox.** Durable, nothing lost, nothing sent twice, nothing
   reported as sent when it was not. Still switched off: the audio retention
   window is unsigned.
@@ -252,6 +302,15 @@ Each is finished when the gate is green and the named checks pass against Go.
   against the NRCeS fact sheet, and `python3 -m kernel.fhir`'s own demo.
   Retiring the Python without replacing those two loses both holds. They
   must move, not be deleted with it.
+- **Whether the Go kernel re-lints a declaration's SHAPE.** Added 2026-11-01,
+  after G7. Three of `kernel/plugins.lint`'s refusals are about the shape of a
+  plugin or a facility declaration and are caught where `bundle.yaml` is
+  parsed; `catalogue.json` carries only the known keys, so no Go process can
+  see them. Either the Go kernel reads the bundle's YAML itself, or the
+  compile step remains the only gate and something must hold it after G9. Not
+  an agent's call: it decides whether a Go-only deployment can be trusted with
+  a hand-edited facility declaration.
+
 - **`MedicationRequest.status` defaults to `"unknown"` where
   `Observation.status` refuses.** Added 2026-10-31, after G6. Two resources,
   two answers to the same question, in one file whose docstring says it may
