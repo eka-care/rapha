@@ -80,9 +80,9 @@ none.
 """
 from __future__ import annotations
 
+import ast
 import json
 import pathlib
-import re
 import sys
 
 ROOT = pathlib.Path(__file__).parents[1]
@@ -224,44 +224,145 @@ ok("a keyed laboratory value is stored preliminary and a nurse's vital sign "
 # own state.
 DOCUMENT_LEVEL = {("notes", "status"), ("notes", "docStatus")}
 
-STATUS_ELEMENT = re.compile(r'"(status|docStatus|intent|[a-z]+Status)"\s*\n?:\s*\n?"([a-z-]+)"')
-READS_ROW = re.compile(r'row\s*\n?(?:\.\n?get\s*\n?\(\s*\n?|\[\s*\n?)"([A-Za-z_]+)"')
+# Which element names are a status at all. `intent` is here because R4 carries
+# a request's certainty there and nowhere else.
+STATUS_ELEMENTS = ("status", "docStatus", "intent")
 
 PROJECTED = dict(fhir.PROJECTIONS, encounter=fhir.encounter)
-SOURCE = (ROOT / "kernel" / "fhir.py").read_text()
+TREE = ast.parse((ROOT / "kernel" / "fhir.py").read_text())
+BODIES = {node.name: node for node in ast.walk(TREE)
+          if isinstance(node, ast.FunctionDef)}
 
 
-def body(function):
-    """One function's live source, comments and docstring stripped off.
+def _is_status(name):
+    return name in STATUS_ELEMENTS or name.endswith("Status") \
+        or name.endswith("status")
 
-    Taken out of the module's own live code rather than by reading the file
-    again, so a rule stated in a comment above a projection cannot satisfy it.
+
+def written(function):
+    """Every FHIR element this function writes a status into, and how.
+
+    Read off the syntax tree rather than off the text, and that is not a
+    stylistic choice. This was first written against the stripped live code
+    from scripts/engine_code.py, and it caught nothing: that stripper removes
+    a string that begins a statement, which in a dict written over several
+    lines is every KEY. So `"status": "final"` came through as `: "final"` and
+    the rule was comparing a pattern that could not occur. Found by mutation,
+    which is the only reason it is not still true.
     """
-    live = engine_code(ROOT / "kernel" / "fhir.py")
-    start = live.find("\ndef\n%s\n" % function.__name__)
-    assert start >= 0, function.__name__
-    end = live.find("\ndef\n", start + 1)
-    return live[start:end if end > 0 else len(live)]
-
-
-for resource, project in sorted(PROJECTED.items()):
-    live = body(project)
-    for element, literal in STATUS_ELEMENT.findall(live):
-        assert (resource, element) in DOCUMENT_LEVEL, \
-            "%s() writes %s = %r as a literal. A status describing somebody " \
-            "else's clinical value is the row's; only a status describing " \
-            "this document is this file's." % (project.__name__, element, literal)
-    for column in READS_ROW.findall(live):
-        if column != "intent" and not column.endswith("status"):
+    out = []
+    for node in ast.walk(BODIES[function.__name__]):
+        if isinstance(node, ast.Dict):
+            pairs = zip(node.keys, node.values)
+        elif isinstance(node, ast.Assign) and len(node.targets) == 1 \
+                and isinstance(node.targets[0], ast.Subscript):
+            pairs = [(node.targets[0].slice, node.value)]
+        else:
             continue
+        for key, value in pairs:
+            if not isinstance(key, ast.Constant) or not isinstance(key.value, str):
+                continue
+            if not _is_status(key.value):
+                continue
+            out.append((key.value, value))
+    return out
+
+
+def reads(function):
+    """Every row column this function reads: `row.get("x")` and `row["x"]`."""
+    out = set()
+    for node in ast.walk(BODIES[function.__name__]):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
+                and node.func.attr == "get" \
+                and isinstance(node.func.value, ast.Name) \
+                and node.func.value.id == "row" and node.args \
+                and isinstance(node.args[0], ast.Constant):
+            out.add(node.args[0].value)
+        if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) \
+                and node.value.id == "row" \
+                and isinstance(node.slice, ast.Constant):
+            out.add(node.slice.value)
+    return {c for c in out if isinstance(c, str)}
+
+
+def fallbacks(node):
+    """Every string literal in an expression that is not a call argument.
+
+    The distinction matters: in `row.get("status") or "unknown"`, `"status"` is
+    the name of a column and `"unknown"` is a value this file chose when the
+    column is empty. Only the second is a fallback, so the walk stops at a
+    call and at a subscript rather than reaching into either: `row["intent"]`
+    names a column too.
+    """
+    if isinstance(node, (ast.Call, ast.Subscript)):
+        return []
+    if isinstance(node, ast.Constant):
+        return [node.value] if isinstance(node.value, str) else []
+    out = []
+    for child in ast.iter_child_nodes(node):
+        out += fallbacks(child)
+    return out
+
+
+seen = 0
+for resource, project in sorted(PROJECTED.items()):
+    for element, value in written(project):
+        seen += 1
+        if isinstance(value, ast.Constant):
+            assert (resource, element) in DOCUMENT_LEVEL, \
+                "%s() writes %s = %r as a literal. A status describing " \
+                "somebody else's clinical value is the row's; only a status " \
+                "describing this document is this file's." \
+                % (project.__name__, element, value.value)
+            continue
+        if (resource, element) in fhir.CODED_STATUS:
+            # A CodeableConcept status, which is an ANSWER a clinician gave
+            # and was resolved against a value set at write time by the one
+            # validating constructor of a Coding. The evidence is the code
+            # system column beside the code: a coding with no system is not
+            # storable, so a `_system` sibling means the answer went through
+            # kernel/terminology.py rather than being typed.
+            column = fhir.CODED_STATUS[(resource, element)]
+            assert column in TABLES[resource], (resource, column)
+            assert "%s_system" % column in TABLES[resource], \
+                "%s.%s carries no code system column, so nothing proves its " \
+                "code came out of a value set" % (resource, column)
+            continue
+        # Not a literal and not a coded answer, so it is a bare FHIR code
+        # copied from the row, and the column has to be bound or translated.
+        assert (resource, element) in fhir.STATUS_BINDING \
+            or (resource, element) in fhir.TRANSLATED_STATUS, \
+            "%s() fills %s from the row with no value set bound to it, so " \
+            "nothing checks what it holds." % (project.__name__, element)
+        # And any literal INSIDE that expression is a fallback the projection
+        # chose, so it is held against the same list.
+        slug = fhir.STATUS_BINDING.get((resource, element))
+        if slug:
+            for literal in fallbacks(value):
+                assert terminology.LOCAL.validate(slug, literal), \
+                    "%s() falls back to %r for %s, which is not a code of %s" \
+                    % (project.__name__, literal, element, slug)
+assert seen >= 5, seen
+ok("none of the %d status elements the %d projections write is a clinical "
+   "literal, and every one filled from a row is bound to a published list"
+   % (seen, len(PROJECTED)))
+
+# The other direction: a status column a projection READS must be bound too,
+# so a new column cannot be copied into FHIR without a list behind it.
+for resource, project in sorted(PROJECTED.items()):
+    for column in sorted(reads(project)):
+        if not _is_status(column) and column != "intent":
+            continue
+        if (resource, "%sStatus" % column.split("_")[0]) in fhir.CODED_STATUS:
+            continue        # a coded answer; checked above by its system column
         assert (resource, column) in fhir.STATUS_BINDING \
             or (resource, column) in fhir.TRANSLATED_STATUS, \
-            "%s() copies %s.%s into FHIR with no value set bound to it, so " \
-            "nothing checks what it holds. Add it to STATUS_BINDING, or to " \
-            "TRANSLATED_STATUS if the projection translates it." \
+            "%s() reads %s.%s with no value set bound to it. Add it to " \
+            "STATUS_BINDING, or to TRANSLATED_STATUS if the projection " \
+            "translates it rather than copying it." \
             % (project.__name__, resource, column)
-ok("no projection writes a clinical status literal, and every status column a "
-   "projection copies verbatim is bound to a published list")
+ok("every status column a projection reads is either bound to a published "
+   "list or declared as one the projection translates")
 
 # Every column the binding table names is a real column of a real table, so a
 # renamed column cannot leave a binding pointing at nothing.
@@ -563,18 +664,29 @@ print("ok   verification: %d checks passed" % checks)
 # ---------------------------------------------------------------------------
 #
 # - put `"status": "final"` back as a literal in `observation()`: section 2
-#   names the function and the element.
-# - drop the no-status refusal from `observation()`: section 3 fails, because a
-#   row with no status projects an Observation with no status.
+#   names the function and the element. THIS ONE EXPOSED A HOLE IN SECTION 2
+#   ITSELF, which is the only reason section 2 reads the syntax tree rather
+#   than the text. The first version scanned the stripped live code from
+#   scripts/engine_code.py with a regular expression, and the mutation was
+#   MISSED: that stripper drops a string that begins a statement, which in a
+#   dict written over several lines is every key, so `"status": "final"`
+#   reached the regex as `: "final"` and the pattern could not occur. The
+#   assertion was comparing a shape that does not exist in its own input.
+# - drop the no-status refusal from `observation()` and default to `final`
+#   instead: section 3 fails.
 # - drop the verification-status refusal from `observation()`: section 3 fails
 #   with the sentence about dropping the doubt and keeping the value.
 # - change `lab.op.result-enter` to store `status: {const: verified}`: section 1
 #   fails, because `verified` is not a code of observation-status.
-# - add `("diagnostic_report", "status")` to STATUS_BINDING: section 2's column
-#   check passes (the column exists) and section 1 then reads
-#   `lab.op.result-verify`'s `{answer: decision}` and fails on `verified`.
+# - add `("diagnostic_report", "status")` to STATUS_BINDING: section 1 then
+#   reads `lab.op.result-verify`'s `{answer: decision}` and fails on
+#   `verified`, which is not an R4 DiagnosticReport status. That is a real
+#   latent defect and it is reported rather than fixed: see the report.
 # - remove `status` from the observation table: section 2's column check fails.
 # - declare a FamilyHistory section in kernel/fhir.PROFILES: section 4 fails.
 # - make `verification_status` a `{const: confirmed}` in the consultation
 #   mapping: section 5 fails twice, on the typed certainty and on the mapping.
-# - have api/scribe.py name a FHIR bundle: section 6 fails.
+# - add a FHIR bundle template to api/scribe.py's request: section 6 fails.
+#
+# 9 of 9 caught. No assertion was deleted. The one hole a mutation exposed was
+# in section 2, described above, and it is fixed rather than noted.

@@ -192,6 +192,17 @@ RESOURCE_TYPE = {
 CODE, CODE_SYSTEM, CODE_DISPLAY = "code", "code_system", "code_display"
 UNIT, UNIT_SYSTEM = "unit", "unit_system"
 
+# The columns a Condition's three codings span, and the ones a
+# MedicationRequest's five span. Query grammar field names, which the adapter
+# stores verbatim: see adapters/local/store.py TABLES.
+CLINICAL, CLINICAL_SYSTEM = "clinical_status", "clinical_status_system"
+VERIFICATION, VERIFICATION_SYSTEM = "verification_status", "verification_status_system"
+MEDICATION = ("medication", "medication_system", "medication_display")
+ROUTE = ("route", "route_system", "route_display")
+FREQUENCY = ("frequency", "frequency_system", "frequency_display")
+
+
+
 # Every stored column a projection below copies VERBATIM into a FHIR `code`
 # element, and the value set R4 binds that element to.
 #
@@ -224,6 +235,20 @@ STATUS_BINDING = {
 # "this is deliberately not a FHIR code". `encounter.status` is this build's
 # own workflow state, translated by `encounter()` below.
 TRANSLATED_STATUS = {("encounter", "status")}
+
+# And the statuses that are a CodeableConcept rather than a bare code, so they
+# were already bound and by a stronger mechanism than the table above.
+#
+# A Condition's clinicalStatus and verificationStatus each carry their code
+# system in a column beside the code, which means the answer went through
+# `kernel/terminology.answer_coding()` and therefore through the one
+# validating constructor of a `Coding`. That is the difference: these are
+# ANSWERS a clinician gave, resolved against a value set at write time, while
+# everything in STATUS_BINDING is a literal an operation declared. The
+# `_system` sibling column is the structural evidence, and
+# `scripts/check_verification.py` holds each pair to having one.
+CODED_STATUS = {("condition", "clinicalStatus"): CLINICAL,
+                ("condition", "verificationStatus"): VERIFICATION}
 
 
 def _urn(seed):
@@ -376,16 +401,6 @@ def observation(row, *, subject, encounter, performer=None):
         else:
             out["valueString"] = str(value)
     return out
-
-
-# The columns a Condition's three codings span, and the ones a
-# MedicationRequest's five span. Query grammar field names, which the adapter
-# stores verbatim: see adapters/local/store.py TABLES.
-CLINICAL, CLINICAL_SYSTEM = "clinical_status", "clinical_status_system"
-VERIFICATION, VERIFICATION_SYSTEM = "verification_status", "verification_status_system"
-MEDICATION = ("medication", "medication_system", "medication_display")
-ROUTE = ("route", "route_system", "route_display")
-FREQUENCY = ("frequency", "frequency_system", "frequency_display")
 
 
 def condition(row, *, subject, encounter, performer=None):
