@@ -55,8 +55,10 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	carephc "github.com/eka-care/care_phc_mcp"
+	"github.com/eka-care/care_phc_mcp/plugins"
 	"github.com/eka-care/care_phc_mcp/proposals"
 	"github.com/eka-care/care_phc_mcp/questionnaire"
 	"github.com/eka-care/care_phc_mcp/store"
@@ -73,6 +75,15 @@ var prefixes = []string{"/api", "/api/v1/phc"}
 // because there is no authentication yet.
 const DemoRole = "demo"
 
+// AdminCapability is api/main.py's own literal: the one capability a role save
+// needs. It is typed here for the reason the Python types it here, which is
+// that this is the route's own rule rather than a declaration -- it names no
+// operation, and neither the guard nor the decision path ever reads it, so on
+// its own it unlocks no kernel write path. It sits in NO shipped preset on
+// purpose, which is why the demo account is the union over declared
+// capabilities rather than over the presets.
+const AdminCapability = "facility.admin"
+
 type kernel struct {
 	cat *carephc.Catalogue
 
@@ -82,8 +93,20 @@ type kernel struct {
 	without  map[string]string // plugin id -> its declared title
 	roles    map[string][]string
 	caps     []string // every capability this bundle declares, sorted
-	workflow string
-	routes   []string
+
+	// A facility's own role combinations, saved AWAY from the shipped
+	// presets, which is what api/main.py's OVERRIDES is and what CARE's
+	// sync_permissions_roles deliberately never touches either. In process,
+	// one facility per kernel, exactly as the Python says: a second facility
+	// sharing this process is what makes it a row beside phc.sqlite3.
+	//
+	// Guarded, because PUT /roles writes it while any other request may be
+	// reading it, and the Python's one-request-at-a-time habit is not a
+	// property Go's server shares.
+	overrides  map[string][]string
+	overrideMu sync.RWMutex
+	workflow   string
+	routes     []string
 
 	store *store.SQLite
 
@@ -94,80 +117,16 @@ type kernel struct {
 }
 
 // ---------------------------------------------------------------------------
-// the facility's shape: kernel/plugins.py, in Go
+// the facility's shape
 // ---------------------------------------------------------------------------
 //
-// A transcription, not a reinterpretation. A plugin that is off is a
-// capability the caller does not hold, subtracted once before anything reads
-// it, and that subtraction is the whole of a facility's runtime effect.
-
-// chosen is kernel/plugins.chosen: the argument wins over PHC_FACILITY, which
-// wins over the bundle's own default. A bundle declaring no facilities has one
-// shape and no choice to make, which is what keeps bundles/lab valid.
-func chosen(cat *carephc.Catalogue, want string) string {
-	if len(cat.Facilities.Declared) == 0 {
-		return ""
-	}
-	if want != "" {
-		return want
-	}
-	if env := os.Getenv("PHC_FACILITY"); env != "" {
-		return env
-	}
-	return cat.Facilities.Default
-}
-
-// off is kernel/plugins.off: the plugin ids this facility does not run, in
-// declaration order, and only those the bundle actually declares.
-func off(cat *carephc.Catalogue, facility string) []string {
-	var out []string
-	for _, pid := range cat.Facilities.Declared[facility].Without {
-		if _, declared := cat.Plugins[pid]; declared {
-			out = append(out, pid)
-		}
-	}
-	return out
-}
-
-// withheldBy is kernel/plugins.withheld: {capability: the plugin id that
-// withholds it}. The guard reads it to name a denial and effective() reads it
-// to subtract. There is no second form.
-func withheldBy(cat *carephc.Catalogue, facility string) map[string]string {
-	out := map[string]string{}
-	for _, pid := range off(cat, facility) {
-		for _, cap := range cat.Plugins[pid].Capabilities {
-			out[cap] = pid
-		}
-	}
-	return out
-}
-
-// absent is kernel/plugins.absent: {plugin id: its declared title}. The same
-// fact read from the other end, and it exists separately because a screen has
-// to be able to SAY it without typing a plugin's name at a clinician.
-func absent(cat *carephc.Catalogue, facility string) map[string]string {
-	out := map[string]string{}
-	for _, pid := range off(cat, facility) {
-		title := cat.Plugins[pid].Title
-		if title == "" {
-			title = pid
-		}
-		out[pid] = title
-	}
-	return out
-}
-
-// effective is kernel/plugins.effective: caps minus what this facility
-// withholds, order preserved. One function, called once, in caller().
-func effective(caps []string, held map[string]string) []string {
-	out := make([]string, 0, len(caps))
-	for _, cap := range caps {
-		if _, gone := held[cap]; !gone {
-			out = append(out, cap)
-		}
-	}
-	return out
-}
+// kernel/plugins.py is package plugins, beside this one. It began as five
+// unexported functions here, which is where a transcription naturally lands;
+// what moved them is the half of that module they left behind. A plugin that
+// is off is a capability the caller does not hold, subtracted once, by
+// plugins.Effective in caller() below, and the lint that refuses a shape
+// which only LOOKS configured is run at startup. Both now live somewhere a
+// test and a differential check can reach.
 
 // ---------------------------------------------------------------------------
 // who is asking
@@ -198,10 +157,21 @@ func (k *kernel) caller(r *http.Request) (user, string) {
 	if !known {
 		return user{}, role
 	}
+	// A facility's own combination if it saved one, the shipped preset
+	// otherwise. The ORDER of these two lines is the whole of it: the
+	// override is what a caller holds BEFORE the facility's subtraction, not
+	// after. Subtracting first and then letting an override replace the
+	// result would hand out a capability this centre does not run, and it
+	// would read as correct at a centre that runs every plugin.
+	k.overrideMu.RLock()
+	if saved, deviated := k.overrides[role]; deviated {
+		declared = saved
+	}
+	k.overrideMu.RUnlock()
 	// The one subtraction, here, before anything reads the set: the guard,
 	// visible(), the quick action row, /whoami and therefore the MCP tool
 	// list, and every view's own capability gate.
-	caps := effective(declared, k.withheld)
+	caps := plugins.Effective(declared, k.withheld)
 	actor := r.Header.Get("X-PHC-Actor")
 	if actor == "" {
 		actor = "user:" + role
@@ -242,7 +212,7 @@ func (k *kernel) index(w http.ResponseWriter, r *http.Request) {
 func (k *kernel) whoami(w http.ResponseWriter, r *http.Request) {
 	who, refused := k.caller(r)
 	if refused != "" {
-		detail(w, http.StatusBadRequest, "no such role %q", refused)
+		detail(w, http.StatusBadRequest, "no such role %s", pyRepr(refused))
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"capabilities": who.Capabilities})
@@ -264,7 +234,7 @@ type viewOut struct {
 func (k *kernel) facility_(w http.ResponseWriter, r *http.Request) {
 	who, refused := k.caller(r)
 	if refused != "" {
-		detail(w, http.StatusBadRequest, "no such role %q", refused)
+		detail(w, http.StatusBadRequest, "no such role %s", pyRepr(refused))
 		return
 	}
 
@@ -303,6 +273,170 @@ func (k *kernel) facility_(w http.ResponseWriter, r *http.Request) {
 		"roles":        roles,
 		"user":         who,
 	})
+}
+
+// ---------------------------------------------------------------------------
+// a facility's own role combinations
+// ---------------------------------------------------------------------------
+
+// rolesRoute is api/main.py's two role routes, which sit on one path: GET
+// /roles reads the shipped presets and this facility's own deviations from
+// them, and PUT /roles/{role} saves one.
+//
+// WHY BOTH COME BACK FROM THE GET
+// -------------------------------
+// The Python's own reason, carried: an editor that seeds only from `presets`
+// shows a role exactly as it SHIPPED even after a facility has deliberately
+// moved away from it, and the next unrelated save silently restores what
+// somebody removed on purpose.
+//
+// THE PRESETS ARE NOT NARROWED, AND THAT IS NOT AN OVERSIGHT
+// ---------------------------------------------------------
+// `presets` is bundle.yaml's `roles:` whole, including capabilities this
+// facility withholds. A facility DECLINES a capability; it does not delete one
+// from the bundle, which is what would make a shape a fork. The narrowing
+// happens once, in caller(), and `current` is the role that was narrowed. The
+// same rule GET /facility already serves `capabilities` under.
+func (k *kernel) rolesRoute(w http.ResponseWriter, r *http.Request) {
+	rest := strings.TrimPrefix(r.URL.Path[strings.Index(r.URL.Path, "/roles")+len("/roles"):], "/")
+	who, refused := k.caller(r)
+	if refused != "" {
+		detail(w, http.StatusBadRequest, "no such role %s", pyRepr(refused))
+		return
+	}
+	if rest == "" {
+		if r.Method != http.MethodGet {
+			notAllowed(w)
+			return
+		}
+		k.overrideMu.RLock()
+		saved := map[string][]string{}
+		for role, caps := range k.overrides {
+			// make, not append to nil: a role deliberately saved with NO
+			// capabilities is an empty list, and encoding/json writes a nil
+			// slice as null. The Python answers [], and `null` here would
+			// make a role editor read "this facility has not deviated" from a
+			// facility that deviated all the way to nothing.
+			copied := make([]string, 0, len(caps))
+			saved[role] = append(copied, caps...)
+		}
+		k.overrideMu.RUnlock()
+		writeJSON(w, http.StatusOK, map[string]any{
+			"presets":   k.cat.Vocabulary.Roles,
+			"overrides": saved,
+			"current":   who.Role,
+		})
+		return
+	}
+	if r.Method != http.MethodPut {
+		notAllowed(w)
+		return
+	}
+	k.setRole(w, r, rest, who)
+}
+
+// setRole is api/main.py's set_role: a facility's own combination, saved away
+// from the shipped preset. bundle.yaml ships as CARE is_system=True roles and
+// a facility's deviation is its own is_system=False row, which CARE's
+// sync_permissions_roles deliberately never touches. So a preset is never
+// mutated here; what is written is a row beside it.
+//
+// THE CAPABILITIES A SAVE MAY NAME ARE THE BUNDLE'S SIXTEEN, NOT THE FILE'S
+// TWENTY-TWO
+// --------------------------------------------------------------------------
+// `k.caps` is the LOADED bundle's own declared capabilities. The embedded
+// catalogue's top-level `capabilities` key is the union over every bundle,
+// because the file is embedded whole and narrowed at runtime, and validating
+// a save against that union would let a health centre's role editor grant six
+// laboratory capabilities this bundle does not declare -- to the only account
+// the browser can be. That over-grant was measured once on this build and it
+// is what this line prevents.
+//
+// AND IT IS THE WHOLE SIXTEEN, NOT THE NARROWED SET
+// -------------------------------------------------
+// A centre with no laboratory may still SAVE a role holding `lab.order`,
+// exactly as the Python allows, because the role is a declaration about who
+// does what and the facility's subtraction is applied afterwards, every time,
+// in caller(). Validating against the narrowed set instead would refuse a
+// legal save, and it would look right at a centre that runs every plugin.
+func (k *kernel) setRole(w http.ResponseWriter, r *http.Request, role string, who user) {
+	if !holds(who.Capabilities, AdminCapability) {
+		detail(w, http.StatusForbidden, "missing capability "+AdminCapability)
+		return
+	}
+	if _, known := k.roles[role]; !known {
+		detail(w, http.StatusNotFound, "no such role %s", pyRepr(role))
+		return
+	}
+	var body struct {
+		Capabilities []string `json:"capabilities"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		detail(w, http.StatusUnprocessableEntity, "the body is not an object: %v", err)
+		return
+	}
+	seen := map[string]bool{}
+	caps := []string{}
+	for _, cap := range body.Capabilities {
+		if !seen[cap] {
+			seen[cap] = true
+			caps = append(caps, cap)
+		}
+	}
+	sort.Strings(caps)
+	declared := map[string]bool{}
+	for _, cap := range k.caps {
+		declared[cap] = true
+	}
+	unknown := []string{}
+	for _, cap := range caps {
+		if !declared[cap] {
+			unknown = append(unknown, cap)
+		}
+	}
+	if len(unknown) > 0 {
+		detail(w, http.StatusBadRequest, "not capabilities of this bundle: %s",
+			pyStrList(unknown))
+		return
+	}
+	k.overrideMu.Lock()
+	k.overrides[role] = caps
+	k.overrideMu.Unlock()
+	writeJSON(w, http.StatusOK, map[string]any{"role": role, "capabilities": caps})
+}
+
+func holds(caps []string, want string) bool {
+	for _, cap := range caps {
+		if cap == want {
+			return true
+		}
+	}
+	return false
+}
+
+// notAllowed is FastAPI's own answer to a method a path does not serve: the
+// Python registers GET on /roles and PUT on /roles/{role}, so the other verb
+// on each is a 405 and not a 404.
+func notAllowed(w http.ResponseWriter) {
+	detail(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+}
+
+// pyRepr renders a string the way Python's %r does, because that is what the
+// message a caller reads already says.
+func pyRepr(s string) string {
+	if !strings.Contains(s, "'") {
+		return "'" + s + "'"
+	}
+	return "\"" + s + "\""
+}
+
+// pyStrList renders a list of strings the way Python's %s of a list does.
+func pyStrList(in []string) string {
+	quoted := make([]string, 0, len(in))
+	for _, one := range in {
+		quoted = append(quoted, pyRepr(one))
+	}
+	return "[" + strings.Join(quoted, ", ") + "]"
 }
 
 // notYet answers a route api/main.py serves and this engine does not.
@@ -378,8 +512,8 @@ var served = []struct {
 	{"/proposals/{proposal_id}", ""},
 	{"/proposals/{proposal_id}/confirm", ""},
 	{"/proposals/{proposal_id}/reject", ""},
-	{"/roles", "G7 serves a facility's own role combinations"},
-	{"/roles/{role}", "G7 serves a facility's own role combinations"},
+	{"/roles", ""},
+	{"/roles/{role}", ""},
 	{"/threads", ""},
 	{"/threads/{thread_id}", ""},
 	{"/subjects/{subject_id}", ""},
@@ -454,6 +588,12 @@ func (k *kernel) mount() http.Handler {
 		// Registered last so they win over any subtree above them.
 		mux.HandleFunc(prefix+"/whoami", k.whoami)
 		mux.HandleFunc(prefix+"/facility", k.facility_)
+		// One path, two methods: GET reads the presets and the deviations,
+		// PUT saves one. Registered as a subtree so PUT /roles/{role} reaches
+		// the same handler, which is how api/main.py's two decorators sit on
+		// one router.
+		mux.HandleFunc(prefix+"/roles", k.rolesRoute)
+		mux.HandleFunc(prefix+"/roles/", k.rolesRoute)
 		// api/main.py puts /catalogue and /operations on one function, and
 		// GET is the only method either answers.
 		mux.HandleFunc(prefix+"/catalogue", only(http.MethodGet, k.catalogue))
@@ -541,10 +681,25 @@ func main() {
 	}
 	defer rows.Close()
 
-	k := &kernel{cat: cat, bundle: cat.Manifest.ID, store: rows}
-	k.facility = chosen(cat, "")
-	k.withheld = withheldBy(cat, k.facility)
-	k.without = absent(cat, k.facility)
+	// Which plugins every declared shape runs, linted before anything is
+	// resolved off it, which is where kernel/declarations.load does it: a
+	// facility that looks configured and is not must stop the kernel rather
+	// than serve a narrowed clinic that is quietly the whole one.
+	//
+	// Fatal, and that is the point. The failure this closes was measured on
+	// this engine: PHC_FACILITY misspelt by one letter resolved to no
+	// declaration, no declaration withheld nothing, and a centre meant to
+	// have no laboratory served every laboratory tool with a green log line.
+	if bad := plugins.Lint(plugins.ShapeOf(cat)); len(bad) > 0 {
+		log.Fatalf("this bundle's plugin declarations do not hold:\n\n%s\n",
+			strings.Join(bad, "\n"))
+	}
+
+	k := &kernel{cat: cat, bundle: cat.Manifest.ID, store: rows,
+		overrides: map[string][]string{}}
+	k.facility = plugins.Chosen(cat, "")
+	k.withheld = plugins.Withheld(cat, k.facility)
+	k.without = plugins.Absent(cat, k.facility)
 
 	// The demo day, seeded on first use so the queue is never an empty
 	// screen: api/main.py's make_store(), condition for condition. The rows
@@ -565,7 +720,7 @@ func main() {
 		log.Fatalf("could not read %s: %v", dbPath, err)
 	}
 	if empty {
-		if _, err := store.Seed(rows, seeded(declaredSeed, cat.Operations, k.withheld)); err != nil {
+		if _, err := store.Seed(rows, plugins.Seeded(declaredSeed, cat.Operations, k.withheld)); err != nil {
 			log.Fatalf("the demo day did not seed: %v", err)
 		}
 	}

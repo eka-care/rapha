@@ -85,7 +85,7 @@ func truthy(v any) bool {
 func (k *kernel) who(w http.ResponseWriter, r *http.Request) (user, bool) {
 	person, refused := k.caller(r)
 	if refused != "" {
-		detail(w, http.StatusBadRequest, "no such role %q", refused)
+		detail(w, http.StatusBadRequest, "no such role %s", pyRepr(refused))
 		return user{}, false
 	}
 	return person, true

@@ -50,6 +50,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import backend                                                       # noqa: E402
 
 PREFIX = "/api/v1/phc"
+
 QUESTIONNAIRES = ROOT / "questionnaires"
 # The shapes bundles/phc declares. Every one of them, rather than a chosen
 # two: a shape is one declared line and the whole point is that nothing else
@@ -60,7 +61,7 @@ SHAPES = ("all-plugins", "no-laboratory", "consulting-room-only")
 # /api and /api/v1/phc are one router in the Python and two mounts in the Go,
 # and that is exactly the kind of difference a diff should catch.
 SERVED = ("/whoami", "/facility", "/catalogue", "/operations",
-          "/questionnaires")
+          "/questionnaires", "/roles")
 # The served read routes whose answer carries THIS STORE'S OWN TIMESTAMPS, so
 # they cannot be compared byte for byte: two engines seed their own file a
 # fraction of a second apart, and a queue row's opened_at is that fraction.
@@ -2572,6 +2573,333 @@ def roll_forward(tmp):
        "the future" % (days, len(queues[backend.GO]["rows"])))
 
 
+# --------------------------------------------------------------------------
+# the facility's shape: the lint, the one refusal a socket can reach, and the
+# resolver's own silence
+# --------------------------------------------------------------------------
+
+def lint_cases():
+    """The bent declarations both lints are asked about.
+
+    Every refusal kernel/plugins.lint() makes that a Go process can reach. The
+    three it makes that no Go process can -- an unknown key on either
+    declaration, a declaration that is not a mapping, and the spelling YAML 1.1
+    reads as a boolean -- are absent on purpose and named in the output below,
+    because they are caught where bundle.yaml is PARSED and catalogue.json has
+    already dropped them. A case written here that Go cannot see would be this
+    check asserting a difference and calling it parity.
+
+    Each case is the real manifest with one thing wrong, which is what
+    scripts/check_plugins.py's own `bend()` does, so a plugin added to the
+    bundle arrives in every case without this function being edited.
+    """
+    import copy
+
+    import yaml
+
+    manifest = yaml.safe_load((ROOT / "bundles" / "phc" / "bundle.yaml").read_text())
+    cases = [("the real bundle, which must refuse nothing", manifest, None)]
+
+    def bend(label, asked=None, **changes):
+        out = copy.deepcopy(manifest)
+        for key, value in changes.items():
+            if value is _GONE:
+                out.pop(key, None)
+            else:
+                out[key] = value
+        cases.append((label, out, asked))
+        return out
+
+    shapes = copy.deepcopy(manifest["facilities"])
+    some = sorted(shapes)[0]
+    shapes[some]["without"] = ["no-such-plugin"]
+    bend("a facility naming a plugin that does not exist", facilities=shapes)
+
+    always = sorted(p for p, d in manifest["plugins"].items() if d.get("always"))
+    assert always, "no plugin is declared always on, so the floor cannot be proved"
+    shapes = copy.deepcopy(manifest["facilities"])
+    shapes[some]["without"] = [always[0]]
+    bend("a facility switching off the floor", facilities=shapes)
+
+    # Two plugins and one capability, and the same plugin naming a capability
+    # the bundle does not declare. Built off whichever plugin owns the first
+    # declared capability rather than named.
+    owner = {cap: pid for pid, decl in sorted(manifest["plugins"].items())
+             for cap in decl["capabilities"]}
+    shared = sorted(owner)[0]
+    other = sorted(p for p in manifest["plugins"] if p != owner[shared])[0]
+    pls = copy.deepcopy(manifest["plugins"])
+    pls[other]["capabilities"] = list(pls[other]["capabilities"]) + [shared]
+    bend("two plugins claiming one capability", plugins=pls)
+
+    pls = copy.deepcopy(manifest["plugins"])
+    pls[other]["capabilities"] = [shared + ".typo"]
+    bend("a plugin naming a capability this bundle does not declare", plugins=pls)
+
+    pls = copy.deepcopy(manifest["plugins"])
+    pls[other].pop("capabilities")
+    bend("a plugin with no capabilities", plugins=pls)
+
+    pls = copy.deepcopy(manifest["plugins"])
+    pls[other].pop("title")
+    bend("a plugin with no title", plugins=pls)
+
+    shapes = copy.deepcopy(manifest["facilities"])
+    shapes[some].pop("title")
+    bend("a facility with no title", facilities=shapes)
+
+    shapes = copy.deepcopy(manifest["facilities"])
+    shapes[some]["without"] = [other, other]
+    bend("a facility naming one plugin twice", facilities=shapes)
+
+    bend("a bundle declaring facilities and no default", facility=_GONE)
+    bend("a default that is not one of the declared shapes",
+         facility=manifest["facility"] + "-typo")
+    bend("a misspelt PHC_FACILITY, which withholds nothing and runs the whole "
+         "facility", asked=manifest["facility"] + "-typo")
+
+    # And the one that matters: a choice that stops the line. A capability is
+    # lifted out of the floor into a plugin of its own and a NARROWED shape
+    # switches that plugin off, so the step nothing left can close and nothing
+    # can skip belongs to a shape this build does not run. A lint that only
+    # looked at the chosen shape would pass this.
+    closes = {}
+    for workflow in _workflow_frontmatter():
+        for step in workflow.get("steps") or []:
+            if not step.get("applies_when"):
+                closes[step["done_when"]] = step["station"]
+    raisers = {}
+    for oid, op in _catalogue_operations().items():
+        for flag in op.get("emits") or []:
+            raisers.setdefault(flag, set()).add(op["capability"])
+    stopper = sorted(flag for flag in closes
+                     if len(raisers.get(flag) or ()) == 1)[0]
+    lifted = sorted(raisers[stopper])[0]
+    pls = copy.deepcopy(manifest["plugins"])
+    for pid in pls:
+        pls[pid]["capabilities"] = [c for c in pls[pid]["capabilities"]
+                                    if c != lifted]
+    pls["lifted"] = {"title": "One step's own ability", "capabilities": [lifted]}
+    shapes = copy.deepcopy(manifest["facilities"])
+    narrowed = sorted(f for f in shapes if f != manifest["facility"])[0]
+    shapes[narrowed]["without"] = list(shapes[narrowed].get("without") or []) + ["lifted"]
+    bend("a NARROWED shape whose choice stops the line, while the shape this "
+         "build runs is sound", plugins=pls, facilities=shapes)
+
+    return cases
+
+
+_GONE = object()
+
+
+@functools.lru_cache(maxsize=None)
+def _workflow_frontmatter():
+    """The bundle's workflow declarations, as kernel/plugins.lint reads them."""
+    from catalogue.build import parse
+    out = []
+    for path in sorted((ROOT / "bundles" / "phc").glob("*.md")):
+        fm, _ = parse(path)
+        if fm.get("type") == "workflow":
+            out.append(fm)
+    return out
+
+
+@functools.lru_cache(maxsize=None)
+def _catalogue_operations():
+    """The CATALOGUE-WIDE operations, which is what
+    kernel/declarations.load() hands plugins.lint(): `ops =
+    catalogue["operations"]`. Narrowing it to the loaded bundle's would be one
+    engine deciding something the other did not."""
+    with open(ROOT / "catalogue" / "catalogue.json") as f:
+        return json.load(f)["operations"]
+
+
+def python_lint(cases):
+    from catalogue.build import parse
+    from kernel import plugins as kplugins
+
+    decls = {}
+    for path in sorted((ROOT / "bundles" / "phc").glob("*.md")):
+        fm, body = parse(path)
+        decls[fm["id"]] = (fm, body)
+    ops = _catalogue_operations()
+
+    out = {}
+    was = os.environ.get(kplugins.ENV)
+    try:
+        for name, manifest, asked in cases:
+            if asked is None:
+                os.environ.pop(kplugins.ENV, None)
+            else:
+                os.environ[kplugins.ENV] = asked
+            out[name] = list(kplugins.lint(manifest, ops, decls))
+    finally:
+        os.environ.pop(kplugins.ENV, None)
+        if was is not None:
+            os.environ[kplugins.ENV] = was
+    return out
+
+
+def go_lint(cases, tmp):
+    """The same bent declarations through the Go lint.
+
+    The manifest is reshaped into the catalogue.json spelling the Go package
+    reads -- `facilities` as {default, declared} rather than a bare mapping
+    beside `facility:` -- because that is the one difference between the two
+    sides that is NOT a difference of opinion: it is what
+    kernel/declarations.compile_json writes, and the Go reads the compiled
+    file.
+    """
+    sent = []
+    for name, manifest, asked in cases:
+        sent.append({
+            "name": name,
+            "plugins": manifest.get("plugins") or {},
+            "facilities": {"default": manifest.get("facility") or "",
+                           "declared": manifest.get("facilities") or {}},
+            "capabilities": manifest.get("capabilities") or [],
+            "operations": _catalogue_operations(),
+            "workflows": [{"id": fm["id"], "steps": fm.get("steps") or []}
+                          for fm in _workflow_frontmatter()],
+            "asked": asked or "",
+        })
+    cases_at = os.path.join(tmp, "plugin-cases.json")
+    answers_at = os.path.join(tmp, "plugin-answers.json")
+    with open(cases_at, "w") as f:
+        json.dump(sent, f)
+    done = subprocess.run(
+        ["go", "test", "./plugins/", "-run", "TestTheLintAnswersForTheParityCheck",
+         "-count=1"],
+        cwd=str(backend.GO_MODULE), capture_output=True, text=True,
+        env=dict(os.environ, PHC_PLUGIN_CASES=cases_at,
+                 PHC_PLUGIN_ANSWERS=answers_at))
+    if done.returncode != 0 or not os.path.exists(answers_at):
+        raise SystemExit("\nthe Go engine could not answer the plugin lint "
+                         "cases:\n\n%s%s\n"
+                         % (done.stdout[-4000:], done.stderr[-2000:]))
+    with open(answers_at) as f:
+        return json.load(f)
+
+
+def lint_parity(tmp):
+    cases = lint_cases()
+    py = python_lint(cases)
+    gone = go_lint(cases, tmp)
+
+    clean = cases[0][0]
+    assert py[clean] == [] == gone[clean], (py[clean], gone[clean])
+    for name, _, _ in cases[1:]:
+        assert py[name], ("%s: the PYTHON lint refuses nothing, so this case "
+                          "proves nothing about either engine" % name)
+        assert py[name] == gone.get(name), (
+            "%s: the two lints refuse differently\npython: %s\ngo:     %s"
+            % (name, json.dumps(py[name], indent=1),
+               json.dumps(gone.get(name), indent=1)))
+    refusals = sum(len(py[name]) for name, _, _ in cases)
+    ok("the plugin lint: %d bent declarations draw the same %d refusals from "
+       "both engines, word for word, and the real bundle draws none"
+       % (len(cases) - 1, refusals))
+
+    # The three the Go cannot be asked, said rather than left to be assumed
+    # from a shorter list. They are caught where bundle.yaml is parsed, and
+    # kernel/declarations.compile_json has dropped them by the time any Go
+    # process can look.
+    from kernel import plugins as kplugins
+    unreachable = ("an unknown key on a plugin or a facility",
+                   "a declaration that is not a mapping",
+                   "the `off:` spelling YAML 1.1 reads as the boolean false")
+    assert set(kplugins.FACILITY_KEYS) == {"title", "without"}, kplugins.FACILITY_KEYS
+    ok("and %d of its refusals cannot cross the port at all, because they are "
+       "about the SHAPE of a declaration and catalogue.json carries only the "
+       "%d keys a facility and the %d a plugin may have: %s"
+       % (len(unreachable), len(kplugins.FACILITY_KEYS),
+          len(kplugins.PLUGIN_KEYS), "; ".join(unreachable)))
+
+
+def misspelt_facility(tmp):
+    """A shape neither bundle declares, asked for by the environment.
+
+    The one refusal in kernel/plugins.lint that a socket check can reach, and
+    the reason the lint had to cross the port at all. `chosen()` returns
+    whatever PHC_FACILITY says; an unrecognised shape resolves to no
+    declaration; and no declaration withholds nothing. So without the lint a
+    typo in the variable runs the FULL facility, and a centre meant to have no
+    laboratory quietly has one, with a green log line.
+
+    Measured on this build before this slice: the Go kernel came up, answered
+    GET /facility with the misspelt name and an empty `withheld`, and served
+    every laboratory tool.
+
+    Neither engine may START. That is stronger than refusing a request: a
+    kernel that answered anything at all would already be the wrong clinic.
+    """
+    import shutil
+
+    asked = "no-such-centre"
+    refused = {}
+    for name in (backend.PYTHON, backend.GO):
+        os.environ[backend.ENV] = name
+        where = os.path.join(tmp, "misspelt-%s" % name)
+        os.makedirs(where, exist_ok=True)
+        try:
+            server = backend.launch(os.path.join(where, "x.sqlite3"),
+                                    bundle="phc", facility=asked)
+        except SystemExit as exc:
+            refused[name] = str(exc)
+            continue
+        finally:
+            os.environ.pop(backend.ENV, None)
+        server.close()
+        raise SystemExit(
+            "\nthe %s backend STARTED with %s=%s, which no shape of this "
+            "bundle declares. It therefore withholds nothing and is running "
+            "the whole facility.\n" % (name, "PHC_FACILITY", asked))
+    os.environ.pop(backend.ENV, None)
+    shutil.rmtree(os.path.join(tmp, "misspelt-%s" % backend.GO), ignore_errors=True)
+    for name, said in refused.items():
+        assert asked in said, (name, said[-2000:])
+        assert "is not one of the facilities" in said, (name, said[-2000:])
+    ok("a misspelt %s stops BOTH engines before they answer anything, naming "
+       "the shape and the ones the bundle declares, rather than withholding "
+       "nothing and running the whole facility" % "PHC_FACILITY")
+
+
+def go_resolver_names_no_declared_word():
+    """The Go plugin resolver types none of this facility's declared words.
+
+    The rule scripts/check_plugins.py section 8 holds kernel/plugins.py to, and
+    for the same reason: a module that types a capability, a station, a flag, a
+    role, a plugin id or a facility id has opinions about ONE facility and is
+    not the thing that makes two of them possible. Nothing held the Go
+    counterpart to it, so the port could have moved `if facility ==
+    "no-laboratory"` across the language boundary unobserved.
+
+    Read off bundle.yaml, so it grows when the bundle does. Test files are
+    excluded for the reason engine_code.py excludes a demo: a case that bends a
+    declaration has to name one.
+    """
+    import yaml
+
+    manifest = yaml.safe_load((ROOT / "bundles" / "phc" / "bundle.yaml").read_text())
+    words = set(manifest["capabilities"]) | set(manifest["states"]) \
+        | set(manifest["stations"]) | set(manifest["roles"]) \
+        | set(manifest["plugins"]) | set(manifest["facilities"]) \
+        | set(manifest["operations"]) | {manifest["id"], manifest["facility"]}
+    assert len(words) >= 60, len(words)
+    files = sorted(p for p in (backend.GO_MODULE / "plugins").glob("*.go")
+                   if not p.name.endswith("_test.go"))
+    assert files, "the Go plugin resolver is not where this check looks"
+    for path in files:
+        live = _go_live_code(path)
+        assert "func " in live, path
+        typed = sorted(w for w in words
+                       if '"%s"' % w in live or "`%s`" % w in live)
+        assert not typed, "%s types this facility's word(s) %r" % (path, typed)
+    ok("the Go plugin resolver types none of this facility's %d declared "
+       "words: not a capability, a station, a flag, a role, a plugin id, a "
+       "facility id or an operation" % len(words))
+
+
 def main():
     # The Go binary is built once, loudly, before anything is compared: a
     # build failure here must not read as a route mismatch.
@@ -2588,6 +2916,12 @@ def main():
         # before three pairs of kernels have been started.
         projection_parity(tmp)
         go_names_no_clinical_word()
+        # The facility's shape, before the shapes themselves are started: the
+        # lint is what decides whether a kernel may start at all, so a
+        # difference in it explains every difference below it.
+        lint_parity(tmp)
+        go_resolver_names_no_declared_word()
+        misspelt_facility(tmp)
         # Before the shapes, because it is the one pair of kernels that does
         # not start from a file seeded today, and a difference here is cheaper
         # to read than one found after three pairs have been started.
@@ -2604,6 +2938,132 @@ def main():
     print("\nok   go parity: %d checks, two engines on one set of declarations"
           % checks)
     return 0
+
+
+def roles(shape, python, go):
+    """A facility's own role combination, saved over both engines.
+
+    bundle.yaml's `roles:` ship as CARE is_system=True presets and a facility's
+    deviation is its own row, which CARE's sync_permissions_roles deliberately
+    never touches. So nothing here mutates a preset: GET /roles comes back with
+    both, and the byte-for-byte pass above already compared it.
+
+    THE PROPERTY THIS IS FOR, WHICH ONLY EXISTS AT A NARROWED CENTRE
+    ---------------------------------------------------------------
+    A role editor is the one place a capability can be ADDED to a caller after
+    the bundle declared it. So it is the one place the facility's subtraction
+    can be stepped around: save `lab.order` into a role at a centre with no
+    laboratory and, if the override replaces the narrowed set rather than
+    feeding it, the caller now holds a capability this centre does not run --
+    and the guard, the quick action row and the MCP tool list all read that set
+    and believe it.
+
+    At a centre that runs every plugin the two orders are indistinguishable,
+    because nothing is withheld. That is why the assertion below is made at
+    every shape that withholds something and said to be vacuous at the one that
+    does not, rather than being written once against the default shape and
+    assumed to hold.
+
+    Run last: an override is in-process state and one facility per kernel, so
+    every comparison before this one would be reading what this one wrote.
+    """
+    # Which role to bend, chosen off the declarations rather than named: a
+    # preset that holds something this facility withholds if there is one, so
+    # the save has something to try to step around.
+    presets = get(python, PREFIX + "/roles")["presets"]
+    withheld = sorted(get(go, PREFIX + "/facility")["withheld"])
+    # Which capability a save needs, DERIVED rather than typed: api/main.py's
+    # own note is that it names no operation and sits in no shipped preset on
+    # purpose, which makes it the one declared capability no preset carries.
+    # Typing the word here would be this check holding an opinion about one
+    # facility's vocabulary.
+    carried = set()
+    for caps in presets.values():
+        carried |= set(caps)
+    admin = sorted(set(get(go, PREFIX + "/facility")["capabilities"]) - carried)
+    assert len(admin) == 1, (
+        "api/main.py's role editor needs exactly one capability no preset "
+        "carries; this bundle leaves %r outside every preset" % admin)
+    admin = admin[0]
+    deviating = sorted(r for r, caps in presets.items()
+                       if set(caps) & set(withheld)) or sorted(presets)
+    role = deviating[0]
+    # And what to save: everything that preset already held, plus everything
+    # this facility withholds. A legal save -- a facility declines a
+    # capability, it does not delete one from the bundle -- so both engines
+    # must accept it.
+    wanted = sorted(set(presets[role]) | set(withheld))
+
+    answers = {}
+    for name, base in (("python", python), ("go", go)):
+        status, body = call(base, PREFIX + "/roles/" + role, method="PUT",
+                            body={"capabilities": wanted})
+        answers[name] = (status, body)
+    assert answers["python"] == answers["go"], answers
+    assert answers["go"][0] == 200, answers["go"]
+    assert answers["go"][1]["capabilities"] == wanted, (answers["go"], wanted)
+
+    # Saved, and readable back as a deviation rather than as an edited preset.
+    for base in (python, go):
+        back = get(base, PREFIX + "/roles")
+        assert back["overrides"][role] == wanted, back["overrides"]
+        assert back["presets"][role] == presets[role], (
+            "the preset itself was edited, which is the one thing a facility's "
+            "deviation may never do")
+    py_roles = get(python, PREFIX + "/roles")
+    go_roles = get(go, PREFIX + "/roles")
+    assert py_roles == go_roles, (py_roles, go_roles)
+
+    # And what the caller actually holds. The subtraction is applied to the
+    # OVERRIDE, every time, which is the property above.
+    header = {"X-PHC-Role": role}
+    py_mine = get(python, PREFIX + "/whoami", header)["capabilities"]
+    go_mine = get(go, PREFIX + "/whoami", header)["capabilities"]
+    assert py_mine == go_mine, (py_mine, go_mine)
+    for cap in withheld:
+        assert cap not in go_mine, (
+            "%s: '%s' was saved into role '%s' and the caller HOLDS it, so a "
+            "role editor stepped around the facility's subtraction" % (
+                shape, cap, role))
+    if withheld:
+        ok("%s: a role saved WITH all %d capabilities this centre withholds is "
+           "accepted by both engines, stored as a deviation beside the "
+           "untouched preset, and the caller still holds none of them"
+           % (shape, len(withheld)))
+    else:
+        ok("%s: a role saved with every capability this bundle declares is "
+           "accepted by both engines and stored as a deviation beside the "
+           "untouched preset; this centre withholds nothing, so the "
+           "subtraction has nothing to prove here" % shape)
+
+    # The three refusals, compared rather than asserted: who may save, which
+    # roles exist, and which words are capabilities of THIS bundle. The last
+    # is the one that matters -- catalogue.json's top-level `capabilities` is
+    # the union over every bundle, and validating a save against that union
+    # would let a health centre's role editor grant laboratory capabilities
+    # this bundle does not declare, to the only account the browser can be.
+    whole = get(go, PREFIX + "/facility")["capabilities"]
+    wider = sorted(set(get(go, PREFIX + "/catalogue")["capabilities"]) - set(whole))
+    refusals = [
+        ("not an administrator", PREFIX + "/roles/" + role,
+         {"X-PHC-Role": next(r for r in sorted(presets)
+                             if admin not in presets[r])},
+         {"capabilities": []}),
+        ("no such role", PREFIX + "/roles/surgeon", {}, {"capabilities": []}),
+        ("not a capability of this bundle", PREFIX + "/roles/" + role, {},
+         {"capabilities": [sorted(whole)[0] + ".typo"]}),
+    ]
+    for label, path, head, body in refusals:
+        py = call(python, path, method="PUT", headers=head, body=body)
+        gone = call(go, path, method="PUT", headers=head, body=body)
+        assert py == gone, (label, py, gone)
+        assert py[0] != 200, (label, py)
+    ok("%s: and the three ways a save is refused -- not an administrator, no "
+       "such role, and a word that is not one of this bundle's %d "
+       "capabilities -- answer identically on both engines%s"
+       % (shape, len(whole),
+          ", including the %d the embedded catalogue carries for OTHER "
+          "bundles" % len(wider) if wider else ""))
 
 
 def compare(shape, python, go):
@@ -2701,6 +3161,11 @@ def compare(shape, python, go):
         owed.append(path[len(PREFIX):] or "/")
     ok("%s: %d routes the Python serves answer 501 on the Go with the slice "
        "that will bring them, rather than 404" % (shape, len(owed)))
+
+    # --- and last, because it writes in-process state that every other
+    # comparison above would then be reading: a facility's own role
+    # combination. See roles().
+    roles(shape, python, go)
 
 
 # ---------------------------------------------------------------------------

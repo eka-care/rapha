@@ -16,7 +16,6 @@ import (
 	"strconv"
 	"time"
 
-	carephc "github.com/eka-care/care_phc_mcp"
 	"github.com/eka-care/care_phc_mcp/directory"
 	"github.com/eka-care/care_phc_mcp/pyval"
 	"github.com/eka-care/care_phc_mcp/spine"
@@ -230,52 +229,4 @@ func (k *kernel) patientPending(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"pending": rows, "count": len(rows)})
-}
-
-// ---------------------------------------------------------------------------
-// the facility's demo day: kernel/plugins.seeded, in Go
-// ---------------------------------------------------------------------------
-
-// seeded is kernel/plugins.seeded: this facility's demo day, which is the
-// seeded threads it could really have had.
-//
-// A seed is fixture data rather than a declaration, but a thread whose history
-// names an operation nobody at this centre may perform is a lie about what
-// happened here, and it draws a pending card no person can confirm. So a
-// thread is dropped WHOLE rather than edited: half a visit with its laboratory
-// step quietly deleted reads as a visit that finished.
-//
-// It sits beside chosen/off/withheldBy/absent/effective in cmd/api rather than
-// in the store, because it is kernel/plugins.py and not the adapter: the store
-// is handed the threads a facility could have had and writes them.
-func seeded(threads []map[string]any, ops map[string]carephc.Operation,
-	heldBack map[string]string) []map[string]any {
-	if len(heldBack) == 0 {
-		return threads
-	}
-	kept := []map[string]any{}
-	for _, thread := range threads {
-		drop := false
-		for _, key := range []string{"proposals", "audit"} {
-			listed, _ := thread[key].([]any)
-			for _, item := range listed {
-				entry, isMap := item.(map[string]any)
-				if !isMap {
-					continue
-				}
-				opID, _ := entry["operation"].(string)
-				op, declared := ops[opID]
-				if !declared {
-					continue
-				}
-				if _, withheld := heldBack[op.Capability]; withheld {
-					drop = true
-				}
-			}
-		}
-		if !drop {
-			kept = append(kept, thread)
-		}
-	}
-	return kept
 }
