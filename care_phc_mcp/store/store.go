@@ -48,6 +48,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/eka-care/care_phc_mcp/pyval"
 	"regexp"
 	"sort"
 	"strconv"
@@ -914,14 +915,20 @@ func (s *SQLite) proposalsWhere(clause string, params []any, order string) ([]Pr
 			CreatedAt: r["created_at"], DecidedBy: r["decided_by"],
 			DecidedAt: r["decided_at"],
 		}
-		if err := json.Unmarshal([]byte(orDefault(r["payload"], "{}")), &p.Payload); err != nil {
+		// pyval.Decode and not json.Unmarshal: a payload read back out
+		// of the file is a clinical answer, and a decimal one must keep the
+		// spelling the Python gives it. encoding/json's default narrows every
+		// number to float64, so 37.0 came back as 37 and the renderer
+		// prefilled a form with a value the clinician had not typed. See
+		// package pyval's own note on why numbers arrive as json.Number.
+		if err := pyval.Decode([]byte(orDefault(r["payload"], "{}")), &p.Payload); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal([]byte(orDefault(r["flags_raised"], "[]")), &p.FlagsRaised); err != nil {
 			return nil, err
 		}
 		if r["final_payload"] != "" {
-			if err := json.Unmarshal([]byte(r["final_payload"]), &p.FinalPayload); err != nil {
+			if err := pyval.Decode([]byte(r["final_payload"]), &p.FinalPayload); err != nil {
 				return nil, err
 			}
 		}
@@ -965,7 +972,10 @@ func (s *SQLite) Audit(thread string) ([]AuditRecord, error) {
 			Actor: r["actor"], Surface: r["surface"], Outcome: r["outcome"],
 			At: r["at"], Proposal: r["proposal"],
 		}
-		if err := json.Unmarshal([]byte(orDefault(r["payload"], "{}")), &a.Payload); err != nil {
+		// pyval.Decode, for the reason proposals above give: an audit
+		// row's payload is the answer as it was judged, and a decimal keeps
+		// its spelling.
+		if err := pyval.Decode([]byte(orDefault(r["payload"], "{}")), &a.Payload); err != nil {
 			return nil, err
 		}
 		out = append(out, a)

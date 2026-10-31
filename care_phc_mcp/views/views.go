@@ -41,6 +41,7 @@ import (
 
 	carephc "github.com/eka-care/care_phc_mcp"
 	"github.com/eka-care/care_phc_mcp/kstate"
+	"github.com/eka-care/care_phc_mcp/pyval"
 	"github.com/eka-care/care_phc_mcp/store"
 )
 
@@ -138,13 +139,16 @@ func count(s Reader, q carephc.StateQuery) (int, error) {
 // order. Denominator is a pointer because a plain count declares none and
 // None goes on the wire as null.
 type MetricValue struct {
-	Metric      string  `json:"metric"`
-	Value       float64 `json:"value"`
-	Numerator   int     `json:"numerator"`
-	Denominator *int    `json:"denominator"`
-	Unit        string  `json:"unit"`
-	Window      string  `json:"window"`
-	WindowStart string  `json:"window_start"`
+	Metric string `json:"metric"`
+	// A float even when the count is whole, because kernel/views.py's
+	// round(value, 2) is one. pyval.Float keeps the Python spelling, so 24
+	// goes on the wire as 24.0 in both engines.
+	Value       pyval.Float `json:"value"`
+	Numerator   int         `json:"numerator"`
+	Denominator *int        `json:"denominator"`
+	Unit        string      `json:"unit"`
+	Window      string      `json:"window"`
+	WindowStart string      `json:"window_start"`
 }
 
 // round2 is Python's round(value, 2).
@@ -200,7 +204,7 @@ func Metric(s Reader, m carephc.Metric, window string, at time.Time) (MetricValu
 	default:
 		value = float64(num) / float64(*den)
 	}
-	return MetricValue{Metric: m.ID, Value: round2(value), Numerator: num,
+	return MetricValue{Metric: m.ID, Value: pyval.Float(round2(value)), Numerator: num,
 		Denominator: den, Unit: m.Unit, Window: window, WindowStart: start}, nil
 }
 

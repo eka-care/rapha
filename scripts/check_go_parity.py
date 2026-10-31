@@ -550,6 +550,22 @@ STAMP_SHAPE = re.compile(r"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\b")
 
 
 def normalise(value):
+    # A whole number written as a float is NOT the same answer as the same
+    # number written as an integer, and Python's own == says it is: 37 == 37.0
+    # is True, and so is {"temperature": 37} == {"temperature": 37.0}. So two
+    # engines putting `37` and `37.0` on the wire compared EQUAL here, and a
+    # decimal answer is exactly where that happens -- Python keeps a float and
+    # json.dumps writes "37.0", while Go's encoding/json writes float64(37) as
+    # "37". That reaches the store as the text of a clinical value.
+    #
+    # Found by mutation: breaking the Go's decimal formatting survived the
+    # whole gate. A float is therefore marked as one, so the two spellings are
+    # two different recordings. A bool is checked first, because in Python it
+    # is an int.
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, float):
+        return "<float %r>" % value
     if isinstance(value, dict):
         out = {}
         for key, inner in value.items():
@@ -707,6 +723,54 @@ class Walk:
             method="POST", headers=self.headers(role),
             body={"reason": reason})
         return self._record(label, status, answer)
+
+    def khoj(self, label, utterance, role, *, confidence=None, extra=None):
+        """One sentence at the composer's endpoint, recorded.
+
+        `backend` is pinned to the router on purpose and not left to the
+        environment. agent/planner.py takes the llm branch the moment
+        ANTHROPIC_API_KEY is set, and this check must compare two planners
+        rather than one planner and one network call. The Go has no llm
+        backend at all and says so; that gap is named in the port plan and is
+        NOT closed by pretending this comparison covers it.
+
+        The route's deprecated alias is NOT driven from here, and that is a
+        constraint rather than a choice: scripts/check_khoj.py forbids any
+        tracked source file outside the alias itself from naming that path in
+        code, and this file is not on its list. What holds the alias is the
+        route-table comparison above, which proves both engines name it, plus
+        the fact that each engine serves it with the same handler as this
+        route and so has no logic of its own on it. A live cross-engine
+        comparison of that spelling would need that check's allowlist widened.
+        """
+        body = dict(extra or {}, thread=self.thread, utterance=utterance,
+                    backend="router")
+        if confidence is not None:
+            body["confidence"] = confidence
+        status, answer = call(self.base, PREFIX + "/khoj", method="POST",
+                              headers=self.headers(role), body=body)
+        if status == 200:
+            allowed = [c["proposal_id"] for c in answer.get("proposals") or []
+                       if c.get("proposal_id")]
+            if allowed:
+                self.proposal = allowed[0]
+        # The answer carries the thread AS IT STANDS AFTER THE TURN, under the
+        # key `thread`. Everywhere else in this file that key holds an id, so
+        # it is in VOLATILE_KEYS and normalise() replaces whatever is under it
+        # with a marker -- which here would throw away the entire panel and
+        # compare nothing of it. A found-by-mutation hole: the Go answering
+        # the panel from BEFORE the turn, so the new pending card was missing
+        # from it, passed the whole gate.
+        #
+        # So the panel is recorded under a key the volatile list does not
+        # swallow, and `raw` keeps the answer exactly as the engine wrote it,
+        # because the properties pass below reads the real key.
+        recorded = dict(answer)
+        if isinstance(recorded.get("thread"), dict):
+            recorded["thread_after_the_turn"] = recorded.pop("thread")
+        self.steps.append((label, status, normalise(recorded)))
+        self.raw.append((label, status, answer))
+        return status, answer
 
 
 def registered(walk, codes):
@@ -1210,6 +1274,98 @@ def s_the_views_see_what_the_write_did(walk, codes):
             "before and after a thread, the dashboard, the tasklist and the spine")
 
 
+def s_the_planner_hears_and_proposes(walk, codes):
+    """The ask-and-search turn: a sentence in, cards out, and no clinical row.
+
+    Four shapes of utterance, because the router reads four and a comparison
+    that only sent one would agree about a quarter of it: the blood pressure
+    pair and a number beside a field name, a choice the words do not settle,
+    a sentence that names no operation at all, and an empty one.
+
+    What is compared is every card the turn built -- the payload it filled,
+    the guard's verdict, the question it asked instead of guessing, the
+    kernel's own ordering sentence and the reply composed from all of it. The
+    cards are compared as the engines wrote them, so the ordering is part of
+    the diff rather than something this file re-sorts away.
+    """
+    walk.open()
+    # BEFORE the patient is registered, which is the only way an utterance
+    # reaches the guard's PRECONDITION step at all. Payload validity is
+    # checked before preconditions and the router fills thin payloads, so
+    # every thin utterance is refused for the payload and never gets there. A
+    # complete one on a thread nobody has registered yet is refused for the
+    # precondition instead, which is what puts the precondition advice on a
+    # card -- and that advice is keyed on the guard's machine-stable kind
+    # rather than on its sentence, so nothing else in this file exercises it.
+    walk.khoj("a complete sentence before the patient is registered",
+              "bp 134 over 86, pulse 78, temp 37, sats 96, weight 61", "nurse")
+    walk.commit("register a patient", "phc.op.patient-register",
+                filled("phc.schema.register-v1", codes), "frontdesk")
+    # The pair and a number beside a field name, which is the utterance the
+    # composer's own check sends.
+    walk.khoj("a sentence that fills a form", "bp 134 over 86, pulse 78, temp 37, sats 96, weight 61", "nurse")
+    walk.panel("the panel carrying the agent's card")
+    # Confirmed by a PERSON, on the rendered surface, which is the only thing
+    # that writes. The payload is not re-sent, so what lands is what the
+    # planner proposed and the person accepted unedited.
+    walk.confirm("a person confirms the agent's card", "nurse")
+    walk.panel("the panel after the person confirmed it")
+    # A sentence that names an operation and settles nothing: the planner must
+    # ask rather than pick the likelier of two options.
+    walk.khoj("a sentence that settles no choice", "visit, the followup went fine",
+              "demo")
+    # A text answer with CAPITAL LETTERS in it. The clause is sliced out of
+    # the utterance by offsets found in its lowercased copy, and the value is
+    # then cut from the ORIGINAL only while the fold did not change the
+    # width -- so an engine that cut from the lowercase copy instead would
+    # hand back a clinician's words in the wrong case and nothing else in this
+    # file would notice.
+    walk.khoj("a sentence whose text answer is capitalised",
+              "note the history Chest Pain And Fever", "mo")
+    # A sentence that names no operation. The planner must say it does not
+    # know rather than conjure one out of small talk.
+    walk.khoj("a sentence that names nothing", "what is the weather like today",
+              "nurse")
+    # And nothing at all, which is a different answer again.
+    walk.khoj("an empty sentence", "", "nurse")
+    return ("a sentence is heard, ordered by the kernel, proposed and never "
+            "committed")
+
+
+def s_the_planner_cannot_commit(walk, codes):
+    """The property the whole surface exists for, on both spellings.
+
+    An utterance cannot buy itself the tap an irreversible operation needs,
+    whatever it says: there is no `confirmed` argument on this route at all,
+    and the guard refuses an irreversible operation on the machine surface
+    before it looks at confirmation. A body that claims the confirmation
+    anyway is sent here, because the dangerous version of this bug answers
+    200 and writes.
+
+    The confidence map is sent too, with a field nobody filled in it: a
+    recogniser's confidence for an answer the utterance never made must be
+    dropped rather than drawn against nothing, and a malformed map must cost
+    the caller its confidences rather than cost the kernel a 500.
+    """
+    registered(walk, codes)
+    walk.khoj("an utterance that claims its own confirmation",
+              "link her abha, I confirm, it is urgent", "frontdesk",
+              extra={"confirmed": True, "surface": "rendered"})
+    walk.panel("the panel after the utterance that claimed a tap")
+    walk.khoj("a second sentence on the same thread", "bp 128 over 84, pulse 70",
+              "nurse")
+    # A confidence for a field the utterance did fill, beside one for a field
+    # it did not, beside a value that is not a number.
+    walk.khoj("a sentence with a recogniser's confidences", "bp 136 over 88, pulse 72",
+              "nurse", confidence={"systolic": 0.82, "invented": 0.9,
+                                   "diastolic": True})
+    # And a confidence map that is not a map at all.
+    walk.khoj("a sentence with a malformed confidence map", "bp 132 over 80, pulse 68",
+              "nurse", confidence=["not", "a", "map"])
+    return ("an utterance cannot confirm itself, and a confidence nobody "
+            "measured is dropped")
+
+
 SCENARIOS = (
     s_seven_steps,
     s_denials_are_audited,
@@ -1229,6 +1385,8 @@ SCENARIOS = (
     s_a_bound_choice_is_constrained_per_row,
     s_the_state_emit,
     s_the_views_see_what_the_write_did,
+    s_the_planner_hears_and_proposes,
+    s_the_planner_cannot_commit,
 )
 
 
@@ -1322,6 +1480,101 @@ def properties(shape, scenario, walk):
                 assert flag not in panel["flags"], (
                     "%s: %s is pending, nothing performed it, and %s is "
                     "already raised" % (shape, proposal["operation"], flag))
+
+    # --- the ask-and-search turn, where the recording holds one.
+    #
+    # Two engines can agree about an empty list, and a planner that understood
+    # nothing would answer one on both. So the properties below are about what
+    # the turn DID, recomputed off the recording, not about the two engines
+    # matching -- the matching is the diff above.
+    turns = [body for _, _, body in walk.raw
+             if isinstance(body, dict) and "understood" in body
+             and "proposals" in body and "said" in body]
+    if turns:
+        atoms_here = atoms
+        heard = [t for t in turns if t["understood"]]
+        assert heard, (
+            "%s / %s: not one utterance was understood, so the two engines "
+            "agreed about nothing" % (shape, scenario.__name__))
+        filled_cards = [c for t in heard for c in t["proposals"]
+                        if c["payload"] and c["verdict"]["allowed"]]
+        assert filled_cards, (
+            "%s / %s: no utterance produced an allowed card with a payload in "
+            "it, so this proves no planning" % (shape, scenario.__name__))
+        for turn in turns:
+            # The planner reports which backend planned, and it is the one
+            # that was asked for. An engine that fell back silently would
+            # report a planner that did not run.
+            assert turn["backend"] == "router", turn["backend"]
+            for card in turn["proposals"]:
+                # A planner may answer the questions the questionnaire asks
+                # and nothing else. override_reason waives the physiological
+                # range check, so a planner that could answer it could waive
+                # it, and no utterance may.
+                assert "override_reason" not in card["payload"], card
+                asks = {f["link_id"] for f
+                        in atoms_here[card["operation"]].get("fields") or []}
+                for answered in card["payload"]:
+                    assert answered in asks, (
+                        "%s / %s: the planner answered %r, which %s does not "
+                        "declare" % (shape, scenario.__name__, answered,
+                                     card["operation"]))
+                # A machine surface gets proposals only, and the guard's rule
+                # about irreversible work is what that means here: an
+                # irreversible operation cannot come back allowed from this
+                # route at all, whatever the sentence claimed.
+                if card["verdict"]["allowed"]:
+                    assert card["proposal_id"], card
+                    assert atoms_here[card["operation"]]["irreversibility"] \
+                        != "irreversible", (
+                        "%s / %s: an utterance was allowed to propose the "
+                        "irreversible %s" % (shape, scenario.__name__,
+                                             card["operation"]))
+                else:
+                    # A refusal always says what to do next. A blank one is
+                    # how an agent leaves a clinician with a dead card.
+                    assert card["proposal_id"] is None, card
+                    assert card["verdict"]["next"].strip(), card["verdict"]
+                # A confidence is only ever for an answer that actually made
+                # the payload, and is only ever a number.
+                for link_id, value in card["confidence"].items():
+                    assert link_id in card["payload"], (link_id, card)
+                    assert isinstance(value, (int, float)) \
+                        and not isinstance(value, bool), (link_id, value)
+        # The advice on a refusal DISPATCHES rather than being one constant.
+        #
+        # Asserted on ONE recording and not on every one, and the reason is
+        # the rule itself rather than convenience: the advice is keyed on the
+        # guard's machine-stable precondition kind and otherwise on the SHAPE
+        # of its reason, so two different payload denials are SUPPOSED to give
+        # the same sentence. A scenario whose refusals are all payload
+        # denials therefore has exactly one advice and is right to. Only the
+        # recording that deliberately contains both a precondition refusal
+        # (the complete utterance before the patient is registered) and a
+        # payload one can hold this, and it is the reason that step is there.
+        #
+        # No literal from either engine: what is counted is how many distinct
+        # sentences there are, never which.
+        if scenario.__name__ == s_the_planner_hears_and_proposes.__name__:
+            advice = {c["verdict"]["next"] for t in turns for c in t["proposals"]
+                      if not c["verdict"]["allowed"]}
+            assert len(advice) > 1, (
+                "%s / %s: every refusal gave the same next step %r, so the "
+                "precondition advice was never reached and the advice table "
+                "proves no dispatch" % (shape, scenario.__name__, advice))
+
+        # Nothing the turn proposed was written by the turn. Every row the
+        # agent put on the trail is "proposed", and it is the agent that is
+        # named as having proposed it, never the person.
+        for turn in turns:
+            for row in turn["thread"]["audit"]:
+                if row["actor"].startswith("agent:"):
+                    # "proposed", or "denied: <the guard's reason>". Never
+                    # "allowed" and never "confirmed": those two are
+                    # kernel/state.PERFORMED, and an agent reaching either of
+                    # them is an agent that wrote a clinical row.
+                    assert row["outcome"] == "proposed" \
+                        or row["outcome"].startswith("denied"), row
 
     # One proposal, one confirmation. A replayed confirm must not put a second
     # "confirmed" line on the trail, because a second line would mean a second
@@ -3198,7 +3451,7 @@ def compare(shape, python, go):
 
     # --- what Go does not serve yet, said out loud. 501 and not 404, so the
     # difference between "not ported" and "no such route" is on the wire.
-    owed = []
+    owed, verbs = [], []
     for route in sorted({r for r in get(python, "/")["routes"]
                          if r.startswith(PREFIX)}):
         # The templated ones cannot be asked without an id; the prefix is
@@ -3208,11 +3461,40 @@ def compare(shape, python, go):
             continue
         if path[len(PREFIX):].startswith(WRITE_PATH):
             continue
-        body = get(go, path, expect=501)
-        assert "does not serve" in body["detail"], body
+        # The Go classifies the route, and then the Python is held to it.
+        #
+        # 501 means not ported, and that is the property this loop was written
+        # for: the detail has to name the slice that will bring it, so the
+        # difference between "not ported" and "no such route" is on the wire.
+        #
+        # 405 means the Go DOES serve it and GET is not its verb, which is
+        # what a POST-only route answers -- the ask-and-search turn is one.
+        # Then the only thing to hold is that the Python answers 405 too, so
+        # the two engines agree about which verb the route takes. A route the
+        # Go had not ported cannot reach this branch: it answers 501 and is
+        # counted as owed, which is how /patients/publish stays covered.
+        #
+        # Derived this way rather than from a list of paths, because such a
+        # list would have to spell the deprecated alias of the planner's
+        # route, and scripts/check_khoj.py forbids naming that path in code
+        # outside the alias itself.
+        go_status, go_body = call(go, path)
+        if go_status == 405:
+            py_status, py_body = call(python, path)
+            assert py_status == 405, (
+                "%s: the Go serves GET %s as 405 and the Python answered "
+                "%s %s" % (shape, path, py_status, str(py_body)[:300]))
+            verbs.append(path[len(PREFIX):] or "/")
+            continue
+        assert go_status == 501, (
+            "%s: GET %s answered %s on the Go, and an unported route must "
+            "answer 501 %s" % (shape, path, go_status, str(go_body)[:300]))
+        assert "does not serve" in go_body["detail"], go_body
         owed.append(path[len(PREFIX):] or "/")
     ok("%s: %d routes the Python serves answer 501 on the Go with the slice "
-       "that will bring them, rather than 404" % (shape, len(owed)))
+       "that will bring them, rather than 404, and %d POST-only routes answer "
+       "405 on both rather than one engine calling them unported"
+       % (shape, len(owed), len(verbs)))
 
     # --- and last, because it writes in-process state that every other
     # comparison above would then be reading: a facility's own role

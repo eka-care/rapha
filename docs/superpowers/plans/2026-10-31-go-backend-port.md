@@ -266,12 +266,41 @@ Each is finished when the gate is green and the named checks pass against Go.
 - **G8. The outbox.** Durable, nothing lost, nothing sent twice, nothing
   reported as sent when it was not. Still switched off: the audio retention
   window is unsigned.
-- **G8b. The planner.** `POST /khoj`, the ask-and-search turn in
-  `agent/turn.py`. **Added 2026-10-31, after G4,** because no slice owned it
-  and 28 of the 49 socket checks in `scripts/e2e.py main()` sit behind it.
-  The nine original slices were drawn from the kernel and the API; the
-  planner is neither, which is how it went unnamed. Nothing can retire the
-  Python while a route no slice owns still answers 501.
+- **G8b. The planner. LANDED 2026-11-01.** `POST /khoj`, the ask-and-search
+  turn in `agent/turn.py`. **Added 2026-10-31, after G4,** because no slice
+  owned it and 28 of the 49 socket checks in `scripts/e2e.py main()` sat
+  behind it. The nine original slices were drawn from the kernel and the API;
+  the planner is neither, which is how it went unnamed.
+
+  What landed: `care_phc_mcp/planner`, the deterministic router of
+  `agent/planner.py` and the ordering, carding and wording of `agent/turn.py`,
+  over the same guard on the same machine surface. `scripts/e2e.py` on Go went
+  from 21 of 49 to 44 of 49, and `scripts/check_go_parity.py` from 102 checks
+  to 108. The spoken field names are read from the tree at startup, beside the
+  questionnaires and the value sets, and not restated in Go.
+
+  **The half that did NOT land, and is not a stub.** `agent/planner.py` has
+  two backends. `route()` is ported. `llm()`, the anthropic SDK on
+  claude-opus-5 when `ANTHROPIC_API_KEY` is set, is not: it would need a
+  network call and a third-party dependency, and this port may take neither.
+  `planner.Backend()` answers `"llm"` exactly where the Python's does, and
+  `Plan()` then returns an error naming the gap rather than planning with the
+  router and reporting a backend that did not run. Nothing compares the two
+  engines on that branch, because there is nothing on the Go side to compare;
+  the Python's own `llm()` has never been run against api.anthropic.com
+  either. **This is the owner's: whether the Go kernel grows an SDK
+  dependency, or whether khoj's llm backend stays a Python-only path after
+  G9.** It blocks G9 for any facility that sets a key.
+
+  **The deprecated spelling is held by the route table and not by a call.**
+  `/agent/say` is served on Go by the same handler as `/khoj`, exactly as
+  `api/main.py` serves it by delegating. The two engines are compared on the
+  route table and on the verb, but no check POSTs a sentence to that spelling
+  across engines, because `scripts/check_khoj.py` forbids any tracked source
+  file outside the alias itself from naming that path in code and
+  `scripts/check_go_parity.py` is not on its allowlist. **Widening that
+  allowlist is a human call**, and the exposure that file already documents
+  for `api/main.py` is the same one.
 - **G8c. Codification.** `kernel/codification.py`, the seam that turns spoken
   words into suggested codes. **Added 2026-10-31, after G5,** for the same
   reason G8b was: no slice owned it. It is the only product caller of the
@@ -279,6 +308,20 @@ Each is finished when the gate is green and the named checks pass against Go.
   counterpart decides whether an uncached value set is an error or simply a
   set with no categories; today the Python raises and the Go returns nothing,
   and no Go caller reads it either way.
+- **The fifth seam: one bundle is compiled INTO the binary.** Found by G8b,
+  which is the slice that bumped into it. `care_phc_mcp/catalogue.json` is
+  embedded at build time with `//go:embed`, and `cmd/api` refuses by name to
+  serve a bundle it was not compiled for. That refusal is right and is not the
+  problem. The problem is that `scripts/e2e.py`'s `lab_separation()` starts a
+  SECOND bundle on its own kernel and its own file, so the last 5 of the 49
+  socket checks cannot pass against Go however correct the engine is: the
+  binary would have to be rebuilt between them. It belongs to no slice. G1
+  embedded the file, every slice since has read it, and no slice owns the
+  question of whether a Go kernel reads `catalogue.json` from the tree at
+  startup, the way it already reads the questionnaires, the value sets, the
+  seed and now the spoken field names. **It blocks G9: a facility running two
+  bundles cannot be served by one Go binary today, and the laboratory's own
+  separation rule is unproven on Go for that reason and no other.**
 - **G9. Retire the Python.** Only on the owner's word, and only when every
   check passes against Go.
 
