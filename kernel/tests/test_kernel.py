@@ -417,7 +417,13 @@ def test_a_queue_groups_in_line_order_with_a_trailing_finished_group():
     assert [(g["key"], g["count"]) for g in res.groups if g["count"]] == [("nurse", 1),
                                                                          (None, 1)]
     row = next(r for r in res.rows if r.thread == "enc-1")
-    assert set(row.subject) == {"name", "age", "sex", "village", "token"}
+    # The declared columns, spelled out rather than read back off the
+    # declaration: a test that asks the bundle what it declares and then
+    # asserts the kernel returned that is true for every bundle and says
+    # nothing. "category" joined this list when the queue gained its
+    # programme filter, which is the only reason to touch this line.
+    assert set(row.subject) == {"name", "age", "sex", "village", "token",
+                                "category"}
     assert row.badges == {"abha.pending": "warn"}, "a declared badge did not fire"
 
 

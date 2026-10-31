@@ -13,7 +13,13 @@ group_by: station
 # but it is a placeholder for whoever actually owns this facility's target,
 # not a number to read back as researched.
 target_minutes: 30
-columns: [name, age, sex, village, token]
+# `category` is the national programme a patient is enrolled in, and it is
+# the one registration already asks for. It is here because a queue is read to answer
+# "show me the NCD patients waiting", not to read one person's details across,
+# and a label the screen cannot see is a filter nobody can use. The screen is
+# still told nothing about what the programmes ARE: it draws whatever this
+# column carries, under whatever the value set calls it.
+columns: [name, age, sex, village, token, category]
 badges:
   abha.pending: warn
   vitals.flagged: crit

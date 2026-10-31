@@ -2726,7 +2726,8 @@
         "age",
         "sex",
         "village",
-        "token"
+        "token",
+        "category"
       ],
       "escalate_minutes": null,
       "group_by": "station",
