@@ -159,6 +159,58 @@ Each is finished when the gate is green and the named checks pass against Go.
 - **G6. Mapping and the record projection.** Rows per group row, the author on
   each, and the three OPConsultRecord slices this build fills, plus the
   narrative fallback.
+
+  **Landed 2026-10-31.** The mapping half was already in Go from G3, so what
+  this slice carried is `kernel/fhir.py`, as `care_phc_mcp/fhir`. The four
+  measures are unmoved and could not have moved: `scripts/check_live.py` is
+  16 of 16, `scripts/e2e.py main()` is 21 of 49 and still stops at
+  `POST /khoj`, and `facility_shape()` is 4 of 4. **A document is on no HTTP
+  route in either engine and never will be** — it is what the outbox sends to
+  ABDM, not something a clinic asks for over the wire — so there is nothing
+  for the socket checks to compare, and no route was invented so that a check
+  could reach behind the service. It is compared the way G3's fill is: a Go
+  test that asserts nothing, driven by `scripts/check_go_parity.py`, over rows
+  the real `kernel/mapping.py` made from payloads generated off the
+  questionnaires. 83 parity checks became 89.
+
+  Every refusal is carried as a refusal: an observation with no status, an
+  observation carrying a certainty R4 has no element for, a section slice
+  NRCeS does not declare, a visit with nobody on it, a resource with no
+  projection. An empty narrative is DECLINED rather than published as a
+  heading claiming a note, and the engine then refuses the document for
+  having nothing in it, which is the hole the fallback was built to close said
+  by the engine rather than asserted by a check.
+
+  **`ToFHIR` keeps its one caller, and that is the decision rather than an
+  omission.** The Go projection goes the way the Python does: a coding is
+  built from stored COLUMNS, which are text read back out of SQLite. Routing
+  it through `terminology.Coding` instead would re-resolve every stored code
+  at projection time, which changes behaviour rather than porting it — a row
+  whose code its value set no longer holds is published by the Python as what
+  the row says, and a Coding-based path would refuse to publish it at all.
+  The write path is where a code is vouched for; by the time a row is read
+  back, the row IS the record of that proof.
+
+  **A THIRD SEAM THAT BELONGS TO NO SLICE: the placement declaration does not
+  travel.** `documents` in `bundles/<id>/bundle.yaml` says which section of
+  which profile each kind of row is filed under. It is absent from
+  `kernel/contracts.BUNDLE_KEYS`, so the word "documents" does not appear in
+  `catalogue.json` at all and **no Go process can read it**. `Document()`
+  therefore takes the placement as an argument, exactly as the Python does,
+  and the parity check passes it the Python bundle's own. The production
+  caller is the outbox, so this is G8's to close, and closing it means editing
+  `kernel/contracts.py` and `kernel/declarations.py` — outside what this slice
+  was allowed to touch. Until it is closed, no Go path can publish a document
+  even once the outbox exists. Like the planner and codification before it,
+  this was found by the slice that bumped into it.
+
+  Also landed, and it is a gap rather than a port: **the Go engine is now held
+  to the rule the Python engine was already held to.** `scripts/check_rx.py`
+  and `scripts/check_vitals.py` assert that no engine MODULE types a
+  diagnosis, a drug, a route, a frequency or a unit; nothing asserted it of a
+  Go file, so the port could have moved `if code == "29463-7"` across the
+  language boundary unobserved. 24 Go files against 56 words from 5 value
+  sets.
 - **G7. Plugins.** A facility's shape as one list of what it does not run,
   subtracted once, denied and never hidden.
 - **G8. The outbox.** Durable, nothing lost, nothing sent twice, nothing

@@ -2704,6 +2704,106 @@ def compare(shape, python, go):
 
 
 # ---------------------------------------------------------------------------
+# The mutation ledger for what G6 added: 21 applied, 20 caught, 1 not and fixed
+# ---------------------------------------------------------------------------
+#
+# Each one was applied, PROVED applied before anything ran (the file changed,
+# the replaced text was gone, the replacement was there, the replacement did
+# not contain what it replaced, and git agreed), run through the whole of
+# scripts/check.sh, reverted, and the revert proved byte clean against git.
+# The gate stops at the first failure, so "first" is the gate's own order.
+# Nineteen are Go only; the last two change BOTH engines.
+#
+# Six were caught by `go test ./...` in "== the MCP server ==", which is
+# EARLIER in the gate than this file, because care_phc_mcp/fhir/fhir_test.go
+# pins those facts from inside the package as well. That is a second net and
+# it is named rather than hidden: a reader who sees only this ledger would
+# otherwise think the diff caught them.
+#
+#  1. A section code drifts: ChiefComplaints carries MedicalHistory's.
+#     -> the projection's declaration tables.
+#  2. An observation with no status is given `final`.   -> go test ./fhir/.
+#  3. An observation carrying a certainty R4 cannot express is projected
+#     anyway, so a denied finding is published as a fact. -> go test ./fhir/.
+#  4. A Condition's verificationStatus is pinned to confirmed.
+#     -> the per-resource diff, on a condition row.
+#  5. The narrative fallback declines EVERY row, which is the fallback that
+#     promised three files and provided none.            -> go test ./fhir/.
+#  6. A stored number is published as a quoted string.   -> go test ./fhir/.
+#  7. A Practitioner id carries the login name instead of its hash.
+#     -> the practitioners comparison.
+#  8. A section reads only the FIRST row of each query.
+#     -> the documents diff, the bundle's own declared consultation.
+#  9. Only the first author met is collected.            -> the same.
+# 10. An entryless section is published, so a heading claims nothing was
+#     found rather than that nothing was looked for.     -> the same.
+# 11. A Go engine file types a diagnosis code.
+#     -> go_names_no_clinical_word(), which nothing held the Go to before.
+# 12. A code with no system becomes a bare resolvable-looking coding, which
+#     is CARE's own failure mode.                        -> go test ./fhir/.
+# 13. The sections come out in reverse, which is what a Go map would do to
+#     the ordered declaration.                           -> the documents diff.
+# 14. The urn loses its namespace prefix.                -> the urns comparison.
+# 15. BOTH engines' ChiefComplaints code drifts.
+# 16. BOTH engines default an absent observation status to `final`.
+# 17. A section query's `where` is dropped on the way to the store.
+#     -> the documents diff, the two-section asking built for exactly this.
+# 18. Document selects rows WITHOUT naming the thread.   -> NOT CAUGHT. See
+#     below.
+# 19. The narrative is projected with no document type, so the attachment
+#     loses its title.                                   -> the documents diff.
+# 20. The performer is dropped on the way into every resource, so the author
+#     is on the Composition and on no resource.          -> the same.
+# 21. The Composition's subject is read from the whole store rather than
+#     this visit.                                        -> go test ./fhir/.
+#
+# THE HOLE THE MUTATIONS FOUND IN THIS CHECK
+# ------------------------------------------
+# 18 passed the whole gate at 843 ok. A `Document` that selected a section's
+# rows without saying WHICH VISIT they belong to was indistinguishable from
+# one that did, because both halves of this comparison -- RowsOnly here and
+# `stub` in fhir/parity_test.go -- ignored the thread argument. In a clinic
+# that is one patient's rows published inside another patient's record, and
+# no literal anywhere was wrong: the two engines agreed.
+#
+# The CHECK was fixed and the mutation was kept. Neither stub implements the
+# thread join, and neither should: the join is the adapter's (an encounter
+# joins on its id, a patient through the encounter's own column) and it is
+# compared over two REAL stores by write_path's walk. What they hold now is
+# the narrower fact that a thread was passed and that it was this one. 18 was
+# re-applied afterwards and fails in "== the MCP server ==".
+#
+# This is the third slice running whose missed property was not the one that
+# looked risky. The section codes, the refusal sentences and the fan-out were
+# all watched closely and all three were caught first time; what nobody was
+# watching was the ARGUMENT, because a stand-in store is written to answer
+# and not to refuse.
+#
+# TWO MUTATIONS WHERE BOTH ENGINES DRIFT TOGETHER, WHICH A DIFF CANNOT SEE
+# ------------------------------------------------------------------------
+# 15 and 16 were both caught, and NEITHER was caught here, which is the point
+# of running them. 15 reached scripts/check_rx.py, which holds the section
+# code against docs/superpowers/specs/2026-10-30-nrces-section-codes.md; 16
+# reached `python3 -m kernel.fhir`, whose own demo asserts the refusal. So the
+# Go side's section table and its status refusal are held to the standard
+# through the PYTHON's literal checks plus this diff, and not by anything on
+# the Go side alone. The day the Python goes (G9), those two literal checks
+# have to go with it rather than be deleted with it.
+#
+# WHAT THIS COMPARISON CANNOT REACH, STATED RATHER THAN IMPLIED
+# ------------------------------------------------------------
+# - Row ORDER. The case file lists rows in the order the real store returns
+#   them (`ORDER BY created_date, id`), so order is an input here. It is the
+#   adapter's property and write_path's walk is where it is compared.
+# - The 200 row ceiling per section query, for the same reason G3 could not
+#   reach the expansion's: no table in this tree holds 200 rows of anything.
+# - A stored value of "inf". Python's float() accepts it, so kernel/fhir.py
+#   publishes `Infinity`, which is not JSON; Go's encoder refuses to marshal
+#   it at all. The two engines genuinely differ and the case is NOT in the
+#   numbers above, because adding it would break the Go transport rather than
+#   compare anything. No questionnaire range admits it. Recorded, not fixed.
+#
+# ---------------------------------------------------------------------------
 # The mutation ledger for what G4 added: 17 applied, 17 caught
 # ---------------------------------------------------------------------------
 #
