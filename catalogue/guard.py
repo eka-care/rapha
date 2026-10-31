@@ -154,7 +154,8 @@ def visible(op, caps, state, actor=None, performers=None):
 
 
 def evaluate(op, *, caps, state, payload, surface, confirmed=False,
-             scopes=None, validate=None, actor=None, performers=None):
+             scopes=None, validate=None, actor=None, performers=None,
+             withheld=None):
     """Guard steps 1 to 4. Returns a Decision carrying the audit record.
 
     validate: callable(op, payload) -> list of problems. Required. There is no
@@ -164,6 +165,14 @@ def evaluate(op, *, caps, state, payload, surface, confirmed=False,
     Required only by an operation carrying an `actor of` precondition, and
     fail closed for exactly the same reason as validate: an unanswered
     separation of duties rule is a denial, never a pass.
+
+    withheld: {capability: the plugin id that withholds it} for the facility
+    this kernel is running. It changes NO decision: the capability has already
+    been subtracted from `caps` before this is called, so step 2 denies either
+    way. What it changes is the sentence, which names both the capability and
+    the plugin. Naming only the plugin leaves an audit line nobody can
+    reconstruct against a bundle.yaml that has since been edited; naming only
+    the capability lies to a clinician whose role plainly holds it.
     """
     audit = {
         "operation": op["id"], "actor": actor, "surface": surface,
@@ -183,6 +192,10 @@ def evaluate(op, *, caps, state, payload, surface, confirmed=False,
 
     # 2. capability, then its scope qualifier. A CHO's rx.prescribe is not an MO's.
     if op["capability"] not in caps:
+        plugin = (withheld or {}).get(op["capability"])
+        if plugin:
+            return deny(f"capability {op['capability']} withheld by plugin "
+                        f"{plugin!r}: this facility does not run it")
         return deny(f"missing capability {op['capability']}")
     qualifier = op.get("scope_qualifier")
     if qualifier and qualifier not in (scopes or set()):

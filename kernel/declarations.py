@@ -33,6 +33,7 @@ from catalogue.build import parse
 from kernel import contracts as c
 from kernel import fhir
 from kernel import mapping
+from kernel import plugins
 from kernel import templates
 
 ROOT = pathlib.Path(__file__).parents[1]
@@ -74,6 +75,12 @@ class Bundle:
     scribe: dict = dataclasses.field(default_factory=dict)
     documents: dict = dataclasses.field(default_factory=dict)
     instruments_raw: list = dataclasses.field(default_factory=list)
+    # Which shape of this facility the kernel is running, and the one dict
+    # that is the whole of its runtime effect: {capability: the plugin id
+    # withholding it}. See kernel/plugins.py. None and {} for a bundle that
+    # declares no facilities, which is what keeps bundles/lab untouched.
+    facility: Optional[str] = None
+    withheld: dict = dataclasses.field(default_factory=dict)
 
     def workflow(self, wid: Optional[str] = None) -> c.Workflow:
         if wid is None:
@@ -601,8 +608,15 @@ def _plain(cls, fm):
                   "summary": fm["summary"].strip()})
 
 
-def load(bundle_id="phc", catalogue=None):
-    """Parse, lint and compile bundles/<bundle_id>/. Raises DeclarationError."""
+def load(bundle_id="phc", catalogue=None, facility=None):
+    """Parse, lint and compile bundles/<bundle_id>/. Raises DeclarationError.
+
+    `facility` picks which of the bundle's declared shapes to run, overriding
+    PHC_FACILITY and the bundle's own `facility:` default. Which plugins a
+    centre runs is resolved here, once, so that everything downstream reads
+    one narrowed capability set rather than asking a config question of its
+    own. See kernel/plugins.py.
+    """
     import json
     if catalogue is None:
         catalogue = json.loads((ROOT / "catalogue" / "catalogue.json").read_text())
@@ -620,7 +634,11 @@ def load(bundle_id="phc", catalogue=None):
     # Which answer becomes which column lives on the operation atom, so it is
     # linted here with everything else that references a questionnaire, and
     # attached to the operations this bundle loads. See kernel/mapping.py.
-    seed = load_seed(path)
+    # This facility's demo day, which is a shorter one at a centre that runs
+    # fewer plugins: a seeded thread whose history names an operation nobody
+    # here may perform is a lie about what happened here.
+    held_back = plugins.withheld(manifest, facility)
+    seed = plugins.seeded(load_seed(path), ops, held_back)
     mappings, bad_mappings = mapping.load()
     bad = lint(manifest, decls, ops, seed) + bad_mappings
     raw_instruments = [fm for fm, _ in decls.values() if fm.get("type") == "instrument"]
@@ -632,6 +650,11 @@ def load(bundle_id="phc", catalogue=None):
     # already holds a template's inherited capability and station, and this
     # holds its narrowing, its bindings and the files it generated.
     bad += templates.lint(manifest, ops, decls)
+    # Which plugins this centre runs. Linted here with everything else that
+    # groups this bundle's own words, and against the workflow, because the
+    # failure worth refusing is a choice that stops the line: a step nothing
+    # left can close and nothing can skip.
+    bad += plugins.lint(manifest, ops, decls)
     if bad:
         raise DeclarationError("\n".join(bad))
 
@@ -656,7 +679,8 @@ def load(bundle_id="phc", catalogue=None):
                     for oid in manifest["operations"]},
         workflows=workflows, views=views, instruments=instruments, metrics=metrics,
         seed=seed, scribe=dict(manifest.get("scribe") or {}),
-        documents=_documents(manifest), instruments_raw=raw_instruments)
+        documents=_documents(manifest), instruments_raw=raw_instruments,
+        facility=plugins.chosen(manifest, facility), withheld=held_back)
 
 
 def compile_json(bundle):

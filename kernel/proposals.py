@@ -86,6 +86,9 @@ def _audit(store, decision_audit, *, thread, at, proposal=None):
 
 def _decide(store, bundle, op, *, thread, payload, caps, surface, actor,
             confirmed=False, scopes=None, workflow=None):
+    # Which plugins this facility runs is the bundle's own answer and never a
+    # caller's argument: a surface that could pass one could widen it.
+    withheld = dict(getattr(bundle, "withheld", None) or {})
     workflow = workflow or bundle.workflow()
     if not drawn_by(workflow, op["id"]):
         # Before the guard, because this is not a judgement about this thread's
@@ -98,7 +101,8 @@ def _decide(store, bundle, op, *, thread, payload, caps, surface, actor,
     return guard.evaluate(
         op, caps=caps, state=thread_flags(store, thread, workflow), payload=payload,
         surface=surface, confirmed=confirmed, scopes=scopes, actor=actor,
-        validate=validator(op), performers=performers(store, thread))
+        validate=validator(op), performers=performers(store, thread),
+        withheld=withheld)
 
 
 def _write(store, bundle, op, *, thread, payload, workflow, actor=None):

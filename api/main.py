@@ -40,7 +40,7 @@ from adapters.local.store import SqliteStore, seed
 from agent import turn
 from api import scribe
 from catalogue import validate, vocab
-from kernel import (declarations, directory, spine, proposals, state,
+from kernel import (declarations, directory, plugins, spine, proposals, state,
                     terminology, views)
 from kernel.contracts import DirectoryError, ThreadRef
 
@@ -123,7 +123,12 @@ def caller(request: Request) -> dict:
             or request.query_params.get("role") or DEMO_ROLE)
     if role not in ROLES:
         raise HTTPException(400, "no such role %r" % role)
-    caps = OVERRIDES.get(role, ROLES[role])
+    # The one subtraction. A plugin this facility does not run is a capability
+    # the caller does not hold, and it is taken away here, before anything
+    # reads the set: the guard, `visible()`, the quick action row, /whoami and
+    # therefore the MCP tool list, and every view's own capability gate. There
+    # is no render time hide to implement and nothing to forget.
+    caps = plugins.effective(OVERRIDES.get(role, ROLES[role]), BUNDLE.withheld)
     return {"id": request.headers.get("X-PHC-Actor") or "user:%s" % role,
             "role": role, "capabilities": caps, "scopes": sorted(caps)}
 
@@ -193,6 +198,12 @@ def facility(request: Request):
     """The bundle this kernel loaded, its views, and who the caller is."""
     user = caller(request)
     return {"bundle": dict(asdict(BUNDLE.manifest), workflow=WORKFLOW.id),
+            # Which shape of this facility is running, and what it withholds.
+            # The caller's own narrowed set is in `user`; these two say why it
+            # is narrower than `capabilities` below, which stays the whole of
+            # what the bundle declares.
+            "facility": BUNDLE.facility,
+            "withheld": dict(sorted(BUNDLE.withheld.items())),
             "capabilities": sorted(vocab.CAPABILITIES),
             "views": [{"id": v.id, "kind": v.kind, "title": v.title,
                        "capability": v.capability} for v in BUNDLE.views.values()],

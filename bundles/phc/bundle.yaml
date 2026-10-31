@@ -253,3 +253,79 @@ roles:
   cho: [patient.find, patient.register, abha.link, visit.household,
         assessment.record, appointment.book, vitals.record,
         encounter.document, lab.order, rx.prescribe]
+
+# --------------------------------------------------------------------------
+# A facility's shape
+# --------------------------------------------------------------------------
+#
+# Primary health centres differ. One has a laboratory and one does not. Making
+# a centre's copy different used to mean editing this bundle, which is a fork,
+# and a fork means every later change has to be applied twice. These two keys
+# make the difference a choice recorded in one place instead.
+#
+# A plugin is a NAMED GROUP OF THIS BUNDLE'S OWN WORDS, exactly as `roles:`
+# above is. It is not a sixth declaration type, for the reason the spine and
+# plugins spec gives: a grouping of ids costs nothing, and a declaration type
+# costs a manifest entry, a lint pass, a dataclass, a compiled key, a Go
+# struct and a renderer type.
+#
+# A plugin that is off is a capability the caller does not hold. That is the
+# whole mechanism, and kernel/plugins.py says why it is the only one available:
+# the renderer may never name a capability, so switching the laboratory off
+# cannot be a condition in a screen, and a second bundle file would be the
+# fork this exists to avoid. The capability set is the one per caller set the
+# guard, `visible()`, the quick action row, `GET /whoami`, `GET /views/{id}`
+# and the MCP server's tool list all already read.
+#
+# A capability no plugin claims is always on. That is the default on rule: a
+# plugin added here later cannot quietly take an ability away from a centre
+# that never heard of it.
+#
+# `always: true` is the floor a facility may not switch off.
+plugins:
+  baseline:
+    title: The line itself
+    always: true
+    capabilities: [patient.find, patient.register, abha.link, vitals.record,
+                   assessment.record, encounter.document, appointment.book,
+                   handover, facility.admin]
+  prescriptions:
+    title: Prescribing and dispensing
+    capabilities: [rx.prescribe, pharmacy.dispense]
+  orders:
+    title: Laboratory orders and results
+    capabilities: [lab.order, lab.result.enter, lab.result.validate]
+  outreach:
+    title: Household visits
+    capabilities: [visit.household]
+  reporting:
+    title: The facility's own numbers
+    capabilities: [reporting.view]
+
+# Which shape this build runs. PHC_FACILITY overrides it, read exactly where
+# PHC_BUNDLE is read and for the same reason: one kernel serves one facility.
+facility: all-plugins
+
+# The shapes this bundle ships, each one a list of what that centre does NOT
+# run. There is no `on` list: a positive one would mean a plugin added later
+# ships off everywhere and nobody notices until a clinician cannot work.
+#
+# The key is `without`. It was written as `off` first, which is what the spec
+# wrote: YAML 1.1 reads a bare off as the boolean false, so that spelling
+# parses as a key named False and the declaration silently describes nothing.
+# kernel/plugins.py refuses it by name rather than as an unknown key.
+#
+# These ids describe which of the plugins above a centre runs. They are NOT
+# facility types from the national health facility registry, and nothing here
+# should be read as a claim about how India's primary care is organised. A
+# real deployment declares its own and names them after its own centres.
+facilities:
+  all-plugins:
+    title: Every plugin this bundle ships
+    without: []
+  no-laboratory:
+    title: A centre with no laboratory
+    without: [orders]
+  consulting-room-only:
+    title: A consulting room, with no laboratory and no outreach
+    without: [orders, outreach, reporting]
