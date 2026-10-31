@@ -1,0 +1,851 @@
+// Package store is the Go side of kernel/contracts.py's Store protocol, over
+// a SQLite file, with modernc.org/sqlite as the driver.
+//
+// THE DRIVER IS PURE GO ON PURPOSE. Not mattn/go-sqlite3, which needs cgo.
+// The whole deployment argument for Go here is one file copied to a clinic
+// PC, and cgo breaks cross-compiling that file. If this driver ever proves
+// unworkable the answer is to stop and report, not to reach for cgo
+// (docs/superpowers/plans/2026-10-31-go-backend-port.md, "Decisions taken up
+// front").
+//
+// THE PROTOCOL IS ONE METHOD WIDER THAN IT READS
+// ----------------------------------------------
+// kernel/contracts.py calls the Store protocol "ten methods" and declares
+// ten. The kernel calls eleven: kernel/directory.py calls
+// store.record_directory_id(...), which the protocol never declares, and
+// scripts/check_queues.py pins the list of off-protocol Store calls in the
+// kernel at exactly that one so a second fails the gate. That is contradiction
+// 29, and it is known rather than fixed: fixing it is a change to the protocol
+// and to the adapter test that pins its ten names.
+//
+// So RecordDirectoryID is on this interface, named as what it is. An
+// interface that declared ten and served eleven would reproduce in Go the
+// exact gap the Python is already pinned at.
+//
+// OpenThread is here for the same reason and is the second gap: it is not on
+// the protocol either, api/main.py calls it, and adapters/local/store.py's own
+// docstring says so. Both are declared because this interface's rule is that
+// it declares every method it serves.
+//
+// EVERY COLUMN IS TEXT, AND THAT IS COPIED RATHER THAN IMPROVED
+// -------------------------------------------------------------
+// adapters/local/store.py creates every column TEXT, so a systolic of 140
+// reads back as the string "140", which is why kernel/fhir.py has a _number()
+// at all. A Go store returning typed numbers would diverge silently from
+// every expectation downstream, so Text() below is a transcription of that
+// file's _text() and nothing more.
+//
+// WHAT IS NOT HERE YET
+// --------------------
+// roll_seed_forward() and seed(). Both belong with the slice that serves a
+// queue (G6): a seeded demo day is only observable through views, and writing
+// it now would be a second unproven implementation of a function whose whole
+// behaviour is about what a screen shows. The constructor therefore does NOT
+// move a stale demo day forward the way the Python's does, which is a real
+// difference and is why nothing in Go reads the seeded rows yet.
+package store
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	_ "modernc.org/sqlite"
+)
+
+// Tables is one table per resource this bundle's operations read or write,
+// plus the kernel's own three. Columns are query grammar field names,
+// verbatim, and they are adapters/local/store.py's TABLES in the same order.
+// adapters/local/tests/test_store.py holds the two against each other, so a
+// column added on one side and not the other fails the gate rather than
+// drifting until a mapped clinical value lands nowhere.
+var Tables = map[string][]string{
+	"patient":                {"id", "name", "age", "sex", "phone", "village", "category", "abha_number", "directory_id", "directory_synced", "created_by", "created_date"},
+	"encounter":              {"id", "patient", "status", "token", "created_by", "created_date"},
+	"observation":            {"id", "encounter", "category", "code", "code_system", "code_display", "value", "unit", "unit_system", "status", "created_by", "created_date"},
+	"condition":              {"id", "encounter", "code", "code_system", "code_display", "clinical_status", "clinical_status_system", "verification_status", "verification_status_system", "onset", "created_by", "created_date"},
+	"notes":                  {"id", "encounter", "text", "created_by", "created_date"},
+	"medication_request":     {"id", "encounter", "medication", "medication_system", "medication_display", "dose", "dose_unit", "dose_unit_system", "route", "route_system", "route_display", "frequency", "frequency_system", "frequency_display", "duration", "duration_unit", "duration_unit_system", "intent", "status", "created_by", "created_date"},
+	"medication_dispense":    {"id", "encounter", "medication", "quantity", "status", "created_by", "created_date"},
+	"service_request":        {"id", "encounter", "code", "status", "created_by", "created_date"},
+	"diagnostic_report":      {"id", "encounter", "code", "code_system", "conclusion", "status", "created_by", "created_date"},
+	"specimen":               {"id", "encounter", "code", "status", "created_by", "created_date"},
+	"inventory_item":         {"id", "encounter", "code", "quantity", "status", "created_by", "created_date"},
+	"questionnaire_response": {"id", "encounter", "questionnaire", "payload", "created_by", "created_date"},
+	"token_booking":          {"id", "encounter", "patient", "status", "created_by", "created_date"},
+	"thread_flag":            {"id", "thread", "flag", "created_by", "created_date"},
+	"proposal":               {"id", "thread", "operation", "payload", "proposed_by", "surface", "status", "created_at", "flags_raised", "decided_by", "decided_at", "final_payload"},
+	"audit":                  {"id", "thread", "operation", "actor", "surface", "payload", "outcome", "at", "proposal"},
+}
+
+// ThreadColumn is the adapter's private knowledge: which column ties a row to
+// its thread. "encounter" is the thread itself; a patient is reached through
+// it, so its entry is empty rather than absent and the lookup below says
+// which.
+var ThreadColumn = map[string]string{"encounter": "id", "thread_flag": "thread", "patient": ""}
+
+// DefaultThreadColumn is what every clinical resource not named above joins on.
+const DefaultThreadColumn = "encounter"
+
+// KernelRecord: the kernel's own two records join and date themselves
+// differently from a clinical resource. thread_flag does not, so it stays in
+// ThreadColumn above.
+var KernelRecord = map[string][2]string{
+	"proposal": {"thread", "created_at"},
+	"audit":    {"thread", "at"},
+}
+
+// SeedActor is what the seed writes as the author of a thread it opened.
+const SeedActor = "seed"
+
+var ident = regexp.MustCompile(`^[a-z_][a-z0-9_]*$`)
+
+// ---------------------------------------------------------------------------
+// the records the kernel passes across the seam
+// ---------------------------------------------------------------------------
+
+// ThreadRef mirrors kernel/contracts.py ThreadRef.
+type ThreadRef struct {
+	ID       string            `json:"id"`
+	Workflow string            `json:"workflow"`
+	Subject  map[string]string `json:"subject"`
+	OpenedAt string            `json:"opened_at"`
+}
+
+// Proposal mirrors kernel/contracts.py Proposal. Payload and FlagsRaised are
+// stored as JSON in TEXT columns, exactly as the Python stores them.
+type Proposal struct {
+	ID           string         `json:"id"`
+	Thread       string         `json:"thread"`
+	Operation    string         `json:"operation"`
+	Payload      map[string]any `json:"payload"`
+	ProposedBy   string         `json:"proposed_by"`
+	Surface      string         `json:"surface"`
+	Status       string         `json:"status"`
+	CreatedAt    string         `json:"created_at"`
+	FlagsRaised  []string       `json:"flags_raised"`
+	DecidedBy    string         `json:"decided_by"`
+	DecidedAt    string         `json:"decided_at"`
+	FinalPayload map[string]any `json:"final_payload"`
+}
+
+// AuditRecord mirrors kernel/contracts.py AuditRecord.
+type AuditRecord struct {
+	ID        string         `json:"id"`
+	Thread    string         `json:"thread"`
+	Operation string         `json:"operation"`
+	Actor     string         `json:"actor"`
+	Surface   string         `json:"surface"`
+	Payload   map[string]any `json:"payload"`
+	Outcome   string         `json:"outcome"`
+	At        string         `json:"at"`
+	Proposal  string         `json:"proposal"`
+}
+
+// Cond is one condition in the query grammar: either an equality, the "*"
+// present-and-not-empty form, or a range. kernel/contracts.py owns the
+// grammar; this is the Go spelling of what adapters/local/store.py._where
+// accepts, and nothing wider.
+type Cond struct {
+	Equals  string // the plain form, already text
+	Present bool   // the "*" form
+	Gte     string
+	Gt      string
+	Lte     string
+	Lt      string
+}
+
+// Query is {field: condition}.
+type Query map[string]Cond
+
+// ---------------------------------------------------------------------------
+// the interface
+// ---------------------------------------------------------------------------
+
+// Store is every method this package serves, and the comment on each of the
+// last two says why it is here when the protocol does not declare it.
+type Store interface {
+	// reads that feed state derivation, views and metrics
+	Count(resource string, thread *string, where Query) (int, error)
+	Select(resource string, thread *string, where Query, fields []string, limit int) ([]map[string]string, error)
+	Threads(workflow, scope string) ([]ThreadRef, error)
+	StoredFlags(thread string) (map[string]bool, error)
+
+	// writes, one per resource kind, by name
+	Write(resource string, record map[string]any, thread string) (string, error)
+	RaiseFlag(thread, flag, actor string) error
+
+	// proposals and audit
+	PutProposal(p Proposal) error
+	Proposals(thread, status string) ([]Proposal, error)
+	AppendAudit(r AuditRecord) error
+	Audit(thread string) ([]AuditRecord, error)
+
+	// The eleventh. kernel/directory.py calls it; the protocol in
+	// kernel/contracts.py never declares it, and scripts/check_queues.py pins
+	// the kernel's off-protocol Store calls at exactly this one. Declared
+	// because this interface serves it. Contradiction 29.
+	RecordDirectoryID(patientID, directoryID, at string, profile map[string]any) (string, error)
+
+	// The twelfth, and the other gap adapters/local/store.py already names in
+	// its own docstring: the protocol has no way to say "open a thread". It is
+	// api/main.py that calls this one rather than the kernel, which is why
+	// check_queues' count of the KERNEL's off-protocol calls stays at one.
+	OpenThread(token, actor string) (string, error)
+}
+
+// ---------------------------------------------------------------------------
+// the SQLite implementation
+// ---------------------------------------------------------------------------
+
+// SQLite is a Store over one file. Pass ":memory:" for a test.
+type SQLite struct {
+	Path string
+	db   *sql.DB
+}
+
+var _ Store = (*SQLite)(nil)
+
+// Open creates the tables if they are not there and returns the store.
+//
+// One *sql.DB and not one connection per thread. database/sql owns a pool and
+// serialises use of each connection, which is the problem
+// adapters/local/store.py solves with thread-local connections because
+// python's sqlite3 cannot do that. The pool is capped at one for a file so
+// that two writers cannot meet inside SQLite: modernc's driver is safe to use
+// concurrently, but WAL plus two writers still returns SQLITE_BUSY, and a
+// busy error on a clinical write is not a thing to discover in a clinic.
+func Open(path string) (*SQLite, error) {
+	dsn := path
+	if path == ":memory:" {
+		// A plain ":memory:" is private to one connection, and the pool may
+		// open more than one, so name it and share the cache. Same reason
+		// adapters/local/store.py does.
+		dsn = "file:mem?mode=memory&cache=shared"
+	}
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(1)
+	s := &SQLite{Path: path, db: db}
+	if path != ":memory:" {
+		if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
+			return nil, err
+		}
+	}
+	for table, columns := range Tables {
+		cols := make([]string, 0, len(columns))
+		for _, c := range columns {
+			if c == "id" {
+				cols = append(cols, c+" TEXT PRIMARY KEY")
+			} else {
+				cols = append(cols, c+" TEXT")
+			}
+		}
+		stmt := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", table, strings.Join(cols, ", "))
+		if _, err := db.Exec(stmt); err != nil {
+			return nil, fmt.Errorf("creating %s: %w", table, err)
+		}
+	}
+	return s, nil
+}
+
+// DB is the handle, for a check that wants to read the file directly.
+func (s *SQLite) DB() *sql.DB { return s.db }
+
+// Close releases the pool.
+func (s *SQLite) Close() error { return s.db.Close() }
+
+// Now is the timestamp every row is dated with: ISO 8601 UTC to the second,
+// the spelling adapters/local/store.py.now() produces, because everything that
+// compares these columns compares strings.
+func Now() string {
+	return time.Now().UTC().Format("2006-01-02T15:04:05+00:00")
+}
+
+// NewID mirrors adapters/local/store.py.new_id: the resource's first four
+// letters and eight hex digits.
+func NewID(prefix string) string {
+	if len(prefix) > 4 {
+		prefix = prefix[:4]
+	}
+	return prefix + "-" + randomHex(8)
+}
+
+// Text is adapters/local/store.py._text, transcribed. Everything is TEXT:
+// numbers keep their ordering because the columns compared with gte or lt are
+// ISO dates, which sort as strings.
+//
+// Copied rather than improved. A systolic of 140 goes in as "140" and comes
+// back as "140", which is why kernel/fhir.py has a _number().
+func Text(value any) (string, bool) {
+	switch v := value.(type) {
+	case nil:
+		return "", false // NULL, the way Python's None is
+	case string:
+		return v, true
+	case bool:
+		if v {
+			return "true", true
+		}
+		return "false", true
+	case int:
+		return strconv.Itoa(v), true
+	case int64:
+		return strconv.FormatInt(v, 10), true
+	case float64:
+		// Python's str() of a float that is integral keeps a ".0", and of an
+		// int keeps none. A JSON number arrives here as float64 whichever it
+		// was written as, so an integral value is spelled without the ".0" to
+		// match what the Python writes for an integer answer: that is the
+		// case every questionnaire integer takes.
+		if v == float64(int64(v)) {
+			return strconv.FormatInt(int64(v), 10), true
+		}
+		return strconv.FormatFloat(v, 'g', -1, 64), true
+	default:
+		b, err := json.Marshal(value)
+		if err != nil {
+			return fmt.Sprint(value), true
+		}
+		return string(b), true
+	}
+}
+
+func table(resource string) (string, error) {
+	if _, ok := Tables[resource]; !ok {
+		return "", fmt.Errorf("no table for resource %q", resource)
+	}
+	if !ident.MatchString(resource) {
+		return "", fmt.Errorf("bad resource name %q", resource)
+	}
+	return resource, nil
+}
+
+func hasColumn(resource, field string) bool {
+	for _, c := range Tables[resource] {
+		if c == field {
+			return true
+		}
+	}
+	return false
+}
+
+// where turns (thread, query grammar where) into a SQL fragment and params.
+// A transcription of adapters/local/store.py._where, including that a patient
+// is reached through its encounter rather than joined directly.
+func (s *SQLite) where(resource string, thread *string, q Query) (string, []any, error) {
+	var clauses []string
+	var params []any
+	if thread != nil {
+		column, named := ThreadColumn[resource]
+		if !named {
+			column = DefaultThreadColumn
+		}
+		if resource == "patient" {
+			clauses = append(clauses, "id IN (SELECT patient FROM encounter WHERE id = ?)")
+		} else {
+			clauses = append(clauses, column+" = ?")
+		}
+		params = append(params, *thread)
+	}
+	// Sorted so one query is one SQL string between runs, which a Go map
+	// iteration would not give.
+	fields := make([]string, 0, len(q))
+	for f := range q {
+		fields = append(fields, f)
+	}
+	sort.Strings(fields)
+	for _, field := range fields {
+		if !hasColumn(resource, field) {
+			return "", nil, fmt.Errorf("%s has no field %q", resource, field)
+		}
+		cond := q[field]
+		switch {
+		case cond.Present:
+			clauses = append(clauses, fmt.Sprintf("(%s IS NOT NULL AND %s != '')", field, field))
+		case cond.Gte != "" || cond.Gt != "" || cond.Lte != "" || cond.Lt != "":
+			for _, pair := range [][2]string{
+				{cond.Gte, ">="}, {cond.Lt, "<"}, {cond.Gt, ">"}, {cond.Lte, "<="},
+			} {
+				if pair[0] != "" {
+					clauses = append(clauses, field+" "+pair[1]+" ?")
+					params = append(params, pair[0])
+				}
+			}
+		default:
+			clauses = append(clauses, field+" = ?")
+			params = append(params, cond.Equals)
+		}
+	}
+	if len(clauses) == 0 {
+		return "1=1", params, nil
+	}
+	return strings.Join(clauses, " AND "), params, nil
+}
+
+// Count is the Store protocol's count.
+func (s *SQLite) Count(resource string, thread *string, q Query) (int, error) {
+	name, err := table(resource)
+	if err != nil {
+		return 0, err
+	}
+	clause, params, err := s.where(resource, thread, q)
+	if err != nil {
+		return 0, err
+	}
+	var n int
+	row := s.db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE %s", name, clause), params...)
+	return n, scanInto(row, &n)
+}
+
+// Select is the Store protocol's select. Every value comes back as a string,
+// because every column is TEXT.
+func (s *SQLite) Select(resource string, thread *string, q Query, fields []string, limit int) ([]map[string]string, error) {
+	name, err := table(resource)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range fields {
+		if !hasColumn(resource, f) {
+			return nil, fmt.Errorf("%s has no field %q", resource, f)
+		}
+	}
+	clause, params, err := s.where(resource, thread, q)
+	if err != nil {
+		return nil, err
+	}
+	cols := "*"
+	if len(fields) > 0 {
+		cols = strings.Join(fields, ", ")
+	}
+	stmt := fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY created_date, id LIMIT ?", cols, name, clause)
+	rows, err := s.db.Query(stmt, append(params, limit)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanRows(rows)
+}
+
+// Threads is the Store protocol's threads: every encounter in scope, newest
+// first, with its subject fields.
+func (s *SQLite) Threads(workflow, scope string) ([]ThreadRef, error) {
+	stmt := "SELECT * FROM encounter"
+	var params []any
+	switch scope {
+	case "today":
+		stmt += " WHERE created_date >= ?"
+		params = append(params, StartOf("day"))
+	case "open":
+		stmt += " WHERE status != 'completed'"
+	}
+	stmt += " ORDER BY created_date DESC, id"
+	rows, err := s.db.Query(stmt, params...)
+	if err != nil {
+		return nil, err
+	}
+	encounters, err := scanRows(rows)
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ThreadRef, 0, len(encounters))
+	for _, row := range encounters {
+		subject := map[string]string{
+			"encounter": row["id"], "token": row["token"], "status": row["status"],
+		}
+		if row["patient"] != "" {
+			pr, err := s.db.Query("SELECT * FROM patient WHERE id = ?", row["patient"])
+			if err != nil {
+				return nil, err
+			}
+			found, err := scanRows(pr)
+			pr.Close()
+			if err != nil {
+				return nil, err
+			}
+			if len(found) == 1 {
+				for k, v := range found[0] {
+					subject[k] = v
+				}
+			}
+		}
+		out = append(out, ThreadRef{
+			ID: row["id"], Workflow: workflow, Subject: subject,
+			OpenedAt: row["created_date"],
+		})
+	}
+	return out, nil
+}
+
+// StoredFlags is the Store protocol's stored_flags.
+func (s *SQLite) StoredFlags(thread string) (map[string]bool, error) {
+	rows, err := s.db.Query("SELECT flag FROM thread_flag WHERE thread = ?", thread)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var flag sql.NullString
+		if err := rows.Scan(&flag); err != nil {
+			return nil, err
+		}
+		out[flag.String] = true
+	}
+	return out, rows.Err()
+}
+
+// Write is the Store protocol's write: one row of `resource`, returning its id.
+//
+// The fan-out happens above this line, as in the Python: three vitals are
+// three calls. What is here is this adapter's own schema, which is the thread
+// join and the fact that a second patient row on a thread is an update of the
+// first person rather than a second person.
+func (s *SQLite) Write(resource string, record map[string]any, thread string) (string, error) {
+	row := map[string]any{}
+	for k, v := range record {
+		row[k] = v
+	}
+	if resource == "patient" {
+		if _, given := row["id"]; !given {
+			existing, err := s.Select("patient", &thread, nil, []string{"id"}, 1)
+			if err != nil {
+				return "", err
+			}
+			if len(existing) == 0 {
+				if did, _ := Text(row["directory_id"]); strings.TrimSpace(did) != "" {
+					// The same person, on a second visit. Scoped to a
+					// thread=nil lookup on purpose: it is a question about a
+					// person across visits, not within one.
+					same, err := s.Select("patient", nil,
+						Query{"directory_id": {Equals: did}}, []string{"id"}, 1)
+					if err != nil {
+						return "", err
+					}
+					existing = same
+				}
+			}
+			if len(existing) > 0 {
+				row["id"] = existing[0]["id"]
+			}
+		}
+	}
+	written, err := s.put(resource, row, thread)
+	if err != nil {
+		return "", err
+	}
+	if resource == "patient" {
+		// The adapter owns the join, so it maintains it: a patient registered
+		// against an empty thread is attached to it here.
+		var patient sql.NullString
+		err := s.db.QueryRow("SELECT patient FROM encounter WHERE id = ?", thread).Scan(&patient)
+		if err == nil && patient.String == "" {
+			if _, err := s.put("encounter", map[string]any{"id": thread, "patient": written}, thread); err != nil {
+				return "", err
+			}
+		}
+	}
+	return written, nil
+}
+
+// put inserts, or updates the named columns when the id already exists.
+//
+// Authorship and the moment a row was opened are written once, both for the
+// reason adapters/local/store.py gives at length: linking an ABHA updates the
+// patient row registration created, and re-putting the encounter row to join a
+// person to it used to reset opened_at to the moment the person was ATTACHED
+// rather than the moment the thread was OPENED.
+func (s *SQLite) put(resource string, record map[string]any, thread string) (string, error) {
+	name, err := table(resource)
+	if err != nil {
+		return "", err
+	}
+	// A column this table does not have is refused, not filtered away.
+	// Silently dropping a mapped clinical value is the worst failure this file
+	// could have, and a mapping typo is exactly how it would happen.
+	var unknown []string
+	for k := range record {
+		if !hasColumn(name, k) {
+			unknown = append(unknown, k)
+		}
+	}
+	if len(unknown) > 0 {
+		sort.Strings(unknown)
+		return "", fmt.Errorf("%s has no column %s", resource, strings.Join(unknown, ", "))
+	}
+
+	row := map[string]any{}
+	for k, v := range record {
+		if text, keep := Text(v); keep {
+			row[k] = text
+		} else {
+			row[k] = nil
+		}
+	}
+	column, named := ThreadColumn[name]
+	if !named {
+		column = DefaultThreadColumn
+	}
+	if column != "" && column != "id" {
+		if _, set := row[column]; !set {
+			row[column] = thread
+		}
+	} else if name == "encounter" {
+		if _, set := row["id"]; !set {
+			row["id"] = thread
+		}
+	}
+	if _, set := row["id"]; !set {
+		row["id"] = NewID(name)
+	}
+	if _, set := row["created_date"]; !set {
+		row["created_date"] = Now()
+	}
+	rid, _ := row["id"].(string)
+
+	var exists int
+	err = s.db.QueryRow(fmt.Sprintf("SELECT 1 FROM %s WHERE id = ?", name), rid).Scan(&exists)
+	if err != nil && err != sql.ErrNoRows {
+		return "", err
+	}
+	if err == nil {
+		var sets []string
+		var params []any
+		for _, key := range Tables[name] { // declaration order, so one row is one statement
+			if key == "id" || key == "created_by" || key == "created_date" {
+				continue
+			}
+			if value, set := row[key]; set {
+				sets = append(sets, key+" = ?")
+				params = append(params, value)
+			}
+		}
+		if len(sets) == 0 {
+			return rid, nil
+		}
+		_, err := s.db.Exec(fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", name, strings.Join(sets, ", ")),
+			append(params, rid)...)
+		return rid, err
+	}
+	var keys []string
+	var params []any
+	for _, key := range Tables[name] {
+		if value, set := row[key]; set {
+			keys = append(keys, key)
+			params = append(params, value)
+		}
+	}
+	_, err = s.db.Exec(fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
+		name, strings.Join(keys, ", "), marks(len(keys))), params...)
+	return rid, err
+}
+
+// OpenThread starts an empty visit and returns its thread id. Off-protocol;
+// see the Store interface above.
+func (s *SQLite) OpenThread(token, actor string) (string, error) {
+	thread := NewID("enc")
+	if token == "" {
+		token = thread[len(thread)-3:]
+	}
+	return s.put("encounter", map[string]any{
+		"id": thread, "status": "in_progress", "token": token, "created_by": actor,
+	}, thread)
+}
+
+// RaiseFlag is the Store protocol's raise_flag. Idempotent: raising a flag
+// twice is one row, not two. The kernel checks the flag is one the workflow
+// declares stored; this does not, because the adapter has never read a
+// workflow.
+func (s *SQLite) RaiseFlag(thread, flag, actor string) error {
+	held, err := s.StoredFlags(thread)
+	if err != nil {
+		return err
+	}
+	if held[flag] {
+		return nil
+	}
+	_, err = s.db.Exec(
+		"INSERT INTO thread_flag (id, thread, flag, created_by, created_date) VALUES (?, ?, ?, ?, ?)",
+		NewID("flag"), thread, flag, nullIfEmpty(actor), Now())
+	return err
+}
+
+// RecordDirectoryID records that the patient directory knows this person, and
+// when. Off-protocol; see the Store interface above.
+//
+// Deliberately narrow, as in the Python: it writes the identifier, the moment
+// we agreed, and optionally the handful of profile columns a refresh may
+// rewrite, on a row that must already exist. It cannot create a patient, it
+// cannot touch an encounter and it raises no flag, so it is not a path to a
+// clinical write and the guard stays the only one.
+func (s *SQLite) RecordDirectoryID(patientID, directoryID, at string, profile map[string]any) (string, error) {
+	row := map[string]any{"directory_id": directoryID, "directory_synced": at}
+	for key, value := range profile {
+		if !hasColumn("patient", key) {
+			return "", fmt.Errorf("patient has no column %q", key)
+		}
+		switch key {
+		case "id", "directory_id", "created_by", "created_date":
+			return "", fmt.Errorf("%q is not a profile column a refresh may rewrite", key)
+		}
+		if text, keep := Text(value); keep && text != "" {
+			row[key] = text
+		}
+	}
+	var found int
+	err := s.db.QueryRow("SELECT 1 FROM patient WHERE id = ?", patientID).Scan(&found)
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("no patient %q to record a directory id against", patientID)
+	}
+	if err != nil {
+		return "", err
+	}
+	var sets []string
+	var params []any
+	for _, key := range Tables["patient"] {
+		if value, set := row[key]; set {
+			sets = append(sets, key+" = ?")
+			params = append(params, value)
+		}
+	}
+	_, err = s.db.Exec("UPDATE patient SET "+strings.Join(sets, ", ")+" WHERE id = ?",
+		append(params, patientID)...)
+	return patientID, err
+}
+
+// PutProposal is the Store protocol's put_proposal: insert or replace by id.
+func (s *SQLite) PutProposal(p Proposal) error {
+	payload, err := json.Marshal(orEmptyObject(p.Payload))
+	if err != nil {
+		return err
+	}
+	flags, err := json.Marshal(orEmptyList(p.FlagsRaised))
+	if err != nil {
+		return err
+	}
+	var final any
+	if p.FinalPayload != nil {
+		b, err := json.Marshal(p.FinalPayload)
+		if err != nil {
+			return err
+		}
+		final = string(b)
+	}
+	_, err = s.db.Exec(
+		"INSERT OR REPLACE INTO proposal (id, thread, operation, payload, proposed_by,"+
+			" surface, status, created_at, flags_raised, decided_by, decided_at,"+
+			" final_payload) VALUES ("+marks(12)+")",
+		p.ID, p.Thread, p.Operation, string(payload), nullIfEmpty(p.ProposedBy),
+		p.Surface, p.Status, p.CreatedAt, string(flags), nullIfEmpty(p.DecidedBy),
+		nullIfEmpty(p.DecidedAt), final)
+	return err
+}
+
+// Proposals is the Store protocol's proposals.
+//
+// The tiebreak is rowid and not id, for the reason the Python's audit()
+// docstring gives: created_at is ISO 8601 to the second, so two proposals on
+// one thread inside the same second tie, and id is random hex.
+func (s *SQLite) Proposals(thread, status string) ([]Proposal, error) {
+	stmt := "SELECT * FROM proposal WHERE thread = ?"
+	params := []any{thread}
+	if status != "" {
+		stmt += " AND status = ?"
+		params = append(params, status)
+	}
+	stmt += " ORDER BY created_at, rowid"
+	rows, err := s.db.Query(stmt, params...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	found, err := scanRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Proposal, 0, len(found))
+	for _, r := range found {
+		p := Proposal{
+			ID: r["id"], Thread: r["thread"], Operation: r["operation"],
+			ProposedBy: r["proposed_by"], Surface: r["surface"], Status: r["status"],
+			CreatedAt: r["created_at"], DecidedBy: r["decided_by"],
+			DecidedAt: r["decided_at"],
+		}
+		if err := json.Unmarshal([]byte(orDefault(r["payload"], "{}")), &p.Payload); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(orDefault(r["flags_raised"], "[]")), &p.FlagsRaised); err != nil {
+			return nil, err
+		}
+		if r["final_payload"] != "" {
+			if err := json.Unmarshal([]byte(r["final_payload"]), &p.FinalPayload); err != nil {
+				return nil, err
+			}
+		}
+		out = append(out, p)
+	}
+	return out, nil
+}
+
+// AppendAudit is the Store protocol's append_audit.
+func (s *SQLite) AppendAudit(r AuditRecord) error {
+	payload, err := json.Marshal(orEmptyObject(r.Payload))
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(
+		"INSERT INTO audit (id, thread, operation, actor, surface, payload, outcome,"+
+			" at, proposal) VALUES ("+marks(9)+")",
+		r.ID, r.Thread, r.Operation, nullIfEmpty(r.Actor), r.Surface,
+		string(payload), r.Outcome, r.At, nullIfEmpty(r.Proposal))
+	return err
+}
+
+// Audit is the Store protocol's audit: oldest first, as ThreadView promises,
+// tiebroken on rowid. The Python's own docstring says why that is not
+// cosmetic: an audit panel showing a refusal after the write it refused reads
+// as a different sequence of events from the one that happened.
+func (s *SQLite) Audit(thread string) ([]AuditRecord, error) {
+	rows, err := s.db.Query("SELECT * FROM audit WHERE thread = ? ORDER BY at, rowid", thread)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	found, err := scanRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]AuditRecord, 0, len(found))
+	for _, r := range found {
+		a := AuditRecord{
+			ID: r["id"], Thread: r["thread"], Operation: r["operation"],
+			Actor: r["actor"], Surface: r["surface"], Outcome: r["outcome"],
+			At: r["at"], Proposal: r["proposal"],
+		}
+		if err := json.Unmarshal([]byte(orDefault(r["payload"], "{}")), &a.Payload); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, nil
+}
+
+// StartOf is adapters/local/store.py._start_of: the first instant of a metric
+// window, as an ISO string to compare with. A week and a month are rolling,
+// not calendar.
+func StartOf(window string) string {
+	day := time.Now().UTC().Truncate(24 * time.Hour)
+	if window == "all" {
+		return "0000-01-01T00:00:00+00:00"
+	}
+	back := map[string]int{"day": 0, "week": 6, "month": 29}[window]
+	return day.AddDate(0, 0, -back).Format("2006-01-02T15:04:05+00:00")
+}
