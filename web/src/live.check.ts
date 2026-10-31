@@ -241,6 +241,43 @@ for (const shape of SHAPES) {
     "the centre running everything has no more of a day than the one that does not");
   ok(`queue: ${threads(whole).length} threads against ${threads(noLab).length}, from one renderer and one list screen`);
 
+  // What this centre does not run, in the words the bundle chose. The role
+  // editor's disabled switches are built from exactly these two maps, so an
+  // empty `without` is a sentence with a plugin id in it instead of a title.
+  assert.deepEqual(whole.facility.withheld, {}, "a centre running everything withholds nothing");
+  assert.deepEqual(whole.facility.without, {}, "and names nothing it does not run");
+  assert.ok(Object.keys(noLab.facility.without).length > 0,
+    "the narrowed centre withholds capabilities and names no plugin for them");
+  for (const [cap, plugin] of Object.entries(noLab.facility.withheld)) {
+    const title = noLab.facility.without[plugin];
+    assert.ok(title, `${cap} is withheld by ${plugin} and the kernel sent no title for it`);
+    assert.notEqual(title, plugin, `${plugin}'s title is just its id again`);
+  }
+  ok(`facility: ${Object.keys(noLab.facility.withheld).length} capabilities withheld by ${Object.keys(noLab.facility.without).length} named plugin, each with the title its bundle gave it`);
+
+  // A summary section says which columns it carries AND in which order, so no
+  // screen has to choose which one a row leads with.
+  let sections = 0;
+  for (const c of [whole, noLab]) {
+    for (const view of Object.values(c.views)) {
+      if (view.kind !== "summary") continue;
+      for (const section of (view.rows ?? []) as { fields?: string[]; rows: unknown[]; resource?: string }[]) {
+        if (!section.resource) continue;          // the line, the flags, the audit
+        assert.ok(section.fields && section.fields.length > 0,
+          `${c.shape}: a summary section carries rows and declares no fields`);
+        for (const row of section.rows as Record<string, unknown>[]) {
+          for (const k of Object.keys(row)) {
+            assert.ok(section.fields!.includes(k),
+              `${c.shape}: a row carries ${k}, which its section never declared`);
+          }
+        }
+        sections++;
+      }
+    }
+  }
+  assert.ok(sections > 0, "something to check: no summary section carried a resource");
+  ok(`summary: ${sections} sections each declare which columns a row carries, and in which order`);
+
   // And a view this centre cannot open never reaches the list screen at all.
   assert.ok(noLab.refused.length >= 0);
   assert.deepEqual(whole.refused, [], "a centre running every plugin is refused no view");
