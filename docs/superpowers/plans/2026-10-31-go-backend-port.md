@@ -105,7 +105,7 @@ Each is finished when the gate is green and the named checks pass against Go.
   measure is worth more than the original order.
 
   **Landed 2026-10-31.** `scripts/check_live.py` is 16 of 16 against Go.
-  `scripts/e2e.py main()` reaches 22 of 49 and stops at `POST /khoj`, which
+  `scripts/e2e.py main()` reaches 21 of 49 and stops at `POST /khoj`, which
   is the planner in `agent/turn.py` and not this slice; `facility_shape()`
   stays 4 of 4. The patient routes `check_live.py` reaches are served from
   the LOCAL half of `kernel/directory.py` only: there is no vendor behind
