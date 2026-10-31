@@ -109,9 +109,9 @@ export const api = {
    *  screen that did not come from the kernel. */
   questionnaires: () => req<{ questionnaires: Record<string, Questionnaire> }>("/questionnaires/"),
   /** A bound choice's concepts, expanded by the kernel's own terminology.
-   *  `limit` is the route's ceiling, so a long value set comes back truncated
-   *  rather than silently short -- see declarations.ts, which says what that
-   *  costs. */
+   *  200 is the route's own hard ceiling (api/main.py clamps it), so this
+   *  asks for every concept the kernel will give. See declarations.ts for
+   *  what that ceiling costs the day a value set is bigger than it. */
   valueset: (slug: string, limit = 200) =>
     req<{ valueset: string; concepts: { value: string; display: string; system: string }[] }>(
       `/valuesets/${encodeURIComponent(slug)}/?limit=${limit}`),

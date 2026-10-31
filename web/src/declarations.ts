@@ -52,6 +52,15 @@ export const boundSets = (got: Record<string, Questionnaire>): string[] =>
  *  load: the question it binds then draws an empty picker, which is what it
  *  drew before any of this existed, and the form still opens. The alternative
  *  is a blank workspace because one slug is unbound, which is worse.
+ *
+ *  The ceiling, named because it does not bite today and will. `GET
+ *  /valuesets/{slug}` clamps its expansion at 200 concepts, and this asks for
+ *  200, so every value set in this build (the largest is nine) arrives whole.
+ *  The day one is larger -- which is the day the local terminology file is
+ *  replaced by the NRCeS release behind the same seam -- a picker will be
+ *  silently short, with no sign on screen that anything was left out. The fix
+ *  is to search as the clinician types through the route's `q` parameter,
+ *  which already exists and which nothing calls, not to raise the number.
  */
 export async function load(source: Source): Promise<{ forms: number; sets: number }> {
   const got = (await source.questionnaires()).questionnaires ?? {};
