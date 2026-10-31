@@ -20,5 +20,5 @@
   "exclude": ["src/validate.check.ts", "src/voice/voice.check.ts", "src/messages.check.ts",
               "src/scribe/scribe.check.ts", "src/abha/abha.check.ts", "src/loops.check.ts",
               "src/grants.check.ts", "src/style.check.ts", "src/ui.check.ts", "src/agent.check.ts",
-              "src/live.check.ts"]
+              "src/live.check.ts", "src/pwa.check.ts"]
 }
