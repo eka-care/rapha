@@ -1055,9 +1055,30 @@ def s_the_views_see_what_the_write_did(walk, codes):
     # case named here.
     _, queue = walk.read("the queue once more, to walk its rows", "/queue",
                          ordered=False)
+    subjects = []
     for row in queue.get("rows") or []:
-        walk.peek("the panel behind queue row %s" % row["thread"],
-                  "/threads/" + row["thread"])
+        _, panel = walk.peek("the panel behind queue row %s" % row["thread"],
+                             "/threads/" + row["thread"])
+        # The spine field's own resource is the subject, and the panel merges
+        # that row in, so its `id` is the continuing subject's. Collected from
+        # the SEEDED threads as well as this walk's own, because a subject
+        # with one visit proves nothing about a timeline: bundles/phc/seed.yaml
+        # says so in its own words at the thread that declares
+        # `same_patient_as`, and without that thread a join that had stopped
+        # joining would look exactly the same.
+        found = (panel.get("subject") or {}).get("id")
+        if found and found not in subjects:
+            subjects.append(found)
+    for found in sorted(subjects):
+        # The seed mints its row ids as serials in declaration order, so this
+        # path is the same path in both engines and the two answers are
+        # comparable. A subject this walk registered has a minted id instead,
+        # which each engine chose for itself; that one is read for the
+        # properties pass and not diffed, the way the panels above are.
+        if SEED_SHAPE.fullmatch(found):
+            walk.read("the spine of seeded subject %s" % found, "/subjects/" + found)
+        else:
+            walk.peek("the spine of subject %s" % found, "/subjects/" + found)
 
     # The spine: one subject, every visit. The subject id is the patient row
     # this walk's own registration created, which the panel carries under the
@@ -1350,6 +1371,14 @@ def properties(shape, scenario, walk):
             % (shape, sorted(kinds), sorted(openable)))
 
         # ---- the spine, when this walk read one
+        timelines = [body for _, status, body in walk.raw
+                     if status == 200 and isinstance(body, dict)
+                     and "encounters" in body]
+        if timelines:
+            assert any(len(t["encounters"]) > 1 for t in timelines), (
+                "%s: every subject this walk read has exactly one visit, so "
+                "neither the join nor the newest-first ordering proves "
+                "anything" % shape)
         for _, status, body in walk.raw:
             if status != 200 or not isinstance(body, dict) or "encounters" not in body:
                 continue
@@ -1902,6 +1931,81 @@ def compare(shape, python, go):
        "that will bring them, rather than 404" % (shape, len(owed)))
 
 
+# ---------------------------------------------------------------------------
+# The mutation ledger for what G4 added: 17 applied, 17 caught
+# ---------------------------------------------------------------------------
+#
+# Each one was applied, PROVED applied before anything ran (the file changed,
+# the replaced text was gone, the replacement was there, and git agreed), run
+# through the whole of scripts/check.sh, reverted, and the revert proved clean
+# against git. The gate stops at the first failure, so "first" is the gate's
+# own order. Thirteen are Go only; the last two change BOTH engines.
+#
+#  1. The dashboard reads each metric's own window instead of the view's.
+#     -> the views walk, phc.view.facility-dashboard.
+#  2. A tasklist ignores its `not` clause entirely.      -> the views walk.
+#  3. A tasklist's `not` tests only its FIRST member, which is the silent
+#     half match.                                        -> the views walk.
+#  4. `window.start` is not bound, so a metric compares a column against the
+#     literal string.                                    -> the views walk.
+#  5. The queue drops the trailing group for a finished thread.
+#     -> roll_forward(), which asks for a queue before any shape does.
+#  6. A queue row carries every subject field instead of the declared columns.
+#     -> roll_forward().
+#  7. A window reaches FORWARD instead of back.          -> the views walk.
+#  8. A visit's `did` includes an operation that was only proposed.
+#     -> the views walk, the spine of a seeded subject.
+#  9. A timeline is oldest first.                        -> the same.
+# 10. The seed's `same_patient_as` stops joining, so a returning patient is a
+#     second person.                                     -> the same.
+# 11. The roll forward loses its clamp and pushes rows into the future.
+#     -> roll_forward().
+# 12. The store stops rolling a stale demo day forward at all.
+#     -> roll_forward().
+# 13. The pending register reads flattened rows, so an unfilled column is ""
+#     and not null.                                      -> stamped().
+# 14. Every declared badge fires whether the row holds the flag or not.
+#     -> roll_forward().
+# 15. A summary's `actions` section is drawn for a caller holding nothing.
+#     -> the views walk, phc.view.visit-summary with a thread.
+#
+# THE HOLE THE MUTATIONS FOUND IN THIS CHECK
+# ------------------------------------------
+# 9 and 10 were applied first against the scenario as it was originally
+# built, and BOTH PASSED THE WHOLE GATE. The walk read the spine of the
+# subject it had just registered, and that subject has exactly ONE visit, so
+# neither the newest-first ordering nor the join had anything to be wrong
+# about. bundles/phc/seed.yaml says so in its own words at the thread that
+# declares `same_patient_as` ("a spine with one visit per person proves
+# nothing"), and the check had to be told to walk the SEEDED subjects before
+# either mutation could fail. The property beside them now refuses a run in
+# which every subject read has one visit.
+#
+# TWO MUTATIONS WHERE BOTH ENGINES DRIFT TOGETHER, WHICH A DIFF CANNOT SEE
+# ------------------------------------------------------------------------
+# 16. BOTH engines read each metric's own window instead of the view's.
+# 17. BOTH engines drop the tasklist's `not` clause.
+# Both were caught, and NEITHER was caught here. The gate reached
+# kernel/tests/test_kernel.py first, where
+# test_a_dashboard_evaluates_every_metric_locally and
+# test_a_tasklist_not_clause_excludes_a_thread_that_has_consented already pin
+# exactly those two facts. So the properties this slice added beside the diff
+# — the view's window winning, and each tasklist predicate recomputed from the
+# flags the kernel derived — are a SECOND net, and they are recorded as
+# unproved by mutation rather than claimed: every mutation that would reach
+# them is caught earlier by a named Python test. They are kept because the day
+# a bundle grows a view the Python has no hand written test for, they are what
+# is left. The same is true of the spine properties, which kernel/tests/
+# test_spine.py pins from the other side.
+#
+# Two mutations were REFUSED BEFORE THEY RAN, both the substring trap in the
+# direction that matters: the first spellings of 3 and 8 left the text they
+# replaced in the file, so they would have run, passed, and been recorded as
+# mutations that proved nothing. The harness asserts the old text is gone
+# BEFORE it writes, which also matters: an earlier spelling wrote the file and
+# then raised, and the next mutation built on a dirty tree and reported a
+# false "not caught".
+#
 # ---------------------------------------------------------------------------
 # The mutation ledger for what G3 added: 15 applied, 14 caught
 # ---------------------------------------------------------------------------
