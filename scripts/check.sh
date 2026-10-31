@@ -89,6 +89,17 @@ python3 scripts/check_templates.py
 # for itself; and invariant I6 is proved case by case, including the two
 # resources where it is NOT kept and the reason it cannot be.
 python3 scripts/check_verification.py
+# A health centre's copy is a choice and not a fork. Which plugins a centre
+# runs is one declared list, a plugin that is off is a capability the caller
+# does not hold, and this holds three shapes of the same bundle against each
+# other: the compiled catalogue is identical, the withheld capabilities are
+# derived, the operation is absent from the quick action row AND from what the
+# MCP server builds its tool list from, the guard refuses it on both surfaces
+# with an audit row naming the plugin, the step it closed is skipped rather
+# than pending, and the dashboard this centre does not run answers 403. Runs
+# the service in process as the SMALLEST shape; the socket half, driving the
+# real Go binary, is in scripts/e2e.py.
+PHC_FACILITY=consulting-room-only python3 scripts/check_plugins.py
 # The connector behind the seam, against a stand-in transport fed the vendor's
 # own published response examples. No credential, no socket, no recording of a
 # live call, and the check says so in its docstring.
