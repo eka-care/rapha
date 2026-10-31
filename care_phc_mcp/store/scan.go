@@ -49,7 +49,11 @@ func scanNullableRows(rows *sql.Rows) ([]map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	var out []map[string]any
+	// An empty slice and not nil, because this answer goes on the wire: the
+	// Python's select() returns [] for no rows and json.Marshal writes nil as
+	// `null`, so a summary section with nothing in it would read as a section
+	// that could not be read rather than as an empty one.
+	out := []map[string]any{}
 	for rows.Next() {
 		cells := make([]any, len(columns))
 		holders := make([]sql.NullString, len(columns))

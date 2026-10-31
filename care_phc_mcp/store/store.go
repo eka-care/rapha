@@ -35,14 +35,13 @@
 // every expectation downstream, so Text() below is a transcription of that
 // file's _text() and nothing more.
 //
-// WHAT IS NOT HERE YET
-// --------------------
-// roll_seed_forward() and seed(). Both belong with the slice that serves a
-// queue (G6): a seeded demo day is only observable through views, and writing
-// it now would be a second unproven implementation of a function whose whole
-// behaviour is about what a screen shows. The constructor therefore does NOT
-// move a stale demo day forward the way the Python's does, which is a real
-// difference and is why nothing in Go reads the seeded rows yet.
+// THE SEED AND THE DEMO DAY ARE IN seed.go
+// ----------------------------------------
+// seed() and roll_seed_forward() were deliberately absent until the slice
+// that serves a queue, because a seeded demo day is only observable through a
+// view and writing them earlier would have been a second unproven
+// implementation. They arrived with the views slice (G4). Open() now moves a
+// stale demo day forward exactly as the Python constructor does.
 package store
 
 import (
@@ -110,11 +109,17 @@ var ident = regexp.MustCompile(`^[a-z_][a-z0-9_]*$`)
 // ---------------------------------------------------------------------------
 
 // ThreadRef mirrors kernel/contracts.py ThreadRef.
+//
+// Subject is map[string]any and not map[string]string because the Python's
+// threads() builds it from dict(patient_row), which carries None for an
+// unfilled column, and the subject goes on the wire: a queue row drawing "no
+// ABHA number yet" sees the difference between null and "". Same reason
+// SelectNullable exists; see that method.
 type ThreadRef struct {
-	ID       string            `json:"id"`
-	Workflow string            `json:"workflow"`
-	Subject  map[string]string `json:"subject"`
-	OpenedAt string            `json:"opened_at"`
+	ID       string         `json:"id"`
+	Workflow string         `json:"workflow"`
+	Subject  map[string]any `json:"subject"`
+	OpenedAt string         `json:"opened_at"`
 }
 
 // Proposal mirrors kernel/contracts.py Proposal. Payload and FlagsRaised are
@@ -314,6 +319,14 @@ func Open(path string) (*SQLite, error) {
 		if _, err := db.Exec(stmt); err != nil {
 			return nil, fmt.Errorf("creating %s: %w", table, err)
 		}
+	}
+	// The constructor's own job in adapters/local/store.py, and here for the
+	// same reason: every queue view is `scope: today`, so a file seeded
+	// yesterday draws an empty workspace this morning. Every process that
+	// opens the file gets the roll forward, including the ones this adapter
+	// does not own. See RollSeedForward in seed.go.
+	if _, err := s.RollSeedForward(); err != nil {
+		return nil, err
 	}
 	return s, nil
 }
@@ -548,35 +561,38 @@ func (s *SQLite) Threads(workflow, scope string) ([]ThreadRef, error) {
 	if err != nil {
 		return nil, err
 	}
-	encounters, err := scanRows(rows)
+	encounters, err := scanNullableRows(rows)
 	rows.Close()
 	if err != nil {
 		return nil, err
 	}
 	out := make([]ThreadRef, 0, len(encounters))
 	for _, row := range encounters {
-		subject := map[string]string{
-			"encounter": row["id"], "token": row["token"], "status": row["status"],
+		id, _ := row["id"].(string)
+		subject := map[string]any{
+			"encounter": id, "token": row["token"], "status": row["status"],
 		}
-		if row["patient"] != "" {
-			pr, err := s.db.Query("SELECT * FROM patient WHERE id = ?", row["patient"])
+		if patient, _ := row["patient"].(string); patient != "" {
+			pr, err := s.db.Query("SELECT * FROM patient WHERE id = ?", patient)
 			if err != nil {
 				return nil, err
 			}
-			found, err := scanRows(pr)
+			found, err := scanNullableRows(pr)
 			pr.Close()
 			if err != nil {
 				return nil, err
 			}
+			// One row, as the Python's fetchone() is: `if patient:` there is a
+			// single row or nothing, so a second would be ignored either way.
 			if len(found) == 1 {
 				for k, v := range found[0] {
 					subject[k] = v
 				}
 			}
 		}
+		opened, _ := row["created_date"].(string)
 		out = append(out, ThreadRef{
-			ID: row["id"], Workflow: workflow, Subject: subject,
-			OpenedAt: row["created_date"],
+			ID: id, Workflow: workflow, Subject: subject, OpenedAt: opened,
 		})
 	}
 	return out, nil
