@@ -323,30 +323,6 @@ def drift(manifest, ops_dir=OPS, schemas_dir=SCHEMAS):
 # lint
 # --------------------------------------------------------------------------
 
-def _required_links(schema, decl):
-    """Every question this template's form will refuse to commit without.
-
-    The base's own required questions that the template still asks, plus the
-    ones the template adds. A required answer is the one that has to go
-    somewhere, which is the check below.
-    """
-    by = {q["link_id"]: q for q in schema.get("questions") or []}
-    asked = [k for k in decl.get("asks") or [] if k in by]
-    return sorted({k for k in asked if by[k].get("required")}
-                  | ({k for k in decl.get("require") or []} & set(asked)))
-
-
-def _mapped_links(records):
-    """Every top level question the narrowed mapping reads."""
-    out = set()
-    for record in records:
-        links, lists = _record_links(record)
-        out |= links
-        for _, named in lists.values():
-            out |= set(named)
-    return out
-
-
 def _bound_slugs(questions):
     """Every value set an asked question, or one of its sub questions, binds
     its answer to."""
@@ -376,10 +352,13 @@ def lint(manifest, ops, decls, ops_dir=OPS):
       from the base, so it can only break when the base's binding does, and
       a bound choice with no cached value set draws an empty dropdown rather
       than failing.
-    - a required answer that goes nowhere: a question this template will not
-      commit without, whose answer the narrowed mapping reads into no column
-      and no note. That is an answer a clinician is forced to give and
-      nothing keeps.
+    A required answer that goes nowhere is NOT checked here, and that is
+    deliberate. kernel/mapping.py already refuses an operation with a
+    required question that no record stores and nobody declared they were
+    dropping, and it runs over a generated atom and its generated form like
+    any other. A second copy of that rule here would be a rule asserted
+    twice, which is a rule nobody maintains; `scripts/check_templates.py`
+    proves the existing one reaches a template instead.
     - a template claiming a station or a capability that is not declared: one
       the bundle does not load, one no scribe instrument may fill, or one the
       workflow does not offer at its own station. All three are a template
@@ -411,7 +390,7 @@ def lint(manifest, ops, decls, ops_dir=OPS):
             continue
         for key in sorted(set(decl) - set(KEYS)):
             bad.append("%s: unknown key '%s'" % (where, key))
-        missing = [k for k in REQUIRED if k not in decl]
+        missing = [k for k in REQUIRED if not decl.get(k)]
         if missing:
             bad.append("%s: missing %s" % (where, ", ".join(missing)))
             continue
@@ -449,9 +428,6 @@ def lint(manifest, ops, decls, ops_dir=OPS):
 
         by = {q["link_id"]: q for q in base_schema.get("questions") or []}
         asks = list(decl.get("asks") or [])
-        if not asks:
-            bad.append("%s: asks nothing, so it is a form with no questions"
-                       % where)
         for link_id in sorted(set(asks)):
             if asks.count(link_id) > 1:
                 bad.append("%s: asks '%s' twice" % (where, link_id))
@@ -478,15 +454,6 @@ def lint(manifest, ops, decls, ops_dir=OPS):
         if not records:
             bad.append("%s: its narrowing leaves no mapping record, so the "
                        "form records nothing it is answered with" % where)
-        mapped = _mapped_links(records)
-        for link_id in _required_links(base_schema, decl):
-            if link_id not in mapped:
-                bad.append("%s: requires '%s', whose answer the narrowed "
-                           "mapping reads into no column and no note. A "
-                           "required answer that goes nowhere is an answer a "
-                           "clinician is made to give and nothing keeps"
-                           % (where, link_id))
-
         station = base_fm.get("station")
         if template_id not in scribe_ops:
             bad.append("%s: no scribe instrument lists it, so a recording may "
@@ -496,5 +463,9 @@ def lint(manifest, ops, decls, ops_dir=OPS):
                        "station it inherits, so nobody is ever shown it"
                        % (where, station))
 
-    bad += drift(manifest, ops_dir)
+    # Only once the declarations themselves are sound. A declaration naming a
+    # question that does not exist cannot be generated at all, and the line
+    # above already says why in the words a reader needs.
+    if not bad:
+        bad += drift(manifest, ops_dir)
     return bad

@@ -73,6 +73,16 @@ python3 scripts/check_codification.py
 # through the ABDM tier one structural validator, and what that does not
 # prove, is in the file's docstring rather than in a commit message.
 python3 scripts/check_op_bundle.py
+# The doctor's three templates. A template is an operation whose form and
+# mapping are generated from one declaration by narrowing another operation's,
+# so there is no second questionnaire to keep in step: a hand edit to a
+# generated atom fails, every template publishes through the one `documents`
+# declaration into the same slices as the general consultation, the narrative
+# fallback is inherited rather than retyped, and a question a template does
+# not ask cannot be filled, so no value can be committed untickable. What it
+# does NOT prove is that any of the three narrowings is clinically correct;
+# the file's docstring says so and two of the three carry a sign-off banner.
+python3 scripts/check_templates.py
 # How sure anybody was, on every coded thing rather than only on a diagnosis.
 # Every status literal an operation stores is held against the published FHIR
 # list R4 binds that element to; no projection chooses a clinical certainty
