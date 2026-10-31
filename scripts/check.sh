@@ -155,12 +155,27 @@ echo "\n== the MCP server =="
 # (where the embedded catalogue.json is) and cmd/mcp and cmd/api are beside
 # its files. `./cmd/mcp` rather than `.`, because the root is a library now.
 (cd care_phc_mcp && go vet ./... && go test ./... \
-   && go build -o care_phc_mcp ./cmd/mcp)
+   && go build -o care_phc_mcp ./cmd/mcp \
+   && go build -o care_phc_api ./cmd/api)
 # Two lines, not one `cmd && echo`: under `set -e` a failing command on the
 # left of && does not stop the script, so that spelling let this check fail in
 # silence. It did.
 python3 scripts/agent_demo.py > /dev/null
 echo "ok   agent demo runs end to end"
+
+echo "\n== the Go backend, beside the Python =="
+# Two engines on one set of declarations, over two real sockets at once, with
+# their answers compared rather than asserted: nothing about either shape is
+# written down here, because a literal would pass while both engines drifted
+# from each other. What Go does not serve yet answers 501 naming the slice
+# that will bring it, and that list is in this check's output rather than in a
+# commit message. Needs the Go toolchain, and fails loudly if cmd/api does not
+# build; it opens two ports, so SKIP_E2E skips it.
+if [ -n "$SKIP_E2E" ]; then
+  echo "warn go parity skipped: SKIP_E2E is set"
+else
+  python3 scripts/check_go_parity.py
+fi
 
 echo "\n== the browser side =="
 # The voice grammar is pure and runs under plain node. The browser's own
