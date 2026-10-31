@@ -432,6 +432,128 @@ class Store(Protocol):
     def audit(self, thread: str) -> list: ...
 
 
+# --------------------------------------------------------------------------
+# The Spool protocol: what the kernel needs from a facility's outbox.
+#
+# BESIDE Store, not behind it, and the reason is the Store docstring's own
+# sentence: "a SQLite file and a REST client over somebody else's record can
+# both satisfy every one". Three things break that if an outbox goes behind
+# Store:
+#
+# 1. `write(resource, record: Mapping) -> id` takes a mapping. A consultation
+#    recording is a blob. Putting blobs behind Store makes every adapter a
+#    blob store, including a REST client over an EMR that is not ours.
+# 2. An outbox row is not clinical state. It is this facility's own record of
+#    what it still owes a remote service, and `resource` would have to join
+#    vocab.CARE_RESOURCES for a thing no CARE resource corresponds to.
+# 3. An outbox must survive the system of record being unreachable, which is
+#    the whole point. A queue kept inside somebody else's record is a queue
+#    that is empty exactly when it is needed.
+#
+# So: five methods, their own protocol, their own adapter, and the kernel
+# reads both through its own module (kernel/queues.py). What is NOT duplicated
+# is the pending set: for a national document there is no body here at all,
+# because the rows already in the Store are the record and the document is
+# re-projected at send time. That is kernel/directory.py's rule, which says
+# "the publish queue is not a queue", applied as far as it goes. It does not
+# reach audio, because audio's bytes exist nowhere else.
+#
+# KNOWN, AND PINNED BY A CHECK RATHER THAN FIXED HERE: kernel/directory.py
+# calls `store.record_directory_id(...)`, an eleventh method the Store
+# protocol above does not declare. scripts/check_queues.py holds the list of
+# off-protocol Store calls in the kernel at exactly that one, so a second one
+# fails the gate. Fixing the first is a change to the protocol and to the
+# adapter test that pins its ten names, and is not this module's to make.
+# --------------------------------------------------------------------------
+
+# What a queued item is for. `audio` is a consultation recording owed to a
+# speech service; `document` is a visit owed to a national record. Two kinds
+# and not one because the bodies come from different places: audio's bytes
+# are held here, a document's body is re-projected from the Store.
+QUEUE_KINDS = ("audio", "document")
+
+# An item's life. Every one of these is a state somebody can be shown.
+#
+#   ready     waiting for a line
+#   sending   claimed, and the outcome is not yet known
+#   sent      the remote acknowledged it, and said so with a receipt
+#   failed    tried the limit and stopped. Visible, not retried, not lost.
+#   refused   the guard denied it at the moment it would have been sent
+#   held      the remote cannot say whether it already has this, so nobody
+#             may resend it and nobody may throw it away. A person decides.
+QUEUE_STATES = ("ready", "sending", "sent", "failed", "refused", "held")
+
+
+@dataclass(frozen=True)
+class QueueItem:
+    """One thing this facility owes a remote service.
+
+    WHAT THIS ROW HOLDS, which is the most sensitive decision in the module:
+    identifiers and state, never content. No name, no mobile number, no
+    Aadhaar number, no OTP, no answer a clinician typed, and for a document no
+    body at all. `blob` is a path to bytes for an `audio` item and empty
+    otherwise, and the file it names is called after `id`, which is opaque.
+    `last_error` is the one free text field and it is scrubbed before it is
+    written; kernel/queues.py is the only writer and scripts/check_queues.py
+    holds it to all three of this project's rules.
+
+    `key` is what the remote is asked under, and it is the whole of the
+    not-sent-twice property: it is supplied by us rather than minted by them,
+    so the same item asked for twice is one job on their side. For audio it is
+    the scribe transaction id, which api/scribe.py already supplies as
+    `txn_id`. For a document it is the encounter id, which kernel/fhir.py
+    already writes as `identifier.value`. Neither is invented here.
+    """
+    id: str
+    kind: str                       # QUEUE_KINDS
+    key: str                        # the idempotency key the remote is asked under
+    thread: str
+    operation: str                  # the operation this item belongs to
+    capability: str                 # what the guard re-judges at send time
+    facility: str                   # the shape this was admitted under
+    created_at: str
+    # Text, not Optional[str]: every field on this row persists as text and a
+    # None that reads back as "" is a field whose type lies about the table.
+    actor: str = ""
+    blob: str = ""                  # audio only: the path to the bytes
+    state: str = "ready"            # QUEUE_STATES
+    attempts: int = 0
+    last_error: str = ""            # scrubbed by kernel/queues.py, never raw
+    claimed_at: str = ""
+    sent_at: str = ""
+    receipt: str = ""               # what the remote called it
+
+
+class Spool(Protocol):
+    """A facility's outbox. Five methods, and `claim` is the only subtle one.
+
+    Nothing here decides anything. It does not know what a plugin is, what the
+    guard is, or when to retry: kernel/queues.py owns all of that, exactly as
+    kernel/state.py owns what a flag means and Store only stores.
+    """
+
+    def put(self, item: QueueItem) -> None: ...
+    # insert or replace by item.id
+
+    def get(self, item_id: str) -> Optional[QueueItem]: ...
+
+    def items(self, *, state: Optional[str] = None, kind: Optional[str] = None,
+              limit: int = 500) -> list: ...
+    # -> list[QueueItem], oldest first
+
+    def claim(self, item_id: str, *, at: str) -> Optional[QueueItem]: ...
+    # Move ready -> sending and add one to attempts, ATOMICALLY, and return
+    # the item as it now stands. None if it was not ready any more, which is
+    # how two pumps running at once cannot both take one item. The write must
+    # be durable before this returns: a crash one instruction later has to
+    # leave the item in `sending`, because an item that is still `ready` after
+    # a crash mid-send is an item a recovery will send a second time.
+
+    def settle(self, item_id: str, *, state: str, at: str, receipt: str = "",
+               error: str = "") -> None: ...
+    # The one write that ends an attempt. `state` is a QUEUE_STATES value.
+
+
 
 # --------------------------------------------------------------------------
 # The PatientDirectory protocol: what the kernel needs from a patient
