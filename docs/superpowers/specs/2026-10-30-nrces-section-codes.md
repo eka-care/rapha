@@ -66,6 +66,42 @@ rather than reusing a code from the table above because it looks close.
 `nrces.in` rejected a direct fetch with a certificate error on 2026-10-30, so
 the route in is the docs server or the packaged guide `ndhm.in#6.5.0`.
 
+## Which resource type each of the twelve slices takes
+
+Read on 2026-10-31 from the ABDM docs server's own mapping atom
+`shared.fhir.map-opconsultation`, catalogue version 2026.09.16, which states
+that the type per slice comes from the profile's own slicing, where each
+slice's `entry` element fixes a `targetProfile`. This table is the whole of
+it, including the four slices with no published code.
+
+| Section slice | Resource type |
+|---|---|
+| ChiefComplaints | Condition |
+| PhysicalExamination | Observation |
+| Allergies | AllergyIntolerance |
+| MedicalHistory | Condition |
+| FamilyHistory | FamilyMemberHistory |
+| InvestigationAdvice | ServiceRequest |
+| Medications | MedicationRequest |
+| FollowUp | Appointment |
+| Procedure | Procedure |
+| Referral | ServiceRequest |
+| OtherObservations | Observation |
+| DocumentReference | DocumentReference |
+
+Two rows are narrowed from what the atom prints, and both narrowings are this
+file's and not the publisher's: MedicalHistory is given as "Condition or
+Procedure" and Medications as "MedicationStatement or MedicationRequest". The
+one of each pair this build can produce is the one recorded above, so a check
+reading this table checks the build it has. Neither alternative is excluded by
+the standard.
+
+The same atom states the thing that decides what this build may publish: the
+resource type is fixed by the slice's own `entry`, so a section's resource and
+its code travel together. A slice whose code NRCeS has not published therefore
+cannot be filled under a code borrowed from another slice, however well the
+resource type matches.
+
 ## What this changes
 
 - The vitals slice, which emits WellnessRecord, is correct as built. The gap
