@@ -5,7 +5,7 @@
  *  ApiError is never blank and never says "something went wrong".
  */
 import { useCallback, useEffect, useState } from "react";
-import type { Catalogue, Facility, SubjectView, ThreadView, ViewResult } from "./types";
+import type { Catalogue, Facility, Questionnaire, SubjectView, ThreadView, ViewResult } from "./types";
 
 export const API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
@@ -103,6 +103,18 @@ const post = <T,>(path: string, body: unknown) =>
 
 export const api = {
   catalogue: () => req<Catalogue>("/catalogue/"),
+  /** What every form asks. Served by the kernel, keyed by the slug an
+   *  operation names in `input`. Until this existed the renderer read the
+   *  files off disk at build time, which made a form the one thing on a
+   *  screen that did not come from the kernel. */
+  questionnaires: () => req<{ questionnaires: Record<string, Questionnaire> }>("/questionnaires/"),
+  /** A bound choice's concepts, expanded by the kernel's own terminology.
+   *  `limit` is the route's ceiling, so a long value set comes back truncated
+   *  rather than silently short -- see declarations.ts, which says what that
+   *  costs. */
+  valueset: (slug: string, limit = 200) =>
+    req<{ valueset: string; concepts: { value: string; display: string; system: string }[] }>(
+      `/valuesets/${encodeURIComponent(slug)}/?limit=${limit}`),
   facility: () => req<Facility>("/facility/"),
   view: (id: string, thread?: string) =>
     req<ViewResult>(`/views/${id}/${thread ? `?thread=${encodeURIComponent(thread)}` : ""}`),

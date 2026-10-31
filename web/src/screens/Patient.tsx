@@ -13,7 +13,7 @@ import { initialsOf } from "../agent";
 import { api, useAsync } from "../api";
 import { questionnaire } from "../declarations";
 import { Icon } from "../icons";
-import { valuesOf } from "../messages";
+import { header, queueViewFor, valuesOf } from "../messages";
 import { Failed, Loading } from "../parts";
 import type { Catalogue, SubjectView, ThreadView } from "../types";
 import { human, title } from "../words";
@@ -31,10 +31,18 @@ export function Patient({ id, cat, onOpenThread }: {
   if (error) return <Failed error={error} what="open this patient" onRetry={reload} />;
   const view = data!;
 
-  const name = String(view.subject.name ?? view.subject.id ?? id);
-  const meta = ["age", "sex", "village"].map((k) => view.subject[k])
-    .filter((v) => v !== null && v !== undefined && v !== "").map(String);
-  const identity = Object.entries(view.subject).find(([k, v]) => /abha|abdm/i.test(k) && v);
+  // Which fields name a subject and which describe one is the queue view's own
+  // `columns:` declaration, and messages.header() is where that rule already
+  // lives. This screen used to pick the three it wanted -- age, sex and
+  // village -- which made it a second place deciding what a subject is, and
+  // wrong for any bundle whose subject is not a village outpatient.
+  const head = header(
+    { id, workflow: "", subject: view.subject, flags: [] } as unknown as ThreadView,
+    queueViewFor(cat, Object.values(cat.workflows ?? {})[0]?.id),
+  );
+  const name = head.name;
+  const meta = head.meta;
+  const identity = head.identity;
   const open = view.encounters.find((e) => e.status !== "completed");
 
   return (
@@ -48,8 +56,8 @@ export function Patient({ id, cat, onOpenThread }: {
             <div className="pt-chips">
               {identity && (
                 <span className="id-badge">
-                  <span className="id-lab">{title(human(identity[0]))}</span>
-                  <span className="id-val">{String(identity[1])}</span>
+                  <span className="id-lab">{identity.label}</span>
+                  <span className="id-val">{identity.value}</span>
                 </span>
               )}
               <span className="badge b-mute">

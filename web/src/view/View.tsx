@@ -168,14 +168,26 @@ function SectionRows({ section }: { section: SectionResult }) {
   return (
     <>
       {(rows as Record<string, unknown>[]).map((r, i) => (
-        <div className="kv" key={i}><span>{describe(r)}</span><b>{when(r)}</b></div>
+        <div className="kv" key={i}>
+          <span>{describe(r, section.fields)}</span><b>{when(r)}</b>
+        </div>
       ))}
     </>
   );
 }
 
-function describe(r: Record<string, unknown>): string {
-  for (const k of ["title", "text", "name", "code", "operation", "status"]) {
+/** What a row leads with.
+ *
+ *  The section's own `fields:`, in the order it declared them. This used to be
+ *  a list of six field names written here -- title, text, name, code,
+ *  operation, status -- which meant a bundle that put its own column first
+ *  got whichever of those six it happened to carry instead, and no amount of
+ *  reordering the declaration changed the screen. The fallback below is for a
+ *  section that declares no fields (the line, the flags, the audit), and it
+ *  reads the row rather than a word list.
+ */
+function describe(r: Record<string, unknown>, fields?: string[]): string {
+  for (const k of fields ?? []) {
     if (r[k]) return String(r[k]);
   }
   const first = Object.entries(r).find(([k, v]) => !/(^|_)id$/.test(k) && v);

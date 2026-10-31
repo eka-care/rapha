@@ -138,6 +138,14 @@ export type Catalogue = {
 /** GET /facility: which bundle this kernel loaded, and who is asking. */
 export type Facility = {
   bundle: { id: string; title: string; version: string; workflow: string };
+  /** Which shape of this facility the kernel is running, and what that shape
+   *  withholds: `withheld` is capability to the plugin withholding it,
+   *  `without` is plugin to its declared title. `capabilities` stays the whole
+   *  of what the BUNDLE declares, which is why a screen needs these two to
+   *  tell a capability this centre has from one it has declined. */
+  facility: string | null;
+  withheld: Record<string, string>;
+  without: Record<string, string>;
   capabilities: string[];
   views: ViewDecl[];
   roles: string[];
@@ -194,6 +202,12 @@ export type MetricValue = {
 
 export type SectionResult = {
   title: string; show?: string; resource?: string; rows: unknown[];
+  /** Which columns the section declared, in the order it declared them. The
+   *  store already narrows a row to these, so this is only about which one a
+   *  row leads with -- which the renderer used to decide for itself from a
+   *  list of field names it had typed out. Empty for a section that shows the
+   *  line, the flags or the audit rather than a resource. */
+  fields?: string[];
 };
 
 /** A tasklist row: a title and a count, no prose. `operation` present makes

@@ -9,7 +9,7 @@
  */
 import { useEffect, useState } from "react";
 import type { Client } from "../api";
-import { inert, inertReason } from "../grants";
+import { inert, inertReason, type Withheld } from "../grants";
 import type { Catalogue, Operation } from "../types";
 import { human } from "../words";
 
@@ -33,12 +33,17 @@ function groupsFor(cat: Catalogue): Group[] {
 }
 
 export function Roles({
-  cat, roleIds, client, onClose,
+  cat, roleIds, facility, client, onClose,
 }: {
   cat: Catalogue;
   /** /facility's role list: the nine presets plus the demo union. Demo is not
    *  a preset a facility can deviate from, so it is not offered here. */
   roleIds: string[];
+  /** What this centre does not run, from GET /facility. Not optional: a
+   *  default of "nothing is withheld" is exactly the wrong answer at the
+   *  centre that withholds something, and it is how this screen came to offer
+   *  a switch the guard refuses. */
+  facility: Withheld;
   client: Client;
   onClose: () => void;
 }) {
@@ -113,7 +118,12 @@ export function Roles({
           <div key={g.title}>
             <div className="eyebrow">{g.title}</div>
             {g.rows.map(({ cap, op }) => {
-              const off = op ? inert(cap, cat) : false;
+              // A capability this centre withholds is dead whether or not an
+              // operation names it: the kernel has already taken it off the
+              // caller. So the facility is asked first, and only then the
+              // workflow, which has nothing to say about a capability that
+              // gates a view.
+              const off = facility.withheld[cap] ? true : op ? inert(cap, cat, facility) : false;
               return (
                 <label className="f-check" key={cap} style={off ? { opacity: 0.5 } : undefined}>
                   <input
@@ -123,7 +133,7 @@ export function Roles({
                     onChange={() => toggle(cap)}
                   />
                   <span>{human(cap)}</span>
-                  {off && <span className="f-hint">{inertReason(cap, cat)}</span>}
+                  {off && <span className="f-hint">{inertReason(cap, cat, facility)}</span>}
                 </label>
               );
             })}

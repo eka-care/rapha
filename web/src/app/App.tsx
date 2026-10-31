@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, currentRole, useAsync } from "../api";
 import { ask } from "../ask";
-import { questionnaire } from "../declarations";
+import { load as loadDeclarations, questionnaire } from "../declarations";
 import { keep, type Recent } from "../loops";
 import { header, queueViewFor, type Ctx, type Said } from "../messages";
 import { Boundary, Failed, Loading } from "../parts";
@@ -85,6 +85,10 @@ export function App() {
 
   const facility = useAsync(() => api.facility(), []);
   const cat = useAsync(() => api.catalogue(), []);
+  // The forms, before the first screen draws. They used to be compiled into
+  // the browser bundle from questionnaires/*.json, which meant the one part
+  // of a screen the kernel did not serve was what it asked a clinician.
+  const decls = useAsync(() => loadDeclarations(api), []);
 
   // §35: ⌘K from anywhere.
   useEffect(() => {
@@ -143,13 +147,13 @@ export function App() {
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
-  if (facility.loading || cat.loading) {
+  if (facility.loading || cat.loading || decls.loading) {
     return <div className="view scroll"><div className="wrap"><Loading what="the workspace" /></div></div>;
   }
-  if (facility.error || cat.error) {
+  if (facility.error || cat.error || decls.error) {
     return (
       <div className="view scroll"><div className="wrap">
-        <Failed error={(facility.error ?? cat.error)!} what="reach the kernel" onRetry={() => location.reload()} />
+        <Failed error={(facility.error ?? cat.error ?? decls.error)!} what="reach the kernel" onRetry={() => location.reload()} />
       </div></div>
     );
   }
@@ -253,7 +257,15 @@ export function App() {
                   <Patient id={route.id} cat={catalogue} onOpenThread={(t) => go(`#/threads/${t}`)} />
                 )}
                 {route.kind === "settings" && (
-                  <Roles client={api} cat={catalogue} roleIds={facility.data?.roles ?? []} onClose={() => go("#/")} />
+                  <Roles
+                    client={api} cat={catalogue}
+                    roleIds={facility.data?.roles ?? []}
+                    facility={{
+                      withheld: facility.data?.withheld ?? {},
+                      without: facility.data?.without ?? {},
+                    }}
+                    onClose={() => go("#/")}
+                  />
                 )}
                 {route.kind === "notfound" && (
                   <div className="notice" role="alert">
