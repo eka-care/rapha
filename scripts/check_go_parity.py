@@ -60,10 +60,28 @@ SHAPES = ("all-plugins", "no-laboratory", "consulting-room-only")
 # and that is exactly the kind of difference a diff should catch.
 SERVED = ("/whoami", "/facility", "/catalogue", "/operations",
           "/questionnaires")
-# And the one served read route that needs a path parameter, so it cannot join
-# the loop above. Compared by valuesets() below, over every slug a question in
-# this bundle actually binds its answer to, derived from the forms on disk.
-SERVED_TEMPLATED = ("/valuesets",)
+# The served read routes whose answer carries THIS STORE'S OWN TIMESTAMPS, so
+# they cannot be compared byte for byte: two engines seed their own file a
+# fraction of a second apart, and a queue row's opened_at is that fraction.
+# Compared by stamped() below, through the same normalise() the write path's
+# walk uses, which replaces a volatile value with a marker that says WHICH
+# volatile thing was there rather than dropping it.
+#
+# /patients/search and /patients/pending are the LOCAL half of
+# kernel/directory.py. There is no vendor behind that seam in Go and no
+# credential is read, so the two engines are compared with
+# PHC_DIRECTORY=absent (see both() below), which makes the Python take the
+# same degraded path by the ordinary route. A facility WITH a credential
+# configured would get suggestions from the Python and none from the Go: that
+# gap is real, it is named here, and it is not closed by pretending this
+# comparison covers it.
+SERVED_STAMPED = ("/queue", "/patients/search", "/patients/pending")
+# And the served read routes that need a path parameter, so they cannot join
+# the loop above. /valuesets is compared by valuesets() below, over every slug
+# a question in this bundle actually binds its answer to; /views and /subjects
+# by the write path's own walk, which is the only place a thread and a subject
+# exist to ask about.
+SERVED_TEMPLATED = ("/valuesets", "/views", "/subjects")
 # The write path, which cannot be compared that way: every one of these needs
 # a thread, most need a payload, and three of them need a proposal that a
 # previous call issued. They are compared by walk() below, which runs the same
@@ -285,6 +303,28 @@ def bound_slugs():
     return sorted(found)
 
 
+def _as_list(value):
+    """kernel/views._as_list: a declaration may write one flag or a list of
+    them and both mean the same thing."""
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]
+
+
+@functools.lru_cache(maxsize=None)
+def declared():
+    """The loaded bundle's own declarations, off the compiled artifact.
+
+    catalogue.json's `views`, `metrics` and `workflows` are the LOADED
+    bundle's (kernel/contracts.BUNDLE_KEYS); its top level `capabilities`,
+    `bundles`, `states` and `operations` are the union over every bundle. Only
+    the first three are read here, and nothing read here is an expectation:
+    these are the declarations the two engines are both evaluating, used to
+    decide what to ASK.
+    """
+    return json.loads((ROOT / "catalogue" / "catalogue.json").read_text())
+
+
 def valuesets(shape, python, go):
     """GET /valuesets/{slug}, every bound slug, and what the parameters do.
 
@@ -382,6 +422,46 @@ def forms(shape, python, go):
           len(whole["capabilities"])))
 
 
+def stamped(shape, python, go):
+    """The served reads whose answers carry this store's own timestamps.
+
+    Compared through normalise(), which is the same treatment the write path's
+    walk gives every recording: an id this store minted and a stamp this
+    store's clock wrote are replaced by a marker naming which volatile thing
+    was there, so a missing value and a present one still differ. Nothing else
+    is touched — a name, a flag, a station, a badge, a count and a status code
+    are compared as they arrived.
+    """
+    asked = 0
+    for route in SERVED_STAMPED:
+        for prefix in ("/api", PREFIX):
+            for spelling in (prefix + route, prefix + route + "/"):
+                py_status, py = call(python, spelling)
+                go_status, gone = call(go, spelling)
+                assert py_status == go_status, (spelling, py_status, go_status)
+                assert normalise(py) == normalise(gone), "%s\npython: %s\ngo:     %s" % (
+                    spelling, json.dumps(normalise(py), sort_keys=True),
+                    json.dumps(normalise(gone), sort_keys=True))
+                asked += 1
+    # And the answers are not two empty screens agreeing. The seeded demo day
+    # is the only reason either engine has a row here at all, so this is also
+    # what fails if a store stops seeding.
+    queue = get(python, PREFIX + "/queue")
+    assert queue["rows"], "%s: the queue is empty, so this compared nothing" % shape
+    assert any(row["station"] for row in queue["rows"]), queue["rows"]
+    assert any(row["station"] is None for row in queue["rows"]), (
+        "%s: no seeded thread has finished the line, so the trailing group "
+        "proves nothing" % shape)
+    register = get(python, PREFIX + "/patients/pending")
+    assert register["count"], (
+        "%s: no registered patient is unpublished, so the pending list "
+        "compared nothing" % shape)
+    ok("%s: %d stamped reads are identical once this store's own ids and "
+       "clocks are marked: a queue of %d seeded threads and a register of %d "
+       "patients no directory has seen" % (shape, asked, len(queue["rows"]),
+                                           register["count"]))
+
+
 def both(shape, db_dir):
     """One kernel of each language on the same declarations and the same shape.
 
@@ -394,7 +474,16 @@ def both(shape, db_dir):
         os.environ[backend.ENV] = name
         started[name] = backend.launch(
             os.path.join(db_dir, "%s-%s.sqlite3" % (name, shape)),
-            bundle="phc", facility=shape)
+            bundle="phc", facility=shape,
+            # The kernel's own answer to having no vendor behind the patient
+            # directory seam, asked for by name rather than relied on. The
+            # Python reaches it anyway whenever EKA_ACCESS_TOKEN and
+            # EKA_CLIENT_ID are unset, which is how every check in this
+            # repository runs, and the Go has no connector at all. Saying it
+            # here means the two engines are compared where they can honestly
+            # be compared instead of agreeing by accident on a machine with no
+            # credential and disagreeing on one that has.
+            env={"PHC_DIRECTORY": "absent"})
     os.environ.pop(backend.ENV, None)
     return started
 
@@ -425,8 +514,22 @@ def both(shape, db_dir):
 VOLATILE_KEYS = ("id", "thread", "encounter", "token", "proposal",
                  "proposal_id", "at", "created_at", "created_date",
                  "decided_at", "opened_at", "directory_synced")
-# An id this store mints: a short prefix, a hyphen and twelve hex characters.
-ID_SHAPE = re.compile(r"\b[a-z_]{3,6}-[0-9a-f]{12}\b")
+# An id either engine mints: a short prefix, a hyphen, and EIGHT OR TWELVE
+# hex characters.
+#
+# There are two shapes and this used to carry only one. A proposal id is
+# `prop-` and twelve hex (kernel/proposals._id, uuid4().hex[:12]); every ROW
+# id is the resource's first four letters and EIGHT (adapters/local/store.new_id,
+# uuid4().hex[:8]). Only the twelve was written here, so a row id appearing as
+# a list VALUE rather than under one of the volatile keys above was compared
+# literally. Nothing reached it until a tasklist put a list of thread ids on
+# the wire, and two stores mint their own, so the first check to get there
+# failed for a reason that was not a difference in behaviour.
+#
+# The seed's own `enc-001` is deliberately NOT matched and stays compared as
+# itself, because the seed DECLARES it and both engines must answer it;
+# SEED_SHAPE below covers the serial row ids the seed mints.
+ID_SHAPE = re.compile(r"\b[a-z_]{3,6}-(?:[0-9a-f]{12}|[0-9a-f]{8})\b")
 # And the seed's own, which is a serial rather than random.
 SEED_SHAPE = re.compile(r"\bseed-[0-9]{4}\b")
 STAMP_SHAPE = re.compile(r"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\b")
@@ -450,17 +553,87 @@ def normalise(value):
     return value
 
 
+def _sorted(value):
+    """Every list in this value, sorted by what it holds. For a comparison
+    that is about a SET of rows and not about their order; see Walk.read."""
+    if isinstance(value, dict):
+        return {k: _sorted(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return sorted((_sorted(item) for item in value),
+                      key=lambda item: json.dumps(item, sort_keys=True))
+    return value
+
+
 class Walk:
     """One engine, one thread, and a recording of everything it answered."""
 
     def __init__(self, base):
         self.base = base
         self.steps = []
+        # The same recording with nothing normalised, for the properties()
+        # pass. A property about a tasklist has to know WHICH thread was
+        # listed, and `thread` is a volatile key: every id in `steps` is
+        # already replaced by a marker, which is right for the diff and
+        # useless for recomputing a predicate.
+        self.raw = []
+        # {view id: the status it answered}, filled by the views scenario, so
+        # the properties pass can say no declared view was skipped without
+        # parsing a step label.
+        self.asked = {}
         self.thread = None
         self.proposal = None
 
     def _record(self, label, status, body):
         self.steps.append((label, status, normalise(body)))
+        self.raw.append((label, status, body))
+        return status, body
+
+    def read(self, label, path, *, ordered=True):
+        """One GET, recorded. For the read routes that need a thread or a
+        subject to exist, which is why they cannot be asked in compare()'s
+        stateless loop.
+
+        WHAT `ordered=False` GIVES UP, AND WHY IT HAS TO
+        ------------------------------------------------
+        A queue is ordered `created_date DESC, id` and a tasklist's threads
+        are sorted by id. By the time this scenario runs, every earlier
+        scenario on this shape has left a thread on the same database, and all
+        of them were opened inside the same second, so the tiebreak is the id
+        — which each store MINTED FOR ITSELF. Two engines on two files
+        therefore order the same rows differently for a reason that is not a
+        difference in behaviour, and normalise() has already replaced those
+        ids with a marker, so no amount of care in the diff can line them up.
+        So the two recordings are compared as multisets at this one step, and
+        what is given up is said rather than hidden: the ROW ORDER of a queue
+        is not compared here. It IS compared, exactly, in stamped() — on a
+        freshly seeded store, where every id is the seed's own declared one
+        and the order is deterministic in both engines.
+        """
+        status, body = call(self.base, PREFIX + path, headers=self.headers("demo"))
+        if ordered:
+            return self._record(label, status, body)
+        self.steps.append((label, status, _sorted(normalise(body))))
+        self.raw.append((label, status, body))
+        return status, body
+
+    def peek(self, label, path):
+        """One GET, kept for the properties pass and NOT compared.
+
+        For a read whose very SUBJECT is an id this store minted: the panel
+        behind each row of a queue. The two engines show the same rows in a
+        different order, because the order is decided by ids they each minted
+        for themselves, so "the third row's panel" is a different thread in
+        each engine and comparing the two is comparing two different visits.
+        The panels are still read, because the tasklist property below
+        recomputes each declared predicate from the flags the kernel itself
+        derived for EVERY thread, and that needs all of them. What is given up
+        is said: these particular panels are not diffed. Every panel whose
+        thread this walk opened itself IS diffed, by panel() above, and
+        GET /threads/{id} is diffed on the seeded threads by every other
+        scenario in this file.
+        """
+        status, body = call(self.base, PREFIX + path, headers=self.headers("demo"))
+        self.raw.append((label, status, body))
         return status, body
 
     def headers(self, role, actor=None):
@@ -830,6 +1003,76 @@ def s_a_bound_choice_is_constrained_per_row(walk, codes):
     return "a bound choice is constrained in every row, not only the first"
 
 
+# --------------------------------------------------------------------------
+# the declared views, the queue, the metrics, the spine
+# --------------------------------------------------------------------------
+#
+# These are reads, so they could in principle have joined compare()'s
+# stateless loop. They are a walk instead because the interesting answers are
+# the ones that CHANGE: a queue is what the writes above it put there, a
+# tasklist's predicate is about threads a write created, a dashboard counts
+# them, and a summary and a spine need a thread and a subject that exist. A
+# stateless pair of reads against two freshly seeded files would compare two
+# demo days and nothing either engine did.
+
+def s_the_views_see_what_the_write_did(walk, codes):
+    """Every declared view, before and after a write, and the spine behind it.
+
+    Which views are asked comes off the compiled catalogue, so a view a bundle
+    adds is asked here without anybody editing this file, and a view whose
+    capability this shape withholds is asked too: the 403 is an answer and is
+    compared like any other.
+    """
+    walk.read("the queue, on the seeded demo day", "/queue", ordered=False)
+    registered(walk, codes)
+    # Named explicitly as well as by default, because api/main.py picks the
+    # first queue view by sorting the ids and that choice is a behaviour.
+    for vid, decl in sorted(declared()["views"].items()):
+        if decl["kind"] == "queue":
+            walk.read("the queue named outright: %s" % vid, "/queue?view=" + vid,
+                      ordered=False)
+    walk.read("the queue, with the thread this walk opened on it", "/queue",
+              ordered=False)
+
+    for vid, decl in sorted(declared()["views"].items()):
+        path = "/views/%s" % vid
+        if decl["kind"] == "summary":
+            # A summary is a view OF a thread, so it needs one, and says so
+            # rather than drawing an empty page.
+            walk.read("%s with no thread named" % vid, path)
+            path += "?thread=" + walk.thread
+        # A queue and a tasklist both carry ids this store minted in a list
+        # whose order those ids decide; see Walk.read.
+        in_order = decl["kind"] not in ("queue", "tasklist")
+        for spelling in (path, path.replace("?", "/?") if "?" in path else path + "/"):
+            status, _ = walk.read("%s at %s" % (vid, spelling), spelling,
+                                  ordered=in_order)
+            walk.asked[vid] = status
+    walk.read("a view no bundle declares", "/views/" + "-".join(sorted(declared()["views"]))[:60])
+
+    # Every thread the queue shows, so the properties pass can recompute each
+    # tasklist predicate from the flags the panels carry rather than from a
+    # case named here.
+    _, queue = walk.read("the queue once more, to walk its rows", "/queue",
+                         ordered=False)
+    for row in queue.get("rows") or []:
+        walk.peek("the panel behind queue row %s" % row["thread"],
+                  "/threads/" + row["thread"])
+
+    # The spine: one subject, every visit. The subject id is the patient row
+    # this walk's own registration created, which the panel carries under the
+    # spine field's own resource. A bundle declaring no spine answers 404 and
+    # that is compared too.
+    _, panel = walk.read("the panel of the thread this walk registered",
+                         "/threads/" + walk.thread)
+    subject = (panel.get("subject") or {}).get("id")
+    if subject:
+        walk.read("the spine of the subject this walk registered", "/subjects/" + subject)
+    walk.read("a subject nobody registered", "/subjects/nobody-of-that-name")
+    return ("the declared views, the queue named and defaulted, the summary "
+            "before and after a thread, the dashboard, the tasklist and the spine")
+
+
 SCENARIOS = (
     s_seven_steps,
     s_denials_are_audited,
@@ -847,6 +1090,7 @@ SCENARIOS = (
     s_a_row_is_addressed_by_number,
     s_a_bound_choice_is_constrained_per_row,
     s_the_state_emit,
+    s_the_views_see_what_the_write_did,
 )
 
 
@@ -979,6 +1223,158 @@ def properties(shape, scenario, walk):
         assert any(panel["flags"] for panel in panels), (
             "%s / %s: no flag was ever raised, so nothing was written"
             % (shape, scenario.__name__))
+
+    # ------------------------------------------------------------------
+    # the declared views, when this walk read any
+    # ------------------------------------------------------------------
+    #
+    # Comparisons prove the two engines answer the same thing. These prove the
+    # thing they both answered is the thing the declaration asked for, which
+    # is the half a diff cannot reach: two resolvers that both ignored a
+    # view's window, or both let a declined visit onto "consent never asked",
+    # would agree perfectly.
+    seen = [(label, body) for label, status, body in walk.raw
+            if status == 200 and isinstance(body, dict)
+            and "view" in body and "generated_at" in body]
+    if seen:
+        decls, metrics = declared()["views"], declared()["metrics"]
+        # Every thread panel this walk read, so a tasklist's predicate can be
+        # recomputed from the flags the kernel itself derived.
+        known = {body["id"]: set(body["flags"])
+                 for _, status, body in walk.raw
+                 if status == 200 and isinstance(body, dict)
+                 and "line" in body and "flags" in body and "id" in body}
+        trails = {body["id"]: body["audit"]
+                  for _, status, body in walk.raw
+                  if status == 200 and isinstance(body, dict)
+                  and "line" in body and "audit" in body}
+        queue_scopes = {d["scope"] for d in decls.values() if d["kind"] == "queue"}
+        kinds = set()
+        for label, body in seen:
+            decl = decls[body["view"]]
+            kinds.add(decl["kind"])
+
+            if decl["kind"] == "dashboard":
+                assert body["rows"], (
+                    "%s / %s: a dashboard answered no metric at all" % (shape, label))
+                for m in body["rows"]:
+                    # THE VIEW'S WINDOW WINS over each metric's own. Without
+                    # this a resolver reading each metric's declared window
+                    # would put a week and a day side by side on one screen.
+                    assert m["window"] == decl["window"], (
+                        "%s / %s: %s answered window %r and the view declares %r"
+                        % (shape, label, m["metric"], m["window"], decl["window"]))
+                    if m["unit"] == "count":
+                        assert m["value"] == float(m["numerator"]), m
+                    elif not m["denominator"]:
+                        # An empty denominator is zero and not an error: an
+                        # empty week is a normal week at a health centre.
+                        assert m["value"] == 0, m
+                    elif m["unit"] == "percent":
+                        assert m["value"] == round(
+                            m["numerator"] / m["denominator"] * 100, 2), m
+                # And the override is really exercised, so the line above is
+                # not satisfied by a dashboard whose metrics all happen to
+                # declare the view's own window.
+                assert any(metrics[mid]["window"] != decl["window"]
+                           for mid in decl["metrics"]), (
+                    "%s: every metric on %s declares the view's own window, "
+                    "so nothing is overridden" % (shape, body["view"]))
+
+            elif decl["kind"] == "queue":
+                for row in body["rows"]:
+                    assert sorted(row["subject"]) == sorted(decl["columns"]), (
+                        "%s / %s: a queue row carries %s and the view declares %s"
+                        % (shape, label, sorted(row["subject"]), sorted(decl["columns"])))
+                    for flag, style in row["badges"].items():
+                        assert flag in row["flags"], (
+                            "%s / %s: badge %r on a row that does not hold it"
+                            % (shape, label, flag))
+                        assert decl["badges"].get(flag) == style, (
+                            "%s / %s: badge %r is %r and the view declares %r"
+                            % (shape, label, flag, style, decl["badges"].get(flag)))
+                keys = [str(g["key"]) for g in body["groups"]]
+                if len(set(keys)) == len(keys):
+                    # Every thread in exactly one group. Guarded, because a
+                    # bundle naming one station at two steps gets two groups
+                    # with the same key and the Python counts it twice.
+                    assert sum(g["count"] for g in body["groups"]) == len(body["rows"]), (
+                        "%s / %s: %d rows across groups totalling %d"
+                        % (shape, label, len(body["rows"]),
+                           sum(g["count"] for g in body["groups"])))
+
+            elif decl["kind"] == "tasklist":
+                assert len(body["rows"]) == len(decl["tasks"]), (shape, label)
+                for row, task in zip(body["rows"], decl["tasks"]):
+                    assert row["title"] == task["title"], (row, task)
+                    # A real count, not a number beside an empty list.
+                    assert row["count"] == len(row["threads"]), row
+                    assert row["operation"] == task.get("operation"), (row, task)
+                    want = _as_list(task["where"].get("flag"))
+                    avoid = _as_list(task["where"].get("not"))
+                    if decl["scope"] in queue_scopes:
+                        assert set(row["threads"]) <= set(known), (
+                            "%s / %s: %r lists a thread no queue showed"
+                            % (shape, label, row["title"]))
+                    # Recomputed from the flags the kernel derived, over every
+                    # thread rather than over a case named here: that is what
+                    # catches a `not` clause that only tests its first member.
+                    expect = sorted(tid for tid, flags in known.items()
+                                    if all(f in flags for f in want)
+                                    and not any(f in flags for f in avoid))
+                    assert sorted(t for t in row["threads"] if t in known) == expect, (
+                        "%s / %s: %r listed %s and the flags say %s"
+                        % (shape, label, row["title"],
+                           sorted(t for t in row["threads"] if t in known), expect))
+
+            elif decl["kind"] == "summary":
+                for block in body["rows"]:
+                    assert block["fields"] == (
+                        decls[body["view"]]["sections"][body["rows"].index(block)]["fields"]), block
+        # No declared view was skipped, and the only reason one is not read is
+        # that this facility withholds the capability that opens it. A view
+        # gated by a plugin this centre does not run answers 403 by design
+        # (scripts/check_plugins.py owns that assertion), which is why the
+        # dashboard is absent from `kinds` at consulting-room-only and present
+        # at the other two shapes.
+        for vid, status in walk.asked.items():
+            assert status in (200, 403), (shape, vid, status)
+            if status == 200:
+                assert decls[vid]["kind"] in kinds, (shape, vid)
+        assert set(walk.asked) == set(decls), (
+            "%s: this walk asked for %s and the bundle declares %s"
+            % (shape, sorted(walk.asked), sorted(decls)))
+        openable = {d["kind"] for vid, d in decls.items() if walk.asked[vid] != 403}
+        assert kinds == openable, (
+            "%s: this walk read %s and this caller may open %s"
+            % (shape, sorted(kinds), sorted(openable)))
+
+        # ---- the spine, when this walk read one
+        for _, status, body in walk.raw:
+            if status != 200 or not isinstance(body, dict) or "encounters" not in body:
+                continue
+            assert body["encounters"], "%s: a subject with no visits at all" % shape
+            opened = [v["opened_at"] for v in body["encounters"]]
+            assert opened == sorted(opened, reverse=True), (
+                "%s: a timeline is not newest first: %s" % (shape, opened))
+            threads = [v["thread"] for v in body["encounters"]]
+            assert len(threads) == len(set(threads)), threads
+            for visit in body["encounters"]:
+                if visit["thread"] not in known:
+                    continue
+                # One subject, every visit, and each visit is the same visit
+                # the thread panel draws: the spine derives its flags and its
+                # station the same way or it is a second opinion about the
+                # same encounter.
+                assert set(visit["flags"]) == known[visit["thread"]], visit
+                did = [d["operation"] for d in visit["did"]]
+                assert len(did) == len(set(did)), ("an operation twice", did)
+                performed = {row["operation"] for row in trails[visit["thread"]]
+                             if row["outcome"].startswith(
+                                 ("committed", "confirmed", "allowed"))}
+                assert set(did) == performed, (
+                    "%s: a visit says it did %s and the trail says %s"
+                    % (shape, sorted(did), sorted(performed)))
 
     # Nothing is decided without a line on the trail. Once any decision has
     # been taken on this thread, allowed or refused, the audit carries it.
@@ -1373,6 +1769,7 @@ def compare(shape, python, go):
     # the rest of what a screen asks a clinician. See forms() and valuesets().
     forms(shape, python, go)
     valuesets(shape, python, go)
+    stamped(shape, python, go)
 
     # --- the write path. The guard, over two real sockets, as a sequence
     # rather than as a set of shapes. See write_path.
@@ -1386,7 +1783,7 @@ def compare(shape, python, go):
         # The templated ones cannot be asked without an id; the prefix is
         # enough, because the Go mounts a subtree.
         path = route.split("{")[0].rstrip("/")
-        if path.endswith(tuple(SERVED) + SERVED_TEMPLATED):
+        if path.endswith(tuple(SERVED) + SERVED_STAMPED + SERVED_TEMPLATED):
             continue
         if path[len(PREFIX):].startswith(WRITE_PATH):
             continue
