@@ -103,6 +103,18 @@ Each is finished when the gate is green and the named checks pass against Go.
   differential check, which compares two engines against each other and
   cannot see the pair drifting together. Restoring the socket checks as a
   measure is worth more than the original order.
+
+  **Landed 2026-10-31.** `scripts/check_live.py` is 16 of 16 against Go.
+  `scripts/e2e.py main()` reaches 22 of 49 and stops at `POST /khoj`, which
+  is the planner in `agent/turn.py` and not this slice; `facility_shape()`
+  stays 4 of 4. The patient routes `check_live.py` reaches are served from
+  the LOCAL half of `kernel/directory.py` only: there is no vendor behind
+  that seam in Go, so a lookup always answers the kernel's own
+  AbsentDirectory, and the differential check sets `PHC_DIRECTORY=absent` so
+  the two engines are compared where they honestly can be.
+  `POST /patients/publish` still answers 501, because publishing is the one
+  verb that sends a person's details off this machine and faking it would be
+  inventing a vendor.
 - **G5. Terminology.** A coding that cannot be constructed unvalidated, the
   three binding forms, the offline value sets. `GET /valuesets/{slug}` is
   already routed, from G3, because a bound choice with nothing to choose is an
