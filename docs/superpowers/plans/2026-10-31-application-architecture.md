@@ -1034,9 +1034,20 @@ proved.
       terminology seam. And a medication `score` is documented as null, so a
       null score is ordinary and is nobody's reason to refuse anything.
       See section 12 entries 10 and 11 for the two contradictions this found.
-- [ ] **`OPConsultRecord`**, once there are Conditions, MedicationRequests
-      and ServiceRequests to put in its sections. The profile table in
-      `kernel/fhir.py` takes one more entry; the rest is declaration.
+- [x] **`OPConsultRecord`.** Done 2026-10-31. A consultation publishes as an
+      NRCeS `OPConsultRecord` inside a DocumentBundle, and **3 of the
+      profile's 12 section slices are filled**: Chief complaints carries every
+      coded diagnosis, Medications carries the prescription, Document
+      Reference carries the narrative. The other nine are accounted for in
+      `scripts/check_op_bundle.py` rather than left blank: four have no
+      published section code, four need a resource this build cannot project,
+      and the twelfth, Medical History, has both and is empty because the form
+      does not ask whether a diagnosis is today's complaint or a past illness.
+      A ServiceRequest was never the blocker this item said it was: every
+      slice is `min: 0`.
+      Where a row goes is now the bundle's declaration, not a caller's
+      choice. See section 12 entries 17 and 18 for the two contradictions this
+      found.
 - [ ] **A client that sends `X-PHC-Actor`.** The seam separates the account
       from the staff member and nothing exercises it, so the actor collapses to
       the account in the browser today. A staff switcher on a shared device is
@@ -1056,15 +1067,16 @@ proved.
 - [ ] **The two network queues**, for audio and for ABDM documents. They are
       the only two things on the path that need a network, and they are
       queues so that a bad line is a delay rather than a failure.
-- [ ] **The section codes.** `Composition.section.code` is how NRCeS
-      discriminates a section slice, and the ABDM catalogue's own
-      `WellnessRecord` atom is a stub that lists the slice names and says the
-      mapping is not authored. The table in `kernel/fhir.py` therefore has
-      `code: None` and the document is emitted without them, which passes the
-      tier one validator and will not match the slice. Somebody has to read
-      the implementation guide. **This is a request for a fact, not a
-      decision:** inventing a SNOMED code here files a record under the wrong
-      heading, which reads as correct everywhere it is read.
+- [x] **The section codes.** Answered 2026-10-30 and recorded in
+      `docs/superpowers/specs/2026-10-30-nrces-section-codes.md`, read off
+      NRCeS's own published examples. Two different answers for the two record
+      types: the OPConsultRecord's eight are real SNOMED codes and are in the
+      table in `kernel/fhir.py`; the WellnessRecord publishes none at all, so
+      `code: None` there is the standard's answer and not a gap. Four
+      OPConsultRecord slices still have no code anywhere this build could
+      read, and are declared nowhere rather than given the nearest one.
+      Which resource type each of the twelve slices takes was added to the
+      same file on 2026-10-31, from the docs server's own mapping atom.
 - [ ] **Confirm the LOINC codes.** The six in `terminology/observation-code.json`
       are hand seeded from the published vital signs panel and every one is
       marked `unverified` with its provenance. Coded data plan step 2 is to
@@ -1323,6 +1335,47 @@ write is scaffolding. Both tripwires fail the day a route opens, and each
 names what then has to arrive with it. Whether to open either is the owner's
 call: route 2 needs the renderer to draw candidates, which is a screen
 decision, and route 3 needs Eka asked for its bundle, which is decision 4.
+
+**17. "Which section of which profile it lands in is declared on the
+questionnaire question" was false, and nothing declared it.** That sentence is
+`kernel/fhir.py`'s own docstring, and no questionnaire, no operation atom and
+no bundle said where a row goes in a published document. Three callers each
+typed their own placement, and two of them disagreed about the same
+consultation: `scripts/check_codification.py` filed a coded diagnosis under
+Medical History and the note under Document Reference, while
+`scripts/check_verification.py` filed the diagnosis under Chief complaints and
+the note under Medical History. Both passed. Both looked right. One visit, two
+records, and whichever ran last was the one a reader would have believed.
+
+Fixed rather than reported, because the fix is where the architecture already
+said it was: `documents` is now a key on `bundles/<id>/bundle.yaml`, linted in
+`kernel/declarations.py` against ABDM's own profile table, and compiled into
+the projection's own argument names so a caller cannot retype a placement on
+the way in. All three callers read the one declaration. It is deliberately NOT
+compiled into `catalogue.json`, for the reason `kernel/mapping.py` gives for
+its own: nothing outside the kernel projects a document, and the renderer must
+never learn a section heading.
+
+**Still typed at the call site: the WellnessRecord's placement**, in three
+checks. That record's slices carry no code at all, so the reason for declaring
+a placement does not reach it, and a second declaration nobody checks would be
+worse than one honest gap. `scripts/check_op_bundle.py` asserts the gap rather
+than leaving it unsaid.
+
+**18. A visit cannot leave as one document, and every plan sentence here
+assumes it can.** Section 9's "project" step, and the pipeline above it, read
+as one thread to one bundle. A consultation with vitals taken at it publishes
+TWO: the vital signs cannot go in the OPConsultRecord, because the only two
+slices of its twelve that take an Observation are PhysicalExamination and
+OtherObservations, and NRCeS has published a code for neither. So they travel
+in the WellnessRecord this build already emits, about the same patient and the
+same encounter, and both documents are valid.
+
+Reported rather than resolved, because which record a vital sign belongs in at
+ABDM is not ours to decide. Two documents per visit is what the published
+profiles permit today. If it should be one, somebody has to get the
+PhysicalExamination slice's own fixed code out of the StructureDefinition, and
+the route in is the docs server or the packaged guide `ndhm.in#6.5.0`.
 
 **And one bug, fixed here rather than reported.** `Store.audit` is documented
 as oldest first and could not deliver it. `AuditRecord.at` is ISO 8601 to the

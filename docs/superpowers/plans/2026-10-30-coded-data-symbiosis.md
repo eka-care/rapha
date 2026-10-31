@@ -382,15 +382,32 @@ confirmation is dead on arrival in an OPD. The rule:
       Checks: `scripts/check_verification.py`, 18. Mutations: 9 of 9 caught,
       and one of them exposed a hole in the check itself, which is recorded at
       the foot of that file.
-- [ ] **7. Bundle seam for `OPConsultRecord`**, validated against the NRCES
-      profile. **Half built 2026-10-31**: the profile is in `kernel/fhir.py`
-      with its eight published section codes, the Condition and
-      MedicationRequest projections it needs, and a check that the Composition
-      fills every path the profile digest requires. What is NOT done is
-      validating a generated bundle against the NRCeS validator, the way the
-      WellnessRecord was: that is a tier one run and it has not been made.
-      Until it has, "validated against the NRCES profile" is not a claim this
-      step may make.
+- [x] **7. Bundle seam for `OPConsultRecord`**, validated against the NRCES
+      profile. Done 2026-10-31, and the validation has now been run.
+      What was built: a consultation publishes as an `OPConsultRecord` inside
+      a DocumentBundle, filling **3 of the profile's 12 section slices** and
+      omitting nine. Where a row goes is declared once, on the bundle, under
+      `documents` in `bundles/phc/bundle.yaml`, and linted against ABDM's own
+      profile table. It was typed at three call sites before, and two of them
+      disagreed about the same consultation: see the application architecture
+      plan's section 12 entry 17.
+      **The validation.** All five bundles the check generates were put
+      through the ABDM catalogue's tier one structural validator on
+      2026-10-31, against the pinned NRCeS profiles (ndhm.in 6.5.0), and every
+      one came back with no findings: four OPConsultRecords and the
+      WellnessRecord from the visit that also had vitals. **That is structural
+      only.** It validates no terminology, it does not check nested paths such
+      as `subject.reference`, and it does not enforce the slice
+      discriminators, because every slice is `min: 0`. The official HL7
+      validator with `-ig ndhm.in#6.5.0` has NOT been run on any of them.
+      Checks: `scripts/check_op_bundle.py`, 20. Mutations: 25 of 25 caught,
+      and two assertions were deleted rather than shipped because no mutation
+      could make either of them fail first; both deletions are recorded in the
+      file where they were.
+      **Not built, and reported rather than resolved:** a visit with vitals
+      taken at it publishes TWO documents, because no OPConsultRecord slice
+      that takes an Observation has a published code. Architecture plan
+      section 12 entry 18.
 - [ ] **8. Doctor templates**, assembled from the catalogue, only now.
 
 Steps 1 to 3 are the Monday path and need no terminology server. Steps 5 to 7
@@ -443,6 +460,15 @@ certification, though not Monday.
   change, and a `final` on an unverified value says a second person stood
   behind it. Moving it needs an update path on the Store or an amendment
   resource, and both are decisions rather than code.
+- **A consultation cannot say which heading a diagnosis belongs under.** The
+  OPConsultRecord has a Chief complaints slice and a Medical History slice,
+  both of which take a Condition, and the consultation form asks for a
+  diagnosis without asking which one it is. Every coded diagnosis is therefore
+  filed under Chief complaints, including a resolved illness with an onset of
+  2019. Nothing infers it: splitting on the clinical status code would file
+  four of that value set's six statuses under no heading at all. **This needs a
+  question on the form, which is a clinical and product decision rather than
+  code.**
 - **A family history finding cannot be recorded.** No resource (FHIR's home
   for it is `FamilyMemberHistory`, and `Condition` has no element naming a
   family member, so a family history stored as a Condition is a condition OF
