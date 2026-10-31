@@ -424,14 +424,24 @@ except KeyError as exc:
 else:
     raise AssertionError("a section with no published code was emitted")
 
+# A row of a resource nothing projects. `notes` used to be the case here and
+# is not any more: a narrative row now publishes as a DocumentReference, which
+# is the designed fallback and is proved in scripts/check_codification.py. So
+# the rule needs a resource that genuinely has none, and a row of it has to
+# exist for the rule to be reached at all.
+store.write("service_request", {"code": "x", "status": "active",
+                                "created_by": A_DOCTOR, "created_date": NOW},
+            thread=thread)
+assert "service_request" not in fhir.PROJECTIONS, "pick a resource with no projection"
 try:
     fhir.document(store, thread, profile="OPConsultRecord",
-                  sections_wanted={"Medications": [("notes", {})]}, now=NOW)
+                  sections_wanted={"InvestigationAdvice": [("service_request", {})]},
+                  now=NOW)
 except KeyError as exc:
     assert "no FHIR projection" in str(exc), exc
     ok("a row with no projection is refused, rather than published as the nearest thing")
 else:
-    raise AssertionError("a notes row was published as some other resource")
+    raise AssertionError("a row nothing projects was published as some other resource")
 
 
 # ---------------------------------------------------------------------------

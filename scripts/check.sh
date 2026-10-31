@@ -25,6 +25,11 @@ echo "\n== coded data: the terminology seam and the FHIR projection =="
 # and a thread projects to an ABDM document with LOINC codes and UCUM units.
 python3 -m kernel.terminology
 python3 -m kernel.fhir
+# The codification seam, whose own definition is that it must work when it
+# returns none. The stub returns none, and the five ways the answer is empty
+# are five separate checks: nothing found, service down, service slow, a code
+# this build cannot resolve, and a code from the wrong branch of the ontology.
+python3 -m kernel.codification
 
 echo "\n== the kernel and its contracts =="
 python3 -m catalogue.tests.test_guard
@@ -52,6 +57,15 @@ python3 scripts/check_lab.py
 # validated, coded, stored and published on its own. This is what replaces
 # `type: structured`, which CARE never finished validating and neither did we.
 python3 scripts/check_rx.py
+# Codification, end to end, with the stub answering nothing: the consultation
+# path is unchanged, a candidate never becomes a value, and an uncoded finding
+# travels as narrative text into an ABDM document. The last of those is proved
+# rather than asserted; it was written down twice and did not exist.
+python3 scripts/check_codification.py
+# The connector behind the seam, against a stand-in transport fed the vendor's
+# own published response examples. No credential, no socket, no recording of a
+# live call, and the check says so in its docstring.
+python3 -m care_phc.connectors.codification.check
 # Patient identity lives in Eka's directory, and the clinic works without it.
 # Runs with PHC_DIRECTORY=absent and opens no socket; the one module that can
 # is the vendor connector, and this is what fails if that stops being true.

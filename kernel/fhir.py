@@ -58,6 +58,7 @@ Run: python3 -m kernel.fhir
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import uuid
 
@@ -73,6 +74,15 @@ LOINC = "http://loinc.org"
 UCUM = "http://unitsofmeasure.org"
 SNOMED = "http://snomed.info/sct"
 HL7_CATEGORY = "http://terminology.hl7.org/CodeSystem/observation-category"
+
+# How a narrative row travels. `text/plain` because what is stored is the
+# note's own words and not a rendered document, and a content type that
+# promised markup would be a claim about the text. The language is the
+# Composition's own, which is the only language this product writes a note in
+# today; a note in another script keeps its script inside the text, and a
+# per-note language column is the honest fix when there is one.
+NARRATIVE_TYPE = "text/plain"
+NARRATIVE_LANGUAGE = "en-IN"
 
 # One entry per ABDM hiType we emit. `sections` is that profile's
 # Composition.section slices, from the NRCeS digest, with the SNOMED code that
@@ -169,6 +179,7 @@ DOCUMENT_BUNDLE = "%s/DocumentBundle" % NRCES
 # bundle, and says nothing about what any particular observation means.
 RESOURCE_TYPE = {
     "observation": "Observation",
+    "notes": "DocumentReference",
     "patient": "Patient",
     "encounter": "Encounter",
     "condition": "Condition",
@@ -391,6 +402,61 @@ def medication_request(row, *, subject, encounter, performer=None):
     return out
 
 
+def document_reference(row, *, subject, encounter, performer=None,
+                       document_type=None):
+    """One narrative row as a FHIR R4 DocumentReference carrying its text.
+
+    THIS IS THE DESIGNED FALLBACK, and until now it was a sentence rather
+    than a path. `kernel/terminology.py` says an uncoded diagnosis travels as
+    narrative text and the note still reaches ABDM, and the architecture
+    document's ceilings say it twice. It was not true: a narrative row had no
+    projection, every profile requires at least one section, so a
+    consultation whose findings this build cannot code published NOTHING.
+    Measured, not assumed: the probe is in scripts/check_codification.py and
+    it is the check that would fail if this were removed again.
+
+    The shape is the NRCeS implementation guide's own, read 2026-10-31 from
+    the OPConsultRecord example Bundle-OPConsultNote-example-05 through the
+    abdm-docs server, where a DocumentReference carries `status`, `docStatus`,
+    a `type` with a SNOMED coding, a `subject` and one `content.attachment`
+    with a contentType, a language, base64 `data`, a title and a creation
+    instant. The example's attachment is a PDF of a laboratory report; this
+    one is the note's own text, which is the same element with a different
+    content type and needs nothing invented.
+
+    `document_type` is the profile's own document type, passed in by
+    `document()` below, because what kind of document this is is the profile's
+    fact and not this function's. Nothing here names a document type.
+
+    `encounter` is accepted and unused: R4's DocumentReference has a `context`
+    element whose shape (`context.encounter` plus a period) is not in the
+    example, so it is left out rather than guessed at from the signature.
+    """
+    text = str(row.get("text") or "")
+    if not text.strip():
+        # A narrative row with nothing in it is not a degraded document, it is
+        # an empty attachment under a heading claiming there is a note.
+        return None
+    attachment = {"contentType": NARRATIVE_TYPE, "language": NARRATIVE_LANGUAGE,
+                  "data": base64.b64encode(text.encode("utf-8")).decode("ascii")}
+    out = {"resourceType": "DocumentReference", "id": row["id"],
+           "meta": {"profile": ["%s/DocumentReference" % NRCES]},
+           "status": "current", "docStatus": "final",
+           "subject": {"reference": subject}}
+    if document_type and document_type.get("code"):
+        out["type"] = {"coding": [{"system": SNOMED,
+                                   "code": document_type["code"],
+                                   "display": document_type["text"]}],
+                       "text": document_type["text"]}
+        attachment["title"] = document_type["text"]
+    if row.get("created_date"):
+        attachment["creation"] = row["created_date"]
+    if performer:
+        out["author"] = [{"reference": performer}]
+    out["content"] = [{"attachment": attachment}]
+    return out
+
+
 def _quantity(row, value, unit, system):
     """A FHIR Quantity from a value column and its unit columns, or None.
 
@@ -472,7 +538,15 @@ PROJECTIONS = {
     "observation": observation,
     "condition": condition,
     "medication_request": medication_request,
+    "notes": document_reference,
 }
+
+# The resources whose projection needs to know what kind of document it is
+# travelling in. One, and it is the narrative attachment: what a note IS is
+# the profile's fact ("Clinical consultation report"), so the projection is
+# handed it rather than typing it. Every other projection describes something
+# that means the same thing in any document and is given nothing.
+TYPED_BY_PROFILE = ("notes",)
 
 
 def sections(profile):
@@ -539,9 +613,17 @@ def document(store, thread, *, profile, sections_wanted, now,
                         "for one would publish something else. Add it to "
                         "PROJECTIONS rather than letting the nearest one "
                         "serve." % resource)
-                entries.append((project(row, subject=subject_ref,
-                                        encounter=encounter_ref,
-                                        performer=performer), ref))
+                extra = {"document_type": spec["type"]} \
+                    if resource in TYPED_BY_PROFILE else {}
+                made = project(row, subject=subject_ref,
+                               encounter=encounter_ref, performer=performer,
+                               **extra)
+                if made is None:
+                    # A projection that refuses this particular row: an empty
+                    # narrative is the only one today. Skipped rather than
+                    # published as an entry pointing at nothing.
+                    continue
+                entries.append((made, ref))
                 refs.append({"reference": ref,
                              "display": RESOURCE_TYPE.get(resource, resource)})
         if not refs:
