@@ -7,6 +7,10 @@ set -e
 cd "$(dirname "$0")/.."
 
 echo "== compile the declarations =="
+# The templates first, because what they generate are ordinary operation atoms
+# and ordinary questionnaires that the two steps below then lint like any
+# other. A hand edit to a generated file fails in kernel/declarations.py.
+python3 scripts/build_templates.py
 python3 -m catalogue.build
 python3 -m kernel.declarations
 

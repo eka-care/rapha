@@ -33,6 +33,7 @@ from catalogue.build import parse
 from kernel import contracts as c
 from kernel import fhir
 from kernel import mapping
+from kernel import templates
 
 ROOT = pathlib.Path(__file__).parents[1]
 BUNDLES = ROOT / "bundles"
@@ -625,6 +626,12 @@ def load(bundle_id="phc", catalogue=None):
     raw_instruments = [fm for fm, _ in decls.values() if fm.get("type") == "instrument"]
     bad += _lint_scribe(manifest, raw_instruments)
     bad += _lint_documents(manifest, ops)
+    # The doctor's templates, which are generated operations. Linted here with
+    # everything else that references a questionnaire, and against the
+    # declarations that have to offer them: the per bundle closure above
+    # already holds a template's inherited capability and station, and this
+    # holds its narrowing, its bindings and the files it generated.
+    bad += templates.lint(manifest, ops, decls)
     if bad:
         raise DeclarationError("\n".join(bad))
 
