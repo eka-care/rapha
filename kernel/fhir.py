@@ -26,8 +26,11 @@ It may not name a clinical concept. There is no `if code == "29463-7"` here
 and there must never be one: that would be the renderer's failure mode
 (kernel/ARCHITECTURE.md's main one) moved one layer down, where it is harder
 to see. What a resource knows about itself comes from the row, and which
-section of which profile it lands in is declared on the questionnaire
-question. The only clinical vocabulary in this file is ABDM's own profile
+section of which profile it lands in is declared on the bundle, under
+`documents` in bundles/<id>/bundle.yaml, linted against the table below.
+That sentence used to say the questionnaire question declared it, and nothing
+did: three callers each typed their own placement and two of them disagreed
+about where a diagnosis goes. The only clinical vocabulary in this file is ABDM's own profile
 table below, which is the standard's and not a facility's, in exactly the way
 catalogue/vocab.py CARE_RESOURCES is the adapter's and not a facility's.
 

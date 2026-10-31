@@ -7,6 +7,12 @@ and a dangling reference is a build failure and not a warning. A capability
 misspelt in frontmatter is not a typo, it is a screen nobody can open or one
 anybody can.
 
+`documents` is the exception, and for the reason kernel/mapping.py gives for
+its own: it is not compiled into catalogue.json. Nothing outside the kernel
+projects a document, the Go server proposes only, and the renderer must never
+learn a section heading. Add it to the compiled artifact when an out of
+process consumer needs it.
+
 compile_json() returns exactly the five new catalogue.json keys, so the
 compiler can stay one writer: build.py adds them with one update() call and
 keeps writing the file. Until it does, the kernel loads declarations from
@@ -25,6 +31,7 @@ import yaml
 from catalogue import guard, validate, vocab
 from catalogue.build import parse
 from kernel import contracts as c
+from kernel import fhir
 from kernel import mapping
 
 ROOT = pathlib.Path(__file__).parents[1]
@@ -64,6 +71,7 @@ class Bundle:
     metrics: dict
     seed: list = dataclasses.field(default_factory=list)
     scribe: dict = dataclasses.field(default_factory=dict)
+    documents: dict = dataclasses.field(default_factory=dict)
     instruments_raw: list = dataclasses.field(default_factory=list)
 
     def workflow(self, wid: Optional[str] = None) -> c.Workflow:
@@ -305,6 +313,88 @@ def _lint_scribe(manifest, instruments):
     return bad
 
 
+def _lint_documents(manifest, ops):
+    """Every ABDM document this facility publishes, against ABDM's own grammar.
+
+    Where a row goes in a published document is a declaration: ABDM names the
+    section slices and fixes their codes, and this bundle says what it files
+    under each. It was typed at three call sites instead, which is how the
+    same diagnosis came to be filed under Chief complaints in one check and
+    under Medical History in another.
+
+    Four failures, each one a document a gateway would reject or a record
+    filed under the wrong heading:
+
+    - a profile this build does not emit. kernel/fhir.PROFILES is the whole
+      of what it emits, and its table is the NRCeS one.
+    - a section slice the profile does not declare, or one whose code NRCeS
+      has not published. Both are absent from that profile's section table,
+      which is why one check covers them: a slice with no published code
+      cannot be matched by a reader, and the nearest code that looks close is
+      how a record gets filed under the wrong heading.
+    - a resource with no FHIR projection, which would publish something else.
+    - a resource no operation in this bundle writes, so the section can never
+      have anything in it. The same per bundle closure the capabilities and
+      the stations get.
+    """
+    bad = []
+    written = {r for oid in manifest.get("operations") or []
+               for r in (ops.get(oid, {}).get("writes") or [])}
+    for did, doc in (manifest.get("documents") or {}).items():
+        where = f"bundle.yaml documents.{did}"
+        for key in sorted(set(doc) - {"profile", "sections"}):
+            bad.append(f"{where}: unknown key '{key}'")
+        profile = doc.get("profile")
+        if profile not in fhir.PROFILES:
+            bad.append(f"{where}: '{profile}' is not a profile this build emits; "
+                       f"it emits {sorted(fhir.PROFILES)}")
+            continue
+        slices = fhir.sections(profile)
+        if not doc.get("sections"):
+            bad.append(f"{where}: declares no section, and every profile "
+                       f"requires at least one")
+        for slice_name, queries in (doc.get("sections") or {}).items():
+            if slice_name not in slices:
+                bad.append(f"{where}: {profile} declares no section "
+                           f"'{slice_name}'; it has {sorted(slices)}")
+                continue
+            for q in queries or []:
+                if not isinstance(q, dict) or "resource" not in q:
+                    bad.append(f"{where}.{slice_name}: not a query")
+                    continue
+                for key in sorted(set(q) - {"resource", "where"}):
+                    bad.append(f"{where}.{slice_name}: unknown query key '{key}'")
+                resource = q["resource"]
+                if resource not in fhir.PROJECTIONS:
+                    bad.append(f"{where}.{slice_name}: no FHIR projection for a "
+                               f"'{resource}' row, so the section would publish "
+                               f"something else")
+                elif resource not in written:
+                    bad.append(f"{where}.{slice_name}: no operation this bundle "
+                               f"loads writes a '{resource}' row, so the section "
+                               f"can never have anything in it")
+    return bad
+
+
+def _documents(manifest):
+    """The declared documents as kwargs for kernel/fhir.document().
+
+    The compiled shape is the projection's own argument names, so a caller
+    says `fhir.document(store, thread, now=..., **bundle.documents[id])` and
+    cannot retype a placement on the way.
+    """
+    out = {}
+    for did, doc in (manifest.get("documents") or {}).items():
+        out[did] = {
+            "profile": doc["profile"],
+            "sections_wanted": {
+                name: [(q["resource"], dict(q.get("where") or {}))
+                       for q in queries or []]
+                for name, queries in (doc.get("sections") or {}).items()},
+        }
+    return out
+
+
 def _lint_metric(fm, fail):
     if fm["unit"] not in c.METRIC_UNITS:
         fail(f"unit must be one of {c.METRIC_UNITS}")
@@ -534,6 +624,7 @@ def load(bundle_id="phc", catalogue=None):
     bad = lint(manifest, decls, ops, seed) + bad_mappings
     raw_instruments = [fm for fm, _ in decls.values() if fm.get("type") == "instrument"]
     bad += _lint_scribe(manifest, raw_instruments)
+    bad += _lint_documents(manifest, ops)
     if bad:
         raise DeclarationError("\n".join(bad))
 
@@ -557,7 +648,8 @@ def load(bundle_id="phc", catalogue=None):
         operations={oid: dict(ops[oid], mapping=mappings.get(oid, []))
                     for oid in manifest["operations"]},
         workflows=workflows, views=views, instruments=instruments, metrics=metrics,
-        seed=seed, scribe=dict(manifest.get("scribe") or {}), instruments_raw=raw_instruments)
+        seed=seed, scribe=dict(manifest.get("scribe") or {}),
+        documents=_documents(manifest), instruments_raw=raw_instruments)
 
 
 def compile_json(bundle):

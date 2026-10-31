@@ -56,6 +56,46 @@ scribe:
   doctor:    {default: phc.op.consult-document, choose: [phc.op.consult-document, phc.op.rx-prescribe]}
   community: {default: null,                    choose: [phc.op.household-visit]}
 
+# What this facility publishes to ABDM, and what it files under which of the
+# profile's own section slices. ABDM names the slices and fixes their codes
+# (kernel/fhir.py PROFILES); this says what a primary health centre files
+# under each one.
+#
+# It is declared here rather than passed in by whoever asks for a document,
+# because a placement typed at the call site is a placement typed once per
+# caller: a diagnosis went under Chief complaints in one check and under
+# Medical History in another, which is the same visit filed two ways. A
+# heading is a fact about this facility's record, so it is written once.
+#
+# `resource` is a table name, and every one must have a FHIR projection and
+# be written by an operation this bundle loads. Both are linted in
+# kernel/declarations.py.
+#
+# Three of the OPConsultRecord's twelve slices are filled and nine are not.
+# Each omission is a missing resource or a missing code rather than a
+# shortcut, and they are listed in the plan: Allergies needs an
+# AllergyIntolerance, InvestigationAdvice and Referral need a ServiceRequest,
+# FollowUp needs an Appointment, Procedure needs a Procedure, and
+# PhysicalExamination, FamilyHistory and OtherObservations have no published
+# section code anywhere this build could read. A slice is min 0, so omitting
+# it is valid; emitting one under a guessed code is not.
+documents:
+  consultation:
+    profile: OPConsultRecord
+    sections:
+      # Every coded diagnosis, whatever its clinical status. This build cannot
+      # tell a presenting complaint from a past condition: the consultation
+      # form asks for a diagnosis and not for which heading it belongs under,
+      # and MedicalHistory takes a Condition too. Splitting them on the
+      # clinical status code would file four of that value set's six statuses
+      # nowhere at all, so they stay in one section until somebody asks the
+      # question on the form. Named in the plan as a decision.
+      ChiefComplaints: [{resource: condition}]
+      Medications: [{resource: medication_request}]
+      # The narrative, which for most consultations is the whole record: only
+      # three conditions and six medicines can be coded here.
+      DocumentReference: [{resource: notes}]
+
 # Thread state flags. Derived from CARE resources where CARE knows the answer;
 # stored on the thread only where it does not. phc.wf.outpatient must declare a
 # rule for every one of these and for nothing else.
