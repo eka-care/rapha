@@ -328,9 +328,26 @@ def valuesets(shape, python, go):
     gone = call(go, missing)
     assert py == gone, "%s\npython: %s\ngo:     %s" % (missing, py, gone)
     assert py[0] == 404 and "is cached in" in py[1]["detail"], py
-    ok("%s: %d expansions of %d bound value sets are identical, the cap and "
-       "the unused q parameter included, and an uncached slug refuses the same "
-       "way in both" % (shape, asked + 1, len(bound_slugs())))
+    # WHAT THE CEILING IS NOT PROVED BY THIS, SAID RATHER THAN IMPLIED.
+    # api/main.py clamps the count at 200 and the renderer asks for 200.
+    # Changing the Go's ceiling from 200 to 20 was applied as a mutation and
+    # PASSED THE WHOLE GATE, because the largest value set in this tree holds
+    # nine concepts, so 20 and 200 and 100000 are the same answer. It cannot
+    # be made to fail without adding concepts to a value set, and nothing here
+    # may do that: terminology/condition-code.json says "NOT A PRIMARY HEALTH
+    # CENTRE DIAGNOSIS LIST" and awaits a named clinician. So the claim below
+    # is the narrow one: an explicit limit is honoured, and a limit below one
+    # is clamped up. The 200 ceiling is unobservable against these
+    # declarations and is the thing that goes silently short the day a real
+    # NRCeS release sits behind the same seam.
+    biggest = max(len(get(python, "%s/valuesets/%s" % (PREFIX, slug))["concepts"])
+                  for slug in bound_slugs())
+    assert biggest < 200, biggest
+    ok("%s: %d expansions of %d bound value sets are identical, an explicit "
+       "limit and the unused q parameter included, and an uncached slug "
+       "refuses the same way in both. The 200 ceiling is NOT proved: the "
+       "largest value set here holds %d concepts"
+       % (shape, asked + 1, len(bound_slugs()), biggest))
 
 
 def forms(shape, python, go):
@@ -1103,10 +1120,38 @@ def fill_cases():
                                 "value": legal(field), "confidence": 0.95,
                                 "evidence": "wrong group"})
         cases["drafts"].append({"slug": slug, "operation": "x.op",
-                                "instrument": "i",
+                                "kind": "whole", "instrument": "i",
                                 "transcript": "a transcript",
                                 "answers": answers})
+
+        # And a second draft for a form with an enable_when, answering ONLY
+        # the gated questions and not the ones they are gated on, so the rule
+        # actually refuses something.
+        #
+        # This exists because of a mutation that did not fail. Breaking
+        # fill.Enabled so a disabled answer is kept passed the whole gate on
+        # its first pass: every draft above answers every question, so every
+        # rule held and the deletion never ran. The declaration this now
+        # reaches is phc.schema.lab-result-v1's `override_reason`, gated on
+        # `value` existing, and it is found by walking rather than named here.
+        gated = [f for f in fields if f["enable_when"]]
+        gates = {r["question"] for f in gated for r in f["enable_when"]}
+        if gated:
+            cases["drafts"].append({
+                "slug": slug, "operation": "x.op", "kind": "gated",
+                "instrument": "i",
+                "transcript": "a transcript",
+                "answers": [{"id": f["link_id"], "value": legal(f),
+                             "confidence": 0.7,
+                             "evidence": "said %s" % f["link_id"]}
+                            for f in fields
+                            if f["link_id"] not in gates and not f["row_of"]]})
     assert cases["coerce"] and cases["drafts"], cases["flatten"]
+    # The gate above really was reached, or the line it exists for proves
+    # nothing: at least one form in this bundle declares an enable_when.
+    assert any(one.get("kind") == "gated" for one in cases["drafts"]), \
+        ("no question in this bundle declares enable_when, so fill's gate is "
+         "unexercised and the mutation that found that hole would pass again")
     return cases
 
 
@@ -1213,7 +1258,11 @@ def fill_parity(tmp):
                             % (one["slug"], at, field["type"]))
                         ticked += 1
         # A row field answered with NO row number was dropped, and the drop is
-        # visible: it is in `unfilled` and its value is in no row.
+        # visible: it is in `unfilled` and its value is in no row. Only for the
+        # draft that answered everything; the gated one answers no row field at
+        # all, so there is nothing for it to have dropped.
+        if one["kind"] != "whole":
+            continue
         for field in py["flatten"][one["slug"]]:
             if not field["row_of"]:
                 continue
@@ -1347,6 +1396,64 @@ def compare(shape, python, go):
     ok("%s: %d routes the Python serves answer 501 on the Go with the slice "
        "that will bring them, rather than 404" % (shape, len(owed)))
 
+
+# ---------------------------------------------------------------------------
+# The mutation ledger for what G3 added: 15 applied, 14 caught
+# ---------------------------------------------------------------------------
+#
+# Each one was applied to the GO side, proved applied (the file changed AND
+# the replaced text was gone AND git agreed), run through the whole of
+# scripts/check.sh, reverted, and the revert proved clean against git. The
+# gate stops at the first failure, so "first" is the gate's own order. Every
+# one that failed failed here, in "== the Go backend, beside the Python ==".
+#
+#  1. CompiledJSON serves catalogue.json's top level capabilities, bundles and
+#     states -- the union over every bundle -- instead of the loaded bundle's
+#     own.  -> GET /api/catalogue differs.
+#  2. CompiledJSON serves every bundle's operations instead of the manifest's.
+#     -> GET /api/catalogue differs.
+#  3. /questionnaires narrowed by the caller's capabilities.
+#     -> forms(), asking as `frontdesk`.
+#  4. /questionnaires serves the parsed questions instead of the whole file.
+#     -> GET /api/questionnaires differs.
+#  5. The expansion's ceiling is 20 and not 200.  -> NOT CAUGHT, and it cannot
+#     be: the largest value set in this tree holds nine concepts, so every
+#     ceiling above nine is the same answer, and nothing here may add a
+#     concept to a value set. Recorded in valuesets() rather than claimed.
+#  6. The expansion ignores `q`.  -> valuesets(), the q taken off a display.
+#  7. The expansion drops the `unit` a coded answer needs beside the code.
+#     -> valuesets(), on lab-analyte.
+#  8. The expansion's `q` filters the display only, never the code.
+#     -> valuesets(), the q taken off a code.
+#  9. The validator accepts a repeating group's sub question answered at the
+#     TOP level, which is a renderer that lost the row it belonged to.
+#     -> the write path, s_a_plugin_that_is_off's consultation: 200 and 422.
+# 10. Every row refusal says row zero.
+#     -> the write path, s_repeating_groups_fan_out's broken second row.
+# 11. fill folds a row field with no row number into row zero.
+#     -> fill_parity, the draft for phc.schema.abha-link-v1.
+# 12. fill owes one tick per question rather than one per row addressed id.
+#     -> fill_parity, the draft for phc.schema.consult-v1.
+# 13. fill flattens the repeating group itself as an answerable field.
+#     -> fill_parity, the flattening of phc.schema.consult-v1.
+# 14. fill keeps an answer whose enable_when does not hold.
+# 15. fill's enable_when refuses nothing at all.
+#     -> both fill_parity, the draft for phc.schema.lab-result-v1 -- but only
+#        after the check grew the case that reaches them. See below.
+#
+# THE HOLE THE MUTATIONS FOUND IN THIS CHECK
+# ------------------------------------------
+# 14 was applied first against the fill cases as they were originally built,
+# and PASSED THE WHOLE GATE. Every draft answered every question of its form,
+# so every enable_when rule held and the deletion never ran: the one branch of
+# api/fill.enabled that does anything was unreachable. The fix is the second
+# draft per form in fill_cases(), which answers only the GATED questions and
+# not the ones they are gated on. 15 was then added as the broader form of the
+# same mutation and both fail.
+#
+# One assertion was NARROWED rather than kept. valuesets() used to say the cap
+# was included in what it compared. It is not and cannot be; the line now says
+# which value set is the largest and that the ceiling is unproved.
 
 if __name__ == "__main__":
     sys.exit(main())
