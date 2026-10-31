@@ -519,6 +519,35 @@ ok("and it refuses a template claiming a station or a capability nothing "
    "declared: one no scribe instrument may fill, and one the workflow does "
    "not offer at the station it inherits")
 
+# And the gate RUNS all of it. Everything above asks templates.lint() directly,
+# which proves the rule and not the wiring: deleting the one call in
+# kernel/declarations.py left every check above passing. So this loads a bent
+# bundle through declarations.load(), the way check.sh does, and asserts the
+# bundle refuses to load at all. Found by mutation.
+with tempfile.TemporaryDirectory() as tmp:
+    home = pathlib.Path(tmp) / "bundles"
+    (home / "phc").mkdir(parents=True)
+    for src in (ROOT / "bundles" / "phc").iterdir():
+        if src.is_file():
+            (home / "phc" / src.name).write_text(src.read_text())
+    bent = copy.deepcopy(MANIFEST)
+    bent["templates"]["phc.op.followup"]["asks"] = ["history", "bp"]
+    (home / "phc" / "bundle.yaml").write_text(yaml.safe_dump(bent, sort_keys=False))
+    was = declarations.BUNDLES
+    try:
+        declarations.BUNDLES = home
+        try:
+            declarations.load("phc")
+            raise AssertionError("a bent template declaration loaded")
+        except declarations.DeclarationError as exc:
+            assert "asks 'bp'" in str(exc), str(exc)
+    finally:
+        declarations.BUNDLES = was
+assert declarations.load("phc").manifest.id == "phc", "the real bundle still loads"
+ok("the gate runs the template lint rather than only owning it: a bent "
+   "declaration makes kernel/declarations.py refuse to load the bundle")
+
+
 # A required answer that goes nowhere is NOT a rule this module owns, and the
 # reason is worth the paragraph: kernel/mapping.py already refuses an
 # operation with a required question that no record stores and that nobody
