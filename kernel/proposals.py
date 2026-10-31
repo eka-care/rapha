@@ -87,8 +87,9 @@ def _audit(store, decision_audit, *, thread, at, proposal=None):
 def _decide(store, bundle, op, *, thread, payload, caps, surface, actor,
             confirmed=False, scopes=None, workflow=None):
     # Which plugins this facility runs is the bundle's own answer and never a
-    # caller's argument: a surface that could pass one could widen it.
-    withheld = dict(getattr(bundle, "withheld", None) or {})
+    # caller's argument: a surface that could pass one could widen it. It
+    # changes no decision, only the sentence; see catalogue/guard.evaluate.
+    withheld = dict(bundle.withheld or {})
     workflow = workflow or bundle.workflow()
     if not drawn_by(workflow, op["id"]):
         # Before the guard, because this is not a judgement about this thread's
