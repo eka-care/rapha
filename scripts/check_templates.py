@@ -630,6 +630,28 @@ for link_id in sorted(BASE_BY):
 ok("the generator types no diagnosis and not one of the consultation's own "
    "question names: %d words and %d link ids" % (len(WORDS), len(BASE_BY)))
 
+# ---------------------------------------------------------------------------
+# 10. The gate runs every check there is.
+# ---------------------------------------------------------------------------
+#
+# Found by mutation, and the hole was not this module's alone: deleting the
+# line that runs this file from scripts/check.sh left the gate green with 549
+# oks, and nothing anywhere said a check had gone missing. The same was true
+# of all ten check scripts. One assertion closes it for nine of them.
+#
+# The tenth is this file, and that is a limit rather than an oversight: an
+# assertion cannot notice that the file holding it was not run. Any one place
+# this lived would have the same hole about itself. It lives here because
+# this is the mutation that found it.
+GATE = (ROOT / "scripts" / "check.sh").read_text()
+SCRIPTS = sorted(p.name for p in (ROOT / "scripts").glob("check_*.py"))
+MISSING = [name for name in SCRIPTS if name not in GATE]
+assert not MISSING, "scripts/check.sh does not run %r, so those checks are " \
+                    "written and never run" % MISSING
+ok("every one of the %d check scripts in scripts/ is named in scripts/check.sh, "
+   "so a check cannot be dropped from the gate in silence, this file aside"
+   % len(SCRIPTS))
+
 print("ok   the doctor's templates: %d checks passed" % checks)
 
 # ---------------------------------------------------------------------------
