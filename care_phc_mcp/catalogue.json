@@ -2697,6 +2697,7 @@
       "group_by": null,
       "id": "phc.view.facility-dashboard",
       "kind": "dashboard",
+      "labels": [],
       "metrics": [
         "phc.metric.visits",
         "phc.metric.abha-coverage",
@@ -2726,12 +2727,16 @@
         "age",
         "sex",
         "village",
-        "token"
+        "token",
+        "category"
       ],
       "escalate_minutes": null,
       "group_by": "station",
       "id": "phc.view.station-queue",
       "kind": "queue",
+      "labels": [
+        "category"
+      ],
       "metrics": [],
       "scope": "today",
       "sections": [],
@@ -2751,6 +2756,7 @@
       "group_by": null,
       "id": "phc.view.today-tasks",
       "kind": "tasklist",
+      "labels": [],
       "metrics": [],
       "scope": "today",
       "sections": [],
@@ -2790,6 +2796,7 @@
       "group_by": null,
       "id": "phc.view.visit-summary",
       "kind": "summary",
+      "labels": [],
       "metrics": [],
       "scope": "today",
       "sections": [

@@ -215,6 +215,14 @@ class View:
     scope: str = "today"            # VIEW_SCOPES
     group_by: Optional[str] = None  # "station" or a flag; None is one list
     columns: list = field(default_factory=list)   # subject fields to show
+    # Which of `columns` a row wears as a LABEL rather than as detail: a pill
+    # beside the name, against the quiet line underneath. The renderer had
+    # been inferring this from the shape of the question that collects the
+    # answer, offering a closed set and not requiring one. That rule picked
+    # exactly the right column today and would have picked a second one
+    # silently the day a bundle added another optional choice. A bundle says
+    # which, or none of them are labels. A subset of `columns`.
+    labels: list = field(default_factory=list)
     badges: dict = field(default_factory=dict)    # flag -> warn | crit | ok | mute
     # summary
     sections: list = field(default_factory=list)  # of Section

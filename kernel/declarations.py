@@ -254,6 +254,14 @@ def _lint_view(fm, refs, fail, voc, ops):
         if fm.get("workflow") not in refs["workflow"]:
             fail(f"{fm['kind']} view names workflow '{fm.get('workflow')}' which does not exist")
 
+    # A label is drawn from a column's value, so a label naming something the
+    # row does not carry draws nothing at all: an empty pill, or no pill, and
+    # no error anywhere. The kernel narrows every row to exactly `columns`,
+    # so this is the only place the two lists can be compared.
+    stray = [k for k in (fm.get("labels") or []) if k not in (fm.get("columns") or [])]
+    if stray:
+        fail(f"labels name {stray}, which this view does not carry as columns")
+
     group_by = fm.get("group_by")
     if group_by is not None and group_by != "station" and group_by not in voc.states:
         fail(f"group_by '{group_by}' is neither 'station' nor a state")

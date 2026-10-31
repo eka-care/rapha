@@ -20,6 +20,10 @@ target_minutes: 30
 # still told nothing about what the programmes ARE: it draws whatever this
 # column carries, under whatever the value set calls it.
 columns: [name, age, sex, village, token, category]
+# Which of those a row wears as a pill beside the name. The rest are the
+# quiet line underneath. Said here rather than worked out from the shape of
+# the question that collects it.
+labels: [category]
 badges:
   abha.pending: warn
   vitals.flagged: crit
