@@ -192,6 +192,78 @@ SEEDS = {
                   "atom wrote `verification_status: {const: confirmed}` on "
                   "every diagnosis, which asserted every one of them.",
     },
+
+    # ------------------------------------------------- the status of a resource
+    #
+    # Three more published FHIR value sets, and the thing they have in common
+    # is what makes them different from every seed above: these are not
+    # answers a clinician gives. They are the `status` and `intent` elements
+    # R4 makes required on a resource, and this product stores a literal into
+    # each of them from an operation's own mapping.
+    #
+    # They are seeded for exactly one reason: a literal nothing checks is a
+    # code nobody checked, and `kernel/fhir.py` copies these three columns
+    # into a FHIR element verbatim. `scripts/check_verification.py` holds
+    # every declared literal against the list below, so a status that R4 would
+    # reject fails the build here rather than at a gateway.
+    #
+    # Note the code systems, which are NOT terminology.hl7.org and are not
+    # interchangeable: Observation.status and DiagnosticReport.status are in
+    # the base `hl7.org/fhir` namespace, while the two MedicationRequest
+    # elements are under `hl7.org/fhir/CodeSystem`. Read off the server's own
+    # expansion rather than written from the pattern the others follow.
+    "observation-status": {
+        "title": "How settled an observation is",
+        "system": "http://hl7.org/fhir/observation-status",
+        "resolve": "valueset",
+        "valueset": "http://hl7.org/fhir/ValueSet/observation-status",
+        "binding": "a stored `status` column that kernel/fhir.py copies into "
+                   "Observation.status",
+        "source": "The FHIR R4 published value set "
+                  "http://hl7.org/fhir/ValueSet/observation-status, expanded "
+                  "through tx.fhir.org. R4 makes Observation.status required "
+                  "and this list is the whole of what it may be. `preliminary` "
+                  "is the one that matters here: it is R4's own word for a "
+                  "value that has been recorded and not yet verified, which is "
+                  "what a laboratory result is between the technician keying it "
+                  "and a second person verifying it. kernel/fhir.py published "
+                  "every observation as `final` until 2026-10-31, so an "
+                  "unverified laboratory value travelled under a patient's ABHA "
+                  "number as a settled one.",
+    },
+    "medicationrequest-status": {
+        "title": "Whether a prescription is in force",
+        "system": "http://hl7.org/fhir/CodeSystem/medicationrequest-status",
+        "resolve": "valueset",
+        "valueset": "http://hl7.org/fhir/ValueSet/medicationrequest-status",
+        "binding": "a stored `status` column that kernel/fhir.py copies into "
+                   "MedicationRequest.status",
+        "source": "The FHIR R4 published value set "
+                  "http://hl7.org/fhir/ValueSet/medicationrequest-status, "
+                  "expanded through tx.fhir.org. Taken whole, like every "
+                  "published list here: R4 requires the element and this "
+                  "product chose the binding and not the codes.",
+    },
+    "medicationrequest-intent": {
+        "title": "Whether a prescription is an order or a suggestion",
+        "system": "http://hl7.org/fhir/CodeSystem/medicationrequest-intent",
+        "resolve": "valueset",
+        "valueset": "http://hl7.org/fhir/ValueSet/medicationrequest-intent",
+        "binding": "a stored `intent` column that kernel/fhir.py copies into "
+                   "MedicationRequest.intent",
+        "source": "The FHIR R4 published value set "
+                  "http://hl7.org/fhir/ValueSet/medicationrequest-intent, "
+                  "expanded through tx.fhir.org. This is where a prescription's "
+                  "certainty already lives, and it is why no certainty QUESTION "
+                  "was added to the prescription form: R4 distinguishes a "
+                  "`proposal`, which is a suggestion made by someone with no "
+                  "authority to make it happen, from an `order`, which is a "
+                  "demand and an authorisation. A medicine a machine suggested "
+                  "is a `proposal`; a medicine a prescriber ordered is an "
+                  "`order`. Inventing a verification status for a "
+                  "MedicationRequest would be inventing a field R4 does not "
+                  "have, when it already has this one.",
+    },
     "condition-code": {
         "title": "Conditions this build can code",
         "system": SNOMED,

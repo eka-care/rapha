@@ -1,0 +1,51 @@
+{
+  "slug": "medicationrequest-status",
+  "title": "Whether a prescription is in force",
+  "system": "http://hl7.org/fhir/CodeSystem/medicationrequest-status",
+  "binding": "a stored `status` column that kernel/fhir.py copies into MedicationRequest.status",
+  "generated": "2026-10-31",
+  "source": "The FHIR R4 published value set http://hl7.org/fhir/ValueSet/medicationrequest-status, expanded through tx.fhir.org. Taken whole, like every published list here: R4 requires the element and this product chose the binding and not the codes.",
+  "verified": "expanded whole from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status, version 4.0.1, through tx.fhir.org",
+  "concepts": {
+    "active": {
+      "display": "Active",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status; this product chose the binding and not the list"
+    },
+    "cancelled": {
+      "display": "Cancelled",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status; this product chose the binding and not the list"
+    },
+    "completed": {
+      "display": "Completed",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status; this product chose the binding and not the list"
+    },
+    "draft": {
+      "display": "Draft",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status; this product chose the binding and not the list"
+    },
+    "entered-in-error": {
+      "display": "Entered in Error",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status; this product chose the binding and not the list"
+    },
+    "on-hold": {
+      "display": "On Hold",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status; this product chose the binding and not the list"
+    },
+    "stopped": {
+      "display": "Stopped",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status; this product chose the binding and not the list"
+    },
+    "unknown": {
+      "display": "Unknown",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-status; this product chose the binding and not the list"
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "slug": "observation-status",
+  "title": "How settled an observation is",
+  "system": "http://hl7.org/fhir/observation-status",
+  "binding": "a stored `status` column that kernel/fhir.py copies into Observation.status",
+  "generated": "2026-10-31",
+  "source": "The FHIR R4 published value set http://hl7.org/fhir/ValueSet/observation-status, expanded through tx.fhir.org. R4 makes Observation.status required and this list is the whole of what it may be. `preliminary` is the one that matters here: it is R4's own word for a value that has been recorded and not yet verified, which is what a laboratory result is between the technician keying it and a second person verifying it. kernel/fhir.py published every observation as `final` until 2026-10-31, so an unverified laboratory value travelled under a patient's ABHA number as a settled one.",
+  "verified": "expanded whole from the published value set http://hl7.org/fhir/ValueSet/observation-status, version 4.0.1, through tx.fhir.org",
+  "concepts": {
+    "amended": {
+      "display": "Amended",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/observation-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/observation-status; this product chose the binding and not the list"
+    },
+    "cancelled": {
+      "display": "Cancelled",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/observation-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/observation-status; this product chose the binding and not the list"
+    },
+    "corrected": {
+      "display": "Corrected",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/observation-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/observation-status; this product chose the binding and not the list"
+    },
+    "entered-in-error": {
+      "display": "Entered in Error",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/observation-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/observation-status; this product chose the binding and not the list"
+    },
+    "final": {
+      "display": "Final",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/observation-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/observation-status; this product chose the binding and not the list"
+    },
+    "preliminary": {
+      "display": "Preliminary",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/observation-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/observation-status; this product chose the binding and not the list"
+    },
+    "registered": {
+      "display": "Registered",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/observation-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/observation-status; this product chose the binding and not the list"
+    },
+    "unknown": {
+      "display": "Unknown",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/observation-status, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/observation-status; this product chose the binding and not the list"
+    }
+  }
+}

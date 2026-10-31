@@ -1,0 +1,51 @@
+{
+  "slug": "medicationrequest-intent",
+  "title": "Whether a prescription is an order or a suggestion",
+  "system": "http://hl7.org/fhir/CodeSystem/medicationrequest-intent",
+  "binding": "a stored `intent` column that kernel/fhir.py copies into MedicationRequest.intent",
+  "generated": "2026-10-31",
+  "source": "The FHIR R4 published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent, expanded through tx.fhir.org. This is where a prescription's certainty already lives, and it is why no certainty QUESTION was added to the prescription form: R4 distinguishes a `proposal`, which is a suggestion made by someone with no authority to make it happen, from an `order`, which is a demand and an authorisation. A medicine a machine suggested is a `proposal`; a medicine a prescriber ordered is an `order`. Inventing a verification status for a MedicationRequest would be inventing a field R4 does not have, when it already has this one.",
+  "verified": "expanded whole from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent, version 4.0.1, through tx.fhir.org",
+  "concepts": {
+    "filler-order": {
+      "display": "Filler Order",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent; this product chose the binding and not the list"
+    },
+    "instance-order": {
+      "display": "Instance Order",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent; this product chose the binding and not the list"
+    },
+    "option": {
+      "display": "Option",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent; this product chose the binding and not the list"
+    },
+    "order": {
+      "display": "Order",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent; this product chose the binding and not the list"
+    },
+    "original-order": {
+      "display": "Original Order",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent; this product chose the binding and not the list"
+    },
+    "plan": {
+      "display": "Plan",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent; this product chose the binding and not the list"
+    },
+    "proposal": {
+      "display": "Proposal",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent; this product chose the binding and not the list"
+    },
+    "reflex-order": {
+      "display": "Reflex Order",
+      "verified": "expanded from the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent, version 4.0.1, through tx.fhir.org",
+      "why": "a code of the published value set http://hl7.org/fhir/ValueSet/medicationrequest-intent; this product chose the binding and not the list"
+    }
+  }
+}
