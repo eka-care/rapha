@@ -6,7 +6,7 @@
 // (docs/superpowers/plans/2026-10-31-go-backend-port.md, "Behaviour is
 // copied, not reinterpreted").
 //
-// WHAT THIS SERVES TODAY, which is slices G1 to G3 of nine
+// WHAT THIS SERVES TODAY, which is slices G1 to G4 of nine
 // --------------------------------------------------------
 //
 //	GET /                       the service, the bundle, and its own routes
@@ -15,6 +15,11 @@
 //	GET /api/v1/phc/catalogue   the compiled catalogue, the loaded bundle's
 //	GET /api/v1/phc/questionnaires   every form this bundle's operations ask
 //	GET /api/v1/phc/valuesets/{slug} one bound choice, expanded
+//	GET /api/v1/phc/queue            the declared queue, and the seeded day
+//	GET /api/v1/phc/views/{id}        a queue, a summary, a dashboard, a tasklist
+//	GET /api/v1/phc/subjects/{id}     the spine: one subject, every visit
+//	GET /api/v1/phc/patients/search   the local register; see package directory
+//	GET /api/v1/phc/patients/pending  the rows no registry has seen
 //	the write path                   POST /threads, commit, propose, confirm,
 //	                                 reject, and GET a thread or a proposal
 //
@@ -377,7 +382,7 @@ var served = []struct {
 	{"/roles/{role}", "G7 serves a facility's own role combinations"},
 	{"/threads", ""},
 	{"/threads/{thread_id}", ""},
-	{"/subjects/{subject_id}", "G6 serves the spine: one subject, every visit"},
+	{"/subjects/{subject_id}", ""},
 	{"/questionnaires", ""},
 	// The expansion seam is G4's; the ROUTE is G3's, because a bound choice
 	// with nothing to choose is an empty dropdown on a form and
@@ -385,16 +390,23 @@ var served = []struct {
 	// What G4 still owes is the rest of kernel/terminology.py: the semantic
 	// tags, the codification seam and the three binding forms at build time.
 	{"/valuesets/{slug}", ""},
-	{"/queue", "G6 serves the declared views"},
-	{"/views/{view_id}", "G6 serves the declared views"},
+	{"/queue", ""},
+	{"/views/{view_id}", ""},
 	// The guard is served; the planner behind these two is agent/turn.py and
 	// is a port of its own. Said as the slice rather than left reading as
 	// though G2 had covered it.
 	{"/khoj", "the ask-and-search planner behind it is agent/turn.py, not the guard"},
 	{"/agent/say", "the ask-and-search planner behind it is agent/turn.py, not the guard; this spelling is deprecated"},
-	{"/patients/search", "G1 does not reach Eka's patient directory"},
-	{"/patients/pending", "G1 does not reach Eka's patient directory"},
-	{"/patients/publish", "G1 does not reach Eka's patient directory"},
+	// The LOCAL half of kernel/directory.py: the register this facility
+	// already holds, and the rows no registry has seen. The vendor behind the
+	// seam is not here and nothing in Go reads a credential, so a search
+	// always answers the kernel's own "the directory could not be asked".
+	// That is the designed degraded path and not a stub; see package
+	// directory. Publishing is the one verb that sends a person's details OFF
+	// this machine, so it waits for a connector rather than being faked.
+	{"/patients/search", ""},
+	{"/patients/pending", ""},
+	{"/patients/publish", "a publish needs a directory to publish TO, and Go has no vendor behind that seam"},
 	{"/abha/config", "G1 does not reach ABDM"},
 	{"/scribe/templates", "G8 serves the outbox, and the scribe with it"},
 	{"/scribe/sessions", "G8 serves the outbox, and the scribe with it"},
@@ -448,6 +460,11 @@ func (k *kernel) mount() http.Handler {
 		mux.HandleFunc(prefix+"/operations", only(http.MethodGet, k.catalogue))
 		mux.HandleFunc(prefix+"/questionnaires", only(http.MethodGet, k.questionnaires))
 		mux.HandleFunc(prefix+"/valuesets/{slug}", only(http.MethodGet, k.valueset))
+		mux.HandleFunc(prefix+"/queue", only(http.MethodGet, k.queue))
+		mux.HandleFunc(prefix+"/views/{view_id}", only(http.MethodGet, k.view))
+		mux.HandleFunc(prefix+"/subjects/{subject_id}", only(http.MethodGet, k.subject))
+		mux.HandleFunc(prefix+"/patients/search", only(http.MethodGet, k.patientSearch))
+		mux.HandleFunc(prefix+"/patients/pending", only(http.MethodGet, k.patientPending))
 		k.mountGuard(mux, prefix)
 	}
 	return eitherSpelling(mux)
@@ -528,6 +545,30 @@ func main() {
 	k.facility = chosen(cat, "")
 	k.withheld = withheldBy(cat, k.facility)
 	k.without = absent(cat, k.facility)
+
+	// The demo day, seeded on first use so the queue is never an empty
+	// screen: api/main.py's make_store(), condition for condition. The rows
+	// are the bundle's own (bundles/<id>/seed.yaml) and this facility's
+	// shape narrows them, because a thread whose history names an operation
+	// nobody here may perform is a lie about what happened here.
+	//
+	// Loud on failure. A kernel that silently started with no demo day would
+	// read as a clinic with nobody in it, which is indistinguishable from a
+	// clinic whose records did not load.
+	declaredSeed, err := store.LoadSeed(filepath.Join(root, "bundles", cat.Manifest.ID))
+	if err != nil {
+		log.Fatalf("the seed did not load: %v\n\nSet PHC_ROOT to the repository "+
+			"root, or run from it.", err)
+	}
+	empty, err := rows.IsEmpty()
+	if err != nil {
+		log.Fatalf("could not read %s: %v", dbPath, err)
+	}
+	if empty {
+		if _, err := store.Seed(rows, seeded(declaredSeed, cat.Operations, k.withheld)); err != nil {
+			log.Fatalf("the demo day did not seed: %v", err)
+		}
+	}
 	k.workflow = cat.Workflow.ID
 	k.operations = cat.BundleOperations()
 	k.write = &proposals.Bundle{

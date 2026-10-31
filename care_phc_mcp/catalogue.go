@@ -115,11 +115,83 @@ type Vocabulary struct {
 	States       []string            `json:"states"`
 }
 
+// Section is one block of a summary view: kernel/contracts.Section. Exactly
+// one of Show or Resource is set, which the Python lint already holds.
+type Section struct {
+	Title    string         `json:"title"`
+	Show     string         `json:"show"`
+	Resource *string        `json:"resource"`
+	Where    map[string]any `json:"where"`
+	Fields   []string       `json:"fields"`
+}
+
+// Task is one row of a tasklist view: kernel/contracts.Task. `Where` is
+// {"flag": str | [str], "not": str | [str]} and either member may be a bare
+// string or a list, which is why both are read through AsList below rather
+// than typed as a slice.
+type Task struct {
+	Title     string         `json:"title"`
+	Where     map[string]any `json:"where"`
+	Operation *string        `json:"operation"`
+}
+
+// View is kernel/contracts.View as the compiled catalogue carries it: one
+// declaration for four kinds, with the fields the other three do not use left
+// empty. Four Go types would need four resolvers and four response shapes,
+// which is the reason the Python has one dataclass.
 type View struct {
 	ID         string `json:"id"`
 	Kind       string `json:"kind"`
 	Title      string `json:"title"`
+	Summary    string `json:"summary"`
 	Capability string `json:"capability"`
+	Workflow   string `json:"workflow"`
+	// queue
+	Scope   string            `json:"scope"`
+	GroupBy string            `json:"group_by"`
+	Columns []string          `json:"columns"`
+	Badges  map[string]string `json:"badges"`
+	// summary
+	Sections []Section `json:"sections"`
+	// dashboard
+	Metrics []string `json:"metrics"`
+	Window  string   `json:"window"`
+	// tasklist
+	Tasks []Task `json:"tasks"`
+}
+
+// Metric is kernel/contracts.Metric. Denominator is a pointer because None
+// and an empty query are different facts: a plain count declares none, and a
+// rate with an empty denominator is zero rather than an error.
+type Metric struct {
+	ID          string      `json:"id"`
+	Title       string      `json:"title"`
+	Summary     string      `json:"summary"`
+	Unit        string      `json:"unit"`
+	Numerator   StateQuery  `json:"numerator"`
+	Window      string      `json:"window"`
+	Denominator *StateQuery `json:"denominator"`
+	CertifiedBy *string     `json:"certified_by"`
+}
+
+// AsList is kernel/views._as_list: a declaration may write one flag or a
+// list of them and both mean the same thing.
+func AsList(v any) []string {
+	switch t := v.(type) {
+	case nil:
+		return nil
+	case string:
+		return []string{t}
+	case []any:
+		out := make([]string, 0, len(t))
+		for _, item := range t {
+			if text, ok := item.(string); ok {
+				out = append(out, text)
+			}
+		}
+		return out
+	}
+	return nil
 }
 
 type Catalogue struct {
@@ -144,6 +216,7 @@ type Catalogue struct {
 	Facilities Facilities        `json:"facilities"`
 	Vocabulary Vocabulary        `json:"vocabulary"`
 	Views      map[string]View   `json:"views"`
+	Metrics    map[string]Metric `json:"metrics"`
 	Workflows  map[string]any    `json:"workflows"`
 
 	// Filled by LoadDeclarations, not by a tag. The one workflow a bundle

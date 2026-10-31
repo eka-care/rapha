@@ -134,6 +134,8 @@ func (c *Catalogue) LoadDeclarations() error {
 		Workflows  map[string]json.RawMessage `json:"workflows"`
 		Mapping    map[string]json.RawMessage `json:"mapping"`
 		Operations map[string]json.RawMessage `json:"operations"`
+		Views      json.RawMessage            `json:"views"`
+		Metrics    json.RawMessage            `json:"metrics"`
 	}
 	if err := json.Unmarshal(catalogueJSON, &raw); err != nil {
 		return fmt.Errorf("the embedded catalogue is not an object: %w", err)
@@ -141,6 +143,28 @@ func (c *Catalogue) LoadDeclarations() error {
 	c.Workflow = nil
 	c.MappingRaw = raw.Mapping
 	c.OperationsRaw = raw.Operations
+
+	// The views and the metrics again, through pyval, because Load reads them
+	// with encoding/json's default and that turns every number in a `where`
+	// into a float64. A declaration's conditions are compared as TEXT by the
+	// store (every column is TEXT), so 30 spelled "30" and 30 spelled "30.0"
+	// are two different queries. Nothing in this tree declares a numeric
+	// condition today; re-decoding here is what keeps that from becoming a
+	// silent difference the first time one does.
+	if len(raw.Views) > 0 {
+		views := map[string]View{}
+		if err := pyval.Decode(raw.Views, &views); err != nil {
+			return fmt.Errorf("the compiled views are not readable: %w", err)
+		}
+		c.Views = views
+	}
+	if len(raw.Metrics) > 0 {
+		metrics := map[string]Metric{}
+		if err := pyval.Decode(raw.Metrics, &metrics); err != nil {
+			return fmt.Errorf("the compiled metrics are not readable: %w", err)
+		}
+		c.Metrics = metrics
+	}
 
 	// The atom a thread panel draws, which is the compiled operation WITH its
 	// mapping merged back in. api/main.py hands the renderer
