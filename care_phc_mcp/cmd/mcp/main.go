@@ -7,6 +7,9 @@
 // wire, bypassing is not expressible.
 //
 // Reads execute. Writes propose, and there is no tool that commits.
+//
+// The catalogue reader is carephc, shared with cmd/api, so there is one parser
+// of catalogue.json in this module and not one per command.
 package main
 
 import (
@@ -21,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	carephc "github.com/eka-care/care_phc_mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -121,7 +125,7 @@ func fail(format string, a ...any) *mcp.CallToolResult {
 	}
 }
 
-func handler(c *Client, op Operation) mcp.ToolHandler {
+func handler(c *Client, op carephc.Operation) mcp.ToolHandler {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var args map[string]any
 		if len(req.Params.Arguments) > 0 {
@@ -162,7 +166,7 @@ func handler(c *Client, op Operation) mcp.ToolHandler {
 // There is no write branch: khoj.Endpoint is the propose-only route, so this
 // can only ever return what that route returns, and that route has no path
 // to confirm or commit.
-func khojHandler(c *Client, khoj Khoj) mcp.ToolHandler {
+func khojHandler(c *Client, khoj carephc.Khoj) mcp.ToolHandler {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var args map[string]any
 		if len(req.Params.Arguments) > 0 {
@@ -187,7 +191,7 @@ func main() {
 	}
 	client := &Client{Base: base, Token: token, HTTP: &http.Client{Timeout: 30 * time.Second}}
 
-	cat, err := Load()
+	cat, err := carephc.Load()
 	if err != nil {
 		log.Fatal(err)
 	}

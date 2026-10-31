@@ -151,7 +151,11 @@ else
 fi
 
 echo "\n== the MCP server =="
-(cd care_phc_mcp && go vet ./... && go test ./... && go build -o care_phc_mcp .)
+# One module, two commands: the catalogue reader is the module root package
+# (where the embedded catalogue.json is) and cmd/mcp and cmd/api are beside
+# its files. `./cmd/mcp` rather than `.`, because the root is a library now.
+(cd care_phc_mcp && go vet ./... && go test ./... \
+   && go build -o care_phc_mcp ./cmd/mcp)
 # Two lines, not one `cmd && echo`: under `set -e` a failing command on the
 # left of && does not stop the script, so that spelling let this check fail in
 # silence. It did.

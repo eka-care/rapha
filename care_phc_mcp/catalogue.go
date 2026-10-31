@@ -1,10 +1,19 @@
-// Package main serves the PHC operation catalogue over MCP.
+// Package carephc reads the compiled PHC catalogue. It is the one reader, and
+// both commands in this module use it rather than keeping a parser each.
 //
-// The tool list is generated from catalogue.json, which is compiled from the
-// operation atoms. That is the whole point: an operation cannot reach an agent
-// without passing the same lint that puts it on the rendered surface, and it
-// cannot be added here by hand.
-package main
+// The declarations do not move for the Go port: catalogue.json is compiled
+// from the operation atoms by python3 -m catalogue.build and
+// python3 -m kernel.declarations, and this package reads it. That is the whole
+// point: an operation cannot reach an agent or a screen without passing the
+// same lint, and it cannot be added in Go by hand.
+//
+// The package sits at the module root because the embedded catalogue.json
+// does: //go:embed cannot reach up a directory, and the file's path is
+// written into kernel/declarations.py and catalogue/build.py. So cmd/api and
+// cmd/mcp are directories beside the reader's files rather than siblings of
+// its directory. That is the one place this module's shape was decided by
+// where the Python already writes a file.
+package carephc
 
 import (
 	_ "embed"
@@ -58,9 +67,55 @@ type Khoj struct {
 }
 
 type Manifest struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
-	Khoj  Khoj   `json:"khoj"`
+	ID      string `json:"id"`
+	Version string `json:"version"`
+	Title   string `json:"title"`
+	Khoj    Khoj   `json:"khoj"`
+}
+
+// Plugin is one entry of bundle.yaml's `plugins:`, carried through
+// catalogue.json unresolved. A plugin is a NAMED GROUP OF ONE BUNDLE'S OWN
+// WORDS and nothing more: ids, a title a screen can say, and whether it is the
+// floor. kernel/plugins.py owns what that means.
+type Plugin struct {
+	Title        string   `json:"title"`
+	Capabilities []string `json:"capabilities"`
+	Always       bool     `json:"always"`
+}
+
+// Facility is one entry of bundle.yaml's `facilities:`: a centre's whole
+// choice, which is a list of what it does NOT run. There is no positive list,
+// because one would mean a plugin added later ships off for everybody and
+// nobody notices until a clinician cannot do their job.
+type Facility struct {
+	Title   string   `json:"title"`
+	Without []string `json:"without"`
+}
+
+// Facilities carries the shapes a bundle declares and the one its own
+// `facility:` picks when nothing overrides it. The default sits beside the
+// shapes rather than on the manifest because it is only meaningful against
+// them.
+type Facilities struct {
+	Default  string              `json:"default"`
+	Declared map[string]Facility `json:"declared"`
+}
+
+// Vocabulary is the LOADED bundle's own words. The catalogue wide
+// `capabilities`, `bundles` and `states` below are the union over every
+// bundle, because this file is embedded whole and narrowed at runtime; these
+// are the one bundle's, which is what api/main.py has always served.
+type Vocabulary struct {
+	Capabilities []string            `json:"capabilities"`
+	Roles        map[string][]string `json:"roles"`
+	States       []string            `json:"states"`
+}
+
+type View struct {
+	ID         string `json:"id"`
+	Kind       string `json:"kind"`
+	Title      string `json:"title"`
+	Capability string `json:"capability"`
 }
 
 type Catalogue struct {
@@ -69,6 +124,23 @@ type Catalogue struct {
 	States       []string             `json:"states"`
 	Operations   map[string]Operation `json:"operations"`
 	Manifest     Manifest             `json:"manifest"`
+
+	// The manifest again, unparsed, filled by Load rather than by a tag:
+	// encoding/json silently drops BOTH of two fields that claim one name, so
+	// tagging this `manifest` too would have left Manifest above empty and
+	// every tool description blank.
+	//
+	// It is here because GET /facility serves asdict(manifest) WHOLE. Serving
+	// it from the raw bytes means a field added to kernel/contracts.Manifest
+	// reaches the response without being retyped in Go, which is that
+	// dataclass's own rule (add, never rename) honoured on this side.
+	ManifestRaw json.RawMessage `json:"-"`
+
+	Plugins    map[string]Plugin `json:"plugins"`
+	Facilities Facilities        `json:"facilities"`
+	Vocabulary Vocabulary        `json:"vocabulary"`
+	Views      map[string]View   `json:"views"`
+	Workflows  map[string]any    `json:"workflows"`
 }
 
 func Load() (*Catalogue, error) {
@@ -76,6 +148,13 @@ func Load() (*Catalogue, error) {
 	if err := json.Unmarshal(catalogueJSON, &c); err != nil {
 		return nil, fmt.Errorf("embedded catalogue is not valid: %w", err)
 	}
+	var raw struct {
+		Manifest json.RawMessage `json:"manifest"`
+	}
+	if err := json.Unmarshal(catalogueJSON, &raw); err != nil {
+		return nil, fmt.Errorf("embedded catalogue has no manifest: %w", err)
+	}
+	c.ManifestRaw = raw.Manifest
 	return &c, nil
 }
 

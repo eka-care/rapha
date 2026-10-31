@@ -115,6 +115,29 @@
     "vitals.record",
     "worklist.read"
   ],
+  "facilities": {
+    "declared": {
+      "all-plugins": {
+        "title": "Every plugin this bundle ships",
+        "without": []
+      },
+      "consulting-room-only": {
+        "title": "A consulting room, with no laboratory and no outreach",
+        "without": [
+          "orders",
+          "outreach",
+          "reporting"
+        ]
+      },
+      "no-laboratory": {
+        "title": "A centre with no laboratory",
+        "without": [
+          "orders"
+        ]
+      }
+    },
+    "default": "all-plugins"
+  },
   "instruments": {
     "phc.inst.consent-speak": {
       "commit": "tap",
@@ -1776,6 +1799,50 @@
       ]
     }
   },
+  "plugins": {
+    "baseline": {
+      "always": true,
+      "capabilities": [
+        "patient.find",
+        "patient.register",
+        "abha.link",
+        "vitals.record",
+        "assessment.record",
+        "encounter.document",
+        "appointment.book",
+        "handover",
+        "facility.admin"
+      ],
+      "title": "The line itself"
+    },
+    "orders": {
+      "capabilities": [
+        "lab.order",
+        "lab.result.enter",
+        "lab.result.validate"
+      ],
+      "title": "Laboratory orders and results"
+    },
+    "outreach": {
+      "capabilities": [
+        "visit.household"
+      ],
+      "title": "Household visits"
+    },
+    "prescriptions": {
+      "capabilities": [
+        "rx.prescribe",
+        "pharmacy.dispense"
+      ],
+      "title": "Prescribing and dispensing"
+    },
+    "reporting": {
+      "capabilities": [
+        "reporting.view"
+      ],
+      "title": "The facility's own numbers"
+    }
+  },
   "scribe": {
     "community": {
       "choose": [
@@ -2061,6 +2128,119 @@
       "window": "day",
       "workflow": "phc.wf.outpatient"
     }
+  },
+  "vocabulary": {
+    "capabilities": [
+      "abha.link",
+      "appointment.book",
+      "assessment.record",
+      "encounter.document",
+      "facility.admin",
+      "handover",
+      "lab.order",
+      "lab.result.enter",
+      "lab.result.validate",
+      "patient.find",
+      "patient.register",
+      "pharmacy.dispense",
+      "reporting.view",
+      "rx.prescribe",
+      "visit.household",
+      "vitals.record"
+    ],
+    "roles": {
+      "anm": [
+        "patient.find",
+        "patient.register",
+        "abha.link",
+        "visit.household",
+        "assessment.record",
+        "appointment.book",
+        "vitals.record"
+      ],
+      "asha": [
+        "patient.find",
+        "patient.register",
+        "abha.link",
+        "visit.household",
+        "assessment.record",
+        "appointment.book"
+      ],
+      "cho": [
+        "patient.find",
+        "patient.register",
+        "abha.link",
+        "visit.household",
+        "assessment.record",
+        "appointment.book",
+        "vitals.record",
+        "encounter.document",
+        "lab.order",
+        "rx.prescribe"
+      ],
+      "frontdesk": [
+        "patient.find",
+        "patient.register",
+        "abha.link",
+        "appointment.book",
+        "handover"
+      ],
+      "lab": [
+        "patient.find",
+        "lab.result.enter",
+        "handover"
+      ],
+      "lab_incharge": [
+        "patient.find",
+        "lab.result.enter",
+        "lab.result.validate",
+        "handover"
+      ],
+      "mo": [
+        "patient.find",
+        "encounter.document",
+        "rx.prescribe",
+        "lab.order",
+        "assessment.record",
+        "reporting.view",
+        "handover"
+      ],
+      "nurse": [
+        "patient.find",
+        "patient.register",
+        "abha.link",
+        "appointment.book",
+        "vitals.record",
+        "assessment.record",
+        "handover"
+      ],
+      "pharmacist": [
+        "patient.find",
+        "pharmacy.dispense",
+        "handover"
+      ]
+    },
+    "states": [
+      "abha.linked",
+      "abha.pending",
+      "capture.agreed",
+      "capture.consented",
+      "capture.declined",
+      "capture.withdrawn",
+      "consult.documented",
+      "dispensed.complete",
+      "dispensed.partial",
+      "followup.booked",
+      "handover.raised",
+      "lab.critical",
+      "lab.ordered",
+      "lab.resulted",
+      "lab.validated",
+      "registered",
+      "rx.confirmed",
+      "vitals.flagged",
+      "vitals.recorded"
+    ]
   },
   "workflows": {
     "phc.wf.outpatient": {
