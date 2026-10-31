@@ -37,10 +37,19 @@ Here: the WellnessRecord profile, which is the one that carries vital signs,
 and the Observation and Patient and Encounter and Practitioner resources a
 vitals visit needs. That is the vertical slice.
 
+Also here, 2026-10-31: the OPConsultRecord profile with the Condition and
+MedicationRequest projections a consultation needs, which is what the
+repeating group work unblocked. Its eight section codes are real, read off
+NRCeS's own published example and recorded in
+docs/superpowers/specs/2026-10-30-nrces-section-codes.md, which is also why
+the WellnessRecord sections above still carry no code: NRCeS's own
+WellnessRecord example publishes none, so an absent code there is the
+standard's answer rather than a gap.
+
 Not here, deliberately, and each is a named plan step rather than an omission:
-OPConsultRecord (plan step 7, and it needs Condition, MedicationRequest and
-ServiceRequest projections that depend on the repeating group work in step 4);
-the gateway call that sends a bundle (care_phc/connectors/abdm/base.py is
+the ServiceRequest projection an investigation needs, which waits on the lab
+order question becoming a repeating group too; the gateway call that sends a
+bundle (care_phc/connectors/abdm/base.py is
 where that boundary already lives, and linking a care context is already
 declared irreversible); and the ECDH encryption M2 wraps a bundle in.
 
@@ -112,6 +121,45 @@ PROFILES = {
             "DocumentReference": {"title": "Document reference", "code": None},
         },
     },
+    # Read off NRCeS's own Bundle-OPConsultNote-example-05 on 2026-10-30 and
+    # again on 2026-10-31, through the abdm-docs server's get_fhir_example,
+    # and recorded in docs/superpowers/specs/2026-10-30-nrces-section-codes.md.
+    # Unlike WellnessRecord above, every section here HAS a published SNOMED
+    # code, and `Composition.type` is fixed by the profile digest to 371530004.
+    #
+    # Four of the profile's twelve slices are absent, and absent on purpose:
+    # PhysicalExamination, FamilyHistory, Referral and OtherObservations are
+    # not populated by the example, so no code for them was published anywhere
+    # this build could read. They are min 0, so omitting them is valid, and
+    # reusing a code from the table below because it looks close is how a
+    # record gets filed under the wrong heading.
+    "OPConsultRecord": {
+        "profile": "%s/OPConsultRecord" % NRCES,
+        "title": "OP Consultation Record",
+        "type": {"code": "371530004", "text": "Clinical consultation report"},
+        "required": ("status", "type", "subject", "encounter", "date", "author",
+                     "title", "section"),
+        "sections": {
+            "ChiefComplaints": {"title": "Chief complaints", "code": "422843007",
+                                "display": "Chief complaint section"},
+            "Allergies": {"title": "Allergies", "code": "722446000",
+                                "display": "Allergy record"},
+            "MedicalHistory": {"title": "Medical History", "code": "371529009",
+                                "display": "History and physical report"},
+            "InvestigationAdvice": {"title": "Investigation Advice", "code": "721963009",
+                                "display": "Order document"},
+            "Medications": {"title": "Medications", "code": "721912009",
+                                "display": "Medication summary document"},
+            "Procedure": {"title": "Procedure", "code": "371525003",
+                                "display": "Clinical procedure report"},
+            "FollowUp": {"title": "Follow Up", "code": "736271009",
+                                "display": "Outpatient care plan"},
+            # The example publishes the Composition's own type code here. That
+            # is what it publishes; it is not a transcription slip.
+            "DocumentReference": {"title": "Document Reference", "code": "371530004",
+                                  "display": "Clinical consultation report"},
+        },
+    },
 }
 
 DOCUMENT_BUNDLE = "%s/DocumentBundle" % NRCES
@@ -123,6 +171,8 @@ RESOURCE_TYPE = {
     "observation": "Observation",
     "patient": "Patient",
     "encounter": "Encounter",
+    "condition": "Condition",
+    "medication_request": "MedicationRequest",
 }
 
 # The columns a coding spans, by prefix. The adapter owns its schema, so these
@@ -173,9 +223,29 @@ def _coding(row, code=CODE, system=CODE_SYSTEM, display=CODE_DISPLAY):
     if not row.get(code) or not row.get(system):
         return None
     out = {"system": row[system], "code": str(row[code])}
-    if row.get(display):
+    if display and row.get(display):
         out["display"] = row[display]
     return out
+
+
+def _concept(row, code=CODE, system=CODE_SYSTEM, display=CODE_DISPLAY):
+    """A CodeableConcept from those columns, or None.
+
+    A coding where the row has a system, and `{"text": ...}` where it has only
+    a code. The second is not a fallback worth being proud of; it is how an
+    uncoded row stays readable instead of becoming an unresolvable code, and it
+    is the shape a diagnosis this build cannot code would take if one ever
+    reached a column.
+    """
+    found = _coding(row, code, system, display)
+    if found:
+        out = {"coding": [found]}
+        if found.get("display"):
+            out["text"] = found["display"]
+        return out
+    if row.get(code):
+        return {"text": str(row[code])}
+    return None
 
 
 def observation(row, *, subject, encounter, performer=None):
@@ -227,6 +297,119 @@ def observation(row, *, subject, encounter, performer=None):
     return out
 
 
+# The columns a Condition's three codings span, and the ones a
+# MedicationRequest's five span. Query grammar field names, which the adapter
+# stores verbatim: see adapters/local/store.py TABLES.
+CLINICAL, CLINICAL_SYSTEM = "clinical_status", "clinical_status_system"
+VERIFICATION, VERIFICATION_SYSTEM = "verification_status", "verification_status_system"
+MEDICATION = ("medication", "medication_system", "medication_display")
+ROUTE = ("route", "route_system", "route_display")
+FREQUENCY = ("frequency", "frequency_system", "frequency_display")
+
+
+def condition(row, *, subject, encounter, performer=None):
+    """One condition row as a FHIR R4 Condition.
+
+    `verificationStatus` is the row's own answer and never a default. That is
+    invariant I6 held at the projection as well as at the write: a finding the
+    patient denied is published as `refuted`, which records it without
+    asserting it, and a row that says nothing about how sure anybody was
+    publishes no verificationStatus rather than a confident one.
+
+    NRCeS's own Condition examples carry a clinicalStatus and no
+    verificationStatus, so neither is required and both are emitted from what
+    the row holds.
+    """
+    out = {"resourceType": "Condition", "id": row["id"],
+           "subject": {"reference": subject},
+           "encounter": {"reference": encounter}}
+    clinical = _concept(row, CLINICAL, CLINICAL_SYSTEM, None)
+    if clinical:
+        out["clinicalStatus"] = clinical
+    verification = _concept(row, VERIFICATION, VERIFICATION_SYSTEM, None)
+    if verification:
+        out["verificationStatus"] = verification
+    code = _concept(row)
+    if code:
+        out["code"] = code
+    if row.get("onset"):
+        out["onsetDateTime"] = row["onset"]
+    if row.get("created_date"):
+        out["recordedDate"] = row["created_date"]
+    if performer:
+        out["recorder"] = {"reference": performer}
+    return out
+
+
+def medication_request(row, *, subject, encounter, performer=None):
+    """One medicine row as a FHIR R4 MedicationRequest.
+
+    The dosage is a Dosage element rather than a sentence, which is the point
+    of the five columns behind it: a dose as a Quantity with its UCUM unit, a
+    coded route, and a course length as a Duration. It used to be one
+    `dosage_instruction` string, so nothing downstream could read the dose.
+
+    The frequency is published as `dosageInstruction.additionalInstruction`,
+    carrying the SNOMED concept the answer named. That is what NRCeS's own
+    OPConsultRecord example does, and it is deliberately NOT turned into
+    `timing.repeat.frequency`: reading "3" out of the words "Three times
+    daily" would be this file inventing structured data from a label, which is
+    the one thing it may not do.
+    """
+    out = {"resourceType": "MedicationRequest", "id": row["id"],
+           # Both required by R4, and both the row's own: `intent` is a
+           # {const: order} in the operation's mapping rather than a literal
+           # here, so this file decides nothing about what a prescription is.
+           "status": row.get("status") or "unknown",
+           "subject": {"reference": subject},
+           "encounter": {"reference": encounter}}
+    if row.get("intent"):
+        out["intent"] = row["intent"]
+    medication = _concept(row, *MEDICATION)
+    if medication:
+        out["medicationCodeableConcept"] = medication
+    if row.get("created_date"):
+        out["authoredOn"] = row["created_date"]
+    if performer:
+        out["requester"] = {"reference": performer}
+
+    dosage = {}
+    route = _concept(row, *ROUTE)
+    if route:
+        dosage["route"] = route
+    frequency = _concept(row, *FREQUENCY)
+    if frequency:
+        dosage["additionalInstruction"] = [frequency]
+    dose = _quantity(row, "dose", "dose_unit", "dose_unit_system")
+    if dose:
+        dosage["doseAndRate"] = [{"doseQuantity": dose}]
+    length = _quantity(row, "duration", "duration_unit", "duration_unit_system")
+    if length:
+        dosage["timing"] = {"repeat": {"boundsDuration": length}}
+    if dosage:
+        out["dosageInstruction"] = [dosage]
+    return out
+
+
+def _quantity(row, value, unit, system):
+    """A FHIR Quantity from a value column and its unit columns, or None.
+
+    A value with no unit is not a Quantity: a dose of 500 is a different thing
+    in milligrams and in millilitres, so an unmeasured number is dropped here
+    rather than published as if the reader could guess. The same rule the
+    validator holds at the other end, where a dose unit is required per row.
+    """
+    if row.get(value) in (None, "") or not row.get(unit):
+        return None
+    out = {"value": _number(row[value]), "unit": row[unit]}
+    if row.get(system):
+        # For UCUM the printable symbol IS the code, which is why the adapter
+        # keeps one column: see observation() above.
+        out["system"] = row[system]
+        out["code"] = row[unit]
+    return out
+
+
 def patient(row):
     """A patient row as a FHIR R4 Patient.
 
@@ -275,6 +458,21 @@ def encounter(row, *, subject):
     if row.get("created_date"):
         out["period"] = {"start": row["created_date"]}
     return out
+
+
+# Which function turns a row of each table into a resource. A table name, not
+# a concept, for the same reason RESOURCE_TYPE is: this says "a condition row
+# becomes a FHIR Condition", which is true of every bundle.
+#
+# `document` used to call `observation()` for every row of every section, so a
+# section carrying conditions would have published them as Observations with a
+# diagnosis in the code field. Nothing caught it because nothing but vitals
+# had a projection to call.
+PROJECTIONS = {
+    "observation": observation,
+    "condition": condition,
+    "medication_request": medication_request,
+}
 
 
 def sections(profile):
@@ -334,9 +532,16 @@ def document(store, thread, *, profile, sections_wanted, now,
                     performer = _urn(prac["id"])
                     if performer not in [r for _, r in authors]:
                         authors.append((prac, performer))
-                entries.append((observation(row, subject=subject_ref,
-                                            encounter=encounter_ref,
-                                            performer=performer), ref))
+                project = PROJECTIONS.get(resource)
+                if project is None:
+                    raise KeyError(
+                        "no FHIR projection for a %r row, so a section asking "
+                        "for one would publish something else. Add it to "
+                        "PROJECTIONS rather than letting the nearest one "
+                        "serve." % resource)
+                entries.append((project(row, subject=subject_ref,
+                                        encounter=encounter_ref,
+                                        performer=performer), ref))
                 refs.append({"reference": ref,
                              "display": RESOURCE_TYPE.get(resource, resource)})
         if not refs:
@@ -348,9 +553,13 @@ def document(store, thread, *, profile, sections_wanted, now,
         declared = spec["sections"][slice_name]
         section = {"title": declared["title"], "entry": refs}
         if declared["code"]:
+            # The display the standard publishes for that code, which is not
+            # the section's title: NRCeS's "Chief complaints" section carries
+            # the display "Chief complaint section". Using the title would put
+            # a display beside a code that the code system does not give it.
             section["code"] = {"coding": [{"system": SNOMED,
                                            "code": declared["code"],
-                                           "display": declared["title"]}]}
+                                           "display": declared["display"]}]}
         section_out.append(section)
 
     if not section_out:

@@ -48,6 +48,10 @@ python3 scripts/check_vitals.py
 # deliberately NOT run here: it needs a network and confirming a code list is
 # design time work.
 python3 scripts/check_lab.py
+# A diagnosis and a medicine are repeating groups: a list of rows, each row
+# validated, coded, stored and published on its own. This is what replaces
+# `type: structured`, which CARE never finished validating and neither did we.
+python3 scripts/check_rx.py
 # Patient identity lives in Eka's directory, and the clinic works without it.
 # Runs with PHC_DIRECTORY=absent and opens no socket; the one module that can
 # is the vendor connector, and this is what fails if that stops being true.
