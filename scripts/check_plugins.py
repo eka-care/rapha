@@ -268,14 +268,19 @@ ok("a view whose capability this facility withholds is unreachable, and so are "
 # not break the screens that remain, which is the failure mode a facility
 # switch has.
 store = a_store(LEAST)
+RESOLVED = 0
 for vid, view in sorted(LEAST.views.items()):
     if view.capability in LEAST.withheld:
         continue
     thread = LEAST.seed[0]["id"] if view.kind == "summary" else None
     result = views.resolve(LEAST, vid, store, thread=thread, caps=held(LEAST))
     assert result.kind == view.kind, vid
+    RESOLVED += 1
+# Counted, not just iterated: a loop that skipped everything would otherwise
+# pass as "every view resolves".
+assert RESOLVED == len(LEAST.views) - 1, (RESOLVED, len(LEAST.views))
 ok("and every view this centre can still open resolves against its own rows: "
-   "%d of %d" % (len(LEAST.views) - 1, len(LEAST.views)))
+   "%d of %d" % (RESOLVED, len(LEAST.views)))
 
 
 # ---------------------------------------------------------------------------
@@ -435,6 +440,21 @@ refused({k: v for k, v in MANIFEST.items() if k != "facility"},
         "declares facilities and no `facility:`")
 refused(bend(facility="no-such-centre"), "is not one of the declared facilities")
 
+# A misspelt PHC_FACILITY. This one is worth its own paragraph: `chosen()`
+# returns whatever the environment says, and an unrecognised shape resolves to
+# no declaration, which withholds nothing. So without this rule a typo in the
+# variable runs the FULL facility, and a centre meant to have no laboratory
+# quietly has one. It was not caught by anything until a mutation said so.
+was = os.environ.get(plugins.ENV)
+try:
+    os.environ[plugins.ENV] = "no-such-centre"
+    refused(copy.deepcopy(MANIFEST), "is not one of the facilities bundle.yaml declares")
+finally:
+    if was is None:
+        os.environ.pop(plugins.ENV, None)
+    else:
+        os.environ[plugins.ENV] = was
+
 # Unknown keys on either declaration, and a plugin missing its words.
 shapes = copy.deepcopy(MANIFEST["facilities"])
 shapes["no-laboratory"]["threshold"] = 7
@@ -442,10 +462,11 @@ refused(bend(facilities=shapes), "unknown key 'threshold'")
 pls = copy.deepcopy(MANIFEST["plugins"])
 pls["orders"].pop("capabilities")
 refused(bend(plugins=pls), "missing capabilities")
-ok("the lint refuses the eight ways a facility declaration looks configured "
+ok("the lint refuses the nine ways a facility declaration looks configured "
    "and is not: an unknown plugin, the floor switched off, an undeclared "
    "capability, one claimed twice, the spelling YAML reads as a boolean, a "
-   "missing default, an unknown default and an unknown key")
+   "missing default, an unknown default, a misspelt PHC_FACILITY and an "
+   "unknown key")
 
 # And the one that matters most: a choice that stops the line. A step nothing
 # left can close and nothing can skip means every patient waits at that
