@@ -202,19 +202,33 @@ Implementations: `care_phc/connectors/directory/eka.py` over Eka's REST API,
 and `kernel/directory.AbsentDirectory`, which is the degraded path and is what
 the checks run against.
 
-**4. `Codification`, not built.** The seam's shape is settled in the coded
-data plan section 2.2 and is one method.
+**4. `Codification`, in `kernel/codification.py`.** Built 2026-10-31. One
+method, the shape settled in the coded data plan section 2.2.
 
 ```
-suggest(text, valueset, context) -> [{coding, score, linked}]
+suggest(text, valueset, *, context, transcript, span) -> Suggestions
 ```
 
-One implementation, Eka's medical linking endpoint. The stub returns an empty
-list and **everything must still work when it does**: a facility with no
-network gets a picker instead of a prefill, which is slower and not broken. If
-anything becomes unusable when `suggest` returns nothing, codification has
-become load bearing, which the plan's own table forbids. Not built because
-nothing in the PHC bundle binds an *answer* yet; see section 6.
+`Suggestions` is a tuple subclass, so it IS a sequence and handling the empty
+case is handling nothing at all; it carries `refused`, the sentences saying why
+the rest are not candidates, and `reachable`, which separates "nobody matched"
+from "I could not look". Four refusals, each with its own reason: a span the
+transcript does not hold, a code this build cannot resolve through the
+terminology seam, a concept from the wrong branch of the ontology (read off the
+candidate's semantic tag against the tags the value set declares), and the same
+concept arriving twice under two of its names.
+
+`NoCodification` returns nothing, always, and is the default wherever a
+codifier is optional, so the offline path is the path the checks exercise
+rather than a fallback nobody reaches. One networked implementation, Eka's
+linking endpoint, in `care_phc/connectors/codification/eka.py`; it never
+raises, because the alternative to a suggestion here is the picker the
+clinician already had.
+
+Nothing here decides anything. A candidate carries its score and its `linked`
+flag and neither is compared to anything: there is no threshold in either
+module and the checks fail if one appears. See section 12 entry 10 for where
+that disagrees with the plan it implements.
 
 **5. Capture, in `care_phc/connectors/scribe/base.py` and `api/extract.py`.**
 
@@ -345,7 +359,7 @@ its queue, record a vital sign and finish a visit.
 | patient directory | `care_phc/connectors/directory/eka.py`, behind `kernel.contracts.PatientDirectory` | the local register answers searches, a registration commits and is marked unpublished, and nothing is sent. Section 6 has the whole of it. This is the one attach point where the degraded path is checked on every run rather than reasoned about. |
 | scribe | `api/scribe.py`, through `care_phc/connectors/scribe/base.py` | `api/scribe.py` raises with a sentence ending "or type the note", `api/main.py` turns it into a 503, and the doctor types. No consultation is blocked. |
 | ABHA | `care_phc/connectors/abdm/eka.py`, behind `AbdmConnector` | `GET /abha/config` returns `hip_id: None`, which the journey reports honestly instead of pretending. A patient with no ABHA is an ordinary patient: the number is a FHIR identifier, never our row id. |
-| codification | *not built*, seam shape settled | a picker instead of a prefill. The stub returns nothing and everything works. |
+| codification | `care_phc/connectors/codification/eka.py`, behind `kernel.codification.Codification` | a picker instead of a prefill. `NoCodification` returns nothing and everything works, and it is the default, so that is the path the gate runs. Every failure on this path is an empty answer rather than an exception. |
 | terminology | `terminology/*.json`, through `kernel/terminology.py` | there is no "without it". It is local on purpose, so the offline path is the only path rather than a fallback nobody tests. |
 
 The last row is the important one and it is a direct lesson from CARE.
@@ -999,8 +1013,27 @@ proved.
       nothing calls it yet, so a coded question draws as a choice with no
       options. One screen, and the route exists so it is a renderer change
       rather than an architecture one.
-- [ ] **The codification seam plus its empty stub.** Check: the whole PHC
-      flow passes with `suggest` returning nothing.
+- [x] **The codification seam plus its empty stub.** Done 2026-10-31.
+      `kernel/codification.py` is the seam, `NoCodification` is the stub and
+      the default everywhere a codifier is optional, and
+      `care_phc/connectors/codification/eka.py` is Eka's linking endpoint
+      behind the same one method. Checks: `scripts/check_codification.py` 20,
+      `python3 -m kernel.codification`, and
+      `python3 -m care_phc.connectors.codification.check` 19, all offline.
+      Mutations: 47 of 47 caught.
+      What it does NOT include: nothing in the renderer draws a candidate yet,
+      so the picker is still the open step above; and no request in the
+      connector has been made against api.eka.care, by instruction, so every
+      translation either side of the socket is checked against the vendor's
+      published response examples and nothing is checked against what the
+      service actually returns.
+      Two facts the contract settles rather than leaves open. A medication
+      candidate's `term_id` is an Eka product id and not a SNOMED concept, so
+      **this build refuses every medication candidate** and the medicine
+      picker gets nothing from codification until CDCI is behind the
+      terminology seam. And a medication `score` is documented as null, so a
+      null score is ordinary and is nobody's reason to refuse anything.
+      See section 12 entries 10 and 11 for the two contradictions this found.
 - [ ] **`OPConsultRecord`**, once there are Conditions, MedicationRequests
       and ServiceRequests to put in its sections. The profile table in
       `kernel/fhir.py` takes one more entry; the rest is declaration.
@@ -1129,6 +1162,42 @@ labelled with the name of the test run on it. A specimen's code is a specimen
 type. The form does not ask which specimen was taken, so the false claim is
 dropped rather than restated, and giving it a real type needs its own value
 set and question.
+
+**10. Coded data, invariant I4 and section 5, answer the plan's own table with
+the wrong party.** Found building the codification seam, 2026-10-31. I4 says
+"A codifier that reports `linked` writes `verification_status: confirmed`", and
+section 5's confirmation-by-exception rule says a linked candidate above a
+threshold is prefilled and "committed with the note". The plan's table gives
+"Does it enter the record" to *a person, by a tick*, and states as a rule that
+no row may be answered by the party in another row. I4 hands that row to the
+codifier. These are also, word for word, the sentences the shipped
+`verification_status: {const: confirmed}` defect implemented, which the
+repeating-groups step found and removed: a scribe's guess and a symptom the
+patient denied were both stored as confirmed diagnoses.
+
+`kernel/codification.py` follows the table and not I4. A candidate carries its
+score and its `linked` flag, both are shown and neither is acted on, there is
+no threshold in the module and its own check fails if a float between 0 and 1
+appears in its live code. **The plan's I4 and section 5 need amending or the
+rule needs dropping, and that is the owner's call, not mine.** Until it is
+made, the code and the plan disagree and this is where it is written down.
+
+**11. "An uncoded finding travels as narrative text and the note still reaches
+ABDM" was false.** Written in `kernel/terminology.py`'s honest-limits section,
+in `terminology/condition-code.json`'s own banner, and in this document's
+ceilings. Measured 2026-10-31: a narrative row had no FHIR projection, every
+profile makes `Composition.section` min 1, and an empty section is correctly
+omitted, so a consultation whose findings this build cannot code published
+**nothing at all**. The designed fallback for the small code lists was the one
+path nobody had run.
+
+Fixed rather than reported, because the claim was load bearing for every
+decision to keep the code lists short: a narrative row is now a
+DocumentReference carrying the note's words as a text attachment, in the shape
+the NRCeS OPConsultRecord example publishes. `scripts/check_codification.py`
+holds it, including the case where nothing at all was coded, and the
+narrative-only bundle passes the tier one structural validator with no
+findings.
 
 **And one bug, fixed here rather than reported.** `Store.audit` is documented
 as oldest first and could not deliver it. `AuditRecord.at` is ISO 8601 to the

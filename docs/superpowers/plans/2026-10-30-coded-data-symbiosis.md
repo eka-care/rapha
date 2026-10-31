@@ -152,6 +152,26 @@ These hold whichever implementation is behind each seam. Each becomes a check.
   forbidden is discarding the signal and storing a low confidence guess as a
   settled fact, because that record travels under the patient's ABHA number to
   clinicians who cannot ask us what it meant.
+
+  **I4's second sentence contradicts the table in section 1, and the code
+  follows the table. 2026-10-31, found building step 5.** "A codifier that
+  reports `linked` writes `verification_status: confirmed`" gives the row
+  "Does it enter the record" to the codifier, and the table gives it to a
+  person, by a tick, under a rule that no row may be answered by the party in
+  another row. Section 5's "linked and not negated and above threshold:
+  prefill ... committed with the note" is the same thing said again.
+
+  These are also the sentences the shipped defect implemented: the
+  consultation mapping carried `verification_status: {const: confirmed}` on
+  every diagnosis row, so a scribe's guess and a symptom the patient denied
+  were both published as confirmed diagnoses. Step 4 removed it.
+
+  `kernel/codification.py` therefore carries the score and the `linked` flag,
+  shows both, acts on neither, and holds no threshold; its own check fails if
+  a float between 0 and 1 appears in its live code. **Amending I4 and section
+  5, or deciding to keep them and change the code, is the owner's call.** Until
+  it is made, the code and this document disagree, and that is recorded here
+  and in the architecture document's section 12.
 - **I5.** The audit row is written before the write executes. *(exists)*
 - **I6.** A negated, hypothetical, family or historical finding is stored with
   that status, never dropped and never asserted. FHIR already has the fields;
@@ -303,8 +323,23 @@ confirmation is dead on arrival in an OPD. The rule:
       `verification_status: {const: confirmed}` on every diagnosis row, which
       is I6 inverted: a finding the patient denied was stored and published as
       a confirmed diagnosis.
-- [ ] **5. Codification seam plus stub.** Check: the whole PHC flow passes with
-      the stub returning nothing.
+- [x] **5. Codification seam plus stub.** Done 2026-10-31. The seam is
+      `kernel/codification.py`, one method, returning a `Suggestions` that is
+      itself a sequence so that handling the empty case is handling nothing.
+      `NoCodification` is the stub and is the DEFAULT wherever a codifier is
+      optional, so the offline path is what runs. Four refusals with their own
+      sentences: no span in the transcript, a code this build cannot resolve,
+      a concept from the wrong branch of the ontology, and one concept twice
+      under two names. The networked implementation is
+      `care_phc/connectors/codification/eka.py` and it never raises: a dead
+      line, a slow line, a status, a body that is not JSON and a missing
+      credential all come back as an empty answer with a sentence.
+      Checks: `scripts/check_codification.py` 20, and the whole PHC flow does
+      pass with the stub returning nothing, which was this step's own check.
+      Mutations: 47 of 47 caught.
+      **This step contradicts I4 below, and follows the table in section 1
+      instead.** See the note under I4. Also NOT done: no candidate is drawn
+      on a screen, and no request has been made against the live service.
 - [ ] **6. Proposal and confirmation path.** I4 and I6 as checks. Mutation:
       make a suggestion commit without a person and confirm FAIL.
 - [ ] **7. Bundle seam for `OPConsultRecord`**, validated against the NRCES
