@@ -36,12 +36,15 @@ export function IconSheet() {
 }
 
 /** An instrument names how a value is captured, so it is what the pill should
- *  say. `device` and `voice` borrow the form icon: they are all a field being
- *  filled in, and only the scribe is a different act. */
+ *  say. `device` and `constrained-voice` borrow the form icon: they are all a
+ *  field being filled in, and only the scribe is a different act. The name
+ *  must be a catalogue/vocab.py INSTRUMENTS entry, which is what
+ *  scripts/check_instruments.py asserts: this read `"voice"` for a while, a
+ *  value no operation can declare, so the branch could never be taken. */
 export function iconFor(op: Operation): IconName {
   if (op.irreversibility === "irreversible") return "lock";
   if (op.instrument === "scribe") return "mic";
-  if (op.instrument === "voice" || op.instrument === "device") return "vitals";
+  if (op.instrument === "constrained-voice" || op.instrument === "device") return "vitals";
   return "clip";
 }
 

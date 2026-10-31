@@ -149,4 +149,33 @@ assert not ghosts, (
 )
 ok("no instrument kind is a ghost: each is declared or drawn")
 
+# ---------------------------------------------------------------------------
+# Every instrument name the renderer compares against must be one an operation
+# can actually declare. icons.tsx compared against `"voice"`, which is in no
+# vocabulary -- the value is `constrained-voice` -- so that branch could never
+# be taken, and no vocabulary check would ever have noticed: a misspelling in
+# the renderer is invisible to a tuple.
+# ---------------------------------------------------------------------------
+
+compared = {}
+for ts in sorted((ROOT / "web" / "src").rglob("*.ts*")):
+    for name in re.findall(r'instrument\s*[=!]==\s*"([^"]+)"', ts.read_text()):
+        compared.setdefault(name, []).append(
+            str(ts.relative_to(ROOT)))
+
+assert compared, (
+    "found no `instrument === \"...\"` comparison anywhere under web/src. "
+    "Either the renderer stopped reading an operation's instrument, or this "
+    "check's pattern has rotted and is now proving nothing."
+)
+unknown = sorted((n, sorted(set(f))) for n, f in compared.items()
+                 if n not in vocab.INSTRUMENTS)
+assert not unknown, (
+    "the renderer compares an operation's instrument against %s, which no "
+    "operation can declare. Spell it as one of %r."
+    % ("; ".join("%r in %s" % (n, ", ".join(f)) for n, f in unknown),
+       list(vocab.INSTRUMENTS))
+)
+ok("every instrument the renderer compares against is one an operation can declare")
+
 print("ok   instrument vocabulary: %d checks passed" % checks)
