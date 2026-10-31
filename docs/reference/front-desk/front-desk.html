@@ -1,0 +1,159 @@
+<style>
+.eka{--bg:#fafaf9;--surface:#fff;--line:#e7e7e4;--line-2:#d4d4d0;--ink:#141413;
+  --ink-2:#5c5c58;--ink-read:#6F6F6A;--accent:#215fff;
+  --btn:rgba(124,92,255,.12);--btn-edge:rgba(124,92,255,.22);--btn-ink:#5b45c9;
+  --warn:#B95108;--warn-tint:#FDF3E7;
+  --font-sans:"Geist",-apple-system,system-ui,sans-serif;
+  --font-serif:"Newsreader",Georgia,serif;--font-mono:"Geist Mono",ui-monospace,monospace;
+  background:var(--bg);color:var(--ink);font-family:var(--font-sans);
+  border:1px solid var(--line);border-radius:14px;padding:18px;line-height:1.55}
+.eka *{box-sizing:border-box}
+.eka .top{display:flex;align-items:center;gap:10px;padding-bottom:12px;
+  border-bottom:1px solid var(--line);margin-bottom:14px}
+.eka .mark{width:24px;height:24px;border-radius:7px;background:var(--accent);color:#fff;
+  display:grid;place-items:center;font-family:var(--font-serif);font-size:14px}
+.eka .brand{font-family:var(--font-serif);font-size:1.05rem}
+.eka .fac{font-family:var(--font-mono);font-size:.6rem;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-read)}
+.eka .big{width:100%;border:1.5px solid var(--line-2);border-radius:999px;
+  padding:13px 18px;font-size:1.05rem;font-family:var(--font-sans);background:var(--surface);
+  color:var(--ink)}
+.eka .big.on{border-color:var(--accent)}
+.eka .hit{display:flex;align-items:center;gap:10px;padding:9px 12px;margin-top:6px;
+  border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.eka .hit.sel{border-color:var(--btn-edge);background:var(--btn)}
+.eka .av{width:26px;height:26px;border-radius:8px;background:var(--bg);
+  border:1px solid var(--line);display:grid;place-items:center;
+  font-family:var(--font-mono);font-size:.58rem;color:var(--ink-read)}
+.eka .nm{font-size:.88rem;font-weight:500}
+.eka .sub{font-size:.75rem;color:var(--ink-read)}
+.eka .key{margin-left:auto;font-family:var(--font-mono);font-size:.6rem;
+  border:1px solid var(--line);border-radius:4px;padding:2px 6px;color:var(--ink-read)}
+.eka .newrow{border-style:dashed}
+.eka .fld{display:flex;align-items:center;gap:12px;padding:10px 0;
+  border-bottom:1px solid var(--line)}
+.eka .fld .k{font-size:.8rem;color:var(--ink-2);flex:0 0 92px}
+.eka .fld .v{font-size:.92rem;font-weight:500;flex:1}
+.eka .fld .v.ghost{color:var(--ink-read);font-weight:400}
+.eka .caret{display:inline-block;width:1.5px;height:1em;background:var(--accent);
+  vertical-align:-2px;margin-left:1px}
+.eka .chips{display:flex;gap:6px;flex-wrap:wrap}
+.eka .chip{border:1px solid var(--line);border-radius:999px;padding:4px 11px;
+  font-size:.78rem;color:var(--ink-2);background:var(--surface)}
+.eka .chip.on{border-color:var(--btn-edge);background:var(--btn);color:var(--btn-ink);
+  font-weight:500}
+.eka .chip b{font-family:var(--font-mono);font-size:.62rem;color:var(--ink-read);
+  margin-right:5px;font-weight:400}
+.eka .chip.on b{color:var(--btn-ink)}
+.eka .tok{display:flex;align-items:center;gap:14px;margin-top:14px;padding:14px 16px;
+  border:1px solid var(--btn-edge);background:var(--btn);border-radius:12px}
+.eka .tok .n{font-family:var(--font-mono);font-size:1.9rem;font-weight:500;
+  color:var(--btn-ink);letter-spacing:.02em}
+.eka .tok .t{font-size:.84rem;color:var(--ink-2)}
+.eka .tok .t b{color:var(--ink);font-weight:550}
+.eka .mic{display:flex;align-items:center;gap:10px;width:100%;margin-top:4px;
+  border:1px solid var(--btn-edge);background:var(--btn);color:var(--btn-ink);
+  border-radius:999px;padding:12px 16px;font-size:.9rem;font-weight:500}
+.eka .mic .bead{width:9px;height:9px;border-radius:50%;background:currentColor}
+.eka .mic .h{margin-left:auto;font-family:var(--font-mono);font-size:.62rem;
+  letter-spacing:.06em;text-transform:uppercase;opacity:.75}
+.eka .said{font-family:var(--font-mono);font-size:.72rem;color:var(--ink-read);
+  margin-top:10px;line-height:1.7}
+.eka .cost{display:flex;gap:18px;margin-top:14px;padding-top:12px;
+  border-top:1px solid var(--line);font-family:var(--font-mono);font-size:.64rem;
+  letter-spacing:.05em;text-transform:uppercase;color:var(--ink-read)}
+.eka .cost b{color:var(--ink);font-weight:500}
+.eka .warn{margin-top:10px;font-size:.78rem;color:var(--warn);
+  background:var(--warn-tint);border-radius:8px;padding:8px 11px}
+.optwrap{margin-bottom:26px}
+.opthead{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.opthead .L{font-family:ui-monospace,monospace;font-size:.7rem;font-weight:700;
+  border:1px solid currentColor;border-radius:5px;padding:1px 7px;opacity:.7}
+</style>
+
+<h2>The front desk — three ways</h2>
+<p class="subtitle">Patient standing there, no paper. Half are new. Shown in the Eka Developers design system, so you're seeing the new look too.</p>
+
+<div class="optwrap">
+  <div class="opthead"><span class="L">A</span><h3>One line</h3></div>
+  <p class="subtitle">The clerk types the name. Nothing else is on screen until it has to be.</p>
+  <div class="eka">
+    <div class="top"><span class="mark">e</span>
+      <div><div class="brand">Front desk</div><div class="fac">PHC Yadiki · 09:14</div></div>
+    </div>
+    <input class="big on" value="kamala" readonly>
+    <div class="hit sel"><span class="av">KD</span>
+      <div><div class="nm">Kamala Devi</div><div class="sub">34 · female · Sonpur · last seen 18 Jun</div></div>
+      <span class="key">↵ send to nurse</span></div>
+    <div class="hit"><span class="av">KR</span>
+      <div><div class="nm">Kamalamma R.</div><div class="sub">58 · female · Yadiki Ward 2</div></div>
+      <span class="key">↓</span></div>
+    <div class="hit newrow"><span class="av">+</span>
+      <div><div class="nm">New patient — “kamala”</div><div class="sub">Keeps what you typed as the name</div></div>
+      <span class="key">⇥</span></div>
+    <div class="cost"><span>returning: <b>1 keystroke run + Enter</b></span><span>new: <b>Tab, then 4 answers</b></span></div>
+  </div>
+</div>
+
+<div class="optwrap">
+  <div class="opthead"><span class="L">B</span><h3>Ask in order</h3></div>
+  <p class="subtitle">One question at a time, in the order you'd actually ask a person. Enter moves on. Never needs the mouse.</p>
+  <div class="eka">
+    <div class="top"><span class="mark">e</span>
+      <div><div class="brand">New patient</div><div class="fac">3 of 5 · nothing saved yet</div></div>
+    </div>
+    <div class="fld"><span class="k">Name</span><span class="v">Kamala Devi</span></div>
+    <div class="fld"><span class="k">Age</span><span class="v">34</span></div>
+    <div class="fld"><span class="k">Sex</span>
+      <span class="v"><span class="chips">
+        <span class="chip on"><b>F</b>Female</span><span class="chip"><b>M</b>Male</span><span class="chip"><b>O</b>Other</span>
+      </span></span></div>
+    <div class="fld"><span class="k">Village</span><span class="v ghost">Son<span class="caret"></span> &nbsp;<span style="color:var(--ink);font-weight:500">Sonpur · Ward 3</span></span></div>
+    <div class="fld"><span class="k">Mobile</span><span class="v ghost">skip with Enter</span></div>
+    <div class="warn">Mobile is required today. If it stays required, this is the field that will get fake numbers typed into it.</div>
+    <div class="cost"><span>new: <b>5 answers, 0 clicks</b></span><span>every field one key where it can be</span></div>
+  </div>
+</div>
+
+<div class="optwrap">
+  <div class="opthead"><span class="L">C</span><h3>Say it once</h3></div>
+  <p class="subtitle">The clerk is already talking to the patient. Hold the key, say the answer, it fills. Typing still works underneath.</p>
+  <div class="eka">
+    <div class="top"><span class="mark">e</span>
+      <div><div class="brand">New patient</div><div class="fac">Listening · Telugu</div></div>
+    </div>
+    <button class="mic"><span class="bead"></span>Recording<span class="h">hold to talk</span></button>
+    <div class="said">“కమల దేవి, ముప్ఫై నాలుగు, సోన్‌పూర్”</div>
+    <div class="fld" style="margin-top:8px"><span class="k">Name</span><span class="v">Kamala Devi</span></div>
+    <div class="fld"><span class="k">Age</span><span class="v">34</span></div>
+    <div class="fld"><span class="k">Village</span><span class="v">Sonpur · Ward 3</span></div>
+    <div class="fld"><span class="k">Sex</span><span class="v ghost">not said — one key</span></div>
+    <div class="cost"><span>new: <b>1 sentence + 1 key</b></span><span>needs a tick on every value</span></div>
+  </div>
+</div>
+
+<h3>And what the patient leaves with</h3>
+<p class="subtitle">Same in all three. No printer at the desk.</p>
+<div class="eka" style="margin-bottom:22px">
+  <div class="tok"><span class="n">A-02</span>
+    <span class="t"><b>Kamala Devi is with the staff nurse.</b><br>Say the token aloud. She collects one printed page at the pharmacy on her way out.</span></div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div><div class="content"><h3>One line</h3>
+    <p>Fastest for the returning half. New patients start from what was already typed.</p></div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div><div class="content"><h3>Ask in order</h3>
+    <p>Calmest to learn. Keyboard only. Search is a separate step.</p></div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div><div class="content"><h3>Say it once</h3>
+    <p>Least effort when it works. Every heard value still needs confirming.</p></div>
+  </div>
+  <div class="option" data-choice="ab" onclick="toggleSelect(this)">
+    <div class="letter">A+</div><div class="content"><h3>A, then B, with C on top</h3>
+    <p>One line finds or starts them; the questions follow in order; the microphone fills them if the clerk would rather talk. My recommendation.</p></div>
+  </div>
+</div>

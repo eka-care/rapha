@@ -1,0 +1,154 @@
+<style>
+.eka{--bg:#fafaf9;--surface:#fff;--line:#e7e7e4;--line-2:#d4d4d0;--ink:#141413;
+  --ink-2:#5c5c58;--ink-read:#6F6F6A;--accent:#215fff;
+  --btn:rgba(124,92,255,.12);--btn-edge:rgba(124,92,255,.22);--btn-ink:#5b45c9;
+  --warn:#B95108;--warn-tint:#FDF3E7;--crit:#CE2E23;--crit-tint:#FBECEA;
+  --ok:#2F7A4E;--ok-tint:#EEF7F1;
+  --font-sans:"Geist",-apple-system,system-ui,sans-serif;
+  --font-serif:"Newsreader",Georgia,serif;--font-mono:"Geist Mono",ui-monospace,monospace;
+  background:var(--bg);color:var(--ink);font-family:var(--font-sans);
+  border:1px solid var(--line);border-radius:14px;padding:0;line-height:1.55;overflow:hidden}
+.eka *{box-sizing:border-box}
+.eka .bar{display:flex;align-items:center;gap:10px;padding:12px 16px;
+  border-bottom:1px solid var(--line);background:var(--surface)}
+.eka .mark{width:23px;height:23px;border-radius:7px;background:var(--accent);color:#fff;
+  display:grid;place-items:center;font-family:var(--font-serif);font-size:13px}
+.eka .brand{font-family:var(--font-serif);font-size:1rem;line-height:1.2}
+.eka .fac{font-family:var(--font-mono);font-size:.58rem;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-read)}
+.eka .pane{padding:14px 16px 16px}
+
+/* filters */
+.eka .fil{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:13px}
+.eka .f{border:1px solid var(--line);border-radius:999px;padding:5px 12px;
+  font-size:.78rem;color:var(--ink-2);background:var(--surface);white-space:nowrap}
+.eka .f .n{font-family:var(--font-mono);font-size:.68rem;color:var(--ink-read);margin-left:6px}
+.eka .f.on{border-color:var(--btn-edge);background:var(--btn);color:var(--btn-ink);font-weight:500}
+.eka .f.on .n{color:var(--btn-ink)}
+.eka .f.risk.on{border-color:var(--crit);background:var(--crit-tint);color:var(--crit)}
+.eka .f.risk.on .n{color:var(--crit)}
+.eka .fsep{width:1px;background:var(--line);margin:2px 4px}
+
+/* rows */
+.eka .qrow{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:10px}
+.eka .qrow + .qrow{margin-top:2px}
+.eka .qrow.on{background:var(--btn);border:1px solid var(--btn-edge);padding:8px 9px}
+.eka .qrow.gone{opacity:.4}
+.eka .tk{width:31px;height:31px;border-radius:9px;flex:0 0 auto;display:grid;
+  place-items:center;font-family:var(--font-mono);font-size:.92rem;font-weight:500;
+  background:var(--bg);border:1px solid var(--line-2);position:relative}
+.eka .tk.scan::after{content:"";position:absolute;right:-2px;bottom:-2px;width:8px;height:8px;
+  border-radius:50%;background:var(--btn-ink);border:1.5px solid var(--bg)}
+.eka .bd{min-width:0;flex:1}
+.eka .l1{display:flex;align-items:center;gap:7px}
+.eka .nm{font-size:.88rem;font-weight:500;white-space:nowrap}
+.eka .lotus{flex:0 0 auto;line-height:0}
+.eka .sb{font-size:.73rem;color:var(--ink-read);margin-top:1px}
+.eka .tags{display:flex;gap:5px;flex-wrap:wrap;margin-left:auto;align-items:center;
+  flex:0 0 auto}
+.eka .pg{font-family:var(--font-mono);font-size:.57rem;letter-spacing:.07em;
+  text-transform:uppercase;border:1px solid var(--line-2);color:var(--ink-2);
+  background:var(--surface);border-radius:999px;padding:3px 9px;white-space:nowrap}
+.eka .pg.der{border-style:dashed;color:var(--ink-read)}
+.eka .pg.risk{border-color:var(--crit);background:var(--crit-tint);color:var(--crit);
+  font-weight:500}
+.eka .at{font-family:var(--font-mono);font-size:.62rem;color:var(--ink-read);
+  width:40px;text-align:right;flex:0 0 auto}
+.eka .key{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);
+  display:flex;gap:18px;flex-wrap:wrap;font-size:.76rem;color:var(--ink-read)}
+.eka .key i{font-style:normal;display:inline-flex;align-items:center;gap:6px}
+.eka .dotb{width:8px;height:8px;border-radius:50%;background:var(--btn-ink);display:inline-block}
+.note{font-size:.86rem;color:var(--ink-2);margin:12px 0 20px;max-width:64ch}
+.note b{color:var(--ink);font-weight:600}
+</style>
+
+<h2>Filters, the lotus, and the programme</h2>
+<p class="subtitle">Filtered to high-risk pregnancies here, so you can see what filtering looks like. The counts stay visible on every chip.</p>
+
+<div class="eka" style="margin-bottom:6px">
+  <div class="bar"><span class="mark">e</span>
+    <div><div class="brand">The line</div><div class="fac">PHC Yadiki · 09:41 · 8 issued</div></div>
+  </div>
+  <div class="pane">
+    <div class="fil">
+      <button class="f">All <span class="n">8</span></button>
+      <button class="f">Waiting <span class="n">5</span></button>
+      <span class="fsep"></span>
+      <button class="f">NCD <span class="n">3</span></button>
+      <button class="f">RCH <span class="n">2</span></button>
+      <button class="f">TB <span class="n">1</span></button>
+      <button class="f risk on">High-risk pregnancy <span class="n">1</span></button>
+      <span class="fsep"></span>
+      <button class="f">No ABHA <span class="n">2</span></button>
+      <button class="f">Scanned <span class="n">4</span></button>
+    </div>
+
+    <div class="qrow"><span class="tk scan">7</span>
+      <div class="bd"><div class="l1"><span class="nm">Saroja M.</span>
+        <span class="lotus"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-label="ABHA linked"><path d="M12 3c1.6 2.3 2.4 4.5 2.4 6.8 0 1.5-.3 2.8-.9 4.1-.6-1.3-.9-2.6-.9-4.1 0-2.3.8-4.5 2.4-6.8z" fill="#215fff" opacity=".9" transform="translate(-2.5 0)"/><path d="M12 2.6c1.7 2.4 2.6 4.8 2.6 7.2 0 2.4-.9 4.8-2.6 7.2-1.7-2.4-2.6-4.8-2.6-7.2 0-2.4.9-4.8 2.6-7.2z" fill="#215fff"/><path d="M20.6 8.4c-.4 2.9-1.5 5.2-3.2 6.9-1.7 1.7-4 2.8-6.9 3.2 1.2-2.7 2.6-4.7 4.3-6.1 1.7-1.4 3.6-2.4 5.8-4z" fill="#215fff" opacity=".62"/><path d="M3.4 8.4c2.2 1.6 4.1 2.6 5.8 4 1.7 1.4 3.1 3.4 4.3 6.1-2.9-.4-5.2-1.5-6.9-3.2C4.9 13.6 3.8 11.3 3.4 8.4z" fill="#215fff" opacity=".62"/><path d="M4 18.4c2.6-.7 5.3-1 8-1s5.4.3 8 1c-2.1 2-4.8 3-8 3s-5.9-1-8-3z" fill="#215fff" opacity=".4"/></svg></span>
+      </div><div class="sb">31 · female · Kottala · waiting, staff nurse</div></div>
+      <div class="tags"><span class="pg">RCH</span><span class="pg risk">High risk</span></div>
+      <span class="at">09:33</span></div>
+  </div>
+</div>
+<p class="note"><b>One person matches.</b> The chip stays coloured because high risk is the one programme label that means clinical risk — everything else is monochrome on purpose, so a red pill always means the same thing.</p>
+
+<h3>Unfiltered, so you can see the whole row</h3>
+
+<div class="eka" style="margin-bottom:6px">
+  <div class="pane">
+    <div class="qrow gone"><span class="tk">1</span>
+      <div class="bd"><div class="l1"><span class="nm">Venkatamma G.</span>
+        <span class="lotus"><svg width="13" height="13" viewBox="0 0 24 24"><path d="M12 2.6c1.7 2.4 2.6 4.8 2.6 7.2 0 2.4-.9 4.8-2.6 7.2-1.7-2.4-2.6-4.8-2.6-7.2 0-2.4.9-4.8 2.6-7.2z" fill="#215fff"/><path d="M20.6 8.4c-.4 2.9-1.5 5.2-3.2 6.9-1.7 1.7-4 2.8-6.9 3.2 1.2-2.7 2.6-4.7 4.3-6.1 1.7-1.4 3.6-2.4 5.8-4z" fill="#215fff" opacity=".62"/><path d="M3.4 8.4c2.2 1.6 4.1 2.6 5.8 4 1.7 1.4 3.1 3.4 4.3 6.1-2.9-.4-5.2-1.5-6.9-3.2C4.9 13.6 3.8 11.3 3.4 8.4z" fill="#215fff" opacity=".62"/><path d="M4 18.4c2.6-.7 5.3-1 8-1s5.4.3 8 1c-2.1 2-4.8 3-8 3s-5.9-1-8-3z" fill="#215fff" opacity=".4"/></svg></span>
+      </div><div class="sb">67 · female · Yadiki W1 · with the doctor</div></div>
+      <div class="tags"><span class="pg">NCD</span><span class="pg der">60+</span></div>
+      <span class="at">08:52</span></div>
+
+    <div class="qrow gone"><span class="tk">2</span>
+      <div class="bd"><div class="l1"><span class="nm">Ramesh Kumar</span>
+        <span class="lotus"><svg width="13" height="13" viewBox="0 0 24 24"><path d="M12 2.6c1.7 2.4 2.6 4.8 2.6 7.2 0 2.4-.9 4.8-2.6 7.2-1.7-2.4-2.6-4.8-2.6-7.2 0-2.4.9-4.8 2.6-7.2z" fill="#215fff"/><path d="M20.6 8.4c-.4 2.9-1.5 5.2-3.2 6.9-1.7 1.7-4 2.8-6.9 3.2 1.2-2.7 2.6-4.7 4.3-6.1 1.7-1.4 3.6-2.4 5.8-4z" fill="#215fff" opacity=".62"/><path d="M3.4 8.4c2.2 1.6 4.1 2.6 5.8 4 1.7 1.4 3.1 3.4 4.3 6.1-2.9-.4-5.2-1.5-6.9-3.2C4.9 13.6 3.8 11.3 3.4 8.4z" fill="#215fff" opacity=".62"/><path d="M4 18.4c2.6-.7 5.3-1 8-1s5.4.3 8 1c-2.1 2-4.8 3-8 3s-5.9-1-8-3z" fill="#215fff" opacity=".4"/></svg></span>
+      </div><div class="sb">61 · male · Bhagwanpur · at the lab</div></div>
+      <div class="tags"><span class="pg">NCD</span><span class="pg der">60+</span></div>
+      <span class="at">08:58</span></div>
+
+    <div class="qrow on"><span class="tk scan">4</span>
+      <div class="bd"><div class="l1"><span class="nm">Kamala Devi</span>
+        <span class="lotus"><svg width="13" height="13" viewBox="0 0 24 24"><path d="M12 2.6c1.7 2.4 2.6 4.8 2.6 7.2 0 2.4-.9 4.8-2.6 7.2-1.7-2.4-2.6-4.8-2.6-7.2 0-2.4.9-4.8 2.6-7.2z" fill="#215fff"/><path d="M20.6 8.4c-.4 2.9-1.5 5.2-3.2 6.9-1.7 1.7-4 2.8-6.9 3.2 1.2-2.7 2.6-4.7 4.3-6.1 1.7-1.4 3.6-2.4 5.8-4z" fill="#215fff" opacity=".62"/><path d="M3.4 8.4c2.2 1.6 4.1 2.6 5.8 4 1.7 1.4 3.1 3.4 4.3 6.1-2.9-.4-5.2-1.5-6.9-3.2C4.9 13.6 3.8 11.3 3.4 8.4z" fill="#215fff" opacity=".62"/><path d="M4 18.4c2.6-.7 5.3-1 8-1s5.4.3 8 1c-2.1 2-4.8 3-8 3s-5.9-1-8-3z" fill="#215fff" opacity=".4"/></svg></span>
+      </div><div class="sb">34 · female · Sonpur · waiting, staff nurse</div></div>
+      <div class="tags"><span class="pg der">NCD</span></div>
+      <span class="at">09:11</span></div>
+
+    <div class="qrow"><span class="tk">5</span>
+      <div class="bd"><div class="l1"><span class="nm">Lakshmi Devi</span></div>
+      <div class="sb">52 · female · Yadiki W1 · waiting, staff nurse</div></div>
+      <div class="tags"><span class="pg">NCD</span></div>
+      <span class="at">09:19</span></div>
+
+    <div class="qrow"><span class="tk scan">6</span>
+      <div class="bd"><div class="l1"><span class="nm">Anjaneyulu P.</span></div>
+      <div class="sb">44 · male · Tadpatri · waiting, staff nurse</div></div>
+      <div class="tags"><span class="pg">TB</span></div>
+      <span class="at">09:26</span></div>
+
+    <div class="key">
+      <i><span class="dotb"></span> corner dot = scanned the poster</i>
+      <i><svg width="12" height="12" viewBox="0 0 24 24"><path d="M12 2.6c1.7 2.4 2.6 4.8 2.6 7.2 0 2.4-.9 4.8-2.6 7.2-1.7-2.4-2.6-4.8-2.6-7.2 0-2.4.9-4.8 2.6-7.2z" fill="#215fff"/><path d="M20.6 8.4c-.4 2.9-1.5 5.2-3.2 6.9-1.7 1.7-4 2.8-6.9 3.2 1.2-2.7 2.6-4.7 4.3-6.1 1.7-1.4 3.6-2.4 5.8-4z" fill="#215fff" opacity=".62"/><path d="M3.4 8.4c2.2 1.6 4.1 2.6 5.8 4 1.7 1.4 3.1 3.4 4.3 6.1-2.9-.4-5.2-1.5-6.9-3.2C4.9 13.6 3.8 11.3 3.4 8.4z" fill="#215fff" opacity=".62"/><path d="M4 18.4c2.6-.7 5.3-1 8-1s5.4.3 8 1c-2.1 2-4.8 3-8 3s-5.9-1-8-3z" fill="#215fff" opacity=".4"/></svg> lotus = ABHA linked</i>
+      <i><span class="pg der" style="margin:0">dashed</span> = the system worked it out, nobody assigned it</i>
+    </div>
+  </div>
+</div>
+
+<p class="note"><b>Two changes I made on my own, tell me if you disagree.</b> "Scanned" became a small dot on the number rather than a word, because it was the least important thing on a row and it was shouting. And a label the system inferred is drawn dashed, so nobody mistakes a guess for somebody's decision.</p>
+
+<p class="note"><b>One thing needing a person, not code.</b> High-risk pregnancy isn't in the declared list today — that list has general, antenatal, NCD and TB. Adding it is a clinical decision, and it sits with the condition list that's already waiting for sign-off.</p>
+
+<div class="options">
+  <div class="option" data-choice="ok" onclick="toggleSelect(this)">
+    <div class="letter">✓</div><div class="content"><h3>Good — build it</h3>
+    <p>Filters, lotus, programme labels, risk in red and nothing else.</p></div>
+  </div>
+  <div class="option" data-choice="tweak" onclick="toggleSelect(this)">
+    <div class="letter">~</div><div class="content"><h3>Change something first</h3>
+    <p>Say what in the terminal.</p></div>
+  </div>
+</div>
