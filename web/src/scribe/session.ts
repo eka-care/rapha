@@ -38,7 +38,43 @@ export type ScribeDraft = {
   tick: string[];
   /** Heard, but not a value this form can hold. Named, never guessed into a field. */
   unfilled: string[];
+  /** Candidate codes for a field in `unfilled`, keyed by that field's id,
+   *  ranked by whoever suggested them.
+   *
+   *  A CANDIDATE IS NOT A VALUE. It is never in `values`, never in `tick`,
+   *  and its field is always in `unfilled`, so there is nothing here a form
+   *  control can bind to and no path from a suggestion to a commit except a
+   *  person choosing one. The shape has no `value` key for that reason, and
+   *  `scribe.check.ts` holds all three of those rules.
+   *
+   *  Absent when there is nothing to offer, which is almost always: three
+   *  conditions and six medicines are coded in this build, and a facility
+   *  with no line has no codification at all. The key being absent rather
+   *  than empty is deliberate.
+   *
+   *  NOT DRAWN YET. Nothing in the renderer puts these on a screen; the
+   *  picker they belong in is the open step in the architecture document's
+   *  section 11. Said here rather than left to be discovered. */
+  candidates?: Record<string, Candidate[]>;
   transcript: string;
+};
+
+/** One suggested code, as kernel/codification.py Candidate.public() writes it.
+ *
+ *  `score` is null for a medication candidate, which the vendor's contract
+ *  documents, and it is compared against nothing: there is no threshold in
+ *  this product and a high score does not select anything. `linked` is the
+ *  suggesting service's own belief that it found the single right match, and
+ *  it is shown beside a candidate rather than acted on. */
+export type Candidate = {
+  code: string;
+  system: string;
+  display: string;
+  valueset: string;
+  score: number | null;
+  linked: boolean;
+  span: string;
+  term: string;
 };
 
 export type ScribeSession = {

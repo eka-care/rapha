@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import {
   apply,
   at, draftFor, elsewhere, mergeDrafts, mustTick, pickMime, preview, reasonFor, sentence,
-  type ScribeSession,
+  type ScribeDraft, type ScribeSession,
 } from "./session.ts";
 import type { Questionnaire } from "../types";
 
@@ -290,6 +290,56 @@ ok(!/mic-live/.test(rec) && !/Microphone live/.test(rec),
   assert.ok(/mergeDrafts\(all, s\.drafts, s\.session\)/.test(enc) && /key=\{key\}/.test(enc),
     "the encounter merges drafts and keys panels by generation");
   checks += 5;
+}
+
+// 7. A suggested code is not a value, and this is the most dangerous kind of
+//    heard value there is: a plausible code is unrecoverable once stored under
+//    a patient's ABHA number. Three rules, all of them about what a candidate
+//    is NOT, because the way this breaks is a suggestion quietly becoming an
+//    answer.
+{
+  const candidate = {
+    code: "44054006", system: "http://snomed.info/sct",
+    display: "Type 2 diabetes mellitus", valueset: "condition-code",
+    score: 1, linked: true, span: "her sugar is known", term: "DM2",
+  };
+  const draft: ScribeDraft = {
+    instrument: "i", operation: "phc.op.consult-document",
+    values: { assessment: "Likely dengue fever" },
+    confidence: { assessment: 0.8 }, evidence: { assessment: "Likely dengue fever" },
+    tick: [], unfilled: ["diagnosis[1].condition"],
+    candidates: { "diagnosis[1].condition": [candidate] },
+    transcript: "Likely dengue fever, and her sugar is known",
+  };
+
+  // (a) Nothing is owed a tick for it, because a tick CONFIRMS a value and
+  //     there is no value here to confirm. A candidate in the tick list would
+  //     mean a person could tick a suggestion into the record.
+  assert.deepEqual(mustTick(draft, new Set(), draft.values), [],
+    "a candidate is not owed a tick, because a tick confirms a value");
+
+  // (b) It is not in the payload, under its own id or under the field's.
+  assert.equal(at(draft.values, "diagnosis[1].condition"), undefined,
+    "a candidate must not be readable out of the payload");
+  assert.ok(!JSON.stringify(draft.values).includes(candidate.code),
+    "a candidate's code reached the values a Commit would send");
+
+  // (c) The field is still unfilled, however sure the suggestion was. A score
+  //     of 1 and linked true is exactly the case that would be prefilled if
+  //     anybody ever added a threshold, which nothing here has.
+  assert.ok(draft.unfilled.includes("diagnosis[1].condition"),
+    "a field with a certain candidate is still unfilled");
+  assert.ok(!("value" in candidate),
+    "a candidate must not carry a key a form control binds to");
+
+  // And nothing in the renderer reads them yet, which is said rather than
+  // implied: the picker is an open step. This fails the day somebody draws
+  // them, which is the right moment to rewrite this check.
+  const files = readdirSync(root + "web/src/scribe");
+  const draws = files.filter((f) => f !== "session.ts" && !f.endsWith(".check.ts"))
+    .filter((f) => read(`web/src/scribe/${f}`).includes("candidates"));
+  assert.deepEqual(draws, [], "candidates are declared and not yet drawn");
+  checks += 6;
 }
 
 console.log(`ok   scribe: ${checks} checks`);

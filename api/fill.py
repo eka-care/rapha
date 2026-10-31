@@ -27,7 +27,7 @@ import re
 from datetime import date, datetime, timedelta
 
 from catalogue import validate
-from kernel import terminology
+from kernel import codification, terminology
 
 TICK_TYPES = ("integer", "decimal", "quantity", "date", "dateTime", "time",
               "choice", "boolean")
@@ -113,6 +113,11 @@ def flatten(schema):
                 "required": bool(q.get("required")), "repeats": bool(q.get("repeats")),
                 "unit": q.get("unit") or phc.get("unit"), "options": _options(q),
                 "labels": _labels(q), "row_of": row_of,
+                # The value set this question's ANSWER is drawn from, or "".
+                # `options` and `labels` are what a renderer needs; the slug
+                # is what a codifier needs, and both come off the same
+                # declaration so they cannot disagree.
+                "valueset": terminology.answer_binding(q) or "",
                 "enable_when": q.get("enable_when") or [],
             })
             walk(q.get("questions") or [], path, row_of)
@@ -219,8 +224,20 @@ def enabled(fields, values):
 
 CAP = 0.89   # under web/src/form/Form.tsx SURE, so every heard value reads as unconfirmed
 
+# Who is asked to turn a heard phrase this form could not hold into candidate
+# codes. The default answers nothing, every time, which is what a health
+# centre with no line runs and what the gate runs: so the offline path is the
+# path that gets exercised rather than a fallback nobody reaches.
+#
+# A candidate is NOT a value. It never enters `values`, it is never owed a
+# tick, and the field it belongs to stays in `unfilled`. The only way one
+# becomes an answer is a person picking it on a screen, which goes through the
+# ordinary validator and the ordinary guard like anything else somebody typed.
+CODIFIER = codification.NoCodification()
 
-def build_draft(operation, schema, answers, transcript, *, instrument, today):
+
+def build_draft(operation, schema, answers, transcript, *, instrument, today,
+                codifier=None):
     """One draft from a set of heard answers, or None when nothing coerced.
 
     `answers` is keyed by field id: a link_id for a top level question, and
@@ -274,7 +291,9 @@ def build_draft(operation, schema, answers, transcript, *, instrument, today):
     if not ids:
         return None
 
-    return {"instrument": instrument, "operation": operation, "values": values,
+    offered = candidates(by, answers, unfilled, transcript,
+                         codifier=codifier or CODIFIER)
+    draft = {"instrument": instrument, "operation": operation, "values": values,
             "confidence": {i: min(CAP, heard[was.get(i, i)]["confidence"]) for i in ids},
             "evidence": {i: heard[was.get(i, i)]["evidence"] for i in ids},
             # Every filled non text value, each under its own id, so a row's
@@ -282,6 +301,40 @@ def build_draft(operation, schema, answers, transcript, *, instrument, today):
             # question's.
             "tick": [i for i in ids if by[split_id(i)[2]]["type"] in TICK_TYPES],
             "unfilled": sorted(unfilled), "transcript": transcript}
+    if offered:
+        # Absent rather than empty when there is nothing to offer. A key that
+        # is always there and always empty is how a renderer learns to stop
+        # looking at it.
+        draft["candidates"] = offered
+    return draft
+
+
+def candidates(by, answers, unfilled, transcript, *, codifier):
+    """Candidate codes for the bound fields a recording could not fill.
+
+    Only for the ids in `unfilled`, and only where the field binds its answer
+    to a value set. That is the whole of when a suggestion is any use: a field
+    that filled needs no choosing, and a field that binds nothing has no codes
+    to choose between.
+
+    The phrase asked about is the WORDS, not the value: `coerce` already
+    failed on the value, and what a service can work with is what was said.
+    The span goes with it, so a candidate for words the transcript does not
+    hold is dropped on `api/extract.py`'s rule rather than offered.
+    """
+    out = {}
+    for ident in unfilled:
+        answer = answers.get(ident)
+        field = by.get(split_id(ident)[2])
+        slug = (field or {}).get("valueset")
+        said = str((answer or {}).get("value") or "").strip()
+        if not (answer and slug and said):
+            continue
+        found = codifier.suggest(said, slug, transcript=transcript,
+                                 span=str(answer.get("evidence") or ""))
+        if found:
+            out[ident] = [c.public() for c in found]
+    return out
 
 
 def demo():
