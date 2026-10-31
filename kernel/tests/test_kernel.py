@@ -718,6 +718,69 @@ def test_the_compiled_form_is_plain_json():
     assert back["vocabulary"]["states"] == sorted(vocab.STATES)
 
 
+def test_the_compiled_state_order_is_the_declared_one_and_not_the_sorted_one():
+    """`state_order` was written and read and held by nothing.
+
+    `kernel.declarations.compile_json` carries it because `write_catalogue`
+    dumps with sort_keys=True, so a second engine reading `states` gets the
+    flags alphabetically. The order is load bearing: `kernel.state._true`
+    evaluates `all_of` against the flags already known, and
+    `test_lint_refuses_a_state_rule_that_looks_ahead` pins that a rule may
+    only reference an earlier one. Alphabetically `abha.pending` cannot see
+    `registered`, and `capture.consented` cannot see `capture.declined` — so
+    an engine deriving flags from the sorted dict serves a visit that is never
+    pending an ABHA and is consented to ambient capture after the patient
+    declined. That is a consent defect, which is why this is pinned and not
+    left to the comment beside the emit.
+
+    Nothing checked it before this. `care_phc_mcp/kstate` reads it, so a drift
+    between the declaration and the carried list is a wrong answer in one
+    engine and a right one in the other, with the gate green.
+    """
+    import json
+    compiled = json.loads(json.dumps(declarations.compile_json(BUNDLE)))
+    for wid, wf in BUNDLE.workflows.items():
+        order = compiled["workflows"][wid]["state_order"]
+        declared = list(wf.states)
+        assert order == declared, (wid, order, declared)
+        assert set(order) == set(compiled["workflows"][wid]["states"]), wid
+        # The property the order exists to preserve, asserted against the
+        # carried list rather than the source: every flag a rule leans on is
+        # earlier in it. A rule that leans on nothing is the base case.
+        position = {flag: i for i, flag in enumerate(order)}
+        leaned_on = 0
+        for i, flag in enumerate(order):
+            for ref in _flags_a_rule_references(wf.states[flag]):
+                assert ref in position, (wid, flag, ref)
+                assert position[ref] < i, (
+                    "%s: %r leans on %r, which the carried order puts later"
+                    % (wid, flag, ref))
+                leaned_on += 1
+        # Without this the loop above is satisfied by an order whose rules
+        # reference nothing at all, which is every order including the sorted
+        # one.
+        assert leaned_on, wid
+        # And the sorted order must actually break it, or this check is about
+        # nothing. phc declares `registered` before `abha.pending`; sorted,
+        # it does not.
+        if sorted(order) != order:
+            assert any(position[ref] > sorted(order).index(flag) or
+                       sorted(order).index(ref) > sorted(order).index(flag)
+                       for flag in order
+                       for ref in _flags_a_rule_references(wf.states[flag])), \
+                "%s: sorting the flags breaks no rule, so the order is not " \
+                "load bearing here and this check proves nothing" % wid
+
+
+def _flags_a_rule_references(rule):
+    """Every flag named inside one state rule, whatever clause holds it."""
+    out = []
+    for clause in ("all_of", "any_of", "none_of"):
+        for ref in rule.get(clause) or ():
+            out.append(ref[4:].strip() if str(ref).startswith("not ") else ref)
+    return [r for r in out if isinstance(r, str)]
+
+
 def test_the_file_on_disk_carries_every_key_the_contract_promises():
     """catalogue.json after `catalogue.build` then `kernel.declarations`. If
     this fails, one of the two compile steps has not been run."""
