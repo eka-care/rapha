@@ -10,7 +10,7 @@
 .input::placeholder { color: var(--color-text-tertiary); }
 .input:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 
-.scrim { position: fixed; inset: 0; z-index: 30; background: var(--color-accent); opacity: .28; }
+.scrim { position: fixed; inset: 0; z-index: 30; background: var(--color-text-primary); opacity: .28; }
 
 .khoj {
   position: fixed; z-index: 31; top: 12vh; left: 50%; transform: translateX(-50%);

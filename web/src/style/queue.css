@@ -47,11 +47,13 @@
   font-family: var(--font-mono); font-size: 10.5px; font-weight: 500;
   color: var(--color-text-tertiary);
 }
+/* Selected wears the prototype's violet tint. It is a control, not a fact
+   about a patient, which is why it may carry a hue at all. */
 .qtab.on {
-  border-color: var(--color-accent); background: var(--color-accent);
-  color: var(--color-bg-surface); font-weight: 600;
+  border-color: var(--color-agent-line); background: var(--color-agent-soft);
+  color: var(--color-agent); font-weight: 600;
 }
-.qtab.on .n { color: var(--color-bg-surface); }
+.qtab.on .n { color: var(--color-agent); }
 
 /* A programme chip wears the mono face of the pill it filters, so a value on
    a row and the same value on a chip are plainly the same thing. It carries
@@ -134,7 +136,10 @@
 .qr-tk-mark::after {
   content: ""; position: absolute; right: -2px; bottom: -2px;
   width: 8px; height: 8px; border-radius: var(--radius-pill);
-  background: var(--color-accent);
+  /* Ink, not the accent. The accent is now the system's blue, and blue on
+     this screen already means national identity: a lotus and an ABHA chip.
+     How somebody reached the queue is not that. */
+  background: var(--color-text-secondary);
   /* A ring in the row's own ground, so the dot reads as sitting on the corner
      rather than as part of the box's edge. */
   border: 1.5px solid var(--color-bg-canvas);

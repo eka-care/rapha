@@ -82,10 +82,17 @@
   /* The one accent, and it is ink. Colour means clinical risk here, so the
      primary action is the darkest thing on the screen rather than the
      bluest. The system's --cta is the same value. */
-  --color-accent: #141413;
-  --color-accent-hover: #000000;
-  --color-accent-soft: #F1F1EF;
-  --color-accent-line: #E0E0DC;
+  --color-accent: #1A50E6;
+  --color-accent-hover: #1540BD;
+  --color-accent-soft: #ECF1FF;
+  --color-accent-line: #CFDDFB;
+
+  /* The dark primary. The system's own --cta, and still the darkest thing on
+     a screen: a button a person presses a hundred times a day may not spend
+     the hue that means national identity. */
+  --color-cta: #141413;
+  --color-cta-hover: #000000;
+  --color-cta-ink: #FAFAF9;
 
   /* Eyebrows and the hairline over a hero: quiet, and not a signal. */
   --color-eyebrow: #6F6F6A;
@@ -96,6 +103,8 @@
      than what it has done. Nothing the machine took is drawn in it. */
   --color-agent: #5B45C9;
   --color-agent-soft: #F0ECFD;
+  --color-agent-line: #DED5FA;
+  --color-agent-hover: #E7E0FC;
 
   /* National identity, and nothing else. */
   --color-abdm: #1A50E6;
@@ -143,10 +152,14 @@
   --color-text-tertiary: #9A9A96;
   --color-text-disabled: #6B6B68;
 
-  --color-accent: #EDEDEC;
-  --color-accent-hover: #FFFFFF;
-  --color-accent-soft: #1E1E1C;
-  --color-accent-line: #333331;
+  --color-accent: #6B93FF;
+  --color-accent-hover: #8AA9F0;
+  --color-accent-soft: #141A28;
+  --color-accent-line: #26304A;
+
+  --color-cta: #EDEDEC;
+  --color-cta-hover: #FFFFFF;
+  --color-cta-ink: #0A0A0A;
 
   --color-eyebrow: #9A9A96;
   --color-rule-warm: #3A3A38;
@@ -154,6 +167,8 @@
 
   --color-agent: #B6A8FF;
   --color-agent-soft: #1E1A2E;
+  --color-agent-line: #2E2748;
+  --color-agent-hover: #241F36;
 
   --color-abdm: #6B93FF;
   --color-abdm-soft: #141A28;
@@ -198,10 +213,14 @@
     --color-text-tertiary: #9A9A96;
     --color-text-disabled: #6B6B68;
 
-    --color-accent: #EDEDEC;
-    --color-accent-hover: #FFFFFF;
-    --color-accent-soft: #1E1E1C;
-    --color-accent-line: #333331;
+    --color-accent: #6B93FF;
+    --color-accent-hover: #8AA9F0;
+    --color-accent-soft: #141A28;
+    --color-accent-line: #26304A;
+
+    --color-cta: #EDEDEC;
+    --color-cta-hover: #FFFFFF;
+    --color-cta-ink: #0A0A0A;
 
     --color-eyebrow: #9A9A96;
     --color-rule-warm: #3A3A38;
@@ -209,6 +228,8 @@
 
     --color-agent: #B6A8FF;
     --color-agent-soft: #1E1A2E;
+    --color-agent-line: #2E2748;
+    --color-agent-hover: #241F36;
 
     --color-abdm: #6B93FF;
     --color-abdm-soft: #141A28;

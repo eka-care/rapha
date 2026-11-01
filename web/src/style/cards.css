@@ -51,8 +51,10 @@
   display: inline-flex; align-items: center; gap: 7px;
   transition: var(--duration-fast) var(--ease-out);
 }
-.btn-b { background: var(--color-accent); color: var(--color-bg-surface); }
-.btn-b:hover:not(:disabled) { background: var(--color-accent-hover); }
+/* The dark primary, which is ink rather than a hue: the button a person
+   presses all day may not spend the blue that means national identity. */
+.btn-b { background: var(--color-cta); color: var(--color-cta-ink); }
+.btn-b:hover:not(:disabled) { background: var(--color-cta-hover); }
 .btn-g {
   background: var(--color-bg-surface); color: var(--color-text-secondary);
   border: 1px solid var(--color-border-subtle);
@@ -69,9 +71,10 @@
   transition: var(--duration-fast) var(--ease-out);
 }
 .chip:hover { border-color: var(--color-accent); color: var(--color-accent); background: var(--color-accent-soft); }
+/* Selected wears the violet tint the prototype gives every chosen control. */
 .chip[data-selected="true"] {
-  background: var(--color-accent); border-color: var(--color-accent);
-  color: var(--color-bg-surface); font-weight: 600;
+  background: var(--color-agent-soft); border-color: var(--color-agent-line);
+  color: var(--color-agent); font-weight: 600;
 }
 
 .nudge {

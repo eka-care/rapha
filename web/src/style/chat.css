@@ -27,7 +27,7 @@
   display: grid; place-items: center; flex-shrink: 0;
   background: var(--color-bg-subtle); color: var(--color-text-tertiary); margin-top: 2px;
 }
-.m-av.agent { background: var(--color-accent-soft); color: var(--color-accent); }
+.m-av.agent { background: var(--color-agent-soft); color: var(--color-agent); }
 .m-b { min-width: 0; }
 .m-meta {
   font-size: 9.5px; color: var(--color-text-tertiary); font-weight: 600;
@@ -75,10 +75,13 @@
 }
 .prop:hover:not(:disabled) { border-color: var(--color-accent); background: var(--color-accent-soft); transform: translateX(2px); }
 .prop:disabled { opacity: .45; cursor: not-allowed; }
-.prop.primary { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-bg-surface); }
-.prop.primary:hover { background: var(--color-accent-hover); }
+/* The machine's own action wears the violet, because it is what the agent
+   is offering rather than something the facility decided. The prototype
+   draws every proposed action this way. */
+.prop.primary { border-color: var(--color-agent); background: var(--color-agent); color: var(--color-bg-surface); }
+.prop.primary:hover { background: var(--color-agent); opacity: .9; }
 .prop.primary .p-s { color: var(--color-bg-surface); opacity: .72; }
-.prop.primary .p-tag { background: var(--color-bg-surface); color: var(--color-accent); border-color: transparent; }
+.prop.primary .p-tag { background: var(--color-bg-surface); color: var(--color-agent); border-color: transparent; }
 .p-b { min-width: 0; flex: 1; display: grid; }
 .p-l { font-size: 12.5px; font-weight: 600; line-height: 1.25; }
 .p-s { font-size: 10.5px; color: var(--color-text-tertiary); margin-top: 2px; line-height: 1.3; }
@@ -88,7 +91,7 @@
   background: var(--color-bg-subtle); color: var(--color-text-tertiary);
   border: 1px solid var(--color-border-subtle); white-space: nowrap;
 }
-.p-tag.scribe { background: var(--color-accent-soft); color: var(--color-accent); border-color: var(--color-accent-line); }
+.p-tag.scribe { background: var(--color-agent-soft); color: var(--color-agent); border-color: var(--color-agent-line); }
 .p-tag.form   { background: var(--color-success-soft); color: var(--color-success); border-color: var(--color-success-border); }
 .p-tag.irr    { background: var(--color-critical-soft); color: var(--color-critical); border-color: var(--color-critical-border); }
 .p-tag.hand   { background: var(--color-warning-soft); color: var(--color-warning); border-color: var(--color-warning-border); }
