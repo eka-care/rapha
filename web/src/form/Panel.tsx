@@ -18,7 +18,7 @@
  *  differs. The payload, the validation, the diff, the confirm stage and the
  *  single client call below are the same ones the modal uses.
  */
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { ABHA_PENDING, demographicsFrom, payloadFor, runsJourney, type AbhaOutcome } from "../abha/sdk";
 import { Journey } from "../abha/Journey";
 import { ApiError, type Client } from "../api";
@@ -27,6 +27,7 @@ import { walk } from "../validate";
 import { questionnaire } from "../declarations";
 import { fmt } from "../messages";
 import type { Operation, Payload, Proposal } from "../types";
+import { say } from "../announce";
 import { Failed } from "../parts";
 import { human } from "../words";
 import { mustTick, type ScribeDraft } from "../scribe/session";
@@ -126,6 +127,14 @@ export function OperationPanel({
   // Two of these are on screen whenever a thread holds two pending proposals.
   const ids = useId();
   const [error, setError] = useState<ApiError | null>(null);
+  /** Whether the keyboard has already been moved into this panel.
+   *
+   *  A callback ref and not an effect, and that is not a style preference:
+   *  voice.check.ts asserts this file contains no effect and no timer at all,
+   *  because the one thing that may reach a write here is a tap or the Enter
+   *  key. Landing the focus on mount is done by the ref itself, which runs
+   *  once, writes nothing, and leaves that property standing. */
+  const landed = useRef(false);
 
   const problems = useMemo(() => (schema ? validate(schema, payload) : []), [schema, payload]);
 
@@ -221,6 +230,10 @@ export function OperationPanel({
     try {
       if (proposal) await client.confirm(proposal.id, { payload, confirmed });
       else await client.commit(op.id, { thread, payload, confirmed });
+      // SC 4.1.3: the panel closes and a row appears somewhere else on the
+      // screen. Seeing that is how a sighted clerk knows the write landed;
+      // everybody else was told nothing at all.
+      say(`Saved: ${op.title}.`);
       onDone(carried);
     } catch (e) {
       setError(e instanceof ApiError ? e : new ApiError(String(e), "This is a bug in the renderer."));
@@ -235,6 +248,7 @@ export function OperationPanel({
     setError(null);
     try {
       await client.reject(proposal.id, {});
+      say(`Rejected: ${op.title}. Nothing was written.`);
       onDone();
     } catch (e) {
       setError(e instanceof ApiError ? e : new ApiError(String(e), "This is a bug in the renderer."));
@@ -257,6 +271,20 @@ export function OperationPanel({
 
   return (
     <div
+      /* A modal with nothing to say it is one. Opened from a quick action,
+         focus stayed on the button behind the scrim, so Escape -- which is
+         handled right here -- did nothing, and a screen reader was never
+         taken to the thing that had just covered the screen. The inline
+         variant is not a modal and does not pretend to be. */
+      ref={(el) => {
+        if (!el || inline || landed.current) return;
+        landed.current = true;
+        el.focus();
+      }}
+      tabIndex={inline ? undefined : -1}
+      role={inline ? undefined : "dialog"}
+      aria-modal={inline ? undefined : true}
+      aria-label={inline ? undefined : op.title}
       className={inline ? "mod inline" : "mod"}
       onKeyDown={(e) => {
         if (e.key === "Escape") { e.preventDefault(); onCancel?.(); return; }

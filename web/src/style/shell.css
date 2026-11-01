@@ -95,6 +95,16 @@
 /* Glass, as the prototype draws it: the canvas shows through and the content
    scrolling under it stays legible. Anyone who has asked for less
    transparency gets the flat surface instead, below. */
+/* SC 2.4.1. Off-screen until it is tabbed to, which is the first stop on
+   every screen, and then it is the only thing on it. */
+.skiplink {
+  position: absolute; left: -9999px; top: 0; z-index: 40;
+  border: 1px solid var(--color-border-strong); border-radius: var(--radius-md);
+  background: var(--color-bg-surface); color: var(--color-text-primary);
+  padding: 10px 16px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.skiplink:focus-visible { left: var(--space-3); top: var(--space-3); }
+
 .topbar {
   height: 56px; flex-shrink: 0;
   background: var(--color-bg-nav);
@@ -106,15 +116,11 @@
 }
 /* The screen's name is display type, not a bold label. Newsreader at 420 is
    the prototype's own setting and the reason its chrome reads as considered.
-   The facility under it is the mono eyebrow, because it is a fact about where
-   you are rather than a heading. */
+   It is the page's h1, so the browser's own heading weight is overridden
+   here rather than the element being chosen for how it looks. */
 .tb-title {
   font-family: var(--font-serif); font-size: 18px; font-weight: 420;
-  letter-spacing: .012em; line-height: 1.2;
-}
-.tb-sub {
-  font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--color-text-tertiary); margin-top: 1px;
+  letter-spacing: .012em; line-height: 1.2; margin: 0;
 }
 
 .pill {

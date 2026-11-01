@@ -146,7 +146,12 @@ export function threadAsks(opts: { hasHistory: boolean; flags: string[] }): stri
  *  workflow's own steps and the labels from the rows. */
 export type Column = {
   station: string;
-  people: { thread: string; name: string; initials: string; alert: boolean }[];
+  /** `alerts` is the declared flags behind `alert`, and it exists because of
+   *  SC 1.4.1: a person drawn in the critical tone and nothing else is a
+   *  person whose state is carried by colour alone, which is no state at all
+   *  to anybody who cannot see it or cannot tell that red from this grey. The
+   *  words are the flags the kernel sent; this file does not read them. */
+  people: { thread: string; name: string; initials: string; alert: boolean; alerts: string[] }[];
   jam: boolean;
 };
 
@@ -161,9 +166,10 @@ export function line(loaded: Loaded[], stations: string[], badges: Record<string
         : Object.values(r.subject ?? {});
       const name = String(cols.find((v) => typeof v === "string" && String(v).trim()) ?? r.thread);
       const list = at.get(r.station) ?? [];
+      const alerts = (r.flags ?? []).filter((f) => called.has(f));
       list.push({
         thread: r.thread, name, initials: initialsOf(name),
-        alert: (r.flags ?? []).some((f) => called.has(f)),
+        alert: alerts.length > 0, alerts,
       });
       at.set(r.station, list);
     }

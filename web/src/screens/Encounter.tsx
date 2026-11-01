@@ -209,10 +209,7 @@ export function Encounter({
       <aside className="panel" aria-label="Context">
         <div className="card">
           <div className="card-h">
-            <div>
-              <div className="eyebrow">Visit</div>
-              <div className="card-t" style={{ marginTop: 2 }}>Patient state</div>
-            </div>
+            <div className="card-t">Patient state</div>
             <span className="badge b-mute ml-auto">
               {thread.station ? human(thread.station) : "Complete"}
             </span>

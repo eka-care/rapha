@@ -647,4 +647,211 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   ok("thread: what a commit learned reaches the next panel that asks for it, by every route");
 }
 
+
+// ----------------------------------------- 5. the structure of a page (§68)
+//
+// Four defects found in the running DOM, each of them a WCAG 2.2 failure and
+// each of them invisible to every check that existed:
+//
+//   no <main> on any screen (SC 1.3.1, 2.4.1), no h1 outside the home screen
+//   so the outline began at the role editor's h3 (SC 1.3.1), no live region
+//   anywhere at all (SC 4.1.3), and one document title for every screen
+//   (SC 2.4.2).
+//
+// These are checked as PROPERTIES of the files rather than as a list of
+// strings, because the four of them are each one line and each one line is
+// exactly the kind of thing a later edit removes without noticing.
+
+{
+  const app = code(readFileSync(join(SRC, "app", "App.tsx"), "utf8"));
+  const topbar = code(readFileSync(join(SRC, "app", "Topbar.tsx"), "utf8"));
+  const parts = code(readFileSync(join(SRC, "parts.tsx"), "utf8"));
+
+  // -- the landmark and the way past the rail -------------------------------
+  assert.match(app, /<main id="workspace"[^>]*className=/,
+    "SC 1.3.1: the workspace is not a <main>, so there is no landmark to jump to");
+  assert.match(app, /<\/main>/, "the main landmark is never closed");
+  assert.match(app, /document\.getElementById\("workspace"\)\?\.focus\(\)/,
+    "SC 2.4.1: nothing moves the keyboard past the rail, which repeats on every screen");
+  // An anchor would be read by the router as a route: this app's address bar
+  // IS its navigation, so #workspace would navigate instead of skipping.
+  assert.ok(!/className="skiplink"[^>]*href=/.test(app),
+    "the skip control is an anchor, and its fragment is a route in this app");
+  ok("a11y: the workspace is a landmark, and the keyboard can reach it past the rail");
+
+  // -- one h1, and it says which screen this is -----------------------------
+  assert.match(topbar, /<h1 className="tb-title"/,
+    "SC 1.3.1: the screen's name is not the page's heading, so there is no h1");
+  const h1s = TSX.filter((f) => f.endsWith(".tsx"))
+    .filter((f) => /<h1\b/.test(code(readFileSync(f, "utf8"))))
+    .map(rel);
+  assert.deepEqual(h1s, ["app/Topbar.tsx"],
+    "the page has more than one top-level heading, or none: " + h1s.join(", "));
+  ok("a11y: every screen has exactly one h1, and it is the screen's declared name");
+
+  // -- the live region is in the document BEFORE it has anything to say -----
+  //
+  // This is the half of SC 4.1.3 that is easy to get wrong: a region that
+  // appears carrying its message arrives after the assistive technology
+  // stopped watching, so the message is never read.
+  assert.match(parts, /export function Announcer\(\)/, "there is no live region to announce into");
+  const slots = [...parts.matchAll(/role="status" aria-live="polite"/g)].length;
+  assert.equal(slots, 2,
+    `the announcer has ${slots} regions and needs two: a live region whose text ` +
+    "did not change is not read again, so saying the same thing twice is silent");
+  assert.match(app, /\n\s*<Announcer \/>/,
+    "the live region is not mounted unconditionally, so it is not there when it is needed");
+  assert.ok(!/\{[^}]*&&\s*<Announcer/.test(app),
+    "the live region is behind a condition, which is the defect SC 4.1.3 names");
+
+  // And the four asynchronous things this product does each say something.
+  // Not a list of sentences -- those are the callers' words -- but that each
+  // of the four call sites is still wired to the one region.
+  const says: [string, string, RegExp][] = [
+    ["form/Panel.tsx", "a write landing", /say\(`Saved: \$\{op\.title\}\.`\)/],
+    ["app/App.tsx", "the agent answering", /say\(answer\.said\)/],
+    ["app/App.tsx", "a list coming back changed", /say\(n === 1 \? "1 in the workspace\." :/],
+    ["screens/Desk.tsx", "a search answering", /say\(n === 1 \? "1 match\." :/],
+  ];
+  for (const [file, what, re] of says) {
+    assert.match(code(readFileSync(join(SRC, file), "utf8")), re,
+      `SC 4.1.3: ${what} is silent again, in ${file}`);
+  }
+  ok("a11y: one live region, mounted before it is needed, and the four silent things speak");
+
+  // -- the tab says which screen it is --------------------------------------
+  assert.match(parts, /document\.title = title/, "SC 2.4.2: nothing sets the document title");
+  assert.match(app, /<PageTitle title=\{[^}]*bundle\.title[^}]*\}/,
+    "the tab is not named after this screen and this facility, so every tab reads alike");
+  ok("a11y: the tab carries the screen's name and the facility's");
+}
+
+// ------------------------------------------ 6. the loading state (§73)
+//
+// Before this, one screen in the app drew anything at all while it read: the
+// rest showed a blank panel, which on a clinic's connection is
+// indistinguishable from empty and from broken. A skeleton fixes that only if
+// it has the shape of what is coming, does not flash, and is not read out as
+// content.
+
+{
+  const parts = readFileSync(join(SRC, "parts.tsx"), "utf8");
+  const cards = readFileSync(join(SRC, "style", "cards.css"), "utf8");
+
+  // -- it does not flash ----------------------------------------------------
+  const settle = /export const SETTLE = (\d+);/.exec(code(parts));
+  assert.ok(settle, "the skeleton has no delay, so a fast answer flashes one");
+  assert.ok(Number(settle![1]) >= 150,
+    `a ${settle![1]}ms delay still flashes: a skeleton seen for an instant is worse than the blank`);
+  assert.match(code(parts), /\{settled && <div aria-hidden="true">/,
+    "the bones are drawn before the delay has passed, or are not hidden from assistive technology");
+
+  // -- it is decoration, and the region around it is the content ------------
+  assert.match(code(parts), /<div className="loading" role="status" aria-busy="true">/,
+    "the loading region does not announce itself, so the skeleton is all there is");
+  assert.match(code(parts), /<span className="u-sr">Loading \{what\}<\/span>/,
+    "the region says nothing about WHAT is loading");
+
+  // -- it is one primitive, not four ---------------------------------------
+  const bones = TSX.filter((f) => f.endsWith(".tsx") && !f.endsWith("parts.tsx"))
+    .filter((f) => /className="sk[ "]/.test(code(readFileSync(f, "utf8"))))
+    .map(rel);
+  assert.deepEqual(bones, [],
+    "a screen draws its own skeleton bar instead of asking parts.tsx: " + bones.join(", "));
+
+  // -- and it has the shape of what is coming -------------------------------
+  //
+  // The whole point. A queue is rows, a thread is messages, a panel is
+  // blocks; one shape for all three is a grey rectangle that says "wait".
+  const shapes: [string, RegExp][] = [
+    ["app/App.tsx", /<Loading what="this list" shape="rows"/],
+    ["app/App.tsx", /<Loading what="this encounter" shape="messages"/],
+    ["app/App.tsx", /<Loading what="the workspace" shape="blocks"/],
+    ["screens/Today.tsx", /<Loading what="the facility" shape="blocks"/],
+    ["screens/Patient.tsx", /<Loading what="this patient" shape="blocks"/],
+    ["screens/Desk.tsx", /<Loading what="who this might be" shape="rows"/],
+  ];
+  for (const [file, re] of shapes) {
+    assert.match(code(readFileSync(join(SRC, file), "utf8")), re,
+      `the skeleton in ${file} is not the shape of what that screen is waiting for`);
+  }
+
+  // -- a file that knows it is loading has to draw it -----------------------
+  const blank = TSX.filter((f) => f.endsWith(".tsx") && !f.endsWith("parts.tsx"))
+    .filter((f) => {
+      const body = code(readFileSync(f, "utf8"));
+      return /\bloading\b/i.test(body) && !/<Loading\b/.test(body);
+    }).map(rel);
+  assert.deepEqual(blank, [],
+    "a screen reads a loading state and draws nothing for it: " + blank.join(", "));
+
+  // -- less motion gets a flat tint, not a frozen frame ---------------------
+  //
+  // base.css shortens every animation under prefers-reduced-motion, which
+  // leaves this one stopped on whichever keyframe it reached -- possibly a
+  // half-faded bar that reads as disabled. The escape is written for the
+  // primitive itself.
+  const quiet = rules(cards).filter((r) => r.selector === ".sk" && /animation:\s*none/.test(r.body));
+  assert.equal(quiet.length, 1,
+    "the skeleton's shimmer has no reduced-motion escape of its own, so less " +
+    "motion freezes it mid-fade instead of flattening it");
+  assert.match(decomment(cards), /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.sk\s*\{/,
+    "the escape is not inside a prefers-reduced-motion query");
+  ok("loading: one delayed, hidden, shaped skeleton per screen, flat under less motion");
+}
+
+// --------------------------------- 7. colour still means one thing (§6.2)
+//
+// The queue's own rule is checked above, against queue.css. The home screen's
+// line draws the same people and was never checked, and it had collected a
+// tone class nothing rendered -- which is how a stylesheet starts meaning
+// something the screen does not.
+
+{
+  const homeCss = readFileSync(join(SRC, "style", "home.css"), "utf8");
+  const today = code(readFileSync(join(SRC, "screens", "Today.tsx"), "utf8"));
+  const agent = code(readFileSync(join(SRC, "agent.ts"), "utf8"));
+
+  const red = rules(homeCss)
+    .filter((r) => /--color-critical/.test(r.body))
+    .filter((r) => !/\balert\b/.test(r.selector))
+    .map((r) => r.selector);
+  assert.deepEqual(red, [],
+    "the home screen paints clinical red on something that is not the declared " +
+    "risk tone: " + red.join(", "));
+  assert.match(agent, /const called = new Set\(Object\.entries\(badges\)\.filter\(\(\[, s\]\) => s === "crit"\)/,
+    "the alert on the line is decided by something other than the declared tone");
+
+  // Every tone a stylesheet offers has to be one a screen actually hands out.
+  // `.at-ic.red` was styled here and rendered nowhere, which is a colour
+  // waiting for somebody to reach for it.
+  const tones = [...new Set(rules(homeCss)
+    .flatMap((r) => [...r.selector.matchAll(/\.at-ic\.([\w-]+)/g)].map((m) => m[1])))];
+  const orphans = tones.filter((t) => !new RegExp(`\\b${t}\\b`).test(today));
+  assert.deepEqual(orphans, [],
+    "a tone is styled on the attention icon that no screen ever gives it: " + orphans.join(", "));
+
+  // SC 1.4.1. A person flagged on the line wore the critical tone and nothing
+  // else, so the state was carried by colour alone.
+  assert.match(today, /\{p\.alert && \(/, "the flagged person has no second carrier");
+  assert.match(today, /<Icon name="alert"[^>]*\/>\s*<span className="u-sr">\{p\.alerts/,
+    "SC 1.4.1: the flag on the line is a colour and nothing else, so it is " +
+    "not there for anybody who cannot see that red");
+  ok("a11y: on the line, clinical red is the declared tone and never the only carrier");
+
+  // -- the panel that covers the screen says it covers the screen -----------
+  const panel = code(readFileSync(join(SRC, "form", "Panel.tsx"), "utf8"));
+  assert.match(panel, /role=\{inline \? undefined : "dialog"\}/,
+    "the operation panel is a modal with nothing saying so");
+  assert.match(panel, /aria-label=\{inline \? undefined : op\.title\}/,
+    "and it is unnamed, so a screen reader is told a dialog opened and not which");
+  // A callback ref, because voice.check.ts asserts this file holds no effect
+  // and no timer: the only thing that may reach a write in the panel is a tap
+  // or the Enter key, and landing the focus must not weaken that.
+  assert.match(panel, /if \(!el \|\| inline \|\| landed\.current\) return;\s*landed\.current = true;\s*el\.focus\(\);/,
+    "opening the panel leaves the keyboard behind the scrim, where Escape does nothing");
+  ok("a11y: the operation panel is a named dialog and the keyboard arrives in it");
+}
+
+
 console.log(`\n${checks} checks passed`);

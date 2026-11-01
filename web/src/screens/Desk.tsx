@@ -30,7 +30,8 @@ import { ApiError, type Client } from "../api";
 import { questionnaire } from "../declarations";
 import { directoryNote, rows as deskRows, type DeskRow, type Resolution } from "../desk";
 import { OperationPanel } from "../form/Panel";
-import { Failed } from "../parts";
+import { say } from "../announce";
+import { Failed, Loading } from "../parts";
 import { createLabel, firstOperation } from "../search";
 import type { Catalogue, ViewDecl } from "../types";
 import { walk } from "../validate";
@@ -64,6 +65,11 @@ export function Desk({ cat, decl, workflow, client, onOpenThread }: {
    *  encounter on the line behind them. */
   const [thread, setThread] = useState<string | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  /** Whether a search is in flight. The list used to say "Still looking." for
+   *  as long as the kernel took, which is a word where the answer is going to
+   *  be rows: a skeleton in the shape of the rows says the same thing and
+   *  says how many to expect. */
+  const [searching, setSearching] = useState(false);
   const box = useRef<HTMLInputElement>(null);
 
   useEffect(() => { box.current?.focus(); }, []);
@@ -73,12 +79,25 @@ export function Desk({ cat, decl, workflow, client, onOpenThread }: {
   const turn = useRef(0);
   useEffect(() => {
     const want = typed.trim();
-    if (!want) { setFound(null); return; }
+    if (!want) { setFound(null); setSearching(false); return; }
     const mine = ++turn.current;
+    setSearching(true);
     const timer = setTimeout(() => {
       client.patients(want).then(
-        (got) => { if (turn.current === mine) { setFound(got); setError(null); } },
-        (e) => { if (turn.current === mine) setError(e instanceof ApiError ? e : new ApiError(String(e), "This is a bug in the renderer.")); },
+        (got) => {
+          if (turn.current !== mine) return;
+          setFound(got); setError(null); setSearching(false);
+          // SC 4.1.3: the list below the box changes under a person who is
+          // still typing into it, and nothing moves their focus. The count is
+          // the whole answer, so the count is what is said.
+          const n = (got.local?.length ?? 0) + (got.suggestions?.length ?? 0);
+          say(n === 1 ? "1 match." : `${n} matches.`);
+        },
+        (e) => {
+          if (turn.current !== mine) return;
+          setSearching(false);
+          setError(e instanceof ApiError ? e : new ApiError(String(e), "This is a bug in the renderer."));
+        },
       );
     }, SETTLE);
     return () => clearTimeout(timer);
@@ -178,11 +197,13 @@ export function Desk({ cat, decl, workflow, client, onOpenThread }: {
             </span>
           </button>
         ))}
-        {!rows.length && (
-          <div className="desk-empty">
-            {typed.trim() ? "Still looking." : "Nobody searched for yet."}
-          </div>
-        )}
+        {!rows.length && (searching
+          ? <Loading what="who this might be" shape="rows" rows={3} />
+          : (
+            <div className="desk-empty" role="status">
+              {typed.trim() ? "Nobody here by that name yet. Keep typing, or register them." : "Nobody searched for yet."}
+            </div>
+          ))}
       </div>
 
       {op && thread && opening && (

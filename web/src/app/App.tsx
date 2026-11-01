@@ -3,14 +3,15 @@
  *  Everything drawn below comes from a declaration. This file knows there are
  *  views, threads and operations; it does not know what any of them are called.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, currentRole, useAsync } from "../api";
 import { ask } from "../ask";
 import { createLabel, firstOperation } from "../search";
 import { displayFor, load as loadDeclarations, questionnaire } from "../declarations";
 import { keep, type Recent } from "../loops";
 import { header, queueViewFor, type Ctx, type Said } from "../messages";
-import { Boundary, Failed, Loading } from "../parts";
+import { say } from "../announce";
+import { Announcer, Boundary, Failed, Loading, PageTitle } from "../parts";
 import { Encounter } from "../screens/Encounter";
 import { Desk } from "../screens/Desk";
 import { ListScreen } from "../screens/ListScreen";
@@ -113,9 +114,15 @@ export function App() {
   // show three different numbers.
   const [loaded, setLoaded] = useState<{ decl: ViewDecl; result: ViewResult }[]>([]);
   const [loadError, setLoadError] = useState<ApiError | null>(null);
+  // Whether that load is still running. Without it the home screen draws
+  // itself out of an empty array -- nobody in the facility, every station
+  // clear, "you're clear" -- which is a lie told confidently and is
+  // indistinguishable from a kernel that is down.
+  const [loadingViews, setLoadingViews] = useState(true);
   useEffect(() => {
     if (!navViews.length) return;
     let live = true;
+    setLoadingViews(true);
     Promise.all(navViews.map((decl) =>
       api.view(decl.id).then(
         (result) => ({ decl, result }),
@@ -125,10 +132,24 @@ export function App() {
         if (!live) return;
         const good = all.filter(Boolean) as { decl: ViewDecl; result: ViewResult }[];
         setLoaded(good);
+        setLoadingViews(false);
         setLoadError(good.length ? null : new ApiError("No view answered.", "Check the kernel is running."));
       });
     return () => { live = false; };
   }, [navViews, nonce]);
+
+  // SC 4.1.3: a write anywhere re-reads every list, and the number in the
+  // rail changes under a person who is looking at something else. The first
+  // read is not announced -- arriving on a screen and being told what is on
+  // it is the screen's job, not a status message's.
+  const announced = useRef(false);
+  useEffect(() => {
+    if (loadingViews) return;
+    if (!announced.current) { announced.current = true; return; }
+    const n = loaded.filter((l) => l.decl.kind === "queue")
+      .reduce((t, l) => t + ((l.result.rows ?? []) as unknown[]).length, 0);
+    say(n === 1 ? "1 in the workspace." : `${n} in the workspace.`);
+  }, [loaded, loadingViews]);
 
   const liveThreads = useMemo(
     () => loaded.filter((l) => l.decl.kind === "queue")
@@ -152,13 +173,13 @@ export function App() {
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   if (facility.loading || cat.loading || decls.loading) {
-    return <div className="view scroll"><div className="wrap"><Loading what="the workspace" /></div></div>;
+    return <main className="view scroll"><div className="wrap"><Loading what="the workspace" shape="blocks" rows={3} /></div></main>;
   }
   if (facility.error || cat.error || decls.error) {
     return (
-      <div className="view scroll"><div className="wrap">
+      <main className="view scroll"><div className="wrap">
         <Failed error={(facility.error ?? cat.error ?? decls.error)!} what="reach the kernel" onRetry={() => location.reload()} />
-      </div></div>
+      </div></main>
     );
   }
 
@@ -190,6 +211,9 @@ export function App() {
         save(SAID_KEY, next);
         return next;
       });
+      // SC 4.1.3: the answer appears at the bottom of a thread nobody's focus
+      // is in. It is the agent's own sentence, not a word invented here.
+      say(answer.said);
       // A turn that proposed something changed the thread, so re-read it.
       if (answer.proposed > 0) reload();
     } finally {
@@ -208,6 +232,23 @@ export function App() {
   return (
     <div className="app">
       <IconSheet />
+      {/* SC 2.4.2: every screen was called "Workspace", so a person with the
+          queue and a patient open in two tabs could not tell them apart. Both
+          halves of this are declarations: the screen's own name, and the
+          facility's -- which is where that word earns its place, rather than
+          under the title on every screen. */}
+      <PageTitle title={facility.data?.bundle.title ? `${title} · ${facility.data.bundle.title}` : title} />
+      <Announcer />
+      {/* SC 2.4.1: the rail repeats on every screen, and until now the only
+          way past it was to tab through all of it. A link and not an anchor,
+          because the address bar is this app's router and #workspace would
+          be read as a route. */}
+      <button
+        className="skiplink"
+        onClick={() => document.getElementById("workspace")?.focus()}
+      >
+        Skip to the workspace
+      </button>
       <Sidebar
         facility={facility.data}
         views={navViews}
@@ -226,13 +267,12 @@ export function App() {
       <div className="main">
         <Topbar
           title={title}
-          sub={facility.data?.bundle.title}
           theme={theme}
           onSearch={() => setKhojOpen(true)}
           onTheme={flipTheme}
           onMenu={() => setDrawer((d) => !d)}
         />
-        <div className={route.kind === "thread" ? "view" : "view scroll"}>
+        <main id="workspace" tabIndex={-1} className={route.kind === "thread" ? "view" : "view scroll"}>
           <div className="wrap">
           <Boundary>
             {route.kind === "thread" ? (
@@ -248,10 +288,8 @@ export function App() {
               <div>
                 {route.kind === "today" && (
                   <Today
-                    loaded={loaded} recents={shownRecents}
+                    loaded={loaded} loading={loadingViews} recents={shownRecents}
                     cat={catalogue}
-                    facilityName={facility.data?.bundle.title}
-                    role={facility.data?.user.role}
                     onOpenThread={(t) => go(`#/threads/${t}`)}
                     onGoView={(v) => go(`#/views/${v}`)}
                     onAsk={(q) => {
@@ -306,7 +344,7 @@ export function App() {
             )}
           </Boundary>
           </div>
-        </div>
+        </main>
       </div>
 
       {khojOpen && (
@@ -346,7 +384,7 @@ function ViewScreen({ id, decl, workflow, nonce }: {
   id: string; decl?: ViewDecl; workflow?: Workflow; nonce: number;
 }) {
   const { data, error, loading, reload } = useAsync(() => api.view(id), [id, nonce]);
-  if (loading) return <Loading what="this list" />;
+  if (loading) return <Loading what="this list" shape="rows" rows={5} />;
   if (error) return <Failed error={error} what="load this list" onRetry={reload} />;
   return (
     <ListScreen
@@ -370,7 +408,7 @@ function ThreadScreen({ id, cat, ctx, said, asking, nonce, onSay, onChanged, onR
   const name = data ? header(data, queueViewFor(cat as never, data.workflow), displayFor).name : id;
   useEffect(() => { if (data) onRemember({ id, name }); }, [data, id, name, onRemember]);
 
-  if (loading) return <Loading what="this encounter" />;
+  if (loading) return <Loading what="this encounter" shape="messages" rows={3} />;
   if (error) return <Failed error={error} what="open this encounter" onRetry={reload} />;
   return (
     <Encounter

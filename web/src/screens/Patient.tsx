@@ -27,7 +27,7 @@ export function Patient({ id, cat, onOpenThread }: {
   // §2.3: the encounters are what somebody came here for, not the demographics.
   const [tab, setTab] = useState<Tab>("encounters");
 
-  if (loading) return <Loading what="this patient" />;
+  if (loading) return <Loading what="this patient" shape="blocks" rows={3} />;
   if (error) return <Failed error={error} what="open this patient" onRetry={reload} />;
   const view = data!;
 
@@ -147,7 +147,7 @@ function Collation({ encounter, cat, open, onToggle, onOpenThread }: {
       {open && (
         <div className="visit__body">
           {!data ? (
-            <div className="skeleton" style={{ height: 48, width: "100%" }} />
+            <Loading what="this visit" shape="lines" rows={3} />
           ) : blocks.length === 0 ? (
             <div className="fl-e">Nothing was recorded on this visit.</div>
           ) : (

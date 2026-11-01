@@ -82,11 +82,50 @@
   border-left: 3px solid var(--color-rule-warm); border-radius: var(--radius-sm);
   padding: 8px 10px; line-height: 1.5;
 }
-.skeleton {
-  border-radius: var(--radius-sm); background: var(--color-bg-subtle);
-  animation: skeleton-pulse 1.4s ease-in-out infinite;
+/* The loading state's one primitive. Every skeleton on every screen is this
+   bar at a different width and height, so there is one shimmer to tune and
+   one escape to honour.
+
+   THE ESCAPE IS WRITTEN HERE AND NOT LEFT TO THE GLOBAL RESET. base.css
+   shortens every animation under prefers-reduced-motion, which freezes this
+   one on whichever frame it lands on -- a bar that may sit at half opacity
+   for the whole read and look disabled rather than busy. Less motion should
+   mean a flat tint, not a stopped clock. */
+.sk {
+  display: block; flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg,
+    var(--color-bg-subtle) 0%, var(--color-bg-hover) 35%,
+    var(--color-bg-subtle) 70%);
+  background-size: 280% 100%;
+  animation: sk-sweep 1.5s var(--ease-out) infinite;
 }
-@keyframes skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+@keyframes sk-sweep { from { background-position: 180% 0; } to { background-position: -80% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .sk { animation: none; background: var(--color-bg-subtle); }
+}
+
+.loading { display: block; }
+.sk-rows { display: grid; gap: var(--space-2); }
+.sk-row {
+  display: flex; align-items: center; gap: 11px;
+  min-height: 56px; padding: 11px 14px;
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+.sk-row-b { flex: 1; min-width: 0; display: grid; gap: 7px; }
+.sk-messages { display: grid; gap: 18px; padding: 4px 0; }
+.sk-msg { display: flex; gap: 11px; align-items: flex-start; }
+.sk-msg.mine { flex-direction: row-reverse; }
+.sk-msg-b { flex: 1; min-width: 0; display: grid; gap: 7px; }
+.sk-msg.mine .sk-msg-b { justify-items: end; }
+.sk-blocks { display: grid; gap: 12px; }
+.sk-block {
+  display: grid; gap: 9px; padding: 13px 14px;
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+.sk-lines { display: grid; gap: 8px; }
 
 .state-empty {
   margin: auto; text-align: center; color: var(--color-text-tertiary);

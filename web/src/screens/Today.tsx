@@ -11,19 +11,23 @@
 import { brief, facilityAsks, initialsOf, line, type Loaded } from "../agent";
 import { Icon } from "../icons";
 import type { Recent } from "../loops";
+import { Loading } from "../parts";
 import type { Catalogue, QueueRow, TaskRow } from "../types";
-import { human } from "../words";
+import { human, title } from "../words";
 
-export function Today({ loaded, recents, cat, facilityName, role, onOpenThread, onGoView, onAsk }: {
+export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, onAsk }: {
   loaded: Loaded[];
+  /** Whether the four view reads are still running. Without it this screen
+   *  draws an empty facility -- nobody here, every station clear -- which is
+   *  a confident lie and looks exactly like a kernel that is down. */
+  loading: boolean;
   recents: Recent[];
   cat: Catalogue;
-  facilityName?: string;
-  role?: string;
   onOpenThread: (thread: string) => void;
   onGoView: (view: string) => void;
   onAsk: (question: string) => void;
 }) {
+  if (loading && !loaded.length) return <Loading what="the facility" shape="blocks" rows={4} />;
   const now = new Date();
   const h = now.getHours();
   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
@@ -65,22 +69,18 @@ export function Today({ loaded, recents, cat, facilityName, role, onOpenThread, 
           </div>
         </div>
 
-        <div className="hero-eye">{human(role ?? "")}{facilityName ? ` · ${facilityName}` : ""}</div>
-        <h1 className="hero-h">
+        <h2 className="hero-h">
           {greeting}.<br />
           <span>{rows.length} in the workspace, {done} complete.</span>
-        </h1>
-        <p className="hero-sub">
-          Everything below is a read. Nothing here writes to a record: the agent proposes, you confirm.
-        </p>
+        </h2>
 
+        {/* A button that OPENS the command bar, so what looked like a field
+            was a read-only input nested inside it: a second stop for the
+            keyboard that accepts nothing, and no accessible name on either.
+            It is now the button's own label. */}
         <button className="hero-ask" onClick={() => onAsk("")}>
           <Icon name="search" className="i lg" />
-          <input
-            readOnly
-            placeholder="Ask about the facility, or find a patient"
-            style={{ cursor: "text" }}
-          />
+          <span className="hero-ask-l">Ask about the facility, or find a patient</span>
           <span className="kbd">⌘K</span>
         </button>
         <div className="chips">
@@ -108,11 +108,7 @@ export function Today({ loaded, recents, cat, facilityName, role, onOpenThread, 
       {columns.length > 0 && (
         <div className="card">
           <div className="card-h">
-            <div>
-              <div className="eyebrow">Live</div>
-              <div className="card-t" style={{ marginTop: 2 }}>Patient flow</div>
-            </div>
-            <span className="badge b-mute ml-auto">the baton, in motion</span>
+            <div className="card-t">Patient flow</div>
           </div>
           <div className="flow">
             {columns.map((c) => (
@@ -132,6 +128,16 @@ export function Today({ loaded, recents, cat, facilityName, role, onOpenThread, 
                       >
                         <span className="fl-av">{p.initials}</span>
                         <span className="fl-nm">{p.name}</span>
+                        {/* SC 1.4.1: the tone alone carried this, so a person
+                            who cannot see that red saw an ordinary row. The
+                            mark is the second carrier and the declared flag
+                            is its name. */}
+                        {p.alert && (
+                          <>
+                            <Icon name="alert" className="i sm" />
+                            <span className="u-sr">{p.alerts.map((f) => title(human(f))).join(", ")}</span>
+                          </>
+                        )}
                       </button>
                     ))}
                 {c.jam && (

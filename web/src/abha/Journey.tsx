@@ -17,6 +17,7 @@
  *  national health account, which is the one line that stays a sentence.
  */
 import { useEffect, useId, useRef, useState } from "react";
+import { Loading } from "../parts";
 import { API_BASE } from "../api";
 import {
   environmentLine, identifierFrom, loadFailure,
@@ -203,7 +204,9 @@ export function Journey({
         </div>
       ) : (
         <>
-          {!mounted && !outcome && <div className="abha-note">Loading</div>}
+          {/* The word "Loading" was the whole of this state, and the
+              journey is a sheet a patient is waiting in front of. */}
+          {!mounted && !outcome && <Loading what="the identity journey" shape="lines" rows={3} />}
           {outcome?.kind === "failed" && <div className="abha-note bad">{outcome.reason}</div>}
           {/* Kept in the tree whatever happens: the SDK holds a React root on
               this node and removing it from under React is how a blank modal

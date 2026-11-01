@@ -3,6 +3,7 @@
  *  filter, sort and search are held per view for the session.
  */
 import { useMemo, useState } from "react";
+import { say } from "../announce";
 import { displayFor } from "../declarations";
 import {
   filterOptions, filterRows, labelColumns, RISK_TONE, sortOptions, sortRows,
@@ -117,7 +118,11 @@ export function ListScreen({ result, decl, workflow, onOpenThread }: {
                 key={JSON.stringify(t.filter) + t.label}
                 className={`qtab${JSON.stringify(state.filter) === JSON.stringify(t.filter) ? " on" : ""}${t.risk ? " risk" : ""}${t.prog ? " prog" : ""}`}
                 aria-pressed={JSON.stringify(state.filter) === JSON.stringify(t.filter)}
-                onClick={() => set({ filter: t.filter })}
+                /* SC 4.1.3: pressing a chip rewrites the list below it and
+                   moves nobody's focus. The chip already carries its count,
+                   so the number is not news -- that the list is now that
+                   number is. */
+                onClick={() => { set({ filter: t.filter }); say(t.n === 1 ? "1 shown." : `${t.n} shown.`); }}
               >
                 {t.label}
                 <span className="n">{t.n}</span>
