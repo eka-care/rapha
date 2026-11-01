@@ -6,7 +6,13 @@
  * own eyebrow, title and badge, and says what kind of thing it holds.
  */
 
-.chatgrid { display: grid; grid-template-columns: 1fr 300px; gap: 16px; height: 100%; align-items: start; }
+/* minmax(0,1fr), not 1fr. A bare `1fr` is `minmax(auto,1fr)`, so the thread
+   column refuses to go below its own min-content width, and one long line in
+   it pushed the right rail 157px off the side of the window -- clipped, not
+   scrollable, so half of every value in it was simply unreadable. The
+   artifact this screen is built from writes it this way for this reason. */
+.chatgrid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px;
+  height: 100%; align-items: start; }
 .chatcard { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 
 .pt-head {
@@ -21,8 +27,44 @@
 .pt-meta { font-size: 10.5px; color: var(--color-text-tertiary); margin-top: 2px; }
 .pt-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
 
-.thread { flex: 1; min-height: 0; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 15px; }
+.thread { flex: 1; min-height: 0; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 15px;
+  position: relative; }
 .thread > * { flex: 0 0 auto; }
+
+/* The line the nodes sit on. Without it they are loose dots and the visit
+   reads as unrelated cards rather than as one patient's afternoon. */
+.tether {
+  position: absolute; left: 27px; top: 26px; bottom: 18px; width: 1px;
+  background: var(--color-border-strong); pointer-events: none;
+}
+
+/* One record: a line, and its card when opened. */
+.ev { display: flex; gap: 10px; max-width: 92%; }
+.ev .m-b { flex: 1; min-width: 0; }
+.ev-h {
+  display: flex; align-items: baseline; gap: 9px; width: 100%; text-align: left;
+  font: inherit; color: inherit; background: none; border: 0; cursor: pointer;
+  padding: 2px 0; border-radius: var(--radius-sm);
+}
+.ev-h .chev {
+  color: var(--color-text-tertiary); font-size: 11px; line-height: 1;
+  transition: transform var(--duration-slow) var(--ease-out); display: inline-block;
+}
+.ev-h[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.ev-st {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--color-eyebrow); white-space: nowrap;
+}
+.ev-t { font-size: 13px; font-weight: 550; color: var(--color-text-primary); white-space: nowrap; }
+.ev-sum {
+  font-size: 12px; color: var(--color-text-tertiary); flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ev-time {
+  font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-tertiary);
+  margin-left: auto; white-space: nowrap;
+}
+.ev .bubble { margin-top: 7px; }
 
 .msg { display: flex; gap: 10px; max-width: 92%; }
 .msg.right { margin-left: auto; flex-direction: row-reverse; }

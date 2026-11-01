@@ -9,6 +9,7 @@
  *  §10 lists eight object types. Task and Comment are not here: the kernel has
  *  no row behind either, and drawing one would be a picture of a product.
  */
+import { useState } from "react";
 import type { Client } from "../api";
 import { OperationPanel } from "../form/Panel";
 import { clock, type Ctx, type Msg, type Said } from "../messages";
@@ -25,26 +26,33 @@ export function Stream({ msgs, thread, client, ctx, instruments, onDone, childre
   onDone: () => void;
   children?: React.ReactNode;
 }) {
+  // What is still open is the station the visit is AT. Everything behind it
+  // folds to one line: a visit with four records used to be four full cards
+  // stacked down the screen, which is the whole page before anybody reads a
+  // word of it. The summary on the folded line carries what was recorded, so
+  // folding costs nothing a person was using.
+  const last = msgs.map((m) => m.kind).lastIndexOf("posted");
   return (
     <div className="thread">
+      <div className="tether" aria-hidden="true" />
       {msgs.length === 0 && (
         <div className="state-empty">
           Nothing recorded for this visit yet.<br />
           Type a message, @mention someone, use / for an action, or dictate.
         </div>
       )}
-      {msgs.map((m) => (
+      {msgs.map((m, i) => (
         <Entry key={m.id} m={m} thread={thread} client={client} ctx={ctx}
-               instruments={instruments} onDone={onDone} />
+               instruments={instruments} onDone={onDone} open={i === last} />
       ))}
       {children}
     </div>
   );
 }
 
-function Entry({ m, thread, client, ctx, instruments, onDone }: {
+function Entry({ m, thread, client, ctx, instruments, onDone, open }: {
   m: Msg; thread: ThreadView; client: Client; ctx: Ctx;
-  instruments?: Record<string, unknown>; onDone: () => void;
+  instruments?: Record<string, unknown>; onDone: () => void; open?: boolean;
 }) {
   if (m.kind === "said") {
     return <Message who={m.who} actor={m.actor} at={clock(m.at)} text={m.text} />;
@@ -52,35 +60,7 @@ function Entry({ m, thread, client, ctx, instruments, onDone }: {
 
   if (m.kind === "handover") return <Handover m={m} />;
 
-  if (m.kind === "posted") {
-    return (
-      <div className="msg">
-        <div className="m-av node kept" aria-hidden="true"><span className="u-sr">record</span></div>
-        <div className="m-b">
-          <div className="m-meta">{m.actor} · {clock(m.at)}</div>
-          <div className="bubble">
-            <div className="t">
-              {m.title}
-              {m.tags.map((t) => (
-                <span className={`badge ${TAG[t.style] ?? "b-mute"}`} key={t.text}>{t.text}</span>
-              ))}
-            </div>
-            {m.values.length > 0 && (
-              <div className="kvbox">
-                {m.values.map((v) => (
-                  <div className={`kv${v.crit ? " crit" : ""}`} key={v.link_id}>
-                    <span>{v.label}</span>
-                    <b>{v.value}{v.crit ? " · critical" : ""}</b>
-                  </div>
-                ))}
-              </div>
-            )}
-            {m.transcript && <div className="quote">{m.transcript}</div>}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (m.kind === "posted") return <Posted m={m} open={!!open} />;
 
   if (m.kind === "denied") {
     return (
@@ -100,6 +80,61 @@ function Entry({ m, thread, client, ctx, instruments, onDone }: {
 
   return <ProposalCard m={m} thread={thread} client={client} ctx={ctx}
                        instruments={instruments} onDone={onDone} />;
+}
+
+/** A value on one folded line. A consultation's history runs to a sentence
+ *  and three of them would push the time off the row before the ellipsis
+ *  caught them, so each is cut to its first clause. The whole value is one
+ *  tap away, which is the point of the fold. */
+function brief(value: string): string {
+  const text = String(value);
+  if (text.length <= 32) return text;
+  const stop = text.slice(0, 32).lastIndexOf(" ");
+  return text.slice(0, stop > 12 ? stop : 32) + "…";
+}
+
+/** One committed record on the thread: a line, and its card when opened.
+ *
+ *  The line is the record -- who, what, when, and what it said -- so a visit
+ *  reads as a list of stations rather than as a stack of forms. The station it
+ *  is at opens itself; the ones behind it are a tap away and say enough on
+ *  their line that most of them never need one.
+ */
+function Posted({ m, open }: { m: Extract<Msg, { kind: "posted" }>; open: boolean }) {
+  const [shown, setShown] = useState(open);
+  const summary = m.values.slice(0, 3).map((v) => `${v.label} ${brief(v.value)}`).join(" · ");
+  return (
+    <div className={`ev${shown ? " on" : ""}`}>
+      <div className="m-av node kept" aria-hidden="true"><span className="u-sr">record</span></div>
+      <div className="m-b">
+        <button className="ev-h" aria-expanded={shown} onClick={() => setShown((v) => !v)}>
+          <span className="chev" aria-hidden="true">›</span>
+          <span className="ev-st">{m.actor}</span>
+          <span className="ev-t">{m.title}</span>
+          {m.tags.map((t) => (
+            <span className={`badge ${TAG[t.style] ?? "b-mute"}`} key={t.text}>{t.text}</span>
+          ))}
+          {!shown && summary && <span className="ev-sum">{summary}</span>}
+          <span className="ev-time">{clock(m.at)}</span>
+        </button>
+        {shown && (
+          <div className="bubble">
+            {m.values.length > 0 && (
+              <div className="kvbox">
+                {m.values.map((v) => (
+                  <div className={`kv${v.crit ? " crit" : ""}`} key={v.link_id}>
+                    <span>{v.label}</span>
+                    <b>{v.value}{v.crit ? " · critical" : ""}</b>
+                  </div>
+                ))}
+              </div>
+            )}
+            {m.transcript && <div className="quote">{m.transcript}</div>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 const TAG: Record<string, string> = { crit: "b-crit", warn: "b-warn", ok: "b-ok", mute: "b-mute" };

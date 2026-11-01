@@ -17,7 +17,7 @@ import { displayFor, questionnaire } from "../declarations";
 import { walk } from "../validate";
 import { Icon } from "../icons";
 import { carriedInto, weigh } from "../loops";
-import { agentLine, header, messages, queueViewFor, valuesOf, type Ctx, type Said } from "../messages";
+import { agentLine, header, messages, queueViewFor, type Ctx, type Said } from "../messages";
 import type { Catalogue, Operation, Payload, ThreadView } from "../types";
 import { Composer } from "../thread/Composer";
 import { ScribeBar } from "../scribe/ScribeBar";
@@ -220,33 +220,12 @@ export function Encounter({
 
         <Details thread={thread} cat={cat} spine={spine ?? null} />
 
-        <div className="card">
-          <div className="card-h">
-            <div className="card-t">Capabilities held</div>
-            <span className="badge b-mute ml-auto">{thread.held.length}</span>
-          </div>
-          <div className="caps">
-            {(cat.capabilities ?? []).map((c) => (
-              <span className={`cap${thread.held.includes(c) ? " on" : ""}`} key={c}>{c}</span>
-            ))}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-h">
-            <div className="card-t">Audit trail</div>
-            <span className="badge b-mute ml-auto">{thread.audit.length}</span>
-          </div>
-          <div className="audit">
-            {thread.audit.length === 0 && <div className="fl-e">Nothing yet.</div>}
-            {[...thread.audit].reverse().map((a) => (
-              <div className="au" key={a.id}>
-                <b>{a.operation.split(".").pop()}</b>
-                <span className="ml-auto">{a.outcome.split(":")[0]}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* WHAT USED TO BE HERE: the 16 raw capability codes this caller holds,
+            and the audit trail. Both are true and neither is a clinician's.
+            A nurse reading our capability ids beside a patient's name is
+            reading our schema, and the trail is every row we wrote, which is
+            a developer's view of their afternoon. They belong behind the
+            control panel, and this rail is for what the thread cannot say. */}
       </aside>
 
       {modal && (
@@ -283,24 +262,12 @@ function Details({ thread, cat, spine }: { thread: ThreadView; cat: Catalogue; s
     return [...keys, ...extra].map((k) => ({ label: title(human(k)), value: String(subject[k]) }));
   }, [thread.subject, thread.workflow, cat]);
 
-  const recorded = useMemo(() => {
-    const out: { id: string; title: string; values: ReturnType<typeof valuesOf> }[] = [];
-    for (const a of thread.audit) {
-      if (!/^(committed|confirmed|allowed)/.test(a.outcome)) continue;
-      const op = cat.operations?.[a.operation];
-      const presents = op?.presents ?? "event";
-      if (presents !== "event" && presents !== "artifact") continue;
-      if (spine && (op?.writes ?? []).includes(spine)) continue;
-      // The real questionnaire resolver, so a value keeps its label and unit.
-      // Passing () => null here dropped both and the panel read "Systolic 186".
-      const values = valuesOf({ operations: cat.operations ?? {}, schema: questionnaire, badges: {}, display: displayFor },
-                              a.operation, a.payload);
-      if (values.length) out.push({ id: a.id, title: op?.title ?? human(a.operation), values });
-    }
-    return out.reverse();
-  }, [thread.audit, cat, spine]);
-
-  if (!rows.length && !recorded.length) return null;
+  // WHAT USED TO BE HERE: every committed record's values, drawn again. The
+  // thread beside this rail already carries each of them, with who recorded
+  // it and when, so this was the same afternoon printed twice -- and it was
+  // most of the page. The identity rows below stay: a name, an age and a
+  // village are what the thread does NOT repeat.
+  if (!rows.length) return null;
   return (
     <div className="card">
       <div className="card-h">
@@ -310,16 +277,6 @@ function Details({ thread, cat, spine }: { thread: ThreadView; cat: Catalogue; s
         {rows.length > 0 && (
           <div>{rows.map((r) => <div className="kv" key={r.label}><span>{r.label}</span><b>{r.value}</b></div>)}</div>
         )}
-        {recorded.map((r) => (
-          <div key={r.id}>
-            <div className="eyebrow" style={{ marginBottom: 4 }}>{r.title}</div>
-            {r.values.map((v) => (
-              <div className={`kv${v.crit ? " crit" : ""}`} key={v.link_id}>
-                <span>{v.label}</span><b>{v.value}</b>
-              </div>
-            ))}
-          </div>
-        ))}
       </div>
     </div>
   );
