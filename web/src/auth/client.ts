@@ -80,12 +80,20 @@ export function canFrameLogin(hostname: string): boolean {
 /** Where Eka sends the browser once the cookie is set: back here.
  *
  *  `next` is required -- the login answers 400 without one -- and it has to
- *  be an address that RESOLVES, which is what went wrong before. Eka's own
- *  default for dev is `https://docapp.eka.care`, read off the redirect
- *  login.dev.eka.care issues for itself, and that name has no DNS record at
- *  all: signing in worked and then dropped the frame on "server IP address
- *  could not be found". Production's default, `https://dr.eka.care`, is a
- *  real host but it is somebody else's dashboard.
+ *  be an address that RESOLVES, which is what went wrong before.
+ *
+ *  EKA'S OWN DEFAULT FOR DEV IS A TYPO. login.dev.eka.care redirects itself
+ *  to `/auth/login?audience=doc-web&next=https://docapp.eka.care`, and that
+ *  name has no DNS record at all; the dev dashboard is at
+ *  `docapp.DEV.eka.care`, which resolves. Taking Eka's default on trust is
+ *  what put "server IP address could not be found" in the frame after a
+ *  sign in that had actually worked. Production's default,
+ *  `https://dr.eka.care`, resolves, but it is somebody else's dashboard.
+ *
+ *  Neither is used. Coming back here is better than either: it is the only
+ *  address guaranteed to resolve wherever this app is served from, it
+ *  cannot be somebody else's dashboard, and the frame's own load event is
+ *  then the earliest notice the screen can get that signing in is done.
  *
  *  So it comes back here. This origin certainly resolves -- the browser is
  *  already on it -- and the login accepts it: it answers 200 for a `next`
