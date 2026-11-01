@@ -12,11 +12,8 @@
 .hero {
   position: relative; overflow: hidden;
   border-radius: var(--radius-xl); border: 1px solid var(--color-border-subtle);
-  /* The floor stops INSIDE the card now. At 165% the wash was mixed almost
-     entirely out before it reached an edge anybody sees, which is why the
-     owner liked it and could not find it. */
-  background: linear-gradient(160deg,
-    var(--color-bg-surface) 0%, var(--color-bg-canvas) 46%, var(--color-hero-floor) 112%);
+  background: linear-gradient(122deg,
+    var(--color-bg-surface) 0%, var(--color-bg-canvas) 58%, var(--color-agent-tint) 165%);
   padding: 30px 26px 26px; box-shadow: var(--shadow-sm);
   /* The owner's call: the hero's own text is centred. Everything in this
      card centres on its axis -- eyebrow, statement, the line under it and the
@@ -24,13 +21,22 @@
      clock floating off it. */
   display: flex; flex-direction: column; align-items: center; text-align: center;
 }
+/* THE FLOWER. Eight petals and three rings, drawn in ink at five per cent,
+   which is a watermark of a watermark: the owner liked it and could not find
+   it. It is the brand's own violet now, at an opacity that reads, and the
+   stroke is thicker so the petals hold their shape at this size.
+
+   It moved off the session clock to do it. At the top right it sat under the
+   one piece of small text on this card, and anything vivid enough to see was
+   something that text had to be read through. Bottom left is the corner the
+   hero's own wash comes from and the only thing over it is the card's edge. */
 .hero-mark {
-  position: absolute; top: -62px; right: -52px; width: 290px; height: 290px;
-  color: var(--color-text-primary); opacity: .052; pointer-events: none;
-  stroke-width: .35; fill: none; stroke: currentColor;
+  position: absolute; bottom: -78px; left: -58px; width: 300px; height: 300px;
+  color: var(--color-agent); opacity: .22; pointer-events: none;
+  stroke-width: .5; fill: none; stroke: currentColor;
   stroke-linecap: round; stroke-linejoin: round;
 }
-[data-theme="dark"] .hero-mark { opacity: .075; }
+[data-theme="dark"] .hero-mark { opacity: .3; }
 .hero-eye {
   font-size: 10.5px; font-weight: 700; color: var(--color-eyebrow);
   text-transform: uppercase; letter-spacing: .1em;
