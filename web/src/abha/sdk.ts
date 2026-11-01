@@ -64,6 +64,29 @@ export const ABHA_PENDING = "abha.pending";
  */
 export const ABHA_LINKED = "abha.linked";
 
+/** Whether a RECORD -- not a thread -- already carries a national health
+ *  account.
+ *
+ *  The queue row draws the lotus from the thread's `abha.linked` flag, which
+ *  the kernel derives. The front desk has no thread: it is looking at a
+ *  patient row out of this centre's register, or at a profile the directory
+ *  suggested, and neither carries a flag. So the same fact is read off the
+ *  record itself, by the field's name, which is the one regular expression
+ *  messages.ts already calls "the one accepted hard-code in this renderer":
+ *  ABHA is a national identifier, not a facility's concept, so no bundle can
+ *  rename it and no declaration is being bypassed.
+ *
+ *  It lives here rather than in desk.ts for the reason mobileHint does: that
+ *  file stays free of the exception and is handed the rule, so a check can
+ *  drive both halves.
+ */
+export function identified(record: Record<string, unknown> | undefined): boolean {
+  return Object.entries(record ?? {}).some(
+    ([key, value]) => /abha|abdm/i.test(key)
+      && value !== null && value !== undefined && String(value).trim() !== "",
+  );
+}
+
 /** Whether a commit panel runs the national identity journey before it shows
  *  its form, and the one rule that decides it.
  *

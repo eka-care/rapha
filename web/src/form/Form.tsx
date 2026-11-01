@@ -55,12 +55,24 @@ function Widget({
 }) {
   const set = (v: unknown) => onChange(v);
   const str = value === undefined || value === null ? "" : String(value);
+  /** SC 1.3.1 and 4.1.2: the id the question's own label points at.
+   *
+   *  Every branch below carries it, and that is the point. Three of them did
+   *  and three did not, and the three that did not were the plain string
+   *  field, the closed choice and the checkbox -- which between them are
+   *  every field on the registration form this product is actually used
+   *  through. The visible label was drawn above each one and attached to
+   *  none, so a person using a screen reader was asked to fill in seven
+   *  blanks. The id was already being computed for a different reason (an
+   *  instrument that refuses to guess hands the cursor back to a field by
+   *  it), so this is the same string doing both jobs. */
+  const id = `${ids}-${q.link_id}`;
 
   switch (q.type) {
     case "boolean":
       return (
         <label className="f-check">
-          <input type="checkbox" checked={value === true} disabled={disabled} autoFocus={autoFocus}
+          <input type="checkbox" id={id} checked={value === true} disabled={disabled} autoFocus={autoFocus}
                  onChange={(e) => set(e.target.checked)} />
           <span>Yes</span>
         </label>
@@ -71,7 +83,7 @@ function Widget({
       // terminology gave the code, because nobody reads 229799001; the value
       // posted is still the code, so what is stored is what was confirmed.
       return (
-        <select className="f-in" value={str} disabled={disabled} autoFocus={autoFocus}
+        <select className="f-in" id={id} value={str} disabled={disabled} autoFocus={autoFocus}
                 onChange={(e) => set(e.target.value || undefined)}>
           <option value="">Choose</option>
           {options(q).map((o) => (
@@ -80,21 +92,21 @@ function Widget({
         </select>
       );
     case "text":
-      return <textarea className="f-in" id={`${ids}-${q.link_id}`} rows={4} value={str} disabled={disabled}
+      return <textarea className="f-in" id={id} rows={4} value={str} disabled={disabled}
                        autoFocus={autoFocus} onChange={(e) => set(e.target.value)} />;
     case "integer":
     case "decimal":
       // The id is how an instrument that refused to guess hands the cursor
       // back to this field. inputMode makes it a keypad on a phone.
       return (
-        <input className="f-in" id={`${ids}-${q.link_id}`} inputMode="decimal" value={str} disabled={disabled}
+        <input className="f-in" id={id} inputMode="decimal" value={str} disabled={disabled}
                step={q.type === "integer" ? 1 : "any"} type="number" autoFocus={autoFocus}
                onChange={(e) => set(e.target.value === "" ? undefined : e.target.value)} />
       );
     case "structured":
       return <Structured q={q} op={op} value={value} onChange={set} disabled={disabled} autoFocus={autoFocus} />;
     default:
-      return <input className="f-in" value={str} disabled={disabled} autoFocus={autoFocus}
+      return <input className="f-in" id={id} value={str} disabled={disabled} autoFocus={autoFocus}
                     onChange={(e) => set(e.target.value)} />;
   }
 }
@@ -330,7 +342,11 @@ export function Form({
     focused = true;
     return (
       <div className={`f-field${mine.length ? " bad" : ""}${unsure ? " unsure" : ""}`} key={q.link_id}>
-        <label className="f-lab">
+        {/* A structured answer is a GROUP of fields, not one field, and each
+            of its own sub widgets is already inside its own label. Pointing
+            this one at an id that is not in the document would be worse than
+            leaving it as the caption it is. */}
+        <label className="f-lab" htmlFor={q.type === "structured" ? undefined : `${ids}-${q.link_id}`}>
           {q.text}
           {phc.unit && <span className="f-unit">{phc.unit}</span>}
         </label>
@@ -367,10 +383,10 @@ export function Form({
 
       {blocked && (
         <div className="f-field override">
-          <label className="f-lab">
+          <label className="f-lab" htmlFor={`${ids}-${OVERRIDE}`}>
             Reason for overriding the range
           </label>
-          <textarea className="f-in" rows={2} disabled={disabled}
+          <textarea className="f-in" id={`${ids}-${OVERRIDE}`} rows={2} disabled={disabled}
                     value={String(value[OVERRIDE] ?? "")}
                     onChange={(e) => set(OVERRIDE, e.target.value || undefined)} />
         </div>

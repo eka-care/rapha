@@ -52,7 +52,7 @@ export function View({ result, decl, workflow, onOpenThread }: {
  *  the subject carries, minus the plumbing. Nothing here decides what a
  *  patient is.
  */
-function fields(
+export function fields(
   decl: ViewDecl | undefined,
   row: QueueRow,
   labelCols: string[] = [],

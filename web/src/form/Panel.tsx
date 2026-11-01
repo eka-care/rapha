@@ -18,7 +18,7 @@
  *  differs. The payload, the validation, the diff, the confirm stage and the
  *  single client call below are the same ones the modal uses.
  */
-import { useId, useMemo, useRef, useState } from "react";
+import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { ABHA_PENDING, demographicsFrom, payloadFor, runsJourney, type AbhaOutcome } from "../abha/sdk";
 import { Journey } from "../abha/Journey";
 import { ApiError, type Client } from "../api";
@@ -44,7 +44,7 @@ const IRREVERSIBLE = "irreversible";
 const FROM_ABHA = "From ABHA";
 
 export function OperationPanel({
-  op, thread, client, proposal, draft, instruments, inline, mobile, seed, found, onDone, onCancel,
+  op, thread, client, proposal, draft, instruments, inline, mobile, seed, start, found, onDone, onCancel,
 }: {
   op: Operation;
   thread: string;
@@ -57,6 +57,23 @@ export function OperationPanel({
    *  registration: the identifier is known, so asking for the journey a second
    *  time would be asking the patient for a second one time password. */
   seed?: Payload;
+  /** WHAT THE CLERK HAS ALREADY TYPED, carried into the fields.
+   *
+   *  Not a seed, and the difference is the whole reason it is a second prop.
+   *  A seed is somebody the desk FOUND, and finding them is exactly what
+   *  stops the national identity journey running. What a clerk typed into a
+   *  search box is not a person anybody has found: the journey still has to
+   *  run, because that is where a new patient's name and address come from
+   *  instead of the keyboard.
+   *
+   *  Carrying it was the mockup's own promise on that row -- "keeps what you
+   *  typed as the name" -- and it was broken: the typed name reached the row,
+   *  the row would not hand it over as a seed in case the journey stopped,
+   *  and the form opened empty. A clerk typed the name twice.
+   *
+   *  Nothing marks these values as coming from anywhere, because they came
+   *  off this clerk's own keyboard thirty seconds ago. */
+  start?: Payload;
   /** Where the seed came from, when it did not come from the ABHA journey.
    *
    *  The front desk seeds this form from somebody it FOUND: a row this centre
@@ -100,7 +117,7 @@ export function OperationPanel({
   onCancel?: () => void;
 }) {
   const schema = questionnaire(op.input);
-  const [payload, setPayload] = useState<Payload>({ ...(proposal?.payload ?? draft?.values ?? seed ?? {}) });
+  const [payload, setPayload] = useState<Payload>({ ...(proposal?.payload ?? draft?.values ?? seed ?? start ?? {}) });
   const [ticked, setTicked] = useState<Set<string>>(new Set());
   const unticked = mustTick(draft ?? null, ticked, payload);
   /** Per link_id, how sure the instrument that produced the value was. A
@@ -140,6 +157,41 @@ export function OperationPanel({
   // so Tab can be held inside it.
   const opener = useRef<HTMLElement | null>(null);
   const box = useRef<HTMLElement | null>(null);
+
+  /** THE REF ITSELF HAS TO BE STABLE, AND THAT IS NOT A STYLE POINT.
+   *
+   *  React detaches and re-attaches a ref whose callback is a NEW FUNCTION on
+   *  every render, which an inline arrow is. So this panel ran its "closing"
+   *  branch and its "opening" branch once per keystroke: `opener.current` was
+   *  refocused, `landed` was reset, and `el.focus()` moved the keyboard back
+   *  onto the dialog box. The visible effect was that a clerk could type ONE
+   *  character into a field and then found themselves typing into nothing --
+   *  on every field, of every operation, on every screen that opens a panel.
+   *  The guard above was written to prevent exactly this and could never
+   *  fire, because the branch that resets it ran first every time.
+   *
+   *  `useCallback` with a stable identity is what makes the guard mean what
+   *  it says: attached once when the panel opens, called with null once when
+   *  it closes. It is not an effect and it is not a timer, so the property
+   *  voice.check.ts asserts about this file still holds.
+   */
+  const landing = useCallback((el: HTMLElement | null) => {
+    if (inline) return;
+    if (!el) {
+      // Closing. Whoever opened this gets the keyboard back; without this the
+      // focus is left on a node React has already removed and the next Tab
+      // starts again at the top of the document.
+      opener.current?.focus();
+      opener.current = null;
+      landed.current = false;
+      return;
+    }
+    if (landed.current) return;
+    landed.current = true;
+    opener.current = document.activeElement as HTMLElement | null;
+    el.focus();
+    box.current = el;
+  }, [inline]);
 
   const problems = useMemo(() => (schema ? validate(schema, payload) : []), [schema, payload]);
 
@@ -270,6 +322,16 @@ export function OperationPanel({
     .filter((p) => p.message.endsWith("is required"))
     .map((p) => labels.get(p.link_id) ?? p.link_id);
 
+  /** Whether a MACHINE put anything in these fields: a proposal, a recording,
+   *  a record the desk found, or the national journey. Only then is the list
+   *  of what is still empty worth drawing before anybody has tried, because
+   *  then it is a report on what the machine left out. On a form nobody has
+   *  touched it is not that at all: it is five red words telling a clerk off
+   *  for not having typed yet, which is the opposite of what this screen is
+   *  for. What the clerk themselves typed into the search box does not count:
+   *  they know what they typed. */
+  const prefilled = !!proposal || !!draft || !!seed || Object.keys(fromAbha).length > 0;
+
   const changed = proposal
     ? labelled(schema, payload).filter(([id]) => String(proposal.payload?.[id] ?? "") !== String(payload[id] ?? ""))
     : [];
@@ -281,23 +343,7 @@ export function OperationPanel({
          handled right here -- did nothing, and a screen reader was never
          taken to the thing that had just covered the screen. The inline
          variant is not a modal and does not pretend to be. */
-      ref={(el) => {
-        if (inline) return;
-        if (!el) {
-          // Closing. Whoever opened this gets the keyboard back; without
-          // this the focus is left on a node React has already removed and
-          // the next Tab starts again at the top of the document.
-          opener.current?.focus();
-          opener.current = null;
-          landed.current = false;
-          return;
-        }
-        if (landed.current) return;
-        landed.current = true;
-        opener.current = document.activeElement as HTMLElement | null;
-        el.focus();
-        box.current = el;
-      }}
+      ref={landing}
       tabIndex={inline ? undefined : -1}
       role={inline ? undefined : "dialog"}
       aria-modal={inline ? undefined : true}
@@ -389,7 +435,7 @@ export function OperationPanel({
           />
         )}
 
-        {showForm && missing.length > 0 && !tried && (
+        {showForm && prefilled && missing.length > 0 && !tried && (
           <div className="missing">Missing: {missing.join(", ")}</div>
         )}
 

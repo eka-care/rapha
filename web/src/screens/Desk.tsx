@@ -17,23 +17,50 @@
  *  draws on its rows, and the cost line under it -- "returning: 1 keystroke
  *  run + Enter", "new: Tab, then 4 answers".
  *
+ *  WHAT A ROW SAYS, AND WHERE IT LEADS. The selected row carries the key that
+ *  takes it AND the station that key leads to, because `↵` alone told a clerk
+ *  nothing about what was about to happen to the person in front of them. The
+ *  word is the workflow's -- the step after the one this operation belongs to
+ *  -- and the line under the name is every column the queue view declared,
+ *  each under the word the bundle gives that stored value. Both are the
+ *  mockup's row (`34 · female · Sonpur · last seen 18 Jun`, `↵ send to
+ *  nurse`) built out of declarations instead of out of this file.
+ *
+ *  WHAT IS HERE BEFORE A KEY IS PRESSED. The screen used to say "Nobody
+ *  searched for yet." A clerk arriving at their shift was told nothing: not
+ *  who had scanned the poster by the door and was sitting in the waiting
+ *  room, not how long the line was, not who had already been through this
+ *  desk this morning. All three are in the rows the declared queue view
+ *  already returns. See desk.arrivals for what earns its place and what does
+ *  not; this screen's job is still the box, and the day disappears the
+ *  instant anything is typed.
+ *
  *  WHAT THIS SCREEN NEVER DOES. It does not write. Choosing a row opens an
  *  empty visit and puts values in the panel's ordinary editable fields; the
  *  panel's own tap, behind the guard, is still the only write. And it names
- *  nothing: the heading, the create row's label and the operation it commits
- *  through all come from declarations, and what a row says about a person
- *  comes from the queue view's own columns.
+ *  nothing: the screen's own name, the create row's label, the station a row
+ *  leads to and the operation it commits through all come from declarations,
+ *  and what a row says about a person comes from the queue view's own
+ *  columns.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { mobileHint } from "../abha/sdk";
+import { ABHA_LINKED, identified, mobileHint } from "../abha/sdk";
+import { Lotus } from "../abha/Lotus";
 import { ApiError, type Client } from "../api";
-import { questionnaire } from "../declarations";
-import { directoryNote, rows as deskRows, type DeskRow, type Resolution } from "../desk";
+import { displayFor, questionnaire } from "../declarations";
+import {
+  arrivals, destination, directoryNote, firstStation,
+  rows as deskRows, type Desk as DeskRules, type DeskRow, type Resolution,
+} from "../desk";
 import { OperationPanel } from "../form/Panel";
 import { say } from "../announce";
+import { labelColumns, marked, provenanceOf } from "../loops";
+import { clock } from "../messages";
 import { Failed, Loading } from "../parts";
 import { createLabel, firstOperation } from "../search";
-import type { Catalogue, ViewDecl } from "../types";
+import type { Catalogue, QueueRow, ViewDecl } from "../types";
+import { fields } from "../view/View";
+import { human } from "../words";
 import { walk } from "../validate";
 
 /** What the chip under a filled field says, per kind of row. Neither of these
@@ -47,13 +74,21 @@ const FROM_DIRECTORY = "From the patient directory";
  *  enough that the list is there before they stop typing. */
 const SETTLE = 180;
 
-export function Desk({ cat, decl, workflow, client, onOpenThread }: {
+export function Desk({ cat, decl, workflow, client, queue, loadingQueue, onOpenThread }: {
   cat: Catalogue;
   /** The queue view, which is what declares how a person is described here.
    *  Absent draws whatever a record carries, minus the plumbing. */
   decl?: ViewDecl;
   workflow?: string;
   client: Client;
+  /** Today's rows off that same queue view, already read by the app for the
+   *  rail's counts and the home screen. Read once and shared, because two
+   *  reads of one view is two different numbers on one screen. */
+  queue?: QueueRow[];
+  /** Whether that read is still running. Without it the desk draws an empty
+   *  facility -- nobody waiting, nobody seen -- which is a confident lie and
+   *  looks exactly like a kernel that is down. */
+  loadingQueue?: boolean;
   onOpenThread: (thread: string) => void;
 }) {
   const [typed, setTyped] = useState("");
@@ -114,14 +149,21 @@ export function Desk({ cat, decl, workflow, client, onOpenThread }: {
     [op?.input],
   );
 
-  const rows = useMemo(
-    () => deskRows(found, typed, decl, questions, mobileHint, createLabel(cat, workflow)),
-    [found, typed, decl, questions, cat, workflow],
-  );
+  /** Where taking a row leads: the station after the one this operation
+   *  belongs to. The workflow's word, never this file's. */
+  const goes = useMemo(() => destination(cat, op, workflow), [cat, op, workflow]);
+
+  const rules: DeskRules = useMemo(() => ({
+    decl, questions, hint: mobileHint, freshLabel: createLabel(cat, workflow),
+    display: displayFor, identified,
+  }), [decl, questions, cat, workflow]);
+
+  const rows = useMemo(() => deskRows(found, typed, rules), [found, typed, rules]);
   useEffect(() => { setPick(0); }, [typed]);
 
   const note = directoryNote(found);
   const freshAt = rows.findIndex((r) => r.kind === "fresh");
+  const searched = typed.trim().length > 0;
 
   const choose = async (row: DeskRow) => {
     setError(null);
@@ -170,7 +212,6 @@ export function Desk({ cat, decl, workflow, client, onOpenThread }: {
         }}
       />
 
-      {note && <div className="desk-note" role="status">{note}</div>}
       {error && <Failed error={error} what="search for this patient" onRetry={() => setError(null)} />}
 
       <div className="desk-hits" id="desk-hits" role="listbox" aria-label="Who this might be">
@@ -182,29 +223,71 @@ export function Desk({ cat, decl, workflow, client, onOpenThread }: {
             aria-selected={i === pick}
             data-active={i === pick}
             className={`desk-hit${r.kind === "fresh" ? " fresh" : ""}`}
-            onMouseDown={(e) => { e.preventDefault(); void choose(r); }}
+            /* MOUSEDOWN ONLY KEEPS THE KEYBOARD WHERE IT IS; THE CLICK IS THE
+               ACTION. Taking the row used to hang off mousedown alone, and a
+               mousedown is something only a mouse produces: a clerk who
+               tabbed onto this row and pressed Enter fired a `click` that
+               nothing was listening for, so the row took the focus and then
+               did nothing at all. The whole "new: Tab, then 4 answers" path
+               was mouse only. preventDefault stays, because without it the
+               box loses focus the instant a mouse comes near the list. */
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => { void choose(r); }}
           >
             <span className="desk-hit-b">
-              <span className="desk-hit-n">{r.name}</span>
+              <span className="desk-hit-n">
+                {r.name}
+                {/* The same mark the queue row wears, for the same reason and
+                    never as the only carrier: it has its own accessible name.
+                    A clerk confirming that this is the right person has one
+                    more fact to go on, and it is a national identifier rather
+                    than anything a bundle declared. */}
+                {r.identified && <Lotus className="desk-hit-lotus" />}
+              </span>
               {r.meta && <span className="desk-hit-m">{r.meta}</span>}
             </span>
-            {/* The key that takes this row, written on it. Not a hover
-                tooltip: a clerk learning the keyboard has to be able to see
-                it while reading the row, and the whole design is that they
-                never go looking. */}
-            <span className="desk-hit-k" aria-hidden="true">
-              {i === pick ? "↵" : r.kind === "fresh" ? "⇥" : "↓"}
+            {/* The key that takes this row, and where it leads, written on
+                it. Not a hover tooltip: a clerk learning the keyboard has to
+                be able to see it while reading the row, and the whole design
+                is that they never go looking. The station is the workflow's
+                word; "sends to" is not a declaration's to give. */}
+            <span className="desk-hit-k">
+              <span aria-hidden="true">{i === pick ? "↵" : r.kind === "fresh" ? "⇥" : "↓"}</span>
+              {i === pick && goes && (
+                <>
+                  <span className="u-sr"> sends to </span>
+                  <span className="desk-hit-go">{goes}</span>
+                </>
+              )}
             </span>
           </button>
         ))}
-        {!rows.length && (searching
+        {!rows.length && searched && (searching
           ? <Loading what="who this might be" shape="rows" rows={3} />
           : (
             <div className="desk-empty" role="status">
-              {typed.trim() ? "Nobody here by that name yet. Keep typing, or register them." : "Nobody searched for yet."}
+              Nobody here by that name yet. Keep typing, or register them.
             </div>
           ))}
       </div>
+
+      {/* What the directory said, once, quietly, and UNDER the people it is
+          not about. It used to sit above them in warning colour on every
+          single search, which in a deployment with no directory is a
+          permanent alarm about a condition that will never change -- and the
+          largest thing on a screen whose job is the patient. Colour here
+          means clinical risk; a missing directory is not one. */}
+      {note && <p className="desk-note">{note}</p>}
+
+      {!searched && (
+        <Day
+          decl={decl}
+          rows={queue ?? []}
+          loading={!!loadingQueue}
+          first={firstStation(cat, workflow)}
+          onOpenThread={onOpenThread}
+        />
+      )}
 
       {op && thread && opening && (
         <>
@@ -220,6 +303,12 @@ export function Desk({ cat, decl, workflow, client, onOpenThread }: {
                is the anti-goal NHA tests for. Nobody yet gets no seed, so the
                journey runs and fills the form from their profile. */
             seed={opening.kind === "fresh" ? undefined : opening.values}
+            /* What the clerk typed, on the row that creates somebody new. NOT
+               a seed: a seed means somebody was found, and being found is
+               what stops the identity journey. This is the mockup's "keeps
+               what you typed as the name", and it has to survive the journey
+               being skipped. */
+            start={opening.kind === "fresh" ? opening.values : undefined}
             found={opening.kind === "fresh" ? undefined : {
               source: opening.kind === "known" ? FROM_HERE : FROM_DIRECTORY,
               evidence: opening.evidence,
@@ -232,5 +321,84 @@ export function Desk({ cat, decl, workflow, client, onOpenThread }: {
         </>
       )}
     </div>
+  );
+}
+
+/** The shift, before anything is typed.
+ *
+ *  Two short lists and the day's one number. Which rows go in which list is
+ *  desk.arrivals' answer and the reasoning is there; this draws them. Every
+ *  word on a row is the queue view's own -- the number, the name, the mark
+ *  that says somebody arrived by themselves -- read through the same
+ *  `fields()` the queue list uses, so the desk and the queue cannot come to
+ *  disagree about one patient.
+ */
+function Day({ decl, rows, loading, first, onOpenThread }: {
+  decl?: ViewDecl;
+  rows: QueueRow[];
+  loading: boolean;
+  first?: string;
+  onOpenThread: (thread: string) => void;
+}) {
+  const day = useMemo(() => arrivals(rows, first), [rows, first]);
+  const provenance = provenanceOf(decl);
+  const labelCols = labelColumns(decl);
+
+  if (loading) return <Loading what="who is already here" shape="rows" rows={3} />;
+
+  const line = (row: QueueRow) => {
+    const f = fields(decl, row, labelCols, provenance?.column);
+    const wears = marked(row, provenance);
+    return (
+      <button className="desk-wr" key={row.thread} onClick={() => onOpenThread(row.thread)}>
+        {f.token && (
+          <span
+            className={`desk-wr-tk${wears ? " mark" : ""}`}
+            aria-label={wears ? `${f.token}, ${provenance!.label}` : undefined}
+          >
+            {f.token}
+          </span>
+        )}
+        {/* A thread nobody has registered yet HAS no name, and `fields()`
+            falls back to the thread id -- which is an internal code and the
+            one thing a clerk must never be shown. This is exactly the row
+            this list exists for: somebody who arrived, took a number, and has
+            not been to the desk. Say that, rather than printing the code. */}
+        <span className={`desk-wr-nm${f.name === row.thread ? " u-mute" : ""}`}>
+          {f.name === row.thread ? "No name yet" : f.name}
+        </span>
+        {(row.flags ?? []).includes(ABHA_LINKED) && <Lotus className="desk-hit-lotus" />}
+        <span className="desk-wr-at">{human(row.station) || clock(row.opened_at)}</span>
+      </button>
+    );
+  };
+
+  return (
+    <section className="desk-day">
+      <h2 className="desk-day-h">
+        Waiting here
+        <span className="desk-day-c">{day.waiting.length}</span>
+      </h2>
+      {day.waiting.length
+        ? <div className="desk-day-l">{day.waiting.map(line)}</div>
+        : (
+          <p className="desk-day-e">
+            Nobody is waiting at this desk. Anybody who arrives at the poster by
+            the door appears here.
+          </p>
+        )}
+
+      <h2 className="desk-day-h">
+        Already sent on today
+        <span className="desk-day-c">{day.sent.length}</span>
+      </h2>
+      {day.sent.length
+        ? <div className="desk-day-l">{day.sent.map(line)}</div>
+        : <p className="desk-day-e">Nobody has been through this desk today yet.</p>}
+
+      <p className="desk-day-n">
+        {day.all} in the workspace today, {day.moving.length} still on the line.
+      </p>
+    </section>
   );
 }

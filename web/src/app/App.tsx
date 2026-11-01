@@ -8,6 +8,7 @@ import { api, ApiError, currentRole, useAsync } from "../api";
 import { ask } from "../ask";
 import { createLabel, firstOperation } from "../search";
 import { displayFor, load as loadDeclarations, questionnaire } from "../declarations";
+import { deskTitle } from "../desk";
 import { keep, type Recent } from "../loops";
 import { header, queueViewFor, type Ctx, type Said } from "../messages";
 import { say } from "../announce";
@@ -221,13 +222,24 @@ export function App() {
     }
   };
 
-  // The desk is titled by the operation it commits through, which is a
-  // declaration's word and not this file's. Every other route is titled the
-  // way it always was.
+  // The desk is titled by the STATION a patient reaches first, which is the
+  // workflow's first step and is what that screen is. It used to wear the
+  // declared title of the operation its panel commits through -- "Register a
+  // new patient" -- so the screen was called by the name of one of the two
+  // things it does, and called that while a clerk was searching for somebody
+  // who is already registered. See desk.deskTitle. The operation's title has
+  // not moved: it is still the name of the panel. Every other route is
+  // titled the way it always was.
   const deskOp = catalogue.operations?.[firstOperation(catalogue, facility.data?.bundle.workflow) ?? ""];
   const title = route.kind === "desk"
-    ? (deskOp?.title ?? createLabel(catalogue, facility.data?.bundle.workflow))
+    ? (deskTitle(catalogue, facility.data?.bundle.workflow)
+       || deskOp?.title || createLabel(catalogue, facility.data?.bundle.workflow))
     : titleFor(route, navViews);
+
+  // The queue this desk is the front of, read once with every other view so
+  // the rail, the home screen and the desk cannot show three numbers.
+  const deskQueue = queueViewFor(catalogue, facility.data?.bundle.workflow);
+  const deskRows = (loaded.find((l) => l.decl.id === deskQueue?.id)?.result.rows ?? []) as QueueRow[];
 
   return (
     <div className="app">
@@ -314,9 +326,11 @@ export function App() {
                 {route.kind === "desk" && (
                   <Desk
                     cat={catalogue}
-                    decl={queueViewFor(catalogue, facility.data?.bundle.workflow)}
+                    decl={deskQueue}
                     workflow={facility.data?.bundle.workflow}
                     client={api}
+                    queue={deskRows}
+                    loadingQueue={loadingViews}
                     onOpenThread={(t) => { reload(); go(`#/threads/${t}`); }}
                   />
                 )}

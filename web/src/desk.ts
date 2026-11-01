@@ -26,7 +26,8 @@
  *  carried on the search response as `commits_through`, so the desk cannot
  *  disagree with the kernel about what registering is.
  */
-import type { Payload, ViewDecl } from "./types";
+import type { Catalogue, Display, Operation, Payload, QueueRow, ViewDecl, Workflow } from "./types";
+import { human, title as titleCase } from "./words.ts";
 
 /** One directory profile, as values for the register form. The shape
  *  kernel/directory.Suggestion serialises to. */
@@ -77,6 +78,33 @@ export type DeskRow = {
    *  so nobody types it twice. Only ever on a `fresh` row: a person we have
    *  already found is not asked for a one time password. */
   mobile?: string;
+  /** Whether the record this row is about already carries a national health
+   *  account. Drawn as the lotus beside the name, the same mark the queue row
+   *  wears, because a clerk about to commit somebody else's record to the day
+   *  needs every corroborating fact the row can carry. Decided by the one
+   *  documented exception in this renderer and injected, not tested here. */
+  identified?: boolean;
+};
+
+/** Everything the desk draws a row out of that it may not know by itself.
+ *
+ *  Gathered into one argument rather than six positional ones. Each member is
+ *  a declaration or a rule from somewhere this file may not import: `hint`
+ *  and `identified` are the ABHA exception, which lives in abha/; `display`
+ *  is what a bundle calls one of its own stored codes; `decl` is the queue
+ *  view; `freshLabel` is the declared verb of the operation that creates.
+ */
+export type Desk = {
+  decl?: ViewDecl;
+  questions: { link_id: string; answer_option?: { value: string }[] }[];
+  hint: (typed: string) => string | undefined;
+  freshLabel: string;
+  /** What a declared value is CALLED. Without it a row drew the stored code,
+   *  so a centre's antenatal patient read `anc` on the one line a clerk uses
+   *  to decide whether this is the right person. */
+  display: Display;
+  /** Whether a record carries a national health account. */
+  identified: (record: Record<string, unknown>) => boolean;
 };
 
 /** Plumbing, not something to show a clerk. The same test view/View.tsx
@@ -106,13 +134,129 @@ export function describing(decl: ViewDecl | undefined, record: Record<string, un
  *  Sharing the half that is common would leave both callers reading a
  *  function whose other half is about the one thing they do not have.
  */
-export function lead(decl: ViewDecl | undefined, record: Record<string, unknown>): {
-  name: string; meta: string;
-} {
+export function lead(
+  decl: ViewDecl | undefined,
+  record: Record<string, unknown>,
+  /** What a declared value is called. A row that says `anc` where the queue
+   *  beside it says RCH is two screens disagreeing about one patient, and
+   *  this is the row a clerk reads before committing somebody else's record
+   *  to the day. */
+  display: Display = (_k, v) => v,
+): { name: string; meta: string } {
   const keys = describing(decl, record);
   return {
     name: keys.length ? text(record[keys[0]]) : "",
-    meta: keys.slice(1, 4).map((k) => text(record[k])).join(" · "),
+    // EVERY other column the view declared that this record carries, not the
+    // first three. The mockup's row is `34 · female · Sonpur · last seen 18
+    // Jun`, and the point of the line is that a clerk can be SURE this is the
+    // person in front of them before they commit the day to it. Capped at
+    // five so one richly declared view cannot run the line off the row.
+    meta: keys.slice(1, 6).map((k) => display(k, text(record[k]))).join(" · "),
+  };
+}
+
+/** Which workflow this screen is about: the one the facility named, or the
+ *  only one there is. The same fallback search.firstOperation makes, for the
+ *  same reason. */
+function workflowOf(cat: Catalogue, workflow?: string): Workflow | undefined {
+  return (workflow && cat.workflows?.[workflow]) || Object.values(cat.workflows ?? {})[0];
+}
+
+/** The station a patient reaches first. The workflow's first step, and the
+ *  only thing on this screen that says which arrivals the desk has not met
+ *  yet: a thread standing there has not been sent on. */
+export function firstStation(cat: Catalogue, workflow?: string): string | undefined {
+  return workflowOf(cat, workflow)?.steps?.[0]?.station;
+}
+
+/** WHAT THIS SCREEN IS CALLED.
+ *
+ *  It was called "Register a new patient", which is the declared title of the
+ *  operation the panel commits through -- so the screen wore the name of one
+ *  of the two things it does, and wore it while the clerk was searching for
+ *  somebody who is already registered.
+ *
+ *  A screen's name has to come from a declaration like every other word here,
+ *  and the declaration that already says what this place is, is the
+ *  workflow's: its FIRST STEP is the station a patient reaches first, and
+ *  this screen is that station. So a health centre's desk is named after the
+ *  centre's own first station and a laboratory's bench after its own, with no
+ *  word typed here and no second declaration invented.
+ *
+ *  Empty when the workflow declares no steps, and the caller falls back to
+ *  what it drew before rather than to a word of its own.
+ */
+export function deskTitle(cat: Catalogue, workflow?: string): string {
+  return titleCase(firstStation(cat, workflow) ?? "");
+}
+
+/** WHERE TAKING A ROW SENDS THIS PERSON, in the workflow's own word.
+ *
+ *  The mockup draws the selected row as `↵ send to nurse`, and the spec's
+ *  first goal is that a returning patient reaches the nurse without the clerk
+ *  typing a full record. The row said `↵` and nothing else, so the one thing
+ *  a clerk needed to know about the key -- where it leads -- was the one
+ *  thing it did not say.
+ *
+ *  Read off the workflow: the step after the one the chosen operation belongs
+ *  to. A step the workflow declares CONDITIONAL is skipped, because a
+ *  conditional step is one a patient may not walk at all and naming it would
+ *  promise a destination nobody can be sure of. Empty when the operation ends
+ *  the line, and then the row says nothing rather than guessing.
+ */
+export function destination(
+  cat: Catalogue, op: Operation | undefined, workflow?: string,
+): string {
+  const steps = workflowOf(cat, workflow)?.steps ?? [];
+  const at = steps.findIndex((s) => s.station === op?.station);
+  if (at < 0) return "";
+  return human(steps.slice(at + 1).find((s) => !s.applies_when)?.station ?? "");
+}
+
+/** WHAT IS ON THIS SCREEN BEFORE A KEY IS PRESSED.
+ *
+ *  The desk used to say "Nobody searched for yet.", which tells a clerk
+ *  arriving at their shift nothing at all. The spec's goals name the poster
+ *  queue and the day's numbers, and both are already in the rows the declared
+ *  queue view returns. Three facts come out of them and nothing else does:
+ *
+ *   - WHO IS HERE AND HAS NOT BEEN SENT ON. A thread standing at the
+ *     workflow's first step has not been registered. That is the person who
+ *     scanned the poster by the door and is sitting in the waiting room, and
+ *     the desk is the only place anybody finds out. The spec: "Self
+ *     registration by poster takes the clerk out of the loop entirely" -- but
+ *     only if the clerk can see them.
+ *   - HOW MANY ARE IN THE LINE, which is the one number a clerk is asked all
+ *     day and the one they cannot see from a search box.
+ *   - WHO THIS DESK HAS ALREADY SENT ON TODAY, newest first, so a patient
+ *     being registered twice in one morning is caught by eye before a second
+ *     record exists. Nothing merges two.
+ *
+ *  It is not a dashboard and it is not allowed to become one: three numbers
+ *  and two short lists, and this function caps both.
+ */
+export type Arrivals = {
+  /** Standing at the first step: arrived, not sent on. */
+  waiting: QueueRow[];
+  /** Past the first step and still walking the line. */
+  moving: QueueRow[];
+  /** Past the first step, newest first, capped. */
+  sent: QueueRow[];
+  /** Everybody the queue returned, including those whose line has finished. */
+  all: number;
+};
+
+export function arrivals(
+  rows: QueueRow[], first: string | undefined, take = 4,
+): Arrivals {
+  const waiting = first ? rows.filter((r) => r.station === first) : [];
+  const past = rows.filter((r) => r.station !== first);
+  const newest = [...past].sort((a, b) => String(b.opened_at).localeCompare(String(a.opened_at)));
+  return {
+    waiting: waiting.slice(0, take),
+    moving: past.filter((r) => r.station),
+    sent: newest.slice(0, take),
+    all: rows.length,
   };
 }
 
@@ -155,19 +299,14 @@ export function answers(
  *  `hint` is abha/sdk.ts's mobileHint, passed in rather than imported, so
  *  this file stays free of the one exception and the check can drive it.
  */
-export function fresh(
-  typed: string,
-  decl: ViewDecl | undefined,
-  hint: (typed: string) => string | undefined,
-  label: string,
-): DeskRow {
+export function fresh(typed: string, d: Desk): DeskRow {
   const want = typed.trim();
-  const mobile = hint(want);
-  const nameKey = ((decl?.columns ?? []) as string[])[0];
+  const mobile = d.hint(want);
+  const nameKey = ((d.decl?.columns ?? []) as string[])[0];
   return {
     kind: "fresh",
     id: "fresh",
-    name: label,
+    name: d.freshLabel,
     meta: want,
     values: !mobile && nameKey && want ? { [nameKey]: want } : {},
     ...(mobile ? { mobile } : {}),
@@ -186,38 +325,33 @@ export function fresh(
  *  is down must still be able to register the person standing in front of
  *  them, and a desk that offers nothing is a desk that sends them away.
  */
-export function rows(
-  found: Resolution | null,
-  typed: string,
-  decl: ViewDecl | undefined,
-  questions: { link_id: string; answer_option?: { value: string }[] }[],
-  hint: (typed: string) => string | undefined,
-  freshLabel: string,
-): DeskRow[] {
+export function rows(found: Resolution | null, typed: string, d: Desk): DeskRow[] {
   const out: DeskRow[] = [];
   if (found) {
     for (const record of found.local) {
-      const { name, meta } = lead(decl, record);
+      const { name, meta } = lead(d.decl, record, d.display);
       out.push({
         kind: "known",
         id: `known:${text(record.id) || name}`,
         name, meta,
-        values: answers(record, questions),
+        values: answers(record, d.questions),
+        identified: d.identified(record),
       });
     }
     for (const s of found.suggestions) {
-      const { name, meta } = lead(decl, s.values);
+      const { name, meta } = lead(d.decl, s.values, d.display);
       out.push({
         kind: "suggested",
         id: `suggested:${s.directory_id}`,
         name, meta,
-        values: answers(s.values, questions),
+        values: answers(s.values, d.questions),
         evidence: s.evidence,
         confidence: s.confidence,
+        identified: d.identified(s.values),
       });
     }
   }
-  if (typed.trim()) out.push(fresh(typed, decl, hint, freshLabel));
+  if (typed.trim()) out.push(fresh(typed, d));
   return out;
 }
 
@@ -227,21 +361,24 @@ export function rows(
  *  Resolution docstring is explicit about: "one means nobody matched, the
  *  other means I could not look, and a clerk who cannot tell them apart
  *  registers a duplicate."
+ *
+ *  ONE SENTENCE, LEADING WITH THE FACT THE CLERK NEEDS. It used to be two,
+ *  and the first of them was about a directory the clerk never asked for:
+ *  "The patient directory could not be asked: no patient directory is
+ *  configured or reachable. Only this centre's own register was searched." In
+ *  a deployment with no directory that is permanently true, so it was drawn
+ *  on every search, hundreds of times a day, in warning colour, above the
+ *  patient. What a clerk actually has to know is which register answered;
+ *  WHY the other one did not is the clause after the colon, and it is still
+ *  the kernel's own words rather than a sentence invented here.
  */
 export function directoryNote(found: Resolution | null): string {
   if (!found) return "";
   if (found.reachable) return "";
-  // The kernel's sentence, finished. `reason` is a clause the directory
-  // handed back and nothing promises it ends in a full stop, so running the
-  // next sentence straight onto it produced "...or reachable Only this
-  // centre's own register was searched."
   const said = found.reason.trim();
-  if (!said) return "The patient directory could not be asked. Only this centre's own register was searched.";
-  // A colon, because the kernel's clause continues this sentence rather than
-  // starting its own: after a full stop it read "could not be asked. no
-  // patient directory is configured". And the clause is finished with a stop
-  // of its own, because nothing promises it carries one and without it the
-  // next sentence ran straight onto the end of it.
-  const whole = /[.!?]$/.test(said) ? said : `${said}.`;
-  return `The patient directory could not be asked: ${whole} Only this centre's own register was searched.`;
+  // The kernel's clause is a fragment and nothing promises it ends in a stop,
+  // so the sentence is finished here rather than run on. A reason that
+  // already carries one does not get a second.
+  if (!said) return "Only this centre's own register was searched: the patient directory could not be asked.";
+  return `Only this centre's own register was searched: ${/[.!?]$/.test(said) ? said : `${said}.`}`;
 }
