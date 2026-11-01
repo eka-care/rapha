@@ -7,16 +7,19 @@ and a dangling reference is a build failure and not a warning. A capability
 misspelt in frontmatter is not a typo, it is a screen nobody can open or one
 anybody can.
 
-`documents` is the exception, and for the reason kernel/mapping.py gives for
-its own: it is not compiled into catalogue.json. Nothing outside the kernel
-projects a document, the Go server proposes only, and the renderer must never
-learn a section heading. Add it to the compiled artifact when an out of
-process consumer needs it.
+`documents` WAS the exception, for the reason kernel/mapping.py gave for its
+own: it was not compiled into catalogue.json, because nothing outside the
+kernel projected a document. That changed on 2026-11-01, when the outbox was
+ported: the outbox is the first production caller of `kernel.fhir.document()`,
+and a Go engine that cannot read the placement cannot publish at all. It is a
+bundle key now. The renderer still may never learn a section heading, and the
+check that holds the renderer to this bundle's words is what fails if it does.
 
-compile_json() returns exactly the five new catalogue.json keys, so the
-compiler can stay one writer: build.py adds them with one update() call and
-keeps writing the file. Until it does, the kernel loads declarations from
-bundles/<id>/ directly, which is the same data by the same lint.
+compile_json() returns exactly the catalogue.json keys the one loaded bundle
+owns, so the compiler can stay one writer: build.py adds them with one
+update() call and keeps writing the file. Until it does, the kernel loads
+declarations from bundles/<id>/ directly, which is the same data by the same
+lint.
 
 Pure: reads files, touches no database and no network.
 """
@@ -775,7 +778,38 @@ def compile_json(bundle):
         # and was not before.
         "mapping": {op_id: op["mapping"] for op_id, op in bundle.operations.items()
                     if op.get("mapping")},
+        # Where each kind of row is filed, which until now reached no engine
+        # but this one. See kernel/contracts.BUNDLE_KEYS for why it is in the
+        # artifact from 2026-11-01 and was not before, and `_compiled_documents`
+        # for why its sections are a list.
+        "documents": _compiled_documents(bundle.documents),
     }
+
+
+def _compiled_documents(documents):
+    """`bundle.documents` as the artifact carries it: sections IN ORDER.
+
+    The in-memory shape is kwargs for `fhir.document()`, so `sections_wanted`
+    is a mapping and its insertion order is the declaration's. The artifact
+    cannot carry that: write_catalogue dumps with sort_keys=True. So the
+    sections become a LIST here, which no dumper can reorder, and each query
+    becomes a named pair rather than a tuple.
+
+    Not a second answer to where a row is filed. This is the same dict, turned
+    into a shape that survives being written down, and `_lint_documents` has
+    already refused anything the profile does not declare.
+    """
+    out = {}
+    for did, doc in (documents or {}).items():
+        out[did] = {
+            "profile": doc["profile"],
+            "sections": [
+                {"slice": name,
+                 "queries": [{"resource": resource, "where": dict(where or {})}
+                             for resource, where in queries or []]}
+                for name, queries in doc["sections_wanted"].items()],
+        }
+    return out
 
 
 def write_catalogue(bundle):

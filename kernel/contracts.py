@@ -812,8 +812,30 @@ CATALOGUE_KEYS = ("capabilities", "bundles", "states", "operations")
 # already resolved: the `question:` codings are bound at build time, so what
 # travels is plain JSON and the engine that reads it re-checks every code
 # against the same value set before it fills a column.
+#
+# `documents` is which section of which profile each kind of row is filed
+# under: bundles/<id>/bundle.yaml's own `documents:` key, linted by
+# kernel.declarations._lint_documents against kernel/fhir.PROFILES. Added
+# 2026-11-01, after G7, on the owner's decision. It was deliberately absent
+# while nothing outside the kernel projected a document; the outbox is the
+# first production caller of kernel.fhir.document(), the outbox is being
+# ported, and a Go engine that cannot read the placement cannot publish at
+# all.
+#
+# ITS SECTIONS ARE A LIST AND NOT A MAPPING, which is the whole of its shape
+# decision and is `state_order`'s reason over again. The projection iterates
+# the declared sections IN ORDER, and that order is observable three times: the
+# order the sections come out in, the order the Bundle's entries come out in,
+# and the order the authors are discovered in. write_catalogue dumps this file
+# with sort_keys=True, so a mapping would arrive alphabetically; the PHC
+# bundle declares ChiefComplaints, Medications, DocumentReference, which is not
+# alphabetical, so a mapping here would silently publish every consultation
+# with its narrative and its medicines the other way round. A list cannot be
+# reordered by a dumper, so the order is carried rather than restated beside
+# the thing it orders.
 BUNDLE_KEYS = ("manifest", "workflows", "views", "instruments", "metrics",
-               "scribe", "plugins", "facilities", "vocabulary", "mapping")
+               "scribe", "plugins", "facilities", "vocabulary", "mapping",
+               "documents")
 
 
 def compiled_keys() -> Iterable[str]:

@@ -115,6 +115,40 @@
     "vitals.record",
     "worklist.read"
   ],
+  "documents": {
+    "consultation": {
+      "profile": "OPConsultRecord",
+      "sections": [
+        {
+          "queries": [
+            {
+              "resource": "condition",
+              "where": {}
+            }
+          ],
+          "slice": "ChiefComplaints"
+        },
+        {
+          "queries": [
+            {
+              "resource": "medication_request",
+              "where": {}
+            }
+          ],
+          "slice": "Medications"
+        },
+        {
+          "queries": [
+            {
+              "resource": "notes",
+              "where": {}
+            }
+          ],
+          "slice": "DocumentReference"
+        }
+      ]
+    }
+  },
   "facilities": {
     "declared": {
       "all-plugins": {

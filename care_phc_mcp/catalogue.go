@@ -115,6 +115,39 @@ type Vocabulary struct {
 	States       []string            `json:"states"`
 }
 
+// DocumentQuery is one row query inside a declared section: a resource table
+// and the condition its rows must meet. kernel/declarations._documents writes
+// it as a `(resource, where)` pair; the artifact names both halves so neither
+// can be read as the other.
+type DocumentQuery struct {
+	Resource string         `json:"resource"`
+	Where    map[string]any `json:"where"`
+}
+
+// DocumentSection is one section slice of a profile and the rows filed under
+// it.
+type DocumentSection struct {
+	Slice   string          `json:"slice"`
+	Queries []DocumentQuery `json:"queries"`
+}
+
+// DocumentDecl is one entry of bundle.yaml's `documents:`: which profile this
+// facility publishes and which section of it each kind of row is filed under.
+// kernel.declarations._lint_documents has already refused a profile this build
+// does not emit, a slice the profile does not declare, a resource with no
+// projection and a resource no operation here writes, so what arrives is a
+// placement that projects.
+//
+// SECTIONS ARE ORDERED AND THAT IS LOAD BEARING. The projection walks them in
+// order and the order shows up three times in the document: the order of the
+// sections, the order of the Bundle's entries, and the order the authors are
+// discovered in. See kernel/contracts.BUNDLE_KEYS for why the artifact carries
+// a list rather than a mapping.
+type DocumentDecl struct {
+	Profile  string            `json:"profile"`
+	Sections []DocumentSection `json:"sections"`
+}
+
 // Section is one block of a summary view: kernel/contracts.Section. Exactly
 // one of Show or Resource is set, which the Python lint already holds.
 type Section struct {
@@ -222,6 +255,13 @@ type Catalogue struct {
 	// Filled by LoadDeclarations, not by a tag. The one workflow a bundle
 	// has, typed, because the guard reads its steps and its state rules.
 	Workflow *Workflow `json:"-"`
+	// Where each kind of row is filed when this bundle publishes, by document
+	// id. Filled by LoadDeclarations and NOT by a tag, for the reason the
+	// views and the metrics are: a `where` read with encoding/json's default
+	// turns every number into a float64, and the store compares conditions as
+	// text, so 30 would be asked for as "30" by one engine and "30.0" by the
+	// other.
+	Documents map[string]DocumentDecl `json:"-"`
 	// The compiled mapping and the operation atoms, unparsed. Kept raw for
 	// the reason ManifestRaw is: what is served or evaluated is the
 	// declaration the Python compiled, so a field added there arrives without

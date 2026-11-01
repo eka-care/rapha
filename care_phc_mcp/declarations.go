@@ -136,6 +136,7 @@ func (c *Catalogue) LoadDeclarations() error {
 		Operations map[string]json.RawMessage `json:"operations"`
 		Views      json.RawMessage            `json:"views"`
 		Metrics    json.RawMessage            `json:"metrics"`
+		Documents  json.RawMessage            `json:"documents"`
 	}
 	if err := json.Unmarshal(catalogueJSON, &raw); err != nil {
 		return fmt.Errorf("the embedded catalogue is not an object: %w", err)
@@ -164,6 +165,18 @@ func (c *Catalogue) LoadDeclarations() error {
 			return fmt.Errorf("the compiled metrics are not readable: %w", err)
 		}
 		c.Metrics = metrics
+	}
+
+	// Where each kind of row is filed when this bundle publishes. Through
+	// pyval for the same reason the two above are, and an EMPTY MAP rather
+	// than nil when the bundle declares none, so "this bundle publishes
+	// nothing" and "the placement was never loaded" are different facts to
+	// the one caller that sends documents.
+	c.Documents = map[string]DocumentDecl{}
+	if len(raw.Documents) > 0 {
+		if err := pyval.Decode(raw.Documents, &c.Documents); err != nil {
+			return fmt.Errorf("the compiled documents are not readable: %w", err)
+		}
 	}
 
 	// The atom a thread panel draws, which is the compiled operation WITH its
