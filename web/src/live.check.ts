@@ -17,9 +17,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { load, options, questionnaire } from "./declarations.ts";
+import { displayFor, load, options, questionnaire } from "./declarations.ts";
 import { weigh } from "./loops.ts";
-import { filterOptions, filterRows, sortOptions, sortRows } from "./loops.ts";
+import { filterOptions, filterRows, labelColumns, sortOptions, sortRows } from "./loops.ts";
 import { header, messages, queueViewFor, valuesOf, type Ctx } from "./messages.ts";
 import { walk } from "./validate.ts";
 import type { Catalogue, Questionnaire, QueueRow, ThreadView, ViewDecl, ViewResult } from "./types";
@@ -137,6 +137,50 @@ for (const shape of SHAPES) {
       `${shape}: sorting by ${sort.key} lost a row`);
   }
 
+  // The programme label, and where its WORD comes from.
+  //
+  // Two declarations meet here and neither of them is this renderer's. The
+  // view says which column is a label; the question that collects the answer
+  // says what each stored value is CALLED. The second one used to be dropped
+  // on the way to the screen, so a queue drew the stored code and a centre's
+  // antenatal programme read ANC rather than the name the programme has.
+  //
+  // Asserted against the questionnaire the kernel actually served, not
+  // against a word written down here: a literal would pass while the
+  // declaration and the screen drifted apart, which is the whole failure
+  // this check exists for.
+  const declaredWord = (column: string, value: string): string | undefined => {
+    for (const form of Object.values(c.questionnaires)) {
+      const q = walk(form.questions ?? []).find((x) => x.link_id === column);
+      const found = q?.answer_option?.find((o) => o.value === value);
+      if (found) return found.display;
+    }
+    return undefined;
+  };
+  const labelCols = labelColumns(decl);
+  assert.ok(labelCols.length > 0, `${shape}: the view declares a label column`);
+  let renamed = 0;
+  let drawn = 0;
+  for (const column of labelCols) {
+    const present = [...new Set(rows.map((r) => String(r.subject?.[column] ?? "")).filter(Boolean))];
+    assert.ok(present.length > 0, `${shape}/${column}: the view labels a column no row carries`);
+    for (const value of present) {
+      const declared = declaredWord(column, value);
+      assert.ok(declared,
+        `${shape}/${column}: "${value}" is drawn on the queue and no question declares a word for it`);
+      assert.equal(displayFor(column, value), declared,
+        `${shape}/${column}: "${value}" draws something other than the word its question declares`);
+      drawn++;
+      if (declared !== value) renamed++;
+    }
+  }
+  // Non-vacuity. Every assertion above would also hold against a renderer
+  // that drew the stored code for everything, in a bundle whose displays all
+  // happened to equal their codes. At least one has to differ, or this check
+  // is passing on a tree where the word never arrives.
+  assert.ok(renamed > 0,
+    `${shape}: no label draws a word that differs from its stored code, so this check cannot tell a declared word from a code`);
+
   // Every name on the list is a name the kernel sent, under a column the view
   // declared. This is the assertion that would catch a fixture creeping back.
   const subjectValues = new Set(rows.flatMap((r) => Object.values(r.subject ?? {})).map(String));
@@ -167,7 +211,7 @@ for (const shape of SHAPES) {
     }
   }
   assert.ok(labelled > 0, `${shape}: something was labelled from a served form`);
-  ok(`${shape}: ${rows.length} rows, ${stations.length} stations and ${labelled} labelled values, all from this kernel`);
+  ok(`${shape}: ${rows.length} rows, ${stations.length} stations, ${labelled} labelled values and ${drawn} label words (${renamed} of them not the stored code), all from this kernel`);
 }
 
 // ------------------------------- 3. one renderer, two facilities, no edit
