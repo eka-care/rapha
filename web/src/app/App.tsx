@@ -64,13 +64,44 @@ const save = (key: string, v: unknown) => {
   try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* private window */ }
 };
 
+/** Light, dark, or whatever the device is set to -- and the device is the
+ *  default, which it was not.
+ *
+ *  `data-theme` was written on every load, pinned to light, so a phone or a
+ *  laptop in dark mode got the light palette and the whole dark half of
+ *  tokens.css only ever appeared if somebody found the moon button. The
+ *  token contract has three states for this reason: no attribute means
+ *  follow `prefers-color-scheme`, and the attribute is an override a person
+ *  asked for. So nothing is written until they ask.
+ */
+type Theme = "system" | "light" | "dark";
+
+const systemDark = () =>
+  typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches;
+
 function useTheme() {
-  const [theme, setTheme] = useState<"light" | "dark">(() => read<"light" | "dark">(THEME_KEY, "light"));
+  const [theme, setTheme] = useState<Theme>(() => read<Theme>(THEME_KEY, "system"));
+  // What is actually on screen, which is what the button has to flip. Kept in
+  // state so that a device changing its own setting redraws the icon.
+  const [dark, setDark] = useState(() => (theme === "system" ? systemDark() : theme === "dark"));
+
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
+    const root = document.documentElement;
+    if (theme === "system") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", theme);
     save(THEME_KEY, theme);
+    setDark(theme === "system" ? systemDark() : theme === "dark");
   }, [theme]);
-  return [theme, () => setTheme((t) => (t === "dark" ? "light" : "dark"))] as const;
+
+  useEffect(() => {
+    if (theme !== "system" || typeof matchMedia !== "function") return;
+    const mq = matchMedia("(prefers-color-scheme: dark)");
+    const on = () => setDark(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, [theme]);
+
+  return [dark ? "dark" : "light", () => setTheme(dark ? "light" : "dark")] as const;
 }
 
 export function App() {

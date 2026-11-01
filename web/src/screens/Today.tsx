@@ -15,6 +15,9 @@ import { Loading } from "../parts";
 import type { Catalogue, QueueRow, TaskRow } from "../types";
 import { human, title } from "../words";
 
+/** How many names a flow column shows before it says how many more. */
+const SHOWN = 4;
+
 export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, onAsk }: {
   loaded: Loaded[];
   /** Whether the four view reads are still running. Without it this screen
@@ -32,6 +35,9 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
   const h = now.getHours();
   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 
+  /** The centre's own name, from the bundle that is loaded. Never typed
+   *  here: a laboratory running this kernel reads its own title. */
+  const facility = cat.manifest?.title ?? "";
   const queues = loaded.filter((l) => l.decl.kind === "queue");
   const rows = queues.flatMap((l) => (l.result.rows ?? []) as QueueRow[]);
   const done = rows.filter((r) => !r.station).length;
@@ -41,6 +47,11 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
     .filter((t) => t.count > 0);
 
   // Station order is the workflow's, never this file's.
+  // SHOWN caps each column. A station with sixty-eight people in it was
+  // sixty-eight chips down the page, so the two cards under this one were
+  // several screens below a wall of names nobody reads. A flow diagram
+  // answers "where is the line heavy", which the count and the rail already
+  // say; the names are the queue's job, one tap away.
   const wf = Object.values(cat.workflows ?? {})[0];
   const stations = (wf?.steps ?? []).map((s) => s.station);
   const badges = queues[0]?.decl.badges ?? {};
@@ -69,10 +80,32 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
           </div>
         </div>
 
+        {/* The artifact's hero: what the centre is, what day it is, and the
+            two numbers a person arriving at a shift wants. The greeting led
+            here and said nothing; it is the eyebrow's "good evening" now,
+            under the one line that matters. */}
+        <div className="hero-eye">
+          {facility} · {now.toLocaleDateString(undefined,
+            { weekday: "long", day: "numeric", month: "long" })} · {greeting.toLowerCase()}
+        </div>
+
         <h2 className="hero-h">
-          {greeting}.<br />
-          <span>{rows.length} in the workspace, {done} complete.</span>
+          {rows.length} in the workspace.<br />
+          <span>
+            {tasks.length === 0
+              ? `${done} complete.`
+              : `${tasks.reduce((n, t) => n + t.count, 0)} ${
+                  tasks.reduce((n, t) => n + t.count, 0) === 1 ? "thing needs" : "things need"} you.`}
+          </span>
         </h2>
+
+        {/* The one sentence this product exists to be able to say, and the
+            gate is what makes it true: no route writes without a person, and
+            no model fills a field. */}
+        <p className="hero-lede">
+          Every record here was committed by a person who was there.
+          Nothing on this screen was written by the system.
+        </p>
 
         {/* A button that OPENS the command bar, so what looked like a field
             was a read-only input nested inside it: a second stop for the
@@ -120,7 +153,7 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
                 <div className="fl-rail">{c.people.length > 0 && <i />}</div>
                 {c.people.length === 0
                   ? <div className="fl-e">Clear</div>
-                  : c.people.map((p) => (
+                  : c.people.slice(0, SHOWN).map((p) => (
                       <button
                         className={`fl-p${p.alert ? " alert" : ""}`}
                         key={p.thread}
@@ -140,6 +173,12 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
                         )}
                       </button>
                     ))}
+                {c.people.length > SHOWN && (
+                  <button className="fl-e fl-more"
+                          onClick={() => queues[0] && onGoView(queues[0].decl.id)}>
+                    {c.people.length - SHOWN} more
+                  </button>
+                )}
                 {c.jam && (
                   <div className="fl-jam">
                     <Icon name="alert" className="i sm" />

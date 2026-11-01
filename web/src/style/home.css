@@ -14,8 +14,11 @@
   border-radius: var(--radius-xl); border: 1px solid var(--color-border-subtle);
   background: linear-gradient(122deg,
     var(--color-bg-surface) 0%, var(--color-bg-canvas) 58%, var(--color-agent-tint) 165%);
-  padding: 44px 26px 38px; box-shadow: var(--shadow-sm);
-  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 30px 26px 26px; box-shadow: var(--shadow-sm);
+  /* Left, not centre. The artifact's hero reads like the top of a page: an
+     eyebrow, a statement, a line of prose, then the one control. Centred, the
+     eyebrow and the lede both looked like captions on the heading. */
+  display: flex; flex-direction: column; align-items: flex-start; text-align: left;
 }
 .hero-mark {
   position: absolute; top: -62px; right: -52px; width: 290px; height: 290px;
@@ -178,3 +181,17 @@
   .hgrid { grid-template-columns: 1fr; }
   .arc { position: static; text-align: left; margin-top: 16px; }
 }
+
+
+/* The sentence under the hero's statement: what this product promises, in
+   the one place a person arriving at a shift will read it. */
+.hero-lede {
+  font-size: 13.5px; line-height: 1.6; color: var(--color-text-secondary);
+  max-width: 52ch; margin: 9px 0 0;
+}
+.hero-eye { margin-bottom: 7px; }
+.fl-more {
+  background: none; border: 0; cursor: pointer; text-align: left;
+  padding: 4px 2px; color: var(--color-text-tertiary);
+}
+.fl-more:hover { color: var(--color-text-secondary); }
