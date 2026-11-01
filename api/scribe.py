@@ -67,13 +67,58 @@ from care_phc.connectors.scribe.eka import _scrub
 
 from api import extract as extractor_module
 from api import fill as filler
+from api import shaped
 
 # The action the SDK's v2rx path takes, and the templates worth asking for.
 ACTION = "ekascribe-v2"
 
-# The transcript and nothing else. Structure is ours: api/fill.py and
-# api/extract.py read whatever questionnaire the template names.
-TEMPLATES = [{"template_id": "transcript_template", "codification_needed": False}]
+# The transcript, always: it is the record of what was said and the thing every
+# value is checked against. The shaped note is asked for beside it, one
+# template per operation, and `api/shaped.py` reads it.
+TRANSCRIPT = {"template_id": "transcript_template", "codification_needed": False}
+TEMPLATES = [TRANSCRIPT]
+
+# The title a shaped template is filed under in the workspace. One per
+# operation, named after the declaration, so a person looking at the Eka
+# console can see which form each one fills.
+TEMPLATE_TITLE = "phc · %s"
+
+# Resolved template ids, by operation. One listing per process, not one per
+# consultation.
+_templates = {}
+
+
+def shaped_template(op_id, fields):
+    """The workspace template that shapes this operation's note, made if the
+    workspace has none and corrected if the declaration has moved since.
+
+    THIS WRITES TO THE EKA WORKSPACE, which is the one outward effect in this
+    module that is not a recording. It is idempotent by title: a second
+    kernel, a restart or a redeploy finds the template rather than making a
+    second one, and a bundle whose questionnaire changed updates the one that
+    is there instead of leaving the service filling yesterday's form.
+    """
+    if op_id in _templates:
+        return _templates[op_id]
+    title, want = TEMPLATE_TITLE % op_id, shaped.instructions(fields)
+    listed = sdk(lambda: client().request("GET", "/voice/api/v1/template"))
+    for item in (listed or {}).get("items") or []:
+        if item.get("title") != title or item.get("default"):
+            continue
+        if item.get("desc") != want:
+            sdk(lambda: client().request(
+                "PATCH", "/voice/api/v1/template/%s" % item["id"], json={"desc": want}))
+        _templates[op_id] = item["id"]
+        return item["id"]
+    made = sdk(lambda: client().request("POST", "/voice/api/v1/template", json={
+        "title": title, "section_ids": [], "desc": want, "type": "custom"}))
+    new_id = (made or {}).get("template_id")
+    if not new_id:
+        raise ScribeError(
+            "The scribe service would not make a template for this form, so "
+            "the recording cannot be structured. Type the note.")
+    _templates[op_id] = new_id
+    return new_id
 
 # What a person picks in the bar, to what Eka is told was spoken. Hinglish is
 # two languages at once, which is how it is sent.
