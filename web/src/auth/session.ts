@@ -91,17 +91,24 @@ export interface Answer {
 export async function probe(): Promise<Answer> {
   if (await throughTheApp()) return { ok: true, said: "the app" };
   try {
-    // NO HEADERS. Not an oversight, and not a simplification: nectar's own
-    // refresh sends the cookie and nothing else -- apps/abdm-parent's
-    // refreshToken() and apps/abdm-records' fetchWrapper are both
-    // `{ method: "POST", credentials: "include" }`. Sending `client-id` as
-    // well is what this did, and with a real session Eka answered 400: the
-    // call got past the gate and was then refused as malformed. It also
-    // made the request non simple, so every poll was a preflight and then
-    // a call. The cookie is the whole credential.
+    // AN EMPTY OBJECT, AND IT HAS TO BE THERE. With a real session Eka
+    // answered 400 and said so in as many words:
+    //     {"error":{"code":"INVALID_REQUEST","message":"EOF"}}
+    // "EOF" is a JSON decoder reaching the end of a body that was never
+    // sent. The route reads one before it looks at anything else, so a POST
+    // with no body is refused before the cookie is ever considered -- which
+    // is why this looked like a session problem and was not one.
+    //
+    // nectar sends no body (apps/abdm-parent's refreshToken,
+    // apps/abdm-records' fetchWrapper) and this file was ported from them.
+    // Those calls only run as a retry after a 401, so nobody there would
+    // have noticed. The cookie is still the whole credential: `{}` carries
+    // nothing, it just gives the decoder something to find.
     const res = await fetch(REFRESH_URL, {
       method: "POST",
       credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: "{}",
     });
     return { ok: res.ok, said: res.status };
   } catch {
