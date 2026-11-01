@@ -69,7 +69,7 @@
 
   /* ---- grounds ---- */
   --color-bg-canvas: #FAFAF9;
-  --color-dot: rgba(20,20,19,.07);
+  --color-dot: rgba(20,20,19,.2);
   /* The chrome the content passes under. Translucent, so the canvas and the
      list scrolling beneath it are both still there. */
   --color-bg-nav: rgba(250,250,249,.72);
@@ -78,6 +78,15 @@
   --color-bg-rail: #F6F6F4;
   --color-bg-hover: #F1F1EF;
   --color-bg-selected: #EFECFD;
+  /* The tint under something inert: an avatar's square, a progress rail, the
+     ground of a hovered row. Alpha, not a grey, because it has to sit over
+     the dot grid and over a card alike and be the same tint on both. */
+  --color-ghost: rgba(20,20,19,.16);
+
+  /* Glass. A floating surface the canvas and the list beneath it both show
+     through, with a bright edge where the light catches it. */
+  --color-glass: rgba(255,255,255,.62);
+  --color-glass-edge: rgba(255,255,255,.75);
 
   --color-border-subtle: #E7E7E4;
   --color-border-strong: #D4D4D0;
@@ -114,6 +123,13 @@
   --color-agent-soft: #F0ECFD;
   --color-agent-line: #DED5FA;
   --color-agent-hover: #E7E0FC;
+  /* The ground every control the MACHINE offers stands on: the microphone,
+     a proposal's button, the row of the patient you are on, a filter that is
+     switched on. The artifacts paint all four in one translucent violet, and
+     it is the single most visible colour in them. Alpha over whatever is
+     behind, so it reads the same on a card and on the canvas. */
+  --color-agent-tint: rgba(91,69,201,.12);
+  --color-agent-tint-hover: rgba(91,69,201,.18);
 
   /* National identity, and nothing else. */
   --color-abdm: #1A50E6;
@@ -158,13 +174,16 @@
   --shadow-overlay: 0 24px 70px rgba(0,0,0,.75);
 
   --color-bg-canvas: #0A0A0A;
-  --color-dot: rgba(255,255,255,.07);
+  --color-dot: rgba(255,255,255,.15);
   --color-bg-nav: rgba(10,10,10,.66);
   --color-bg-surface: #111111;
   --color-bg-subtle: #1A1A19;
   --color-bg-rail: #0D0D0D;
   --color-bg-hover: #171716;
   --color-bg-selected: #1E1A2E;
+  --color-ghost: rgba(255,255,255,.14);
+  --color-glass: rgba(23,23,23,.6);
+  --color-glass-edge: rgba(255,255,255,.1);
 
   --color-border-subtle: #1F1F1E;
   --color-border-strong: #2E2E2C;
@@ -192,6 +211,8 @@
   --color-agent-soft: #1E1A2E;
   --color-agent-line: #2E2748;
   --color-agent-hover: #241F36;
+  --color-agent-tint: rgba(160,140,255,.14);
+  --color-agent-tint-hover: rgba(160,140,255,.20);
 
   --color-abdm: #6B93FF;
   --color-abdm-soft: #141A28;
@@ -221,13 +242,16 @@
     --shadow-overlay: 0 24px 70px rgba(0,0,0,.75);
 
     --color-bg-canvas: #0A0A0A;
-    --color-dot: rgba(255,255,255,.07);
+    --color-dot: rgba(255,255,255,.15);
     --color-bg-nav: rgba(10,10,10,.66);
     --color-bg-surface: #111111;
     --color-bg-subtle: #1A1A19;
     --color-bg-rail: #0D0D0D;
     --color-bg-hover: #171716;
     --color-bg-selected: #1E1A2E;
+    --color-ghost: rgba(255,255,255,.14);
+    --color-glass: rgba(23,23,23,.6);
+    --color-glass-edge: rgba(255,255,255,.1);
 
     --color-border-subtle: #1F1F1E;
     --color-border-strong: #2E2E2C;
@@ -255,6 +279,8 @@
     --color-agent-soft: #1E1A2E;
     --color-agent-line: #2E2748;
     --color-agent-hover: #241F36;
+    --color-agent-tint: rgba(160,140,255,.14);
+    --color-agent-tint-hover: rgba(160,140,255,.20);
 
     --color-abdm: #6B93FF;
     --color-abdm-soft: #141A28;

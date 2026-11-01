@@ -55,7 +55,7 @@ function Entry({ m, thread, client, ctx, instruments, onDone }: {
   if (m.kind === "posted") {
     return (
       <div className="msg">
-        <div className="m-av" aria-hidden="true"><span className="u-sr">record</span></div>
+        <div className="m-av node kept" aria-hidden="true"><span className="u-sr">record</span></div>
         <div className="m-b">
           <div className="m-meta">{m.actor} · {clock(m.at)}</div>
           <div className="bubble">
@@ -85,7 +85,7 @@ function Entry({ m, thread, client, ctx, instruments, onDone }: {
   if (m.kind === "denied") {
     return (
       <div className="msg">
-        <div className="m-av" aria-hidden="true"><span className="u-sr">refused</span></div>
+        <div className="m-av node refused" aria-hidden="true"><span className="u-sr">refused</span></div>
         <div className="m-b">
           <div className="m-meta">{m.actor} · {clock(m.at)}</div>
           <div className="bubble">
@@ -109,7 +109,7 @@ const TAG: Record<string, string> = { crit: "b-crit", warn: "b-warn", ok: "b-ok"
 function Handover({ m }: { m: Extract<Msg, { kind: "handover" }> }) {
   return (
     <div className="msg">
-      <div className="m-av" aria-hidden="true"><span className="u-sr">handover</span></div>
+      <div className="m-av node handed" aria-hidden="true"><span className="u-sr">handover</span></div>
       <div className="m-b" style={{ width: "100%" }}>
         <div className="m-meta">{m.from} · {clock(m.at)}</div>
         <div className="bubble">
