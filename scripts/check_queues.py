@@ -519,7 +519,16 @@ ok("and refused the same way when the centre has since switched the plugin "
 
 # A precondition that has gone since queueing. The operation is still the
 # caller's to perform; this visit is no longer one it may be performed on.
+#
+# The withdrawal is the example because its precondition is the capture gate.
+# Since 2026-11-01 that gate stands on every visit nobody refused, so the
+# visit has to actually withdraw for the precondition to go: it used to be
+# enough that nobody had consented. The property under test is the queue's,
+# not the gate's, and it is unchanged.
 store3, thread3 = consulted()
+assert proposals.commit(
+    store3, BUNDLE, "phc.op.capture-withdraw", thread=thread3,
+    payload={"capture_stop": True}, caps=MO, actor=A_DOCTOR, at=NOW)
 box3 = SqliteSpool(":memory:")
 gone = queues.enqueue(box3, kind="document", key=thread3, thread=thread3,
                       operation="phc.op.capture-withdraw",

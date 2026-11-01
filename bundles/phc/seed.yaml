@@ -88,8 +88,10 @@ threads:
         questionnaire: phc.schema.handover-reply-v1
         created_by: "user:mo"
         payload: {comment: "Coming now. Keep her in the side room.", state: acknowledged}
-    # Agreed to the recording at the desk, so the scribe is offerable at the
-    # doctor. capture.consented is composed from this, not stored.
+    # Asked at the desk and agreed. Since 2026-11-01 the recording would be
+    # offerable either way: capture.consented is composed from the absence of
+    # a refusal, not from this. Kept so the seeded day still has a visit where
+    # the question was put and answered yes.
     flags: [vitals.flagged, capture.agreed]
     # A handover conversation, so the demo day has one (§12.3). The rows are
     # what the operations write; the audit entries are what the thread draws

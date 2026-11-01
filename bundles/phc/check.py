@@ -5,12 +5,19 @@ uvicorn, no browser: SqliteStore on :memory: and kernel.proposals.commit, so
 what is asserted here is the same write path the API serves.
 
 capture.consented used to be declared, gated on, and raised by nothing, which
-made the scribe permanently off and the consent theatre. It is composed now:
+made the scribe permanently off and the consent theatre. It is composed:
 
     capture.agreed     the consent question on the registration form
     capture.declined   its own answer on the same form, a first class no
     capture.withdrawn  phc.op.capture-withdraw, one question, its own action
-    capture.consented  agreed, and neither declined nor withdrawn
+    capture.consented  neither declined nor withdrawn
+
+THE OWNER'S DECISION OF 2026-11-01: consent is presumed. `capture.agreed` is
+still raised and still recorded, and it no longer gates anything. A visit
+nobody asked about may be recorded; the two refusals are what stop it. The
+checks below were written against the older rule and are corrected to this
+one rather than removed, because every sentence they hold is still a sentence
+that has to stay true.
 
 The checks below are the sentences that have to stay true: consenting offers
 the scribe, declining is visibly declined, neither leaks to the next visit,
@@ -125,15 +132,21 @@ def check_declining_is_visible_rather_than_absent():
        "so the next station reads the answer instead of asking again")
 
 
-def check_a_visit_nobody_asked_is_not_a_decline():
+def check_a_visit_nobody_asked_may_be_recorded_and_is_not_a_decline():
+    """The owner's decision, asserted where it can be read: an unanswered
+    question is not a refusal and no longer stops a recording. What it is
+    still not is a decline, and the queue must not draw it as one."""
     store, thread = register({})
     known = flags(store, thread)
-    assert not [f for f in known if f.startswith("capture.")], sorted(known)
+    assert "capture.agreed" not in known, sorted(known)
+    assert "capture.declined" not in known, sorted(known)
+    assert "capture.consented" in known, sorted(known)
+    assert scribe_offerable(store, thread), "a visit nobody refused and the scribe is off"
     row, = [r for r in views.resolve(BUNDLE, "phc.view.station-queue", store).rows
             if r.thread == thread]
     assert not row.badges.get("capture.declined")
-    ok("an unanswered consent question is neither consent nor a decline, and "
-       "is not drawn as one")
+    ok("a visit nobody asked about may be recorded, is not drawn as a decline, "
+       "and nothing claims the patient agreed")
 
 
 def check_a_contradiction_fails_closed():
@@ -146,18 +159,24 @@ def check_a_contradiction_fails_closed():
        "declined beats agreed, nothing listens")
 
 
-def check_consent_does_not_leak_to_the_next_encounter():
-    store, first = register({"capture_consent": True})
+def check_a_refusal_does_not_leak_to_the_next_encounter():
+    """Which way round this matters changed with the rule. Consent carrying
+    forward is no longer a leak, because consent is presumed everywhere. A
+    REFUSAL carrying forward is, and in the wrong direction: a patient who
+    said no once would be unrecordable for the rest of their life, with no
+    way to say yes again. Both directions are asserted on one store."""
+    store, first = register({"capture_declined": True})
     second = store.open_thread(token="T2")
     assert commit(store, second, "phc.op.patient-register", REGISTER)
-    assert "capture.consented" in flags(store, first)
-    assert "capture.consented" not in flags(store, second), \
-        "consent given at one visit followed the patient to the next"
-    assert not scribe_offerable(store, second)
+    assert "capture.declined" in flags(store, first)
+    assert "capture.consented" not in flags(store, first)
+    assert "capture.declined" not in flags(store, second), \
+        "a decline at one visit followed the patient to the next"
+    assert scribe_offerable(store, second)
     # And it is scoped by the store, not by this check remembering to ask.
     assert store.stored_flags(second) == frozenset()
-    ok("consent is scoped to the visit: a second encounter starts with nothing "
-       "raised, on the same day and the same store")
+    ok("a refusal is scoped to the visit: a second encounter starts with "
+       "nothing raised, on the same day and the same store")
 
 
 def check_withdrawal_is_its_own_operation_and_writes_no_note():
@@ -211,9 +230,15 @@ def can_withdraw(store, thread):
     return "phc.op.capture-withdraw" in live
 
 
-def check_the_withdrawal_action_is_invisible_with_nothing_to_withdraw():
+def check_the_withdrawal_action_is_there_wherever_there_is_something_to_stop():
+    """Its precondition is `capture.consented`, so the stop follows the gate
+    wherever the gate goes. That sentence used to mean "absent unless somebody
+    remembered to ask"; since 2026-11-01 it means "there on every visit that
+    is not refused", which is the one place a patient can always reach it.
+    Absent still means absent: a visit that declined is not being recorded,
+    and neither is one already withdrawn."""
     never, thread = register({})
-    assert not can_withdraw(never, thread), "offered to a visit nobody asked"
+    assert can_withdraw(never, thread), "recording is on and there is no way to stop it"
 
     declined, thread = register({"capture_declined": True})
     assert not can_withdraw(declined, thread), "offered to a visit that said no"
@@ -227,9 +252,9 @@ def check_the_withdrawal_action_is_invisible_with_nothing_to_withdraw():
     again = commit(store, thread, "phc.op.capture-withdraw", {"capture_stop": True},
                    actor="user:mo")
     assert not again and again.reason == "Requires capture consented.", again.reason
-    ok("the withdrawal is absent when consent was never given, when it was "
-       "declined and once it has already been withdrawn, on both the screen "
-       "and the tap")
+    ok("the stop is on every visit that is being recorded, including one "
+       "nobody asked; it is absent when the patient declined and once it has "
+       "already been withdrawn, on both the screen and the tap")
 
 
 def check_a_withdrawal_that_says_nothing_is_refused_rather_than_allowed():
@@ -285,9 +310,15 @@ def check_the_demo_day_shows_both_answers():
             views.resolve(BUNDLE, "phc.view.station-queue", store).rows}
     assert "capture.consented" in rows["enc-003"].flags, rows["enc-003"].flags
     assert rows["enc-004"].badges.get("capture.declined") == "mute"
-    assert not [f for f in rows["enc-005"].flags if f.startswith("capture.")]
-    ok("the seeded day has all three: one visit consented and standing at the "
-       "doctor, one declined and badged, and one nobody asked")
+    assert "capture.consented" not in rows["enc-004"].flags, rows["enc-004"].flags
+    # The visit nobody asked. Since 2026-11-01 it may be recorded like any
+    # other, and the only thing that distinguishes it on the queue is that
+    # nothing claims the patient agreed.
+    assert "capture.agreed" not in rows["enc-005"].flags, rows["enc-005"].flags
+    assert "capture.consented" in rows["enc-005"].flags, rows["enc-005"].flags
+    assert not rows["enc-005"].badges.get("capture.declined")
+    ok("the seeded day has all three: one visit asked and agreed, one declined "
+       "and badged and not recordable, and one nobody asked and recordable")
 
 
 def check_the_laboratory_is_not_given_a_consent_it_has_no_use_for():

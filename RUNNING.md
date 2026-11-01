@@ -296,16 +296,19 @@ port.
   There is no voice route on the kernel and there is no surface argument on
   `commit()`. A body claiming `"surface": "voice"` is recorded as `rendered`,
   because the kernel names the surface and the caller does not.
-- **Capture consent is asked at the desk and composed by the workflow.** The
-  registration form carries the consent question and its own decline answer,
-  `phc.op.capture-withdraw` is the one tap stop, and
-  `phc.wf.outpatient` composes `capture.consented` from the three:
-  agreed, and neither declined nor withdrawn. So the scribe appears when
-  somebody said yes, the queue badges a visit that said no, a withdrawal turns
-  it off for the rest of the visit, and nothing carries to the next encounter,
-  because a thread is one visit. The seeded day shows all three: enc-003
-  consented and standing at the doctor, enc-004 declined, enc-005 never asked.
-  `python3 -m bundles.phc.check` is the twelve checks, and needs no network.
+- **Capture consent is presumed, and refusing it is composed by the
+  workflow.** The owner decided on 2026-11-01 that nothing needs recording
+  consent, so `phc.wf.outpatient` composes `capture.consented` from the two
+  refusals alone: neither declined nor withdrawn. The registration form still
+  carries the question and still records the answer, and `capture.agreed` now
+  gates nothing. So the scribe appears on every visit, the queue badges a
+  visit that said no and that visit is not recorded, `phc.op.capture-withdraw`
+  stops it for the rest of any visit and is on screen wherever there is
+  something to stop, and nothing carries to the next encounter, because a
+  thread is one visit. The seeded day shows all three: enc-003 asked and
+  agreed, enc-004 declined and not recordable, enc-005 never asked and
+  recordable. `python3 -m bundles.phc.check` is the thirteen checks, and needs
+  no network.
   Withdrawal is enforced on the server and not only in the browser: every path
   that could bring a draft back re-reads the flag first, so a recording still
   running at the gateway when the patient says stop is never collected, by the
@@ -342,7 +345,8 @@ port.
 
   Verified end to end on 2026-09-11 against `https://api.eka.care`, with a 77
   second synthetic consultation: consent yes at registration raises
-  `capture.agreed`, the workflow composes `capture.consented`, the scribe is
+  `capture.agreed`, the workflow composed `capture.consented` from it (it is
+  presumed since 2026-11-01 and that tick no longer decides it), the scribe is
   offered at the doctor, the draft comes back in 10 to 21 seconds, the doctor
   edits it on screen, and the edited value is what lands in SQLite. The same
   recording drafts the prescription, waiting on that form.

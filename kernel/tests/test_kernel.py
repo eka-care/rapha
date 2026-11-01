@@ -495,14 +495,16 @@ def test_a_tasklist_resolves_a_count_and_the_matching_threads_per_task():
     the resolver must not confuse the two. A resolver that ignored `where`
     and returned every thread would pass a check that only asserts *some*
     rows come back; this asserts the exact set and the exact count."""
-    s = Fake(threads=_refs("enc-1", "enc-2", "enc-3"))
+    s = Fake(threads=_refs("enc-1", "enc-2", "enc-3"),
+             stored_by_thread={t: {"capture.withdrawn"} for t in ("enc-1", "enc-2", "enc-3")})
     for t in ("enc-1", "enc-2", "enc-3"):
         s.add("patient", thread=t)
     s.add("service_request", thread="enc-2")
     s.add("service_request", thread="enc-3")
     s.add("diagnostic_report", thread="enc-3")
 
-    res = views.resolve(BUNDLE, "phc.view.today-tasks", s)
+    bundle, vid = _unasked_bundle()
+    res = views.resolve(bundle, vid, s)
     by_title = {r.title: r for r in res.rows}
 
     waiting = by_title["Waiting on a lab result"]
@@ -514,16 +516,39 @@ def test_a_tasklist_resolves_a_count_and_the_matching_threads_per_task():
     assert unasked.operation is None, "a task with no declared operation is a worklist"
 
 
+def _unasked_bundle():
+    """The two-member `not` list the PHC's own tasklist used to carry.
+
+    It stopped carrying it on 2026-11-01, when consent became presumed and
+    the row that counted unasked patients went permanently to zero. The
+    RESOLVER property it proved is not about consent at all: a `not` list
+    must exclude on EVERY member, not merely on the first. So the clause
+    moved into this fixture rather than leaving with the row it was declared
+    on, which would have taken a real test with it.
+    """
+    tasks = [c.Task(title="Waiting on a lab result",
+                    where={"flag": "lab.ordered", "not": "lab.resulted"},
+                    operation="phc.op.lab-result-enter"),
+             c.Task(title="Consent never asked",
+                    where={"flag": "registered",
+                           "not": ["capture.consented", "capture.declined"]})]
+    view = c.View(id="phc.view._fixture-unasked", kind="tasklist", title="", summary="",
+                  capability="patient.find", workflow=WF.id, tasks=tasks)
+    return dataclasses.replace(BUNDLE, views={view.id: view}), view.id
+
+
+
 def test_a_tasklist_with_nothing_matching_is_a_real_zero_not_an_empty_result():
     """The other half of the mutation: a resolver that always returned no
     threads would still pass a check that only asserts *a* zero count
     somewhere. This pins a task that must be non-zero alongside one that
     must be exactly zero, on the same call."""
-    s = Fake(threads=_refs("enc-1"))
+    s = Fake(threads=_refs("enc-1"), stored_by_thread={"enc-1": {"capture.withdrawn"}})
     s.add("patient", thread="enc-1")
     s.add("service_request", thread="enc-1")
     s.add("diagnostic_report", thread="enc-1")   # lab.resulted: the task must be 0
-    res = views.resolve(BUNDLE, "phc.view.today-tasks", s)
+    bundle, vid = _unasked_bundle()
+    res = views.resolve(bundle, vid, s)
     by_title = {r.title: r for r in res.rows}
     assert by_title["Waiting on a lab result"].count == 0
     assert by_title["Consent never asked"].count == 1, "the other task on the same call is not zero"
@@ -536,10 +561,12 @@ def test_a_tasklist_not_clause_excludes_a_thread_that_has_declined():
     would let a declined thread straight back onto the row, which is the
     silent-half-match failure the spec calls out by name."""
     s = Fake(threads=_refs("enc-1", "enc-3"),
-            stored_by_thread={"enc-3": {"capture.declined"}})
+            stored_by_thread={"enc-1": {"capture.withdrawn"},
+                              "enc-3": {"capture.declined"}})
     s.add("patient", thread="enc-1")
     s.add("patient", thread="enc-3")
-    res = views.resolve(BUNDLE, "phc.view.today-tasks", s)
+    bundle, vid = _unasked_bundle()
+    res = views.resolve(bundle, vid, s)
     row = next(r for r in res.rows if r.title == "Consent never asked")
     assert row.threads == ["enc-1"], \
         "a thread that declined must be excluded, not counted as unasked"
@@ -547,13 +574,16 @@ def test_a_tasklist_not_clause_excludes_a_thread_that_has_declined():
 
 def test_a_tasklist_not_clause_excludes_a_thread_that_has_consented():
     """The other half of the same `not` list: capture.consented is composed
-    (all_of agreed, not declined, not withdrawn), so this also proves the
-    tasklist reads a derived flag correctly and not only a stored one."""
+    (since 2026-11-01: not declined, not withdrawn), so this also proves the
+    tasklist reads a derived flag correctly and not only a stored one. enc-2
+    stored nothing at all and is consented by presumption, which is exactly
+    the case a resolver reading only stored flags would get wrong."""
     s = Fake(threads=_refs("enc-1", "enc-2"),
-            stored_by_thread={"enc-2": {"capture.agreed"}})
+            stored_by_thread={"enc-1": {"capture.withdrawn"}})
     s.add("patient", thread="enc-1")
     s.add("patient", thread="enc-2")
-    res = views.resolve(BUNDLE, "phc.view.today-tasks", s)
+    bundle, vid = _unasked_bundle()
+    res = views.resolve(bundle, vid, s)
     row = next(r for r in res.rows if r.title == "Consent never asked")
     assert row.threads == ["enc-1"], \
         "a thread that already consented must be excluded, not counted as unasked"

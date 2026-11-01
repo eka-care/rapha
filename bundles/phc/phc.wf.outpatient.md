@@ -66,7 +66,7 @@ states:
   capture.declined: {stored: true}
   capture.withdrawn: {stored: true}
   capture.consented:
-    all_of: [capture.agreed, "not capture.declined", "not capture.withdrawn"]
+    all_of: ["not capture.declined", "not capture.withdrawn"]
   vitals.flagged: {stored: true}
   lab.critical: {stored: true}
 ---
@@ -87,23 +87,28 @@ threshold. Those thresholds are ours, so those flags are ours.
 
 `capture.consented` is the flag every scribe is gated on, and it is not
 stored. It is composed, because the store can raise a flag and cannot lower
-one, and a consent that cannot be withdrawn is not a consent:
+one, and a capture that cannot be stopped is not one a patient controls.
 
-- `capture.agreed` is raised by the consent question on the registration
-  form, which is read out at the desk.
-- `capture.declined` is raised by its own answer on the same form, so a visit
-  the patient said no to is visibly declined rather than merely unconsented
-  and no station asks again. Ticking both is a contradiction, and the safe
-  answer wins: declined beats agreed.
+THE OWNER'S DECISION OF 2026-11-01 CHANGED WHAT IT COMPOSES. It used to
+require `capture.agreed`, so a visit nobody had asked about could not be
+recorded, and the station answered a refusal instead of a reading. It now
+requires only that nobody refused: consent is presumed, and the two ways a
+patient says no are what lower it. The change is this one line and nothing
+else, which is the point of the flag being declared rather than coded.
+
+- `capture.declined` is raised by the consent question's own answer on the
+  registration form, so a visit the patient said no to is not recorded. This
+  is the half that still gates, and it is deliberately the only one: not
+  asking is not the same as being told no.
 - `capture.withdrawn` is raised by `phc.op.capture-withdraw`, which is its
   own action at the doctor and asks one question. From that commit the gate
   is false and nothing listens for the rest of the visit. Records already
-  confirmed are rows, and rows are untouched. It rode on the consultation
-  form until now, where `assessment` is required, so withdrawing a consent
-  meant writing a note as well. Its precondition is `capture.consented`, so
-  the action is absent when there is nothing to withdraw.
-- A visit with none of the three was never asked. That is not the same as a
-  decline and is not drawn as one.
+  confirmed are rows, and rows are untouched. Its precondition is
+  `capture.consented`, which now stands on every visit nobody refused, so
+  the stop is where a patient can always reach it rather than only where
+  somebody remembered to ask first.
+- `capture.agreed` is still raised by the same question and is still a
+  recorded fact about what the patient was asked. It gates nothing.
 
 All three are thread flags, and a thread is one encounter, so consent is
 scoped to the visit and the next encounter starts with nothing raised. There

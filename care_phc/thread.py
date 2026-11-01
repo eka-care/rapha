@@ -75,10 +75,12 @@ def derive(s: Snapshot) -> set[str]:
 
     # Consent to ambient capture is composed rather than stored: the store can
     # raise a flag and cannot lower one, so a withdrawal has to be a flag of
-    # its own that turns the gate off. Declining beats agreeing, because the
-    # safe answer wins a contradiction. phc.wf.outpatient declares this rule.
-    if "capture.agreed" in flags and not (
-            {"capture.declined", "capture.withdrawn"} & flags):
+    # its own that turns the gate off. Since the owner's decision of
+    # 2026-11-01 it is presumed: a visit nobody refused may be recorded, and
+    # only a decline at the desk or a withdrawal at the doctor lowers it.
+    # phc.wf.outpatient declares this rule and this is that rule, in code,
+    # until thread.py is retired.
+    if not ({"capture.declined", "capture.withdrawn"} & flags):
         flags.add("capture.consented")
 
     if s.vitals_observations:

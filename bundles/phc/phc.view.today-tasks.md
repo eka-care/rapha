@@ -10,15 +10,16 @@ tasks:
   - title: Waiting on a lab result
     where: {flag: lab.ordered, not: lab.resulted}
     operation: phc.op.lab-result-enter
-  - title: Consent never asked
-    where: {flag: registered, not: [capture.consented, capture.declined]}
 ---
 
 ## In plain words
 
 A queue answers "what next on this visit". This answers "what needs someone,
-across every visit today": a count of specimens nobody has resulted, a count
-of patients nobody has asked about recording. The first row carries an
-operation, so it opens straight into entering the result; the second carries
-none, because asking for consent is not itself an operation and this is a
-worklist to work from, not a button to tap.
+across every visit today": today, a count of specimens nobody has resulted.
+The row carries an operation, so it opens straight into entering the result.
+
+A second row counted the patients nobody had asked about recording. It is
+gone with the owner's decision of 2026-11-01: consent is presumed unless the
+patient refuses, so there is nobody left to chase and a row that is always
+zero is worse than no row. The decline on the registration form still stops
+a recording; it is just not a task for anyone to go and collect.

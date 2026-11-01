@@ -2812,17 +2812,6 @@
             "flag": "lab.ordered",
             "not": "lab.resulted"
           }
-        },
-        {
-          "operation": null,
-          "title": "Consent never asked",
-          "where": {
-            "flag": "registered",
-            "not": [
-              "capture.consented",
-              "capture.declined"
-            ]
-          }
         }
       ],
       "title": "Needs you",
@@ -3154,7 +3143,6 @@
         },
         "capture.consented": {
           "all_of": [
-            "capture.agreed",
             "not capture.declined",
             "not capture.withdrawn"
           ]

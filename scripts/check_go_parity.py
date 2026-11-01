@@ -1605,7 +1605,13 @@ def properties(shape, scenario, walk):
             "%s / %s: refusals were not audited" % (shape, scenario.__name__))
         for row in panels[-1]["audit"]:
             assert row["outcome"].startswith("denied: "), row
-        assert not panels[-1]["flags"] and not panels[-1]["proposals"], (
+        # "Left something behind" means RAISED something. Since 2026-11-01
+        # `capture.consented` is composed from the absence of a refusal, so
+        # it stands on an untouched thread and no call put it there. Allowing
+        # it by name keeps the property about writes rather than about the
+        # resting state of a visit.
+        PRESUMED = {"capture.consented"}
+        assert set(panels[-1]["flags"]) <= PRESUMED and not panels[-1]["proposals"], (
             "%s / %s: a refused call left something behind: %s"
             % (shape, scenario.__name__, panels[-1]["flags"]))
     else:

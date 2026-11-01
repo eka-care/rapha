@@ -42,7 +42,7 @@ def test_the_queue_draws_the_declared_view_with_everyone_on_it():
 
 def test_a_thread_returns_flags_station_line_and_actions():
     body = client.get("/api/threads/enc-002").json()
-    assert body["flags"] == ["abha.pending", "registered"]
+    assert body["flags"] == ["abha.pending", "capture.consented", "registered"]
     assert body["station"] == "nurse"
     assert [s["status"] for s in body["line"]] == ["done", "now", "pending",
                                                    "skipped", "skipped"]
@@ -130,11 +130,11 @@ def test_an_irreversible_commit_needs_the_explicit_confirm():
     assert ok.status_code == 200
     flags = ok.json()["thread"]["flags"]
     assert "abha.linked" in flags and "abha.pending" not in flags
-    # capture.consented is declared stored and nothing raises it yet: the
-    # kernel raises the flags validate.flags() returns, which are the critical
-    # thresholds, and a consent question is not one. Asserted as it is, so the
-    # gap cannot be forgotten quietly.
-    assert "capture.consented" not in flags
+    # capture.consented is composed, not stored, and since 2026-11-01 it is
+    # presumed: this visit refused nothing, so it stands. What must never be
+    # here is a claim the patient agreed, which only the consent question
+    # raises and this payload does not answer.
+    assert "capture.consented" in flags and "capture.agreed" not in flags
 
 
 def test_a_walk_in_can_be_registered_and_the_line_moves():
@@ -146,7 +146,7 @@ def test_a_walk_in_can_be_registered_and_the_line_moves():
     thread = reply.json()["thread"]
     assert thread["subject"]["name"] == "Devi Prasad"
     assert thread["station"] == "nurse"
-    assert thread["flags"] == ["abha.pending", "registered"]
+    assert thread["flags"] == ["abha.pending", "capture.consented", "registered"]
     # registering twice is refused by the precondition, not by a database error.
     twice = client.post("/api/operations/phc.op.patient-register/commit",
                         json={"thread": "enc-001", "payload": payload})
@@ -247,7 +247,9 @@ def test_an_utterance_proposes_and_the_card_carries_what_the_thread_must_draw():
     # per field, and only for fields that ended up in the payload.
     assert card["confidence"] == {"systolic": 0.82, "pulse": 0.91}
     assert card["verdict"] == {"allowed": True, "reason": "proposed", "next": ""}
-    assert card["order"] == "the kernel lists it 1 of 7 at nurse", \
+    # 8 since 2026-11-01, not 7: recording is presumed, so the action that
+    # stops it stands on every visit nobody refused and is offered here too.
+    assert card["order"] == "the kernel lists it 1 of 8 at nurse", \
         "ordering is read from kernel actions(), never decided by the agent"
     assert card["offered_here"] is True
 
@@ -472,16 +474,30 @@ def consented_thread():
     return "enc-003"
 
 
-def test_a_visit_without_capture_consent_is_never_recorded():
+def test_a_visit_that_declined_is_never_recorded():
+    """The gate, since the owner's decision of 2026-11-01 that consent is
+    presumed. What stops a recording is a refusal, and enc-004 refused."""
     fake = fake_scribe(TRANSCRIPT)
-    # enc-002 stands at the nurse and nobody asked it for consent.
-    reply = client.post("/api/scribe/sessions?thread=enc-002", content=AUDIO,
+    reply = client.post("/api/scribe/sessions?thread=enc-004", content=AUDIO,
                         headers={"Content-Type": "audio/webm"})
     assert reply.status_code == 403
     assert "consent" in reply.json()["detail"].lower()
     assert "type the note" in reply.json()["detail"].lower(), \
         "a refusal says what to do instead, because declining is not a barrier to care"
     assert fake.v2rx.uploads == [], "not one byte left this machine"
+
+
+def test_a_visit_nobody_asked_is_recorded():
+    """The other half of the same decision, and the half that changed. enc-002
+    stands at the nurse and nobody put the question to them; it used to be
+    refused and is now an ordinary recording."""
+    reset()
+    fake = fake_scribe(RUNNING, TRANSCRIPT)
+    reply = client.post(
+        "/api/scribe/sessions?thread=enc-002&operations=phc.op.vitals-record",
+        content=AUDIO, headers={"Content-Type": "audio/webm"})
+    assert reply.status_code == 200, reply.text
+    assert len(fake.v2rx.uploads) == 1, fake.v2rx.uploads
 
 
 def test_a_role_the_scribe_is_not_declared_for_is_refused():

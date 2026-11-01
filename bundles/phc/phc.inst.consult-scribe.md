@@ -19,7 +19,14 @@ Only where `capture.consented` is set on the thread, which is what `requires`
 above declares: the renderer reads that field and does not start capture
 without it. This paragraph used to be the only place the rule existed, and the
 renderer hard-coded the flag to honour it -- which meant a bundle spelling its
-consent flag differently got no gate at all. The scribe produces a Draft for the consult form and,
+consent flag differently got no gate at all.
+
+What that flag MEANS changed on 2026-11-01 and this line did not: the owner
+decided consent is presumed, so `phc.wf.outpatient` now composes it from the
+absence of a refusal rather than from a tick at the desk. The gate is in the
+same place, reads the same name, and stands on every visit the patient did
+not refuse. That is the whole value of declaring it: the policy moved and no
+instrument, renderer or route had to. The scribe produces a Draft for the consult form and,
 if it heard a prescription, a Draft for the prescription form. Each is shown
 in editable fields and each is committed by the doctor separately.
 

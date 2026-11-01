@@ -16,13 +16,23 @@ SEEN = Snapshot(patient_exists=True, abha_number="12-3456", vitals_observations=
 
 def test_a_registered_patient_without_abha_is_pending_not_broken():
     flags = derive(REG)
-    assert flags == {"registered", "abha.pending"}
+    assert flags == {"registered", "abha.pending", "capture.consented"}
     assert "abha.linked" not in flags
 
 
 def test_linking_an_abha_clears_pending():
     flags = derive(Snapshot(patient_exists=True, abha_number="12-3456"))
-    assert flags == {"registered", "abha.linked"}
+    assert flags == {"registered", "abha.linked", "capture.consented"}
+
+
+def test_capture_is_consented_until_somebody_refuses_it():
+    """The owner's decision of 2026-11-01. A visit nobody asked about may be
+    recorded; a decline at the desk and a withdrawal at the doctor are the
+    two answers that still stop it, and either one alone is enough."""
+    assert "capture.consented" in derive(REG)
+    for refusal in ("capture.declined", "capture.withdrawn"):
+        flags = derive(Snapshot(patient_exists=True, stored=frozenset({refusal})))
+        assert "capture.consented" not in flags, refusal
 
 
 def test_partial_and_complete_dispense_are_a_comparison_not_a_boolean():
