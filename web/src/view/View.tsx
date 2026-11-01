@@ -151,11 +151,13 @@ function Queue({ rows, decl, derived, labelCols, provenance, onOpenThread }: {
                   person, and monochrome, because it is not a risk: in this
                   system red means a clinician should look sooner and nothing
                   else. The word is whatever the declaration calls the stored
-                  value, which today is the value itself. */}
+                  value, and it is set in the reading face rather than the
+                  flag face, because it is a name a person says out loud and
+                  not a state the engine worked out. */}
               {labelCols.map((col) => {
                 const value = String(r.subject?.[col] ?? "");
                 return value ? (
-                  <span className="qr-pg" key={col}>{displayFor(col, value)}</span>
+                  <span className="qr-pg dsp" key={col}>{displayFor(col, value)}</span>
                 ) : null;
               })}
               {labels(r, derived).map((l) => (
