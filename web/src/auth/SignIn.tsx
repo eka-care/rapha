@@ -17,6 +17,11 @@
  *  nothing else: no message crosses that origin boundary. So while the card
  *  is open this asks, quietly, whether the session has appeared -- which is
  *  the same question the app asks on load, and the only one there is.
+ *
+ *  WHICH IS WHY THE CARD DOES NOT ASK TO BE RETURNED TO. The frame's return
+ *  address is Eka's own, not this app's: see `loginUrl`. Nothing here waits
+ *  on that redirect, because the cookie is the whole result and this is
+ *  already asking for it.
  */
 import { useEffect, useRef } from "react";
 import { NAME } from "../brand";
@@ -64,7 +69,7 @@ export function SignIn({ checking, onRetry }: {
         ) : framed ? (
           <iframe
             className="way-in-frame"
-            src={loginUrl(ENV, CLIENT_ID, location.origin + location.pathname)}
+            src={loginUrl(ENV, CLIENT_ID)}
             title="Sign in with Eka"
           />
         ) : (

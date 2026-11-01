@@ -68,13 +68,20 @@ ok(!canFrameLogin("eka.care.evil.com"),
    "and a name that merely ENDS in something like it is not a subdomain of it");
 
 // -- the login's own address ----------------------------------------------
-const url = loginUrl("DEV", "doc-web", "https://sam.eka.care/");
+const url = loginUrl("DEV", "doc-web");
 ok(url.startsWith("https://login.dev.eka.care/auth/login?"), "it is Eka's own login path");
 ok(url.includes("audience=doc-web"), "the surface asking is named, as on every other call");
-ok(url.includes("next=https%3A%2F%2Fsam.eka.care%2F"),
-   "and it comes BACK here, encoded: a login that lands on somebody else's "
-   + "dashboard is a login that did not work");
-ok(loginUrl("PROD", "androiddoc", "https://x.eka.care").includes("login.eka.care/auth/login"),
+// The return address is Eka's own, not this app's. An origin pointed at
+// somebody's laptop is not an address Eka has been told about, and the card
+// was showing Eka's refusal of one.
+ok(url.includes("next=https%3A%2F%2Fdocapp.eka.care"),
+   "and it returns to the address Eka itself hands out for dev, encoded");
+ok(!url.includes("sam.eka.care") && !url.includes("localhost"),
+   "never to this app: a login that reloads the app inside its own card is "
+   + "an app in a box, and a return address Eka does not know is refused");
+ok(loginUrl("PROD", "androiddoc").includes("login.eka.care/auth/login"),
    "production follows the same switch as everything else");
+ok(loginUrl("PROD", "doc-web").includes("next=https%3A%2F%2Fdr.eka.care"),
+   "and production returns to the address production hands out");
 
 console.log(`ok   session rules: ${checks} checks`);

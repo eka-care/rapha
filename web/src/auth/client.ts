@@ -77,15 +77,36 @@ export function canFrameLogin(hostname: string): boolean {
   return hostname === "eka.care" || hostname.endsWith(".eka.care");
 }
 
-/** Where the login goes, for a card on this origin.
+/** Where Eka sends a browser once the cookie is set, by environment.
+ *
+ *  MEASURED, from the redirect login.eka.care issues for itself:
+ *    GET https://login.dev.eka.care/  ->  /auth/login?audience=doc-web&next=https://docapp.eka.care
+ *    GET https://login.eka.care/      ->  /auth/login?audience=doc-web&next=https://dr.eka.care
+ *  so these two are the return addresses Eka hands out, which means they are
+ *  the two it is certain to accept.
+ */
+export function landingAfterLogin(env: string | undefined): string {
+  return env === "PROD" ? "https://dr.eka.care" : "https://docapp.eka.care";
+}
+
+/** Where the login goes, for the card on this screen.
  *
  *  `audience` is the surface asking, the same id every request carries, and
- *  `next` is where Eka sends the browser once the cookie is set -- back
- *  here, so a login that completes inside the card lands on this app rather
- *  than on somebody else's dashboard. Both are Eka's own parameters, read
- *  off the redirect login.eka.care issues for itself.
+ *  `next` is required -- the page answers 400 without one.
+ *
+ *  WHY `next` IS NOT THIS APP. It used to be, and that was wrong twice.
+ *  Once because a login that completed then loaded the whole app INSIDE the
+ *  card, an app in a box in the app. And once because `next` is a return
+ *  address Eka recognises or does not: login.dev.eka.care answers a path it
+ *  does not serve with `{"message":"Forbidden"}`, which is exactly what the
+ *  card was showing, and an origin somebody has pointed at their own laptop
+ *  is not an address Eka has ever been told about.
+ *
+ *  So it uses the address Eka itself names, and nothing waits on the
+ *  redirect: the cookie is the whole result, and the card is already asking
+ *  every couple of seconds whether it has arrived.
  */
-export function loginUrl(env: string | undefined, clientId: string, back: string): string {
-  const next = encodeURIComponent(back);
+export function loginUrl(env: string | undefined, clientId: string): string {
+  const next = encodeURIComponent(landingAfterLogin(env));
   return `${loginBase(env)}/auth/login?audience=${encodeURIComponent(clientId)}&next=${next}`;
 }
