@@ -890,4 +890,37 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
 
+/* ---- a liveness flag must be switched ON, not only off ------------------
+ *
+ * THIS KEPT SOMEBODY OUT OF THEIR OWN APP FOR AN AFTERNOON. SignIn held an
+ * `alive` ref so a reply arriving after the screen had gone was ignored, and
+ * the effect that managed it was a cleanup and nothing else:
+ *
+ *     useEffect(() => () => { alive.current = false; }, []);
+ *
+ * React's StrictMode mounts a component, runs the cleanup, and mounts it
+ * again. With no setup body, the second mount left the flag false for the
+ * rest of the session, so every `if (!alive.current) return;` below it was
+ * dead code. The Eka session arrived and was thrown away, and the line that
+ * would have said so was behind the same guard. It fails only in
+ * development, which is the half of the day a person is looking at it.
+ *
+ * The rule is the shape, not the name: an effect whose entire body is a
+ * cleanup setting some ref to false is refused. Setting it true on the way
+ * in costs one line and survives being mounted twice.
+ */
+{
+  const bad: string[] = [];
+  for (const file of TSX) {
+    const src = readFileSync(file, "utf8");
+    const m = src.match(/useEffect\(\(\) => \(\) => \{?[^}]*?\.current = false;?\s*\}?,\s*\[\]\)/);
+    if (m) bad.push(`${relative(SRC, file)}: ${m[0].replace(/\s+/g, " ").slice(0, 90)}`);
+  }
+  assert.deepEqual(bad, [],
+    "an effect that is only a cleanup leaves its flag false after StrictMode "
+    + "mounts the component a second time, and every guard on that flag is "
+    + "then dead: set it true in the setup too. " + bad.join(" | "));
+  ok("no effect sets a liveness flag false without setting it true on the way in");
+}
+
 console.log(`\n${checks} checks passed`);

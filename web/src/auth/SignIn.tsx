@@ -44,7 +44,17 @@ export function SignIn({ checking, onRetry }: {
   const alive = useRef(true);
   const [heard, setHeard] = useState<Answer | null>(null);
 
-  useEffect(() => () => { alive.current = false; }, []);
+  // SET TRUE ON THE WAY IN, and this is the whole bug that kept somebody
+  // out of their own app. React's StrictMode mounts a component, runs the
+  // cleanup, and mounts it again. With no setup body this effect was only a
+  // cleanup, so the second mount left `alive` false FOREVER -- and every
+  // line below that guards on it was then dead. The session arrived, was
+  // thrown away, and the screen said nothing, because the line that says
+  // what Eka answered was behind the same guard.
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
 
   const ask = useCallback(() => {
     void probe().then((answer) => {
