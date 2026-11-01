@@ -136,6 +136,10 @@
      own token so it can be lifted without moving every violet surface
      with it, and it is decoration -- nothing is ever read on it. */
   --color-hero-floor: rgba(91,69,201,.26);
+  /* What a tour or a sheet lays over the page. Light enough that the
+     control being pointed at stays readable through it: a tour that
+     dims what it explains is a tour about a dark rectangle. */
+  --color-scrim: rgba(20,20,19,.38);
 
   /* National identity, and nothing else. */
   --color-abdm: #1A50E6;
@@ -220,6 +224,7 @@
   --color-agent-tint: rgba(160,140,255,.14);
   --color-agent-tint-hover: rgba(160,140,255,.20);
   --color-hero-floor: rgba(160,140,255,.30);
+  --color-scrim: rgba(0,0,0,.58);
 
   --color-abdm: #6B93FF;
   --color-abdm-soft: #141A28;
@@ -289,6 +294,7 @@
     --color-agent-tint: rgba(160,140,255,.14);
     --color-agent-tint-hover: rgba(160,140,255,.20);
     --color-hero-floor: rgba(160,140,255,.30);
+    --color-scrim: rgba(0,0,0,.58);
 
     --color-abdm: #6B93FF;
     --color-abdm-soft: #141A28;

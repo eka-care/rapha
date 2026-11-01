@@ -18,6 +18,7 @@ import { Desk } from "../screens/Desk";
 import { ListScreen } from "../screens/ListScreen";
 import { Patient } from "../screens/Patient";
 import { Patients } from "../screens/Patients";
+import { seenTour, Tour } from "./Tour";
 import { Roles } from "../screens/Settings";
 import { Today } from "../screens/Today";
 import type { Facility, QueueRow, ViewDecl, ViewResult, Workflow } from "../types";
@@ -117,6 +118,10 @@ export function App() {
   }, []);
 
   const [theme, flipTheme] = useTheme();
+  /** The tour runs once, on a person's first load, and only once the screen
+   *  has something to point at. Nothing reopens it: a tour that comes back
+   *  is an interruption, and the control panel is where it starts again. */
+  const [tour, setTour] = useState(() => !seenTour());
   const [khojOpen, setKhojOpen] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [said, setSaid] = useState<Record<string, Said[]>>(() => read(SAID_KEY, {}));
@@ -319,6 +324,7 @@ export function App() {
         onCall={(token) => { setKhojOpen(false); go(`#/desk?q=${encodeURIComponent(token)}`); }}
         onCloseDrawer={() => setDrawer(false)}
       />
+      {tour && <Tour onClose={() => setTour(false)} />}
       {drawer && <div className="drawer-scrim" onClick={() => setDrawer(false)} />}
       <div className="main">
         <Topbar

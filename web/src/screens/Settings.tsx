@@ -168,6 +168,15 @@ export function Roles({
   return (
     <div className="mod mod-roles">
       <div className="mod-bar" />
+      {/* The one place the tour starts again. Nothing else reopens it: a
+          tour that comes back on its own is an interruption. */}
+      <button
+        className="tour-again"
+        onClick={() => { try { localStorage.removeItem("phc.tour.seen"); } catch { /* private window */ }
+                         location.hash = "#/"; location.reload(); }}
+      >
+        Take the tour again
+      </button>
       <div className="mod-h">
         <div className="mod-t">Roles</div>
         <p className="mod-sub">

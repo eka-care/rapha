@@ -228,6 +228,9 @@ if [ -d web/node_modules ]; then
   # one is worth a trend, and who has been near the visit. Pure rules over
   # two visits' values, so no browser and no kernel.
   (cd web && node --experimental-strip-types src/thread/earlier.check.ts)
+  # The tour: it points at elements that are really on screen, and its card
+  # never leaves one. Pure rules over a rectangle, so no browser.
+  (cd web && node --experimental-strip-types src/app/guide.check.ts)
   # One primary action per station, everything else in overflow: pure rules
   # over declarations, checked without a browser.
   (cd web && node --experimental-strip-types src/loops.check.ts)
