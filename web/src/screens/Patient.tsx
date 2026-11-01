@@ -11,7 +11,7 @@
 import { useState } from "react";
 import { initialsOf } from "../agent";
 import { api, useAsync } from "../api";
-import { questionnaire } from "../declarations";
+import { displayFor, questionnaire } from "../declarations";
 import { Icon } from "../icons";
 import { header, queueViewFor, valuesOf } from "../messages";
 import { Failed, Loading } from "../parts";
@@ -39,6 +39,7 @@ export function Patient({ id, cat, onOpenThread }: {
   const head = header(
     { id, workflow: "", subject: view.subject, flags: [] } as unknown as ThreadView,
     queueViewFor(cat, Object.values(cat.workflows ?? {})[0]?.id),
+    displayFor,
   );
   const name = head.name;
   const meta = head.meta;
@@ -194,7 +195,7 @@ function Timeline({ view, onOpenThread }: { view: SubjectView; onOpenThread: (t:
 }
 
 function committed(thread: ThreadView, cat: Catalogue) {
-  const ctx = { operations: cat.operations ?? {}, schema: questionnaire, badges: {} };
+  const ctx = { operations: cat.operations ?? {}, schema: questionnaire, badges: {}, display: displayFor };
   return (thread.audit ?? [])
     .filter((a) => /^(committed|confirmed|allowed)/.test(a.outcome))
     .map((a) => ({

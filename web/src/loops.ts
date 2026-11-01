@@ -272,7 +272,16 @@ export function provenanceOf(
 ): { column: string; mark: string; label: string } | null {
   const p = decl?.provenance;
   if (!p?.column || !p.mark || !p.label) return null;
-  return (decl?.columns ?? []).includes(p.column) ? { ...p } : null;
+  // The intersection applies only when the view actually declares columns.
+  //
+  // `/facility` sends a SHORT form of a view, with no `columns` on it, and
+  // the command palette is handed that one; a screen reading the short form
+  // falls back to whatever the subject carries, and the declaration about
+  // that subject is still true. Requiring the column to be listed therefore
+  // switched provenance OFF on exactly the screen that had no column list to
+  // narrow, and the stored value went back to being drawn as a word. It did.
+  const columns = decl?.columns ?? [];
+  return columns.length === 0 || columns.includes(p.column) ? { ...p } : null;
 }
 
 /** Whether this row wears the mark: its provenance column carries exactly the

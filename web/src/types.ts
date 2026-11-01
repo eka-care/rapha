@@ -115,6 +115,26 @@ export type MappingRecord = {
   fields: Record<string, Record<string, unknown>>;
 };
 
+/** What a declared answer is CALLED: a stored value in, the word a person
+ *  reads out.
+ *
+ *  A FUNCTION passed in, never an import, and that is the whole point of it.
+ *  `declarations.displayFor` answers out of a registry the app fetches before
+ *  the first screen draws, so it is loaded state; the modules that work out
+ *  what a row says (messages.ts, search.ts) are pure by instruction and run
+ *  under plain node in their own checks. If they imported it they would get
+ *  an EMPTY registry there, every display would fall back to the stored code,
+ *  and the check would pass green over exactly the defect it exists to catch
+ *  while the browser drew something else. Taking it as an argument is the
+ *  same move `optionsFrom` makes with its value sets and `kernel/terminology`
+ *  makes with its terminology, for the same reason: a check can hand over a
+ *  fake and assert the thing was really consulted.
+ *
+ *  It has no default. A new caller has to decide, because every one that
+ *  silently drew the stored code got there by not thinking about it.
+ */
+export type Display = (column: string, value: string) => string;
+
 export type ViewDecl = {
   id: string; kind: "queue" | "summary" | "dashboard" | "tasklist"; title: string; summary?: string;
   /** A queue view says which subject fields matter and how a flag is styled.

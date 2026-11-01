@@ -100,10 +100,17 @@ function questionFor(linkId: string): Question | null {
 /** What a declared answer is CALLED.
  *
  *  The option's own display when the declaration carries one, and the stored
- *  value itself when it does not. Today this bundle's questions list bare
- *  values, so a programme draws as its own code; the day a question binds a
- *  value set or carries displays, the word on screen improves here with no
- *  edit in any screen.
+ *  value itself when it does not. The health centre's programmes carry one
+ *  now, so a queue says NCD where it used to say the stored code; a question
+ *  that declares no display still draws its own value, which is what every
+ *  one of them did before any of them carried a word.
+ *
+ *  This is loaded state: it answers out of a registry `load()` fills before
+ *  the first screen draws, and an unfetched registry answers the code. So the
+ *  pure modules that work out what a row says take it as an argument rather
+ *  than importing it (see the Display type in types.ts), because importing it
+ *  into a file that runs under plain node means reading an empty registry and
+ *  checking the fallback instead of the rule.
  */
 export function displayFor(linkId: string, value: string): string {
   const q = questionFor(linkId);

@@ -241,6 +241,17 @@ ok(provenanceOf({ columns: ["name"], badges: {} }) === null,
 ok(provenanceOf({ columns: ["name"], badges: {},
                   provenance: { column: "howtheygothere", mark: "x", label: "y" } }) === null,
   "provenance naming a column this view does not carry draws nothing");
+// But a view that declares NO columns at all is not a view that excluded the
+// column; it is one that listed none, and a screen reading it falls back to
+// whatever the subject carries. The declaration about that subject still
+// holds, so the provenance still does. Guarding on the intersection alone
+// switched the rule OFF on exactly the screen that had no column list, which
+// is where the stored value went back to being drawn as a word.
+assert.deepEqual(
+  provenanceOf({ columns: [], badges: {}, provenance: PROV_DECL.provenance }),
+  PROV_DECL.provenance,
+  "FAIL a view that lists no columns keeps the provenance it declares");
+checks++;
 
 const prov = provenanceOf(PROV_DECL)!;
 ok(marked(mixed[0], prov) && marked(mixed[2], prov),
