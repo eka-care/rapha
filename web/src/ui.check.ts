@@ -693,9 +693,20 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   const h1s = TSX.filter((f) => f.endsWith(".tsx"))
     .filter((f) => /<h1\b/.test(code(readFileSync(f, "utf8"))))
     .map(rel);
-  assert.deepEqual(h1s, ["app/Topbar.tsx"],
+  // TWO FILES, NEVER ONE PAGE. The sign-in screen is what App renders
+  // INSTEAD of the shell when there is no Eka session -- it returns before
+  // the rail, the top bar and the workspace exist -- so the two headings
+  // cannot meet. A screen with no h1 at all is the thing this rule is for,
+  // and the sign-in screen having one is it obeying the rule, not breaking
+  // it. Asserted as the exact pair so a THIRD cannot arrive quietly.
+  assert.deepEqual(h1s, ["app/Topbar.tsx", "auth/SignIn.tsx"],
     "the page has more than one top-level heading, or none: " + h1s.join(", "));
-  ok("a11y: every screen has exactly one h1, and it is the screen's declared name");
+  const appSrc = code(readFileSync(join(SRC, "app", "App.tsx"), "utf8"));
+  assert.match(appSrc, /if \(session !== true\) \{[\s\S]{0,400}?<SignIn/,
+    "the sign-in screen must REPLACE the shell, not sit inside it: two h1s "
+    + "on one page is what this allows and it is only safe because it returns");
+  ok("a11y: every screen has exactly one h1, and the sign-in screen replaces "
+     + "the shell rather than joining it");
 
   // -- the live region is in the document BEFORE it has anything to say -----
   //

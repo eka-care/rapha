@@ -231,6 +231,10 @@ if [ -d web/node_modules ]; then
   # The tour: it points at elements that are really on screen, and its card
   # never leaves one. Pure rules over a rectangle, so no browser.
   (cd web && node --experimental-strip-types src/app/guide.check.ts)
+  # The Eka session: which surface is asking, when a session is worth
+  # refreshing, and the one origin where the gate cannot apply. Nectar's own
+  # rules, so the claims product and this one behave the same way.
+  (cd web && node --experimental-strip-types src/auth/client.check.ts)
   # One primary action per station, everything else in overflow: pure rules
   # over declarations, checked without a browser.
   (cd web && node --experimental-strip-types src/loops.check.ts)

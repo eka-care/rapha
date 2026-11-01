@@ -19,6 +19,9 @@ import { ListScreen } from "../screens/ListScreen";
 import { Patient } from "../screens/Patient";
 import { Patients } from "../screens/Patients";
 import { seenTour, Tour } from "./Tour";
+import { gateApplies } from "../auth/client";
+import { SignIn } from "../auth/SignIn";
+import { signedIn } from "../auth/session";
 import { Roles } from "../screens/Settings";
 import { Today } from "../screens/Today";
 import type { Facility, QueueRow, ViewDecl, ViewResult, Workflow } from "../types";
@@ -118,6 +121,22 @@ export function App() {
   }, []);
 
   const [theme, flipTheme] = useTheme();
+
+  /** The Eka session, nectar's way: there is no login form here, only the
+   *  question of whether one was done on Eka. `null` is "still asking".
+   *
+   *  It gates this SCREEN. The kernel is its own service and cannot check an
+   *  Eka cookie, so it still takes a caller's word -- web/src/auth/session.ts
+   *  says so at length, and so does `caller()` in api/main.py. */
+  const [session, setSession] = useState<boolean | null>(
+    () => (gateApplies(location.hostname) ? null : true));
+  const askSession = useCallback(() => {
+    setSession(null);
+    void signedIn().then(setSession);
+  }, []);
+  useEffect(() => {
+    if (gateApplies(location.hostname)) askSession();
+  }, [askSession]);
   /** The tour runs once, on a person's first load, and only once the screen
    *  has something to point at. Nothing reopens it: a tour that comes back
    *  is an interruption, and the control panel is where it starts again. */
@@ -294,6 +313,17 @@ export function App() {
   // the rail, the home screen and the desk cannot show three numbers.
   const deskQueue = queueViewFor(catalogue, facility.data?.bundle.workflow);
   const deskRows = (loaded.find((l) => l.decl.id === deskQueue?.id)?.result.rows ?? []) as QueueRow[];
+
+  // No Eka session: the one screen there is to show. In front of everything,
+  // because a sign-in behind a half drawn workspace is not a sign-in.
+  if (session !== true) {
+    return (
+      <div className="app">
+        <IconSheet />
+        <SignIn checking={session === null} onRetry={askSession} />
+      </div>
+    );
+  }
 
   return (
     <div className="app">
