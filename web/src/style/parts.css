@@ -229,7 +229,18 @@
   border-radius: var(--radius-xl); box-shadow: var(--shadow-lg);
   overflow: hidden; display: flex; flex-direction: column;
 }
-.way-in-frame { width: 100%; height: 520px; border: 0; display: block; }
+/* THE CARD NEVER SCROLLS. It used to hold a frame of a fixed 520 pixels,
+   which on a laptop is taller than the room left over once the name, the
+   padding and the footer have had theirs, so the screen behind it grew a
+   scroll bar. The frame takes what is left instead: enough to show Eka's
+   page, never more than the screen can hold.
+   A scroll bar INSIDE Eka's own page is Eka's. It is a different origin and
+   nothing here can reach into it. */
+.way-in-frame {
+  width: 100%; border: 0; display: block;
+  height: min(560px, 74dvh);
+}
+@media (max-height: 720px) { .way-in-frame { height: 68dvh; } }
 .way-in-wait, .way-in-out { padding: 28px 24px; text-align: center; }
 .way-in-wait { color: var(--color-text-tertiary); font-size: 13.5px; }
 .way-in-out { display: flex; flex-direction: column; align-items: center; gap: 10px; }
