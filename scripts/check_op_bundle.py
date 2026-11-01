@@ -122,6 +122,58 @@ assert [r for q in DECLARED.values() for r, _ in q] \
 ok("the consultation this facility publishes is declared on the bundle: three "
    "of the profile's twelve slices, and which rows go under each")
 
+# ---------------------------------------------------------------------------
+# And that placement SURVIVES BEING COMPILED, in order. The third seam, closed
+# 2026-11-01: `documents` is a bundle key now, so a Go process can read where a
+# row is filed instead of being handed it by a caller.
+#
+# THE ORDER IS THE WHOLE OF THIS CHECK. `fhir.document()` walks the declared
+# sections in order, and that order is observable three times in what it
+# publishes: the order of the sections, the order of the Bundle's entries, and
+# the order the authors are discovered in. catalogue.json is written with
+# sort_keys=True, so a MAPPING of slice name to queries would arrive
+# alphabetically at every engine that reads the file -- and both engines read
+# the same file, so the differential check would compare two identically
+# reordered documents and pass. Nothing else in the gate looks at this. That
+# is why the artifact carries a LIST and why the comparison is against the
+# DECLARATION rather than against the other engine.
+# ---------------------------------------------------------------------------
+
+COMPILED = json.loads(
+    (ROOT / "catalogue" / "catalogue.json").read_text())["documents"]
+assert sorted(COMPILED) == sorted(BUNDLE.documents), \
+    "the compiled artifact and the loaded bundle declare different documents: " \
+    "%s against %s" % (sorted(COMPILED), sorted(BUNDLE.documents))
+for did, declared in BUNDLE.documents.items():
+    carried = COMPILED[did]
+    assert carried["profile"] == declared["profile"], carried
+    assert [s["slice"] for s in carried["sections"]] \
+        == list(declared["sections_wanted"]), (
+            "documents.%s: the compiled section order is %s and the bundle "
+            "declares %s. A section order that changes on the way into "
+            "catalogue.json publishes every one of this facility's "
+            "consultations with its sections the other way round."
+            % (did, [s["slice"] for s in carried["sections"]],
+               list(declared["sections_wanted"])))
+    assert [[q["resource"] for q in s["queries"]] for s in carried["sections"]] \
+        == [[r for r, _ in qs] for qs in declared["sections_wanted"].values()], \
+        carried
+    assert [[q["where"] for q in s["queries"]] for s in carried["sections"]] \
+        == [[dict(w or {}) for _, w in qs]
+            for qs in declared["sections_wanted"].values()], carried
+
+# And this facility's own declaration is NOT in alphabetical order, so the
+# assertion above is not a check that passes whatever the compiler does. If a
+# bundle ever declares its sections alphabetically this fails loudly, and the
+# answer is to hold a bundle that does not, never to drop the check.
+_ORDERED = [s["slice"] for s in COMPILED["consultation"]["sections"]]
+assert _ORDERED != sorted(_ORDERED), (
+    "bundles/phc declares its sections in alphabetical order, so the order "
+    "check above would pass against a compiler that sorted them and proves "
+    "nothing: %s" % _ORDERED)
+ok("and it survives being compiled into catalogue.json IN ORDER, which is "
+   "what a second engine reads instead of being handed a placement")
+
 # And it compiles to the projection's own argument names, so a caller cannot
 # retype a placement on the way in. That is the whole point: a diagnosis was
 # filed under Chief complaints in one check and under Medical History in

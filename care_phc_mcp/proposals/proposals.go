@@ -147,12 +147,21 @@ func (b *Bundle) Raised(op carephc.Operation, payload map[string]any) []string {
 	return out
 }
 
+// Auditable is all AuditRow needs, which is the one append. Narrower than
+// Store on purpose: the outbox (G8) writes the queue's own audit rows and
+// reaches a store through which nothing clinical can be written, so a builder
+// that demanded the whole write path would have forced that caller to hold a
+// wider handle than it uses. Every Store satisfies this.
+type Auditable interface {
+	AppendAudit(r store.AuditRecord) error
+}
+
 // audit writes one audit record from a guard decision's audit dict. Public as
 // AuditRow, because the queue slice (G8) writes the queue's own audit rows
 // and there must be exactly one builder of an audit record. A second one
 // would be a second place for the id prefix, the field order and the guard's
 // dict shape to drift, which is the whole reason this helper exists.
-func AuditRow(s Store, decision map[string]any, thread, at, proposal string) (store.AuditRecord, error) {
+func AuditRow(s Auditable, decision map[string]any, thread, at, proposal string) (store.AuditRecord, error) {
 	record := store.AuditRecord{
 		ID:        newID("aud"),
 		Thread:    thread,

@@ -266,6 +266,57 @@ Each is finished when the gate is green and the named checks pass against Go.
 - **G8. The outbox.** Durable, nothing lost, nothing sent twice, nothing
   reported as sent when it was not. Still switched off: the audio retention
   window is unsigned.
+
+  **Landed 2026-11-01.** `kernel/queues.py` as `care_phc_mcp/queues` and
+  `adapters/local/spool.py` as `care_phc_mcp/spool`. The four measures:
+  before, the gate was 894 and said nothing was skipped, `e2e.py` on Go was
+  44 of 49, `check_go_parity.py` was 108 and `check_live.py` on Go was 16 of
+  16. After this slice and the two seams it came with, the gate is 906,
+  `e2e.py` on Go is 49 of 49, parity is 116 and `check_live.py` is 16 of 16.
+
+  **Each of the four properties is MADE TO HAPPEN rather than asserted.**
+  Durability is a real process, against a real file, killed with SIGKILL
+  between claiming an item and sending it, and the row is `sending` when the
+  file is reopened; the same test against a claim held in an uncommitted
+  transaction leaves it `ready`, which is the item a recovery sends a second
+  time. The claim is one statement and its `RowsAffected` is the
+  compare-and-set, so eight pumps racing for one item produce one claim.
+  Recovery asks the remote what it already has rather than guessing, and an
+  item the remote cannot speak for waits in `held` for a person. `sent` needs
+  a receipt; an empty receipt is a failure; and a receipt that could not be
+  written down leaves the row `sending` and is reported on its own, because
+  that is neither a success nor an ordinary failure.
+
+  Nothing clinical goes in a row. **That decision is read from
+  `kernel/queues.py`'s own prose and carried, not re-derived**, and this slice
+  is not where it is argued again.
+
+  **Two things Go could not copy, and neither is papered over.** Its regexp
+  engine is RE2 and has no lookaround, so the mobile rule drops the Python's
+  two and the property they protect is asserted of the OUTPUT instead: no run
+  of ten or more digits survives a scrubbed sentence, over nine real shapes.
+  And a failure that is not an `Unsendable` leaves `type(broke).__name__` on
+  the Python's row, which Go has no equivalent of; the differential check
+  normalises that one sentence and says so rather than dropping it from the
+  comparison, and what both engines are held to is that the row names a KIND
+  of failure and never the sentence that came with it.
+
+  It is on no HTTP route in either engine and it stays switched OFF, so it is
+  compared the way the projection is: a Go test that asserts nothing, driven
+  by `scripts/check_go_parity.py` over cases this side generates. Twelve
+  scripted sweeps, compared down to each row's state, attempt count, receipt
+  and reason, across all five states a row can be in.
+
+  **Three things this slice could not prove, and did not pretend to.** That
+  the outbox is REACHED: nothing in either engine calls it, by decision, so
+  what is proved is that the two outboxes answer alike and not that anybody
+  asks them anything. The order items are swept in WITHIN one sweep is not
+  determined in either engine: `due` reads oldest first and breaks ties on
+  the row id, which is a random hex string on both sides, so two items queued
+  in the same second have no settled order and the comparison is a bag rather
+  than a list. And the retry numbers are still the engineering guesses the
+  Python labels them as; nobody has measured a clinic line, and copying them
+  did not measure one.
 - **G8b. The planner. LANDED 2026-11-01.** `POST /khoj`, the ask-and-search
   turn in `agent/turn.py`. **Added 2026-10-31, after G4,** because no slice
   owned it and 28 of the 49 socket checks in `scripts/e2e.py main()` sat
@@ -308,6 +359,43 @@ Each is finished when the gate is green and the named checks pass against Go.
   counterpart decides whether an uncached value set is an error or simply a
   set with no categories; today the Python raises and the Go returns nothing,
   and no Go caller reads it either way.
+
+  **Landed 2026-11-01**, as `care_phc_mcp/codification`. The four refusals in
+  order, each named in a sentence a person can read, because "the service
+  found nothing" and "the service found four things this build cannot code"
+  are different things to tell a doctor. No score threshold, and no `value`
+  key on a candidate: a shape a form control could bind to is how a
+  suggestion becomes a value without anybody picking it. A `Candidate`'s
+  fields are unexported and its one constructor takes a `Coding`, which is
+  the shape G5 settled and for the same reason.
+
+  **The decision went to the Python, and the Python was not touched.** An
+  uncached value set is an ERROR and not a set with no categories. The
+  reasoning is not a preference: an empty tag set means "the tag rule does not
+  apply", so reading a missing value set as having no categories turns the
+  wrong-branch refusal OFF SILENTLY and lets a procedure be offered for a
+  diagnosis. And an uncached value set is not an operating condition the way
+  an empty answer is -- a question's binding is linted against the cache at
+  build time, so a slug that is not there means the declarations are broken or
+  a connector invented one, and this build fails closed and loudly on a
+  declaration error everywhere else. The Go `Tags` returning nil for a slug it
+  does not hold could not be told from a value set declaring none, so
+  `AcceptedTags` now asks `Known` first and returns the terminology's own
+  sentence. Both engines are held to FAILING on it rather than compared on the
+  wording, because one raises from inside its cache loader and the other
+  builds the same words from its own and they spell the directory differently.
+  All three tag outcomes are proved separately, because "declares no tags" and
+  "is not there" being one answer is the whole defect.
+
+  Twelve askings compared, down to every refusal sentence, with all four
+  refusals reached. 114 parity checks became 116.
+
+  **What this slice could not prove.** The same thing the outbox could not:
+  nothing in either engine calls it. The stub is what the gate runs and what a
+  health centre with no line has, and a candidate's only path into a record is
+  through a screen, so what is proved is that the two seams answer alike. The
+  `llm` half of the planner is the nearest thing to a caller and it is
+  unported for its own reasons.
 - **The fifth seam: one bundle is compiled INTO the binary.** Found by G8b,
   which is the slice that bumped into it. `care_phc_mcp/catalogue.json` is
   embedded at build time with `//go:embed`, and `cmd/api` refuses by name to
@@ -321,7 +409,52 @@ Each is finished when the gate is green and the named checks pass against Go.
   startup, the way it already reads the questionnaires, the value sets, the
   seed and now the spoken field names. **It blocks G9: a facility running two
   bundles cannot be served by one Go binary today, and the laboratory's own
-  separation rule is unproven on Go for that reason and no other.**
+  separation rule is unproven on Go for that reason and no other.
+
+  **Closed 2026-11-01.** The catalogue is read from the tree at startup, the
+  way the questionnaires, the value sets, the seed and the spoken field names
+  already are. `cmd/api`'s refusal to serve a bundle it was not compiled for
+  is UNCHANGED and still right; what changed is that it is now satisfiable
+  without rebuilding anything. `scripts/e2e.py` on Go went from 44 of 49 to
+  **49 of 49**, and `lab_separation()` is the last 5.
+
+  **The embedded copy stays, and it is the honest design rather than a
+  leftover.** The deployment argument for Go here is one file copied to a
+  clinic PC, and a binary that could not start without a source tree beside it
+  would give that up. So: the tree if there is one, the embedded copy if there
+  is not, and the `Catalogue` says which it read so a log line and a check can
+  tell them apart instead of inferring it from the environment. A path named
+  outright in `PHC_CATALOGUE` is a CHOICE and not a fallback, so an unreadable
+  one is fatal: falling back there is how a check reports a second bundle
+  passing while the first one answered.
+
+  **The compiler gained the argument, not a caller.**
+  `kernel/declarations.write_catalogue` takes `--out`, writing one bundle's
+  catalogue anywhere and leaving both tracked copies alone, and
+  `scripts/backend.py` -- which already owns what it takes to launch a
+  backend -- compiles the asked-for bundle when it is not the tracked one. The
+  declarations still compile in exactly one place and the Go engine still only
+  reads. `PHC_BUNDLE` goes on meaning the same thing to a caller.
+
+  **THE DEFECT THIS SLICE FOUND, which had passed the whole gate.** `Load`,
+  `LoadDeclarations` and `CompiledJSON` each re-read the package level
+  embedded variable. That was harmless only while there was exactly one
+  catalogue, and it is the kind of harmless that stops being harmless in one
+  commit: with the file readable from the tree, a `Load` that read the
+  laboratory's and a `LoadDeclarations` that read the health centre's would
+  have served one bundle's manifest over the other's workflow, through
+  `GET /facility` and `GET /catalogue`, with nothing saying so. The bytes
+  `Load` read are kept on the `Catalogue` and every reader uses them, and a
+  `Catalogue` nobody loaded now says it has nothing to read rather than
+  answering from the embedded copy.
+
+  **What this seam's measure does NOT exercise.** `e2e.py` reaches the
+  explicitly named file, because that is what `backend.py` sets; the
+  PHC_ROOT-relative tree read and the embedded fallback are held by Go tests
+  instead. Both halves are proved, and by different things, which is worth
+  knowing before anybody reads 49 of 49 as proof that a Go kernel finds its
+  own catalogue in a tree. Compiled back in, `e2e.py` is 44 again, which is
+  what says the measure is this seam and not something else that moved.**
 - **G9. Retire the Python.** Only on the owner's word, and only when every
   check passes against Go.
 
@@ -355,6 +488,49 @@ skipped beside the verdict.
   process can read it. `Document()` takes it as an argument instead. This is
   a change to the compiled artifact's public contract, and it blocks G8: no
   Go path can publish a document even once the outbox exists.
+
+  **DECIDED BY THE OWNER AND CLOSED 2026-11-01. `documents` is a bundle key.**
+  This is a change to the compiled artifact's public contract, so here is
+  exactly what was added and what shape it has. `catalogue.json` grew one top
+  level key, `documents`, taking it from fourteen keys to fifteen. It is
+  `{document id: {profile, sections}}`, where `profile` is a string naming one
+  of the profiles `kernel/fhir.PROFILES` emits, and `sections` is an ORDERED
+  LIST of `{slice, queries}`, each query being `{resource, where}`. It carries
+  the one loaded bundle's declaration, already linted by
+  `kernel.declarations._lint_documents` against that profile's own section
+  table, so what arrives is a placement that projects. The in-memory
+  `bundle.documents` is unchanged: it is still kwargs for `fhir.document()`,
+  and `_compiled_documents` is the one place the same dict becomes a shape
+  that survives being written down.
+
+  **ITS SECTIONS ARE A LIST AND NOT A MAPPING, and that is the whole of the
+  shape decision.** `state_order`'s reason over again. The projection walks
+  the declared sections IN ORDER and that order is observable three times in
+  what it publishes: the order of the sections, the order of the Bundle's
+  entries, and the order the authors are discovered in. `write_catalogue`
+  dumps the file with `sort_keys=True`, and the PHC bundle declares
+  ChiefComplaints, Medications, DocumentReference, which is not alphabetical.
+  So a mapping would have published every consultation at this facility with
+  its narrative and its medicines the other way round.
+
+  **AND NOTHING ELSE IN THE GATE WOULD HAVE CAUGHT THAT.** Both engines read
+  the same file, so the differential check would have compared two identically
+  reordered documents and passed, and `/catalogue` is compared byte for byte
+  between them. The 894 checks that were green before this slice included an
+  in-memory assertion of that very order in `scripts/check_op_bundle.py`,
+  which is why it looked covered: what was held was the order in
+  `bundle.documents`, and the artifact did not exist to disagree with it. So
+  the compiled order is now held against the DECLARATION, in the file that
+  already owns the rule that no caller types a section heading, and that check
+  refuses to pass vacuously if a bundle ever declares its sections
+  alphabetically.
+
+  `fhir.Document()` keeps its `wanted` argument, because it is the pure
+  projection and the checks drive it directly. What changed is that the
+  production path cannot type one: `queues.DocumentBody` reads the placement
+  out of the catalogue, and a Go kernel that never loaded the declarations
+  refuses to publish rather than reading "no placement" as "this bundle files
+  nothing".
 - **What replaces the two Python-only holds at G9.** Added 2026-10-31, after
   G6. The Go section table and the Go observation-status refusal are held by
   the differential check PLUS two Python checks and nothing else:
@@ -370,6 +546,28 @@ skipped beside the verdict.
   compile step remains the only gate and something must hold it after G9. Not
   an agent's call: it decides whether a Go-only deployment can be trusted with
   a hand-edited facility declaration.
+
+- **When the outbox is switched on.** Added 2026-11-01, after G8. Both
+  engines now have a complete, proved outbox and NEITHER IS WIRED TO
+  ANYTHING: `api/scribe.py` does not call the Python's, nothing in `cmd/api`
+  calls the Go's, and no route in either reaches one. That is the Python's own
+  decision carried, not an omission, and `kernel/queues.py` states the order:
+  surviving an outage MEANS holding consultation audio on a clinic's disk, the
+  retention backstop that makes that safe has no clinical or legal sign-off,
+  so sign the retention window and then wire the route. Porting it did not sign
+  anything. Until it is wired, the one thing neither engine can prove is that
+  the outbox is REACHED, and both parity checks say so rather than implying
+  otherwise.
+
+- **Whether the differential check may compare the sweep ORDER inside one
+  pass.** Added 2026-11-01, after G8. `due()` reads items oldest first and
+  breaks ties on the row id, which is a random hex string in both engines, so
+  two items queued in the same second have no determined order on either side.
+  The check compares each sweep's outcomes as a bag for that reason. Making
+  the order determined is a change to the Python (a tiebreak on the key, or a
+  monotonic sequence on the row) rather than a port, so it was reported and
+  not made. It matters only for a clinic that queues two items inside one
+  second, which is every clinic that ends a visit and starts the next.
 
 - **`MedicationRequest.status` defaults to `"unknown"` where
   `Observation.status` refuses.** Added 2026-10-31, after G6. Two resources,

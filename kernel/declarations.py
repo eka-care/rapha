@@ -7,16 +7,19 @@ and a dangling reference is a build failure and not a warning. A capability
 misspelt in frontmatter is not a typo, it is a screen nobody can open or one
 anybody can.
 
-`documents` is the exception, and for the reason kernel/mapping.py gives for
-its own: it is not compiled into catalogue.json. Nothing outside the kernel
-projects a document, the Go server proposes only, and the renderer must never
-learn a section heading. Add it to the compiled artifact when an out of
-process consumer needs it.
+`documents` WAS the exception, for the reason kernel/mapping.py gave for its
+own: it was not compiled into catalogue.json, because nothing outside the
+kernel projected a document. That changed on 2026-11-01, when the outbox was
+ported: the outbox is the first production caller of `kernel.fhir.document()`,
+and a Go engine that cannot read the placement cannot publish at all. It is a
+bundle key now. The renderer still may never learn a section heading, and the
+check that holds the renderer to this bundle's words is what fails if it does.
 
-compile_json() returns exactly the five new catalogue.json keys, so the
-compiler can stay one writer: build.py adds them with one update() call and
-keeps writing the file. Until it does, the kernel loads declarations from
-bundles/<id>/ directly, which is the same data by the same lint.
+compile_json() returns exactly the catalogue.json keys the one loaded bundle
+owns, so the compiler can stay one writer: build.py adds them with one
+update() call and keeps writing the file. Until it does, the kernel loads
+declarations from bundles/<id>/ directly, which is the same data by the same
+lint.
 
 Pure: reads files, touches no database and no network.
 """
@@ -775,21 +778,69 @@ def compile_json(bundle):
         # and was not before.
         "mapping": {op_id: op["mapping"] for op_id, op in bundle.operations.items()
                     if op.get("mapping")},
+        # Where each kind of row is filed, which until now reached no engine
+        # but this one. See kernel/contracts.BUNDLE_KEYS for why it is in the
+        # artifact from 2026-11-01 and was not before, and `_compiled_documents`
+        # for why its sections are a list.
+        "documents": _compiled_documents(bundle.documents),
     }
 
 
-def write_catalogue(bundle):
-    """Merge the five declaration keys into the catalogue.json that
+def _compiled_documents(documents):
+    """`bundle.documents` as the artifact carries it: sections IN ORDER.
+
+    The in-memory shape is kwargs for `fhir.document()`, so `sections_wanted`
+    is a mapping and its insertion order is the declaration's. The artifact
+    cannot carry that: write_catalogue dumps with sort_keys=True. So the
+    sections become a LIST here, which no dumper can reorder, and each query
+    becomes a named pair rather than a tuple.
+
+    Not a second answer to where a row is filed. This is the same dict, turned
+    into a shape that survives being written down, and `_lint_documents` has
+    already refused anything the profile does not declare.
+    """
+    out = {}
+    for did, doc in (documents or {}).items():
+        out[did] = {
+            "profile": doc["profile"],
+            "sections": [
+                {"slice": name,
+                 "queries": [{"resource": resource, "where": dict(where or {})}
+                             for resource, where in queries or []]}
+                for name, queries in doc["sections_wanted"].items()],
+        }
+    return out
+
+
+def write_catalogue(bundle, out=None):
+    """Merge this bundle's declaration keys into the catalogue.json that
     catalogue/build.py just wrote, and into the copy the Go server embeds.
 
     This runs here and not in build.py because the layering only goes one way:
     kernel imports catalogue, so catalogue importing kernel.declarations back
     would be a circular import. Run build first, then this; check.sh does.
+
+    `out` writes ONE file at that path and leaves the two tracked copies
+    alone. Added 2026-11-01 for the fifth seam: a Go kernel reads
+    catalogue.json from the tree, so serving a SECOND bundle means compiling
+    that bundle's catalogue somewhere and pointing the process at it. The
+    compiler is the only thing that may write that file, so it is the thing
+    that gained the argument, rather than a caller learning to merge the keys
+    itself.
+
+    The base is still the tracked catalogue.json either way, which is correct
+    and is worth saying: its `operations`, `capabilities`, `bundles` and
+    `states` are the UNION over every bundle, so they are already the second
+    bundle's too. What `out` replaces is exactly the per bundle keys.
     """
     import json
-    out = ROOT / "catalogue" / "catalogue.json"
-    cat = json.loads(out.read_text())
+    base = ROOT / "catalogue" / "catalogue.json"
+    cat = json.loads(base.read_text())
     cat.update(compile_json(bundle))
+    if out is not None:
+        blob = json.dumps(cat, indent=2, sort_keys=True) + "\n"
+        pathlib.Path(out).write_text(blob)
+        return sorted(compile_json(bundle))
     # The four original keys stay catalogue wide, because `operations` is: the
     # Go server embeds every bundle's atoms and narrows at runtime by asking
     # the kernel which bundle it loaded (/facility), and its own test asserts
@@ -798,7 +849,7 @@ def write_catalogue(bundle):
     # the five keys added above are the one loaded bundle's. The API is the
     # place that answers per bundle: it serves vocab for the bundle it loaded.
     blob = json.dumps(cat, indent=2, sort_keys=True) + "\n"
-    out.write_text(blob)
+    base.write_text(blob)
     (ROOT / "care_phc_mcp" / "catalogue.json").write_text(blob)
     return sorted(compile_json(bundle))
 
@@ -806,7 +857,19 @@ def write_catalogue(bundle):
 def main():
     import json
     import sys
-    named = [a for a in sys.argv[1:] if not a.startswith("-")]
+    argv = sys.argv[1:]
+    # `--out PATH` writes ONE catalogue there and leaves the tracked copies
+    # alone, which is how a second bundle is compiled for a Go kernel to read.
+    # See write_catalogue.
+    out = None
+    if "--out" in argv:
+        at = argv.index("--out")
+        if at + 1 >= len(argv):
+            print("FAIL --out needs a path to write the catalogue to")
+            return 1
+        out = argv[at + 1]
+        argv = argv[:at] + argv[at + 2:]
+    named = [a for a in argv if not a.startswith("-")]
     try:
         bundle = load(named[0] if named else "phc")
     except DeclarationError as e:
@@ -814,7 +877,9 @@ def main():
             print(f"FAIL {line}")
         return 1
     if "--json" not in sys.argv:
-        print("ok   catalogue.json now carries %s" % ", ".join(write_catalogue(bundle)))
+        where = out or "catalogue.json"
+        print("ok   %s now carries %s"
+              % (where, ", ".join(write_catalogue(bundle, out=out))))
     print("ok   %d records mapped from %d operations' answers to their columns"
           % (sum(len(op["mapping"]) for op in bundle.operations.values()),
              sum(1 for op in bundle.operations.values() if op["mapping"])),

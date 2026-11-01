@@ -13,17 +13,86 @@
 // cmd/mcp are directories beside the reader's files rather than siblings of
 // its directory. That is the one place this module's shape was decided by
 // where the Python already writes a file.
+//
+// THE FILE IS READ FROM THE TREE, AND THE EMBEDDED COPY IS THE FALLBACK
+// ---------------------------------------------------------------------
+// The fifth seam, closed 2026-11-01. One bundle used to be compiled INTO the
+// binary and nothing else could be served: cmd/api refuses by name to serve a
+// bundle it was not compiled for, which is right and stays, but it was
+// unsatisfiable, because the only way to change which bundle the binary held
+// was to rebuild the binary. A facility running two bundles could not be
+// served by one Go binary, and the laboratory's own separation rule was
+// unprovable on Go for that reason and no other.
+//
+// So the catalogue is read the way the questionnaires, the value sets, the
+// seed and the spoken field names already are: from the tree at startup. The
+// embedded copy remains, and it is the honest design rather than a leftover,
+// because the deployment argument for Go here is ONE FILE COPIED TO A CLINIC
+// PC. A binary that could not start without a source tree beside it would
+// give that up. So: the tree if there is one, the embedded copy if there is
+// not, and the Catalogue says which it read so a check and a log line can
+// tell them apart rather than guessing.
+//
+// A path named EXPLICITLY is not a fallback. PHC_CATALOGUE is a deliberate
+// choice of file, so a missing or unreadable one is fatal and does not
+// silently become the embedded bundle: that silence is how a check would
+// report a second bundle passing while the first one answered.
 package carephc
 
 import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 )
 
 //go:embed catalogue.json
-var catalogueJSON []byte
+var embeddedCatalogue []byte
+
+// CatalogueEnv names one compiled catalogue file outright. Set per process,
+// which is what lets a second bundle be started without rebuilding anything.
+const CatalogueEnv = "PHC_CATALOGUE"
+
+// RootEnv is the repository root the tree is read relative to, the same
+// variable the questionnaires, the value sets and the seed are read against.
+const RootEnv = "PHC_ROOT"
+
+// CataloguePath is where the compile step writes the artifact, relative to the
+// root. Written in kernel/declarations.write_catalogue and catalogue/build.py;
+// spelled once here.
+var CataloguePath = filepath.Join("catalogue", "catalogue.json")
+
+// Embedded is what the binary was compiled with, for a caller that wants to
+// say which bundle that was.
+const Embedded = "the catalogue compiled into this binary"
+
+// catalogueBytes is the compiled catalogue and where it came from.
+func catalogueBytes() ([]byte, string, error) {
+	if named := os.Getenv(CatalogueEnv); named != "" {
+		raw, err := os.ReadFile(named)
+		if err != nil {
+			// Named outright, so this is fatal. Falling back here would serve
+			// one bundle while a check believed it had started another.
+			return nil, named, fmt.Errorf("%s=%q could not be read, and a "+
+				"catalogue named outright is not one this kernel may silently "+
+				"replace with the embedded copy: %w", CatalogueEnv, named, err)
+		}
+		return raw, named, nil
+	}
+	root := os.Getenv(RootEnv)
+	if root == "" {
+		root = "."
+	}
+	at := filepath.Join(root, CataloguePath)
+	if raw, err := os.ReadFile(at); err == nil {
+		return raw, at, nil
+	}
+	// No tree. One file copied to a clinic PC, which is the whole deployment
+	// argument for Go here.
+	return embeddedCatalogue, Embedded, nil
+}
 
 type Field struct {
 	LinkID   string   `json:"link_id"`
@@ -113,6 +182,39 @@ type Vocabulary struct {
 	Capabilities []string            `json:"capabilities"`
 	Roles        map[string][]string `json:"roles"`
 	States       []string            `json:"states"`
+}
+
+// DocumentQuery is one row query inside a declared section: a resource table
+// and the condition its rows must meet. kernel/declarations._documents writes
+// it as a `(resource, where)` pair; the artifact names both halves so neither
+// can be read as the other.
+type DocumentQuery struct {
+	Resource string         `json:"resource"`
+	Where    map[string]any `json:"where"`
+}
+
+// DocumentSection is one section slice of a profile and the rows filed under
+// it.
+type DocumentSection struct {
+	Slice   string          `json:"slice"`
+	Queries []DocumentQuery `json:"queries"`
+}
+
+// DocumentDecl is one entry of bundle.yaml's `documents:`: which profile this
+// facility publishes and which section of it each kind of row is filed under.
+// kernel.declarations._lint_documents has already refused a profile this build
+// does not emit, a slice the profile does not declare, a resource with no
+// projection and a resource no operation here writes, so what arrives is a
+// placement that projects.
+//
+// SECTIONS ARE ORDERED AND THAT IS LOAD BEARING. The projection walks them in
+// order and the order shows up three times in the document: the order of the
+// sections, the order of the Bundle's entries, and the order the authors are
+// discovered in. See kernel/contracts.BUNDLE_KEYS for why the artifact carries
+// a list rather than a mapping.
+type DocumentDecl struct {
+	Profile  string            `json:"profile"`
+	Sections []DocumentSection `json:"sections"`
 }
 
 // Section is one block of a summary view: kernel/contracts.Section. Exactly
@@ -219,9 +321,24 @@ type Catalogue struct {
 	Metrics    map[string]Metric `json:"metrics"`
 	Workflows  map[string]any    `json:"workflows"`
 
+	// Where this catalogue was read from: a path, or Embedded. Carried so a
+	// startup line and a check can say which, rather than a reader having to
+	// work it out from the environment.
+	Source string `json:"-"`
+	// The bytes Load read, so nothing below it goes back to the embedded copy
+	// and reads a different bundle. See Load.
+	raw []byte
+
 	// Filled by LoadDeclarations, not by a tag. The one workflow a bundle
 	// has, typed, because the guard reads its steps and its state rules.
 	Workflow *Workflow `json:"-"`
+	// Where each kind of row is filed when this bundle publishes, by document
+	// id. Filled by LoadDeclarations and NOT by a tag, for the reason the
+	// views and the metrics are: a `where` read with encoding/json's default
+	// turns every number into a float64, and the store compares conditions as
+	// text, so 30 would be asked for as "30" by one engine and "30.0" by the
+	// other.
+	Documents map[string]DocumentDecl `json:"-"`
 	// The compiled mapping and the operation atoms, unparsed. Kept raw for
 	// the reason ManifestRaw is: what is served or evaluated is the
 	// declaration the Python compiled, so a field added there arrives without
@@ -234,17 +351,30 @@ type Catalogue struct {
 }
 
 func Load() (*Catalogue, error) {
+	blob, from, err := catalogueBytes()
+	if err != nil {
+		return nil, err
+	}
 	var c Catalogue
-	if err := json.Unmarshal(catalogueJSON, &c); err != nil {
-		return nil, fmt.Errorf("embedded catalogue is not valid: %w", err)
+	if err := json.Unmarshal(blob, &c); err != nil {
+		return nil, fmt.Errorf("the catalogue at %s is not valid: %w", from, err)
 	}
 	var raw struct {
 		Manifest json.RawMessage `json:"manifest"`
 	}
-	if err := json.Unmarshal(catalogueJSON, &raw); err != nil {
-		return nil, fmt.Errorf("embedded catalogue has no manifest: %w", err)
+	if err := json.Unmarshal(blob, &raw); err != nil {
+		return nil, fmt.Errorf("the catalogue at %s has no manifest: %w", from, err)
 	}
 	c.ManifestRaw = raw.Manifest
+	// THE BYTES ARE KEPT, and every later read goes through them rather than
+	// back to the embedded copy. LoadDeclarations and CompiledJSON both used to
+	// re-read the package level variable, which was harmless only while there
+	// was one catalogue: once the file can come from the tree, a Load that read
+	// the laboratory's and a LoadDeclarations that read the health centre's
+	// would have served one bundle's manifest over the other's workflow, and
+	// nothing would have said so.
+	c.raw = blob
+	c.Source = from
 	return &c, nil
 }
 

@@ -1,9 +1,138 @@
 package carephc
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// ---------------------------------------------------------------------------
+// The fifth seam: where the catalogue comes from.
+//
+// One bundle used to be compiled INTO the binary and nothing else could be
+// served. cmd/api's refusal to serve a bundle it was not compiled for is right
+// and stays; what was wrong is that the only way to satisfy it was to rebuild.
+// These hold the order the file is looked for in, and the one hazard the
+// change introduced: two readers reaching for different copies.
+// ---------------------------------------------------------------------------
+
+// A test's working directory is this module, so there is no catalogue/ beside
+// it and the fallback is what answers. That is the deployment the embedded
+// copy exists for: one file copied to a clinic PC, with no source tree.
+func TestWithNoTreeBesideItTheEmbeddedCatalogueAnswers(t *testing.T) {
+	t.Setenv(CatalogueEnv, "")
+	t.Setenv(RootEnv, "")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Source != Embedded {
+		t.Errorf("with no tree beside it the kernel read %q", c.Source)
+	}
+	if len(c.Operations) == 0 {
+		t.Error("the embedded catalogue is empty")
+	}
+}
+
+// And with a tree, the tree. This is the whole of the seam: the file is a
+// file, so a second bundle is compiled and read without rebuilding anything.
+func TestWithATreeTheCatalogueIsReadFromIt(t *testing.T) {
+	t.Setenv(CatalogueEnv, "")
+	t.Setenv(RootEnv, "..")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Source == Embedded {
+		t.Fatal("a kernel with the repository root given still read its own " +
+			"embedded copy, so a second bundle could not be served")
+	}
+	if !strings.HasSuffix(c.Source, CataloguePath) {
+		t.Errorf("it read %q", c.Source)
+	}
+	if len(c.Operations) == 0 {
+		t.Error("the catalogue in the tree is empty")
+	}
+}
+
+// A path named OUTRIGHT is a choice and not a fallback, so an unreadable one
+// is fatal. Falling back here is how a check would report a second bundle
+// passing while the first one answered.
+func TestACatalogueNamedOutrightIsNotSilentlyReplaced(t *testing.T) {
+	t.Setenv(RootEnv, "")
+	t.Setenv(CatalogueEnv, filepath.Join(t.TempDir(), "nothing-is-here.json"))
+	c, err := Load()
+	if err == nil {
+		t.Fatalf("a missing catalogue named outright was replaced by %q", c.Source)
+	}
+	if !strings.Contains(err.Error(), CatalogueEnv) {
+		t.Errorf("the failure does not name the variable: %v", err)
+	}
+}
+
+// THE HAZARD THE CHANGE INTRODUCED, and the reason the bytes are kept on the
+// Catalogue. Load, LoadDeclarations and CompiledJSON all used to re-read the
+// package level embedded variable, which was harmless only while there was one
+// catalogue. Once the file can come from the tree, a Load that read one bundle
+// and a LoadDeclarations that read another would serve one bundle's manifest
+// over the other's workflow, and nothing would have said so.
+func TestEveryReaderUsesTheBytesLoadActuallyRead(t *testing.T) {
+	// A catalogue that differs from the embedded one in a way every reader
+	// passes through: the manifest, which Load types, LoadDeclarations leaves
+	// raw, and CompiledJSON serves whole.
+	var body map[string]any
+	if err := json.Unmarshal(embeddedCatalogue, &body); err != nil {
+		t.Fatal(err)
+	}
+	manifest, _ := body["manifest"].(map[string]any)
+	if manifest == nil {
+		t.Fatal("the embedded catalogue has no manifest")
+	}
+	const marker = "a title no compiled catalogue carries"
+	manifest["title"] = marker
+	blob, err := json.MarshalIndent(body, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := filepath.Join(t.TempDir(), "catalogue.json")
+	if err := os.WriteFile(at, blob, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv(RootEnv, "")
+	t.Setenv(CatalogueEnv, at)
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Manifest.Title != marker {
+		t.Errorf("Load read %q, not the file it was pointed at", c.Manifest.Title)
+	}
+	if err := c.LoadDeclarations(); err != nil {
+		t.Fatal(err)
+	}
+	served, err := c.CompiledJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _ := served["manifest"].(map[string]any)
+	if out == nil || out["title"] != marker {
+		t.Errorf("GET /catalogue would serve the manifest %v, which is not the "+
+			"one Load read: two readers are reaching for different copies",
+			out["title"])
+	}
+}
+
+// And a Catalogue that Load did not build has no bytes to read, which is said
+// rather than answered from the embedded copy.
+func TestACatalogueLoadDidNotBuildHasNothingToReadDeclarationsFrom(t *testing.T) {
+	bare := &Catalogue{}
+	if err := bare.LoadDeclarations(); err == nil {
+		t.Fatal("a Catalogue nobody loaded read its declarations from somewhere")
+	}
+}
 
 func load(t *testing.T) *Catalogue {
 	t.Helper()

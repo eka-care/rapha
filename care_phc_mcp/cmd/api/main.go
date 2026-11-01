@@ -636,19 +636,35 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// One bundle: the one catalogue.json was compiled with. Refused by name
+	// One bundle: the one this catalogue was compiled with. REFUSED BY NAME
 	// rather than served wrongly, because serving a laboratory's threads out
 	// of a health centre's manifest is the kind of wrong that reads as
 	// working.
+	//
+	// The refusal is unchanged and is still right. What changed on 2026-11-01
+	// is that it is now SATISFIABLE WITHOUT REBUILDING THIS BINARY: the
+	// catalogue is read from the tree, so a second bundle is compiled by the
+	// Python and pointed at with PHC_CATALOGUE. Before that the only way to
+	// change which bundle this process could serve was to compile it again,
+	// which is why the laboratory's separation rule was unprovable here.
 	want := os.Getenv("PHC_BUNDLE")
 	if want == "" {
 		want = cat.Manifest.ID
 	}
 	if want != cat.Manifest.ID {
-		log.Fatalf("PHC_BUNDLE=%q, and the embedded catalogue was compiled for "+
-			"%q. Recompile it with PHC_BUNDLE=%s python3 -m kernel.declarations, "+
-			"or run this check with PHC_BACKEND=python.", want, cat.Manifest.ID, want)
+		log.Fatalf("PHC_BUNDLE=%q, and the catalogue this kernel read (%s) was "+
+			"compiled for %q.\n\nCompile that bundle and point this process at "+
+			"it:\n\n  python3 -m kernel.declarations %s --out /somewhere/catalogue.json\n"+
+			"  %s=/somewhere/catalogue.json\n\nOr run against the reference "+
+			"implementation with PHC_BACKEND=python.",
+			want, cat.Source, cat.Manifest.ID, want, carephc.CatalogueEnv)
 	}
+	// Which catalogue answered, said once at startup. A kernel reading the
+	// tree and a kernel reading its own embedded copy are different
+	// deployments, and a log that does not distinguish them is how a check
+	// reports a second bundle passing while the first one answered.
+	log.Printf("bundle %s %s, from %s", cat.Manifest.ID, cat.Manifest.Version,
+		cat.Source)
 	// The typed workflow, the compiled mapping and each atom's own JSON. Not
 	// part of Load, because cmd/mcp builds a tool list and has no business
 	// failing on a mapping it will never evaluate.
