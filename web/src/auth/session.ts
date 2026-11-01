@@ -72,21 +72,41 @@ function throughTheApp(): Promise<boolean> {
   return Promise.resolve(false);
 }
 
-/** A new token, or false. The app first, then the cookie. */
-export async function refresh(): Promise<boolean> {
-  if (await throughTheApp()) return true;
+/** What the last ask came back as, for a screen that has to say so.
+ *
+ *  A SIGN IN THAT DOES NOTHING IS THE WORST ANSWER THERE IS. The way in used
+ *  to ask this question every couple of seconds and throw away everything
+ *  but yes or no, so somebody who had signed in to Eka and was still looking
+ *  at the sign in screen had nothing to go on and neither did anybody
+ *  helping them. The number Eka gave is kept now, and shown.
+ */
+export interface Answer {
+  /** A session, or not. */
+  ok: boolean;
+  /** Eka's own status, or "no answer" when the call never arrived. */
+  said: number | "no answer" | "the app";
+}
+
+/** A new token, or not, and what Eka said. The app first, then the cookie. */
+export async function probe(): Promise<Answer> {
+  if (await throughTheApp()) return { ok: true, said: "the app" };
   try {
     const res = await fetch(REFRESH_URL, {
       method: "POST",
       credentials: "include",
       headers: { "client-id": CLIENT_ID },
     });
-    return res.ok;
+    return { ok: res.ok, said: res.status };
   } catch {
     // Cross origin, so a refused refresh and an unreachable Eka arrive the
-    // same way. Neither is a session.
-    return false;
+    // same way. Neither is a session, and neither carries a status.
+    return { ok: false, said: "no answer" };
   }
+}
+
+/** A new token, or false. */
+export async function refresh(): Promise<boolean> {
+  return (await probe()).ok;
 }
 
 /** Is somebody signed in?
