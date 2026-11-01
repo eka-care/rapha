@@ -3238,6 +3238,266 @@ def outbox_parity(tmp):
        "after a failed send, identically in both engines")
 
 
+# ---------------------------------------------------------------------------
+# Codification. G8c.
+#
+# On no route in either engine: the stub is what the gate runs and what a
+# health centre with no line has, and a candidate's only path into a record is
+# through a screen. So the same shape again, a Go test that asserts nothing.
+#
+# THE ONE DECISION THIS SLICE MADE is which way an UNCACHED value set goes. The
+# Python raises; the Go's terminology cache returns nil tags for a slug it does
+# not hold, which cannot be told from a value set that declares none. The
+# Python is right, because an empty tag set means "the tag rule does not
+# apply", so reading a missing value set as having no categories turns the
+# wrong-branch refusal OFF and lets a procedure through for a diagnosis. The Go
+# was made to match and the Python was not touched. Both engines are asserted
+# to FAIL on it below, rather than compared on the sentence: one raises from
+# inside its cache loader and the other builds the same words from its own, and
+# they spell the directory differently.
+# ---------------------------------------------------------------------------
+
+def codification_tag():
+    """Which key a value set says a concept's semantic tag under. Read off the
+    kernel's own constant rather than typed, because what the categories of a
+    code system are called is the terminology's business."""
+    from kernel import codification
+    return codification.SEMANTIC_TAG
+
+
+def codification_cases(tmp):
+    """The inputs both codification seams are driven through.
+
+    `crafted` is a value set written here, and it is the only way the
+    wrong-branch rule can be reached at all: it needs a terminology that WOULD
+    resolve the code, or the unresolvable rule catches the case first and the
+    tag rule could be deleted with nothing failing. kernel/codification.py's
+    own demo makes the same file for the same reason.
+    """
+    from kernel import terminology
+
+    slug = "condition-code"
+    local = terminology.LOCAL
+    # Read off the value set rather than typed, so nothing here names a
+    # clinical code and the cases grow when the bundle does.
+    codes = sorted(local.expand(slug, "", 50), key=lambda c: c.code)
+    assert codes, "%s holds no codes, so these cases prove nothing" % slug
+    first = codes[0].code
+    held = local.concepts(slug)
+    tag = (held.get(first) or {}).get(codification_tag()) or ""
+
+    crafted = os.path.join(tmp, "crafted-terminology")
+    os.makedirs(crafted, exist_ok=True)
+    with open(os.path.join(crafted, "%s.json" % slug), "w") as f:
+        json.dump({"slug": slug, "system": "http://snomed.info/sct",
+                   "semantic_tags": ["disorder", "finding"],
+                   "concepts": {"71388002": {"display": "A Concept",
+                                             "semantic_tag": "procedure"}}}, f)
+    tagless = os.path.join(tmp, "tagless-terminology")
+    os.makedirs(tagless, exist_ok=True)
+    with open(os.path.join(tagless, "%s.json" % slug), "w") as f:
+        json.dump({"slug": slug, "system": "http://snomed.info/sct",
+                   "concepts": {"71388002": {"display": "A Concept"}}}, f)
+
+    said = "the patient said something"
+    return {
+        "cases": [
+            {"what": "a resolvable code becomes a candidate",
+             "cache_dir": "", "valueset": slug, "transcript": said,
+             "span": "", "text": "",
+             "results": [{"code": first, "term": "what the service called it",
+                          "score": 0.98, "linked": True, "tag": tag}]},
+            {"what": "a code this build cannot resolve is refused and named",
+             "cache_dir": "", "valueset": slug, "transcript": said,
+             "span": "", "text": "",
+             "results": [{"code": "38362002", "term": "not coded here",
+                          "score": 0.99, "linked": True, "tag": "disorder"}]},
+            {"what": "a candidate with no code is refused and counted",
+             "cache_dir": "", "valueset": slug, "transcript": said,
+             "span": "", "text": "",
+             "results": [{"code": "", "term": "nameless"},
+                         {"code": "   ", "term": "blank"}]},
+            {"what": "the same concept under three names is kept once",
+             "cache_dir": "", "valueset": slug, "transcript": said,
+             "span": "", "text": "",
+             "results": [{"code": first, "term": "the first name",
+                          "score": 0.9, "tag": tag},
+                         {"code": first, "term": "the second name",
+                          "score": 0.8, "tag": tag},
+                         {"code": first, "term": "the third name",
+                          "score": 0.7, "tag": tag}]},
+            {"what": "the service's own order is preserved",
+             "cache_dir": "", "valueset": slug, "transcript": said,
+             "span": "", "text": "",
+             "results": [{"code": c.code, "term": "name", "score": 0.1 * (n + 1),
+                          "tag": (held.get(c.code) or {}).get(
+                              codification_tag()) or ""}
+                         for n, c in enumerate(codes[:3])]},
+            {"what": "a span that was never said refuses the whole batch",
+             "cache_dir": "", "valueset": slug,
+             "transcript": "the patient said one thing",
+             "span": "a phrase nobody uttered", "text": "",
+             "results": [{"code": first, "term": "a name", "tag": tag},
+                         {"code": first, "term": "another", "tag": tag}]},
+            {"what": "a span that WAS said is checked the same way",
+             "cache_dir": "", "valueset": slug,
+             "transcript": "the patient said one thing", "span": "one thing",
+             "text": "", "results": [{"code": first, "term": "a name", "tag": tag}]},
+            # The wrong branch, over the crafted cache.
+            {"what": "a candidate from the wrong branch is refused on its tag",
+             "cache_dir": crafted, "valueset": slug, "transcript": said,
+             "span": "", "text": "",
+             "results": [{"code": "71388002", "term": "A Concept",
+                          "score": 0.9, "linked": True, "tag": "procedure"}]},
+            {"what": "and the same code with an accepted tag is kept",
+             "cache_dir": crafted, "valueset": slug, "transcript": said,
+             "span": "", "text": "",
+             "results": [{"code": "71388002", "term": "A Concept",
+                          "tag": "disorder"}]},
+            {"what": "a concept of no stated kind, where tags are declared",
+             "cache_dir": crafted, "valueset": slug, "transcript": said,
+             "span": "", "text": "",
+             "results": [{"code": "71388002", "term": "A Concept", "tag": ""}]},
+            # A value set that declares no tags refuses nothing on a tag.
+            {"what": "a value set that declares no tags refuses nothing on one",
+             "cache_dir": tagless, "valueset": slug, "transcript": said,
+             "span": "", "text": "",
+             "results": [{"code": "71388002", "term": "A Concept",
+                          "tag": "anything at all"}]},
+            # And the decision: an uncached value set FAILS on both sides.
+            {"what": "an uncached value set is an error, not a set with no "
+                     "categories",
+             "cache_dir": "", "valueset": "a-value-set-nobody-cached",
+             "transcript": said, "span": "", "text": "",
+             "results": [{"code": "71388002", "tag": "procedure"}]},
+        ],
+        "tags": [
+            {"cache_dir": "", "valueset": slug},
+            {"cache_dir": crafted, "valueset": slug},
+            {"cache_dir": tagless, "valueset": slug},
+            {"cache_dir": "", "valueset": "a-value-set-nobody-cached"},
+        ],
+    }
+
+
+def python_codification(cases):
+    """The same inputs through kernel/codification.py."""
+    from kernel import codification, terminology
+
+    def cache(where):
+        return terminology.LOCAL if not where \
+            else terminology.CachedTerminology(path=where)
+
+    out = {"cases": [], "tags": []}
+    for one in cases["cases"]:
+        try:
+            got = codification.resolve(
+                one["results"], one["valueset"],
+                transcript=one["transcript"], span=one["span"],
+                terminology_=cache(one["cache_dir"]), text=one["text"])
+        except Exception:
+            out["cases"].append({"failed": True, "candidates": [],
+                                 "refused": [], "asked": "", "reachable": False})
+            continue
+        out["cases"].append({
+            "failed": False,
+            "candidates": [c.public() for c in got],
+            "refused": list(got.refused), "asked": got.asked,
+            "reachable": got.reachable})
+    for one in cases["tags"]:
+        try:
+            tags = codification.accepted_tags(one["valueset"],
+                                              cache(one["cache_dir"]))
+        except Exception:
+            out["tags"].append({"failed": True, "tags": []})
+            continue
+        out["tags"].append({"failed": False, "tags": sorted(tags)})
+    return out
+
+
+def go_codification(cases, tmp):
+    cases_at = os.path.join(tmp, "codification-cases.json")
+    answers_at = os.path.join(tmp, "codification-answers.json")
+    with open(cases_at, "w") as f:
+        json.dump(cases, f)
+    done = subprocess.run(
+        ["go", "test", "./codification/", "-run",
+         "TestTheCodificationSeamAnswersForTheParityCheck", "-count=1"],
+        cwd=str(backend.GO_MODULE), capture_output=True, text=True,
+        env=dict(os.environ, PHC_CODIFICATION_CASES=cases_at,
+                 PHC_CODIFICATION_ANSWERS=answers_at))
+    if done.returncode != 0 or not os.path.exists(answers_at):
+        raise SystemExit("\nthe Go engine could not answer the codification "
+                         "cases:\n\n%s%s\n"
+                         % (done.stdout[-4000:], done.stderr[-2000:]))
+    with open(answers_at) as f:
+        return json.load(f)
+
+
+def codification_parity(tmp):
+    cases = codification_cases(tmp)
+    py = python_codification(cases)
+    gone = go_codification(cases, tmp)
+
+    for one, a, b in zip(cases["tags"], py["tags"], gone["tags"]):
+        assert a["failed"] == b["failed"], (
+            "the two engines disagree about whether %r has readable tags: "
+            "python failed=%s, go failed=%s"
+            % (one["valueset"], a["failed"], b["failed"]))
+        if not a["failed"]:
+            assert a["tags"] == b["tags"], (one, a["tags"], b["tags"])
+    declared = [a for a in py["tags"] if not a["failed"] and a["tags"]]
+    none_declared = [a for a in py["tags"] if not a["failed"] and not a["tags"]]
+    failed = [a for a in py["tags"] if a["failed"]]
+    # All three outcomes really happened, or this is two engines agreeing about
+    # one of them. The middle one is the whole reason the third is an error:
+    # "declares no tags" and "is not there" must not be the same answer.
+    assert declared and none_declared and failed, \
+        (len(declared), len(none_declared), len(failed))
+    ok("codification: both engines read the same semantic tags, agree that a "
+       "value set declaring none has none, and BOTH REFUSE an uncached one "
+       "rather than reading it as a set with no categories")
+
+    for one, a, b in zip(cases["cases"], py["cases"], gone["cases"]):
+        assert a["failed"] == b["failed"], (
+            "%s: python failed=%s and go failed=%s"
+            % (one["what"], a["failed"], b["failed"]))
+        if a["failed"]:
+            continue
+        assert a["candidates"] == b["candidates"], (
+            "%s: the candidates differ\npython: %s\ngo:     %s"
+            % (one["what"], json.dumps(a["candidates"], sort_keys=True),
+               json.dumps(b["candidates"], sort_keys=True)))
+        assert a["refused"] == b["refused"], (
+            "%s: the refusal sentences differ\npython: %s\ngo:     %s"
+            % (one["what"], a["refused"], b["refused"]))
+        assert a["asked"] == b["asked"] and a["reachable"] == b["reachable"], \
+            (one["what"], a, b)
+
+    offered = [a for a in py["cases"] if not a["failed"] and a["candidates"]]
+    refused = [a for a in py["cases"] if not a["failed"] and a["refused"]]
+    broke = [a for a in py["cases"] if a["failed"]]
+    assert offered and refused and broke, (len(offered), len(refused), len(broke))
+    # Each of the four refusals really was reached, or the sentences above are
+    # two engines agreeing about the ones that were.
+    sentences = " ".join(s for a in py["cases"] for s in a["refused"])
+    for what, phrase in (("no span", "not in the transcript"),
+                         ("not resolvable", "cannot resolve"),
+                         ("wrong branch", "is a procedure"),
+                         ("no code", "came back with no code")):
+        assert phrase in sentences, \
+            "the %r refusal was never reached, so it is unproved" % what
+    # And nothing offered carries a shape a form control could bind to.
+    for a in py["cases"]:
+        for candidate in a["candidates"]:
+            assert "value" not in candidate, \
+                "a candidate has a `value` key: %s" % candidate
+    ok("codification: %d askings answer identically in both engines, down to "
+       "every refusal sentence, with all four refusals reached and no "
+       "candidate carrying a shape a form control could bind to"
+       % len(cases["cases"]))
+
+
 def go_names_no_clinical_word():
     """No Go engine file types a diagnosis, a drug, a route or a frequency.
 
@@ -3743,6 +4003,8 @@ def main():
         # route in either engine, so there is nothing for a socket check to
         # compare.
         outbox_parity(tmp)
+        # And the codification seam, for the same reason again.
+        codification_parity(tmp)
         go_names_no_clinical_word()
         # The facility's shape, before the shapes themselves are started: the
         # lint is what decides whether a kernel may start at all, so a
