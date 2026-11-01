@@ -66,7 +66,10 @@ import (
 // drifting until a mapped clinical value lands nowhere.
 var Tables = map[string][]string{
 	"patient":                {"id", "name", "age", "sex", "phone", "village", "category", "abha_number", "directory_id", "directory_synced", "created_by", "created_date"},
-	"encounter":              {"id", "patient", "status", "token", "created_by", "created_date"},
+	// `arrival` is how the person reached the queue: at the desk, or by
+	// themselves at the printed poster. A fact about THIS visit, so it sits
+	// on the encounter beside the number that was issued in the same moment.
+	"encounter":              {"id", "patient", "status", "token", "arrival", "created_by", "created_date"},
 	"observation":            {"id", "encounter", "category", "code", "code_system", "code_display", "value", "unit", "unit_system", "status", "created_by", "created_date"},
 	"condition":              {"id", "encounter", "code", "code_system", "code_display", "clinical_status", "clinical_status_system", "verification_status", "verification_status_system", "onset", "created_by", "created_date"},
 	"notes":                  {"id", "encounter", "text", "created_by", "created_date"},
@@ -572,6 +575,7 @@ func (s *SQLite) Threads(workflow, scope string) ([]ThreadRef, error) {
 		id, _ := row["id"].(string)
 		subject := map[string]any{
 			"encounter": id, "token": row["token"], "status": row["status"],
+			"arrival": row["arrival"],
 		}
 		if patient, _ := row["patient"].(string); patient != "" {
 			pr, err := s.db.Query("SELECT * FROM patient WHERE id = ?", patient)

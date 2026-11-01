@@ -62,7 +62,7 @@ const thread: ThreadView = {
   id: "enc-t",
   workflow: WF,
   subject: { encounter: "enc-t", name: "A Patient", age: "34", sex: "female", village: "Sonpur",
-             token: "A02", abha_number: null, status: "in_progress", created_by: "seed" },
+             token: "2", abha_number: null, status: "in_progress", created_by: "seed" },
   flags: ["registered", "vitals.recorded", "abha.pending"],
   station: "doctor",
   line: [
@@ -190,7 +190,7 @@ assert.ok(
   "the queue view's columns decide the meta line, so plumbing never reaches it",
 );
 assert.deepEqual(head.meta, ["34", "female", "Sonpur"]);
-assert.ok(head.badges.some((b) => b.text === "A02"), "the token is a badge, not part of the meta");
+assert.ok(head.badges.some((b) => b.text === "2"), "the token is a badge, not part of the meta");
 assert.ok(
   head.badges.some((b) => b.text === "abha pending" && b.style === "warn"),
   "a flag is styled by the queue view's badge map, not by a regex over its name",
@@ -219,9 +219,9 @@ const decl = queue;
 const result: ViewResult = {
   view: decl.id, kind: "queue", generated_at: "", groups: [],
   rows: [
-    { thread: "enc-1", subject: { name: "Kamala Devi", age: "34", sex: "female", village: "Sonpur", token: "A02" },
+    { thread: "enc-1", subject: { name: "Kamala Devi", age: "34", sex: "female", village: "Sonpur", token: "2" },
       station: "doctor", flags: [], badges: { "abha.pending": "warn" }, opened_at: "" },
-    { thread: "enc-2", subject: { name: "Rahul Yadav", age: "51", sex: "male", village: "Bela", token: "A03" },
+    { thread: "enc-2", subject: { name: "Rahul Yadav", age: "51", sex: "male", village: "Bela", token: "3" },
       station: "nurse", flags: [], badges: {}, opened_at: "" },
   ],
 };

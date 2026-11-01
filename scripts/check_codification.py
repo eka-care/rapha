@@ -155,7 +155,7 @@ ok("every coded value of every row is still owed its own tick")
 # And the commit path. The payload a person confirms is what commits, through
 # the ordinary validator and the ordinary guard.
 store = SqliteStore(":memory:")
-thread = store.open_thread(token="B01", actor=A_DOCTOR)
+thread = store.open_thread(token="1", actor=A_DOCTOR)
 decision = proposals.commit(store, BUNDLE, "phc.op.patient-register",
                             thread=thread,
                             payload={"name": "Sunita Devi", "age": 34,
@@ -409,7 +409,7 @@ ok("the same note in another document carries that document's type, and none "
 # consultation whose every finding is uncoded used to publish no document at
 # all, because an empty section is omitted and every profile requires one.
 bare = SqliteStore(":memory:")
-bare_thread = bare.open_thread(token="B02", actor=A_DOCTOR)
+bare_thread = bare.open_thread(token="2", actor=A_DOCTOR)
 assert proposals.commit(bare, BUNDLE, "phc.op.patient-register",
                         thread=bare_thread,
                         payload={"name": "Lakshmi", "age": 41, "sex": "female",
@@ -436,7 +436,7 @@ ok("a consultation that coded nothing at all still publishes a document, "
 # And a narrative row with nothing in it publishes nothing, rather than an
 # empty attachment under a heading claiming there is a note.
 empty = SqliteStore(":memory:")
-empty_thread = empty.open_thread(token="B03", actor=A_DOCTOR)
+empty_thread = empty.open_thread(token="3", actor=A_DOCTOR)
 assert proposals.commit(empty, BUNDLE, "phc.op.patient-register",
                         thread=empty_thread,
                         payload={"name": "Ram", "age": 50, "sex": "male",

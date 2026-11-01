@@ -62,7 +62,7 @@ READING = {"systolic": 186, "diastolic": 112, "pulse": 92, "spo2": 97,
 def fresh():
     """A store with one registered patient on one open thread."""
     store = SqliteStore(":memory:")
-    thread = store.open_thread(token="A01", actor=A_NURSE)
+    thread = store.open_thread(token="1", actor=A_NURSE)
     decision = proposals.commit(
         store, BUNDLE, "phc.op.patient-register", thread=thread,
         payload={"name": "Sunita Devi", "age": 34, "sex": "female",

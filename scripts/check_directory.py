@@ -74,7 +74,7 @@ def fresh():
     return SqliteStore(":memory:")
 
 
-def register(store, payload, *, actor=MEENA, token="A01"):
+def register(store, payload, *, actor=MEENA, token="1"):
     thread = store.open_thread(token=token, actor=actor)
     decision = proposals.commit(store, BUNDLE, "phc.op.patient-register",
                                 thread=thread, payload=payload, caps=ACCOUNT,
@@ -224,7 +224,7 @@ ok("no read or resolve in kernel/directory.py reaches a clinical write at all")
 
 # The only way those values become a row: through the operation and the guard.
 refused = proposals.commit(store, BUNDLE, "phc.op.patient-register",
-                           thread=store.open_thread(token="A02", actor=RAVI),
+                           thread=store.open_thread(token="2", actor=RAVI),
                            payload=dict(suggestion.values, age=400),
                            caps=ACCOUNT, actor=RAVI)
 assert not refused and "outside 0 to 120" in refused.reason, refused.reason
@@ -232,7 +232,7 @@ ok("a suggestion's values are validated like any other: %s"
    % refused.reason.split(".")[0])
 
 no_cap = proposals.commit(store, BUNDLE, "phc.op.patient-register",
-                          thread=store.open_thread(token="A03", actor=RAVI),
+                          thread=store.open_thread(token="3", actor=RAVI),
                           payload=suggestion.values, caps={"patient.find"},
                           actor=RAVI)
 assert not no_cap and "patient.register" in no_cap.reason, no_cap.reason
@@ -243,9 +243,9 @@ ok("and guarded like any other: %s" % no_cap.reason)
 # ---------------------------------------------------------------------------
 
 two = fresh()
-first, d1 = register(two, suggestion.values, actor=MEENA, token="B01")
+first, d1 = register(two, suggestion.values, actor=MEENA, token="4")
 assert d1, d1.reason
-second, d2 = register(two, suggestion.values, actor=RAVI, token="B02")
+second, d2 = register(two, suggestion.values, actor=RAVI, token="5")
 assert d2, d2.reason
 assert first != second, "two visits"
 rows = two.select("patient", thread=None, where={"directory_id": "oid-ramesh"},
@@ -260,8 +260,8 @@ ok("the same directory id on a second visit is one person with two visits, "
 # Without a directory id there is nothing to join on, and the honest outcome is
 # two rows rather than a guess that two people with the same name are one.
 anon = fresh()
-register(anon, SUNITA, token="C01")
-register(anon, SUNITA, token="C02")
+register(anon, SUNITA, token="6")
+register(anon, SUNITA, token="7")
 assert len(anon.select("patient", thread=None, where={}, fields=["id"], limit=9)) == 2
 ok("with no directory id, two registrations stay two rows rather than being "
    "guessed into one")
@@ -313,7 +313,7 @@ class BadReceipt:
 
 
 again = fresh()
-lost_thread, _ = register(again, SUNITA, token="D01")
+lost_thread, _ = register(again, SUNITA, token="8")
 lost = directory.pending(again)[0]["id"]
 report2 = directory.publish_pending(BadReceipt(again), Live(oid="oid-dup"), at="now")
 assert report2.published == [], report2
@@ -500,9 +500,15 @@ else:
     # every capability, caller() is the only thing standing between "which
     # desk" and "which person", and the record is the person.
     staff = TestClient(app)
-    opened = staff.post("/api/v1/phc/threads", json={"token": "E01"},
+    # No token in the body: the number is the kernel's to issue, out of this
+    # facility's day sequence (kernel/tokens.py), and a client that names one
+    # is simply given the next. scripts/check_front_desk.py is where that is
+    # proved; this call just stops teaching the old shape.
+    opened = staff.post("/api/v1/phc/threads", json={},
                         headers={"X-PHC-Actor": "user:meena"})
     assert opened.status_code == 200, opened.text
+    assert str(opened.json()["subject"]["token"]).isdigit(), \
+        "the service handed out a token that is not a number"
     wire_thread = opened.json()["id"]
     committed = staff.post(
         "/api/v1/phc/operations/phc.op.patient-register/commit",

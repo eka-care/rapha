@@ -27,7 +27,11 @@ export type Question = {
   type: string;
   required?: boolean;
   repeats?: boolean;
-  answer_option?: { value: string }[];
+  /** A closed list declared inline. `display` is what the value is CALLED;
+   *  the stored answer is always `value`. A question that declares no display
+   *  is drawn as its own code, which is what every one of them did before any
+   *  of them carried a word. */
+  answer_option?: { value: string; display?: string }[];
   /** The value set this question's ANSWER is drawn from, when the answer
    *  carries the concept. A question that binds one declares no
    *  `answer_option`: the codes live in the value set and writing them into
@@ -130,6 +134,21 @@ export type ViewDecl = {
    *  optional closed choice, which happened to pick the right column in this
    *  bundle and would have picked a second one the moment another was added. */
   labels?: string[];
+  /** How a row reached this queue, when the view distinguishes it. Three
+   *  things, all declared: `column` is which of `columns` carries the fact,
+   *  `mark` is the single value that earns a mark on the row's number, and
+   *  `label` is what a filter chip over those rows is called.
+   *
+   *  This renderer is told the column, the value and the word, and nothing at
+   *  all about what any of them mean. It draws a mark where the column equals
+   *  the value and offers one chip under that word; it does not know that the
+   *  value means a poster by a door, and a centre with no poster declares no
+   *  provenance and loses both with no edit here.
+   *
+   *  Not a `label`, deliberately: a mark on the number rather than a pill,
+   *  because it is the least important thing on the row. The declaration lint
+   *  refuses a column that is both. */
+  provenance?: { column: string; mark: string; label: string };
   badges?: Record<string, string>;
   workflow?: string | null;
   group_by?: string | null;

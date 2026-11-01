@@ -442,7 +442,7 @@ DIAGNOSES = [
 ]
 
 store = SqliteStore(":memory:")
-thread = store.open_thread(token="C01", actor=A_DOCTOR)
+thread = store.open_thread(token="1", actor=A_DOCTOR)
 assert proposals.commit(store, BUNDLE, "phc.op.patient-register", thread=thread,
                         payload={"name": "Sunita Devi", "age": 34,
                                  "sex": "female", "phone": "9876500000",

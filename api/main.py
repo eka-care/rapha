@@ -41,7 +41,7 @@ from agent import turn
 from api import scribe
 from catalogue import validate, vocab
 from kernel import (declarations, directory, plugins, spine, proposals, state,
-                    terminology, views)
+                    terminology, tokens, views)
 from kernel.contracts import DirectoryError, ThreadRef
 
 BUNDLE = declarations.load(os.environ.get("PHC_BUNDLE", "phc"))
@@ -145,7 +145,7 @@ def ref_or_404(thread: str) -> ThreadRef:
     if not rows:
         raise HTTPException(404, "no such thread %r" % thread)
     subject = {"encounter": thread, "token": rows[0].get("token"),
-               "status": rows[0].get("status")}
+               "status": rows[0].get("status"), "arrival": rows[0].get("arrival")}
     patient = store.select("patient", thread=thread, where={}, fields=[], limit=1)
     if patient:
         subject.update(patient[0])
@@ -290,6 +290,21 @@ def get_subject(subject_id: str, request: Request):
     return found
 
 
+def declared_provenance() -> dict:
+    """What this facility's queue says about where an arrival came from.
+
+    Read off the queue view rather than written down here, so the word that
+    marks a self registered arrival is the declaration's and this module does
+    not carry a facility's vocabulary. A bundle that declares no provenance
+    has no self registration surface, which is the honest answer for a centre
+    with no poster on the wall.
+    """
+    for view in BUNDLE.views.values():
+        if view.kind == "queue" and view.workflow == WORKFLOW.id and view.provenance:
+            return dict(view.provenance)
+    return {}
+
+
 @router.post("/threads")
 def open_thread(request: Request, body: dict = Body(default={})):
     """Open an empty visit, so reception has something to register against.
@@ -297,10 +312,61 @@ def open_thread(request: Request, body: dict = Body(default={})):
     This writes an encounter row and no clinical fact whatsoever: an empty
     thread asserts nothing about a person. Every fact still goes through the
     guard, which is why opening one is not an operation in the catalogue.
+
+    The number is ISSUED HERE and is not the caller's to choose. A token in
+    the body is ignored, and that is the point: a number a client picks is a
+    number nothing else knew it had given out, and two clients each picking
+    their own is how one waiting room ends up with two people called seven.
+    The sequence rule is kernel/tokens.py.
+
+    An arrival through this route carries no provenance mark. The desk is the
+    ordinary way in and the mark is for the other one, so the absence is the
+    answer rather than a word this module would have to know. Nothing here
+    names how anybody arrived.
     """
     user = caller(request)
-    thread = store.open_thread(token=body.get("token"), actor=user["id"])
+    thread = store.open_thread(token=tokens.issue(store, workflow=WORKFLOW.id),
+                               actor=user["id"])
     return panel(thread, user)
+
+
+@router.post("/arrivals")
+def self_registered_arrival(body: dict = Body(default={})):
+    """A patient who scanned the poster by the door, and the number they get.
+
+    The poster carries this facility's id and a counter id, so the scan
+    happens at the counter and THE SCAN IS THE ARRIVAL. The number is issued
+    at that moment, out of the same sequence the desk draws from, and it is
+    returned on this response: that is how it reaches the patient's own
+    application, which is the only screen this person is going to look at.
+
+    No capability and no staff caller, deliberately. Nobody at the desk is
+    involved in this route, which is the whole value of it, so there is no
+    staff identity to read. What it writes is an encounter row with a number
+    and a provenance, no clinical fact and no name, exactly as the desk's own
+    route does, so the guard is still the only path to a fact about a person.
+
+    What it answers is the number and nothing else. An unauthenticated caller
+    does not get a clinical panel: this is the one route on this server with
+    no capability in front of it, and what it can read back has to be the
+    thing it was given rather than everything the thread knows.
+
+    NOT the ABDM share callback. The profile this patient consented to send
+    arrives by that callback, which this build does not have, because real
+    ABDM calls are out of scope while ABHA is on staging. This is the arrival
+    half: the number exists and is on the sequence before any profile lands,
+    which is the right order, because a person is in the room either way.
+    """
+    provenance = declared_provenance()
+    if not provenance:
+        raise HTTPException(404, "this facility declares no self registration")
+    counter = str(body.get("counter") or "").strip()
+    if not counter:
+        raise HTTPException(400, "a scan carries the counter it happened at")
+    number = tokens.issue(store, workflow=WORKFLOW.id)
+    thread = store.open_thread(token=number, arrival=provenance["mark"],
+                               actor="poster:%s" % counter)
+    return {"thread": thread, "token": number}
 
 
 # ---------------------------------------------------- the patient directory

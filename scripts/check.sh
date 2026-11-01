@@ -35,6 +35,15 @@ python3 -m kernel.fhir
 # this build cannot resolve, and a code from the wrong branch of the ontology.
 python3 -m kernel.codification
 
+echo "\n== the front desk: the number, and how they got here =="
+# The day sequence on its own, over a list and with no store: numeric, one per
+# facility, one past the highest issued.
+python3 -m kernel.tokens
+# And over the real service, through BOTH ways into the queue, because two
+# routes each numbering their own arrivals is the failure that leaves every
+# check above green and puts two people called four in one waiting room.
+python3 scripts/check_front_desk.py
+
 echo "\n== the kernel and its contracts =="
 python3 -m catalogue.tests.test_guard
 python3 -m catalogue.tests.test_validate

@@ -286,8 +286,23 @@ def test_a_seeded_audit_line_answers_its_own_questionnaire():
     manifest = dataclasses.asdict(phc.manifest)
     voc = vocab.for_bundle("phc")
 
-    good = declarations._lint_seed(phc.seed, manifest, voc, ops)
+    # The provenance marks this bundle's own views declare. A seeded arrival
+    # is closed against them, so the lint needs them the same way the build
+    # does; passing none would make that half of it quietly vacuous.
+    marks = {v.provenance["mark"] for v in phc.views.values() if v.provenance}
+    assert marks, "this bundle declares a provenance mark to close the seed against"
+
+    good = declarations._lint_seed(phc.seed, manifest, voc, ops, marks)
     assert good == [], good
+
+    # And a demo day that invents its own word for how somebody arrived is a
+    # build failure, not a thread that silently draws no mark.
+    invented = [{"id": "enc-1", "arrival": "walked-in-through-the-window"}]
+    assert declarations._lint_seed(invented, manifest, voc, ops, marks), \
+        "an arrival no view declares has to fail the build"
+    assert declarations._lint_seed(
+        [{"id": "enc-1", "arrival": sorted(marks)[0]}], manifest, voc, ops, marks) == [], \
+        "and a declared mark has to pass, or the rule is just refusing everything"
 
     typo = [{"id": "enc-1", "audit": [
         {"operation": "phc.op.vitals-record", "actor": "user:nurse",

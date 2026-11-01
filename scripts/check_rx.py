@@ -268,7 +268,7 @@ ok("a medicine row is a drug, a dose, a route, a frequency and a course length")
 
 def fresh():
     store = SqliteStore(":memory:")
-    thread = store.open_thread(token="B01", actor=A_DOCTOR)
+    thread = store.open_thread(token="1", actor=A_DOCTOR)
     for op, payload in (("phc.op.patient-register",
                          {"name": "Sunita Devi", "age": 34, "sex": "female",
                           "phone": "9876500000", "village": "Yadiki",

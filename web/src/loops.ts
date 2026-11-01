@@ -256,22 +256,67 @@ export function labelColumns(decl: Pick<ViewDecl, "columns" | "labels"> | undefi
   return (decl?.labels ?? []).filter((label) => columns.includes(label));
 }
 
+/** How a row reached this queue, if the view says so, and nothing about what
+ *  that means.
+ *
+ *  Returns the declaration's own three parts or null. Intersected with
+ *  `columns` for the same reason labelColumns is: the declaration lint
+ *  refuses provenance naming a column the view does not carry, so this should
+ *  never remove anything, and it is here so a renderer reading an older or
+ *  hand-edited catalogue draws no mark rather than reaching for a field no
+ *  row has. A view that declares none gets null, and the mark and the chip
+ *  are both simply absent.
+ */
+export function provenanceOf(
+  decl: Pick<ViewDecl, "columns" | "provenance"> | undefined,
+): { column: string; mark: string; label: string } | null {
+  const p = decl?.provenance;
+  if (!p?.column || !p.mark || !p.label) return null;
+  return (decl?.columns ?? []).includes(p.column) ? { ...p } : null;
+}
+
+/** Whether this row wears the mark: its provenance column carries exactly the
+ *  declared value. String-compared, because a column is whatever the store
+ *  put in it and a number that arrived as a number must still match. */
+export function marked(
+  row: Pick<QueueRow, "subject">,
+  provenance: { column: string; mark: string } | null,
+): boolean {
+  if (!provenance) return false;
+  return String(row.subject?.[provenance.column] ?? "") === provenance.mark;
+}
+
 export type Filter = { flag: string } | { station: string } | { column: string; value: string } | null;
 
 /** The filter chips this bundle's queue declaration earns: one per declared
  *  badge (a flag worth calling out), and one per station actually present in
  *  today's rows. A bundle that declares no badges offers no flag filter. */
 export function filterOptions(
-  decl: Pick<ViewDecl, "badges"> | undefined,
+  decl: Pick<ViewDecl, "badges" | "columns" | "provenance"> | undefined,
   rows: QueueRow[],
   /** The declared columns that are labels. One chip per value actually
    *  present, because a chip for a programme nobody in the room is on is a
    *  chip that can only ever say nought. */
   labels: string[] = [],
-): { flags: string[]; stations: string[]; labels: { column: string; values: string[] }[] } {
+): {
+  flags: string[];
+  stations: string[];
+  labels: { column: string; values: string[] }[];
+  /** The provenance chip, when the view declares one AND somebody in the room
+   *  actually wears the mark. Same rule as a label value, for the same
+   *  reason: a chip that can only say nought is clutter on a strip a phone
+   *  already has to scroll. It is one chip and not two, because the ordinary
+   *  way in is the absence of the mark and "everybody else" is what the All
+   *  chip beside it already means. */
+  provenance: { column: string; value: string; label: string } | null;
+} {
+  const prov = provenanceOf(decl);
   return {
     flags: Object.keys(decl?.badges ?? {}),
     stations: [...new Set(rows.map((r) => r.station).filter((s): s is string => !!s))],
+    provenance: prov && rows.some((r) => marked(r, prov))
+      ? { column: prov.column, value: prov.mark, label: prov.label }
+      : null,
     labels: labels
       .map((column) => ({
         column,

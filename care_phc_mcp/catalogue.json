@@ -2703,6 +2703,7 @@
         "phc.metric.abha-coverage",
         "phc.metric.vitals-flagged-rate"
       ],
+      "provenance": {},
       "scope": "today",
       "sections": [],
       "summary": "Visits, ABHA coverage and flagged vitals.",
@@ -2728,7 +2729,8 @@
         "sex",
         "village",
         "token",
-        "category"
+        "category",
+        "arrival"
       ],
       "escalate_minutes": null,
       "group_by": "station",
@@ -2738,6 +2740,11 @@
         "category"
       ],
       "metrics": [],
+      "provenance": {
+        "column": "arrival",
+        "label": "Scanned",
+        "mark": "poster"
+      },
       "scope": "today",
       "sections": [],
       "summary": "Today, grouped by station.",
@@ -2758,6 +2765,7 @@
       "kind": "tasklist",
       "labels": [],
       "metrics": [],
+      "provenance": {},
       "scope": "today",
       "sections": [],
       "summary": "What is waiting across today's visits, not what is waiting on one.",
@@ -2798,6 +2806,7 @@
       "kind": "summary",
       "labels": [],
       "metrics": [],
+      "provenance": {},
       "scope": "today",
       "sections": [
         {
