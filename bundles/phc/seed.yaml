@@ -2,16 +2,28 @@
 #
 # This was adapters/local/store.py SEED_PEOPLE until 2026.09.13, where it ran
 # under whatever bundle was loaded, so a laboratory opened on six outpatients
-# with tokens like A01 and a pending Amoxicillin. A seed belongs to the
+# with prefixed tokens and a pending Amoxicillin. A seed belongs to the
 # facility whose words it speaks, so it lives here. A bundle that declares no
 # seed starts empty, which is a supported outcome and not a crash.
+#
+# The tokens are ONE SEQUENCE, numeric, in arrival order, and they ascend with
+# the clock: whoever has been here longest holds the lowest number. Both ways
+# in draw from it. Two of these six registered themselves at the poster by the
+# door and the desk never met them, and they are numbers 4 and 5 of the same
+# six rather than a series of their own, because a waiting room is one room.
+# The seed shipped A01 to A06 until 2026.11.01, which is where the renderer's
+# idea of a token came from.
 #
 # Six people standing at six points of phc.wf.outpatient, so no screen is
 # empty: reception, nurse, doctor, lab, pharmacy, and one finished line.
 #
 # Shape, linted by kernel/declarations.py:
 #   id       the thread, which is an encounter row
-#   token    what is called out in the waiting area
+#   token    what is called out in the waiting area: this facility's day
+#            sequence, issued at arrival by kernel/tokens.py
+#   arrival  the provenance mark a view declares, for somebody who registered
+#            themselves rather than being registered at the desk. Absent is
+#            the ordinary way in, so there is no word here for the desk
 #   status   the encounter's own status; "completed" closes it at reception
 #   patient  one patient row, joined to the thread by the adapter
 #   rows     one row each, `resource` plus that table's columns, in order
@@ -24,32 +36,37 @@
 #                seeded row actually past its declared threshold; every
 #                other thread shares the seed's single "now" stamp
 threads:
-  # Walked in, not registered. Stands at reception with no patient row at all.
+  # Walked in, not registered. Stands at reception with no patient row at all,
+  # and holds the newest number because he is the one who just arrived.
   - id: enc-001
-    token: A01
+    token: "6"
     status: in_progress
 
   # Registered, waiting for the nurse -- and has been for 45 minutes, past
   # this bundle's own 30 minute target, so the wait rule always has one row
   # to actually ink on a fresh seed.
   - id: enc-002
-    token: A02
+    token: "1"
     status: in_progress
     minutes_ago: 45
     patient: {name: Kamala Devi, age: 34, sex: female, phone: "9800000002",
-              village: Sonpur, category: general}
+              village: Sonpur, category: anc}
     audit:
       - operation: phc.op.patient-register
         actor: "user:frontdesk"
         payload: {name: Kamala Devi, age: 34, sex: female, phone: "9800000002",
-                  village: Sonpur, category: general}
+                  village: Sonpur, category: anc}
 
   # Vitals taken and the blood pressure is high. Stands at the doctor.
+  # Registered himself at the poster: he carries a national account already,
+  # so his profile came from his own application and no clerk typed a word of
+  # it. There is no abha-link line in his audit for the same reason.
   - id: enc-003
-    token: A03
+    token: "5"
     status: in_progress
+    arrival: poster
     patient: {name: Ramesh Kumar, age: 61, sex: male, phone: "9800000003",
-              village: Bhagwanpur, category: general,
+              village: Bhagwanpur, category: ncd,
               abha_number: "12-3456-7890-1234"}
     rows:
       - {resource: observation, status: final, category: vital-signs,
@@ -87,7 +104,7 @@ threads:
       - operation: phc.op.patient-register
         actor: "user:frontdesk"
         payload: {name: Ramesh Kumar, age: 61, sex: male, phone: "9800000003",
-                  village: Bhagwanpur, category: general, capture_consent: true}
+                  village: Bhagwanpur, category: ncd, capture_consent: true}
       - operation: phc.op.vitals-record
         actor: "user:nurse"
         payload: {systolic: 186, diastolic: 112, pulse: 92, spo2: 97,
@@ -96,9 +113,13 @@ threads:
   # Seen and sent to the laboratory. Carries the one proposal a person has
   # not yet accepted, so the confirm path has a subject the moment the app
   # starts: the agent read the note over MCP and offered a prescription.
+  # The second poster arrival of the day, and the one that shows the mark is
+  # not a different queue: he scanned on the way in and sits between two
+  # patients the desk registered.
   - id: enc-004
-    token: A04
+    token: "4"
     status: in_progress
+    arrival: poster
     patient: {name: Iqbal Ahmed, age: 52, sex: male, phone: "9800000004",
               village: Sonpur, category: general,
               abha_number: "12-3456-7890-5678"}
@@ -149,7 +170,7 @@ threads:
 
   # Prescribed, waiting at the pharmacy.
   - id: enc-005
-    token: A05
+    token: "3"
     status: in_progress
     patient: {name: Sunita Bai, age: 27, sex: female, phone: "9800000005",
               village: Rampur, category: general}
@@ -211,11 +232,15 @@ threads:
                duration: 3, duration_unit: "d"}
 
   # Dispensed and closed. Stands nowhere; the line is complete.
+  # Registered at the desk, and her national account was linked there too:
+  # her audit carries the abha-link line that the two poster arrivals above do
+  # not need. So a lotus on a row does not mean somebody scanned a poster, and
+  # this is the thread that proves the two facts are separate.
   - id: enc-006
-    token: A06
+    token: "2"
     status: completed
     patient: {name: Meera Patel, age: 45, sex: female, phone: "9800000006",
-              village: Rampur, category: general,
+              village: Rampur, category: ncd,
               abha_number: "12-3456-7890-9012"}
     rows:
       - {resource: observation, status: final, category: vital-signs,
@@ -252,7 +277,7 @@ threads:
       - operation: phc.op.patient-register
         actor: "user:frontdesk"
         payload: {name: Meera Patel, age: 45, sex: female, phone: "9800000006",
-                  village: Rampur, category: general}
+                  village: Rampur, category: ncd}
       - operation: phc.op.abha-link
         actor: "user:frontdesk"
         payload: {method: link_existing, abha_number: "12-3456-7890-9012",
@@ -297,8 +322,10 @@ threads:
   # other seeded thread makes its own patient, so without this the patient
   # screen (§7, kernel/spine.py) would draw a single visit for everybody and
   # a join that had stopped joining would look exactly the same.
+  # Its token is from THAT day's sequence, not today's: the sequence restarts
+  # every morning, so a number only means anything beside its own date.
   - id: enc-000
-    token: A44
+    token: "12"
     status: completed
     same_patient_as: enc-003
     minutes_ago: 129600          # ninety days, so the timeline has a gap in it

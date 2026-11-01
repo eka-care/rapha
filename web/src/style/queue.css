@@ -53,14 +53,18 @@
 }
 .qtab.on .n { color: var(--color-bg-surface); }
 
-/* A programme chip wears the same mono uppercase as the pill it filters, so
-   a code on a row and the same code on a chip are plainly the same thing.
-   The declaration gives no word for these values today, only the stored code,
-   and a code set in sentence case reads as a misspelling rather than as a
-   code. It carries no colour: a programme is not a risk. */
+/* A programme chip wears the mono face of the pill it filters, so a value on
+   a row and the same value on a chip are plainly the same thing. It carries
+   no colour: a programme is not a risk.
+   It is no longer upper-cased. That was here because "the declaration gives
+   no word for these values today, only the stored code, and a code set in
+   sentence case reads as a misspelling rather than as a code" -- true of a
+   raw code, and the declaration carries the word now. Upper-casing a declared
+   display is this stylesheet overriding the declaration, which is the same
+   defect as the renderer picking the word itself: it is what turned a
+   programme called General into GENERAL. */
 .qtab.prog {
   font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .07em;
-  text-transform: uppercase;
 }
 
 /* The one chip allowed to carry colour: the view's own tone for clinical
@@ -112,6 +116,41 @@
   font-family: var(--font-mono); font-size: 14px; font-weight: 500;
   color: var(--color-text-primary);
   background: var(--color-bg-subtle); border: 1px solid var(--color-border-strong);
+  position: relative;
+}
+
+/* How this row got into the queue, as a dot on the corner of the number.
+   docs/reference/front-desk/queue-labels.html draws it exactly here and says
+   why: it was a word on the row before, it was the least important thing on
+   the line, and as a word it shouted.
+
+   Monochrome, in the interface's own accent, NOT in a hue of its own. Colour
+   in this product means clinical risk and nothing else, and how somebody
+   reached the desk is not a risk; the approved mockup inks this dot in its
+   interaction purple, which here is the agent's colour and would have made
+   one colour mean two things. The dot is never the only carrier of the fact:
+   the number's accessible name says it in the declaration's own word, a
+   filter chip above counts it, and a legend under the list decodes it. */
+.qr-tk-mark::after {
+  content: ""; position: absolute; right: -2px; bottom: -2px;
+  width: 8px; height: 8px; border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  /* A ring in the row's own ground, so the dot reads as sitting on the corner
+     rather than as part of the box's edge. */
+  border: 1.5px solid var(--color-bg-canvas);
+}
+
+/* The legend. One line, under the list, and only while some row wears a mark.
+   The word is the declaration's; this file supplies the dot beside it. */
+.qkey {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 12px; padding-top: 11px;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 12px; color: var(--color-text-tertiary);
+}
+.qkey-dot {
+  width: 8px; height: 8px; border-radius: var(--radius-pill);
+  background: var(--color-accent); flex: 0 0 auto;
 }
 
 .qr-bd { grid-area: bd; min-width: 0; }
@@ -134,6 +173,13 @@
   text-transform: uppercase; white-space: nowrap; padding: 3px 9px;
   border: 1px solid var(--color-border-control); border-radius: var(--radius-pill);
   color: var(--color-text-secondary); background: var(--color-bg-surface);
+}
+/* A declared display name is a word a person says out loud, so it is set in
+   the reading face at reading case. The mono capitals above are for the
+   states the engine worked out, and the difference is the point. */
+.qr-pg.dsp {
+  font-family: var(--font-sans); font-size: 11px; letter-spacing: 0;
+  text-transform: none;
 }
 /* Dashed means the kernel worked this out of the records rather than somebody
    deciding it. The border carries that, so it is drawn in the 3:1 control

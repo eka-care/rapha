@@ -17,9 +17,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { load, options, questionnaire } from "./declarations.ts";
+import { displayFor, load, options, questionnaire } from "./declarations.ts";
 import { weigh } from "./loops.ts";
-import { filterOptions, filterRows, sortOptions, sortRows } from "./loops.ts";
+import {
+  filterOptions, filterRows, labelColumns, provenanceOf, sortOptions, sortRows,
+} from "./loops.ts";
+import { rows as searchRows } from "./search.ts";
 import { header, messages, queueViewFor, valuesOf, type Ctx } from "./messages.ts";
 import { walk } from "./validate.ts";
 import type { Catalogue, Questionnaire, QueueRow, ThreadView, ViewDecl, ViewResult } from "./types";
@@ -112,6 +115,7 @@ const feed = (c: Capture) => load({
 const ctxFor = (c: Capture): Ctx => ({
   operations: c.catalogue.operations ?? {},
   schema: questionnaire,
+  display: displayFor,
   badges: queueViewFor(c.catalogue, c.facility.bundle.workflow)?.badges ?? {},
 });
 
@@ -137,17 +141,117 @@ for (const shape of SHAPES) {
       `${shape}: sorting by ${sort.key} lost a row`);
   }
 
+  // The programme label, and where its WORD comes from.
+  //
+  // Two declarations meet here and neither of them is this renderer's. The
+  // view says which column is a label; the question that collects the answer
+  // says what each stored value is CALLED. The second one used to be dropped
+  // on the way to the screen, so a queue drew the stored code and a centre's
+  // antenatal programme read ANC rather than the name the programme has.
+  //
+  // Asserted against the questionnaire the kernel actually served, not
+  // against a word written down here: a literal would pass while the
+  // declaration and the screen drifted apart, which is the whole failure
+  // this check exists for.
+  const declaredWord = (column: string, value: string): string | undefined => {
+    for (const form of Object.values(c.questionnaires)) {
+      const q = walk(form.questions ?? []).find((x) => x.link_id === column);
+      const found = q?.answer_option?.find((o) => o.value === value);
+      if (found) return found.display;
+    }
+    return undefined;
+  };
+  const labelCols = labelColumns(decl);
+  assert.ok(labelCols.length > 0, `${shape}: the view declares a label column`);
+  let renamed = 0;
+  let drawn = 0;
+  for (const column of labelCols) {
+    const present = [...new Set(rows.map((r) => String(r.subject?.[column] ?? "")).filter(Boolean))];
+    assert.ok(present.length > 0, `${shape}/${column}: the view labels a column no row carries`);
+    for (const value of present) {
+      const declared = declaredWord(column, value);
+      assert.ok(declared,
+        `${shape}/${column}: "${value}" is drawn on the queue and no question declares a word for it`);
+      assert.equal(displayFor(column, value), declared,
+        `${shape}/${column}: "${value}" draws something other than the word its question declares`);
+      drawn++;
+      if (declared !== value) renamed++;
+    }
+  }
+  // Non-vacuity. Every assertion above would also hold against a renderer
+  // that drew the stored code for everything, in a bundle whose displays all
+  // happened to equal their codes. At least one has to differ, or this check
+  // is passing on a tree where the word never arrives.
+  assert.ok(renamed > 0,
+    `${shape}: no label draws a word that differs from its stored code, so this check cannot tell a declared word from a code`);
+
   // Every name on the list is a name the kernel sent, under a column the view
   // declared. This is the assertion that would catch a fixture creeping back.
-  const subjectValues = new Set(rows.flatMap((r) => Object.values(r.subject ?? {})).map(String));
+  //
+  // Compared against the kernel's values AS THEY DRAW, not as they are
+  // stored. The header is required to put a declared answer on screen under
+  // the word its declaration gives it, so a set built from the raw values
+  // would now be asserting the opposite of the rule.
+  const subjectValues = new Set(rows.flatMap((r) =>
+    Object.entries(r.subject ?? {}).map(([k, v]) => displayFor(k, String(v)))).map(String));
+  const prov = provenanceOf(decl);
+  // Drawn, the way the real app draws it: the real displayFor, over the real
+  // registry this check already loaded from the real kernel.
+  const headerOf = (r: QueueRow) =>
+    header({ ...(c.threads[r.thread] ?? {}), subject: r.subject, flags: r.flags } as ThreadView,
+      decl, displayFor);
   for (const r of rows) {
-    const h = header({ ...(c.threads[r.thread] ?? {}), subject: r.subject, flags: r.flags } as ThreadView, decl);
+    const h = headerOf(r);
     assert.ok(subjectValues.has(h.name) || h.name === r.thread,
       `${shape}: "${h.name}" is on the list and the kernel never sent it`);
     for (const m of h.meta) {
       assert.ok(subjectValues.has(m), `${shape}: "${m}" is on the list and the kernel never sent it`);
     }
   }
+
+  // The two rules the queue row has always followed, now asserted on the
+  // other two screens that draw the same subject: the encounter header and
+  // the command palette. Both drew the stored code and both drew the
+  // provenance column as plain text, off the same columns of the same rows.
+  let saidAsDeclared = 0;
+  let marksOnTheList = 0;
+  const khojRows = searchRows(
+    "", [{ decl, result: { view: decl.id, kind: "queue", generated_at: "", groups: [], rows } }],
+    [], displayFor);
+  for (const r of rows) {
+    const drawn = [...headerOf(r).meta, headerOf(r).name];
+    const inKhoj = khojRows.find((x) => x.id === r.thread);
+    const everywhere = [...drawn, ...(inKhoj ? [inKhoj.name, inKhoj.meta] : [])].join(" · ");
+
+    if (prov) {
+      const wears = String(r.subject?.[prov.column] ?? "");
+      if (wears === prov.mark) marksOnTheList++;
+      assert.ok(!everywhere.split(" · ").includes(prov.mark),
+        `${shape}/${r.thread}: the provenance value "${prov.mark}" is drawn as a word on a screen `
+        + "that is not the queue, and the view declares it a mark");
+    }
+    for (const [column, raw] of Object.entries(r.subject ?? {})) {
+      const value = String(raw ?? "");
+      if (!value) continue;
+      const word = displayFor(column, value);
+      if (word === value) continue;        // nothing declared a word for it
+      saidAsDeclared++;
+      assert.ok(!drawn.includes(value),
+        `${shape}/${r.thread}: "${value}" is drawn as its stored code where its `
+        + `declaration calls it "${word}"`);
+    }
+  }
+  // Non-vacuity, both halves. A demo day with no renamed value and no marked
+  // row would satisfy every assertion above without exercising either rule.
+  assert.ok(saidAsDeclared > 0,
+    `${shape}: no drawn value has a declared word, so the display rule is untested here`);
+  if (prov) {
+    assert.ok(marksOnTheList > 0,
+      `${shape}: nobody on the list wears the provenance mark, so the mark rule is untested here`);
+  }
+  ok(`${shape}: the header and the palette draw ${saidAsDeclared} declared words rather than `
+    + "stored codes, and draw the provenance of the "
+    + `${marksOnTheList} ${marksOnTheList === 1 ? "row" : "rows"} wearing it nowhere at all`);
 
   // The thread: its own cards, composed from the kernel's audit and the
   // kernel's forms. A card labelled from a form the kernel did not serve
@@ -167,7 +271,7 @@ for (const shape of SHAPES) {
     }
   }
   assert.ok(labelled > 0, `${shape}: something was labelled from a served form`);
-  ok(`${shape}: ${rows.length} rows, ${stations.length} stations and ${labelled} labelled values, all from this kernel`);
+  ok(`${shape}: ${rows.length} rows, ${stations.length} stations, ${labelled} labelled values and ${drawn} label words (${renamed} of them not the stored code), all from this kernel`);
 }
 
 // ------------------------------- 3. one renderer, two facilities, no edit

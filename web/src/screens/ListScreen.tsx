@@ -48,7 +48,7 @@ export function ListScreen({ result, decl, workflow, onOpenThread }: {
    *  means clinical risk is allowed to carry colour. */
   const tabs = useMemo(() => {
     if (!isQueue) return [];
-    const { flags, stations, labels } = filterOptions(decl, rows, labelColumns(decl));
+    const { flags, stations, labels, provenance } = filterOptions(decl, rows, labelColumns(decl));
     const made: { label: string; filter: Filter; n: number; risk?: boolean; prog?: boolean; sep?: boolean }[] = [
       { label: "All", filter: null, n: rows.length },
     ];
@@ -70,6 +70,18 @@ export function ListScreen({ result, decl, workflow, onOpenThread }: {
           prog: true,
         });
       }
+    }
+    // How they got here. One chip, under the word the view declared, counting
+    // the rows that wear the mark. This file does not know what the word
+    // means or that the value behind it is about a poster by a door; a centre
+    // that declares no provenance gets no chip and no edit here.
+    if (provenance) {
+      made.push({ label: "", filter: null, n: 0, sep: true });
+      made.push({
+        label: provenance.label,
+        filter: { column: provenance.column, value: provenance.value },
+        n: rows.filter((r) => String(r.subject?.[provenance.column] ?? "") === provenance.value).length,
+      });
     }
     if (flags.length) made.push({ label: "", filter: null, n: 0, sep: true });
     for (const f of flags) {

@@ -19,14 +19,14 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  actorOf, agentLine, clock, fmt, header, messages, queueViewFor, summariesFor,
+  actorOf, agentLine, clock, fmt, header, messages, queueViewFor, summariesFor, valuesOf,
   type Ctx,
 } from "./messages.ts";
 import { firstOperation, isAsk, rows } from "./search.ts";
 import { blankRow, itemFields, toRow } from "./structured.ts";
 import { isRowGroup, rowQuestions, walk } from "./validate.ts";
 import { optionsFrom, type ValueSet } from "./valuesets.ts";
-import type { Catalogue, Operation, Questionnaire, ThreadView, ViewDecl, ViewResult } from "./types";
+import type { Catalogue, Display, Operation, Questionnaire, ThreadView, ViewDecl, ViewResult } from "./types";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const read = (p: string) => readFileSync(root + p, "utf8");
@@ -56,13 +56,27 @@ assert.ok(cat.operations[VITALS], "the compiled catalogue should carry the vital
 const queue = queueViewFor(cat, WF)!;
 assert.equal(queue.kind, "queue");
 
-const ctx: Ctx = { operations: cat.operations, schema, badges: queue.badges ?? {} };
+/** What a declared value is CALLED, as a fake.
+ *
+ *  A fake and not the real `declarations.displayFor`, for the reason the
+ *  Display type gives: this file runs under plain node with no kernel, so the
+ *  registry behind the real one is empty and every display would fall back to
+ *  the stored code. A check that passed the real one here would go green over
+ *  exactly the defect it exists to catch. This one renames something
+ *  unmistakably, so an assertion can tell a header that consulted the
+ *  declaration from one that printed the code.
+ */
+const SAYS: Display = (column, value) =>
+  (column === "category" && value === "ncd" ? "The NCD one" : value);
+
+const ctx: Ctx = { operations: cat.operations, schema, badges: queue.badges ?? {}, display: SAYS };
+
 
 const thread: ThreadView = {
   id: "enc-t",
   workflow: WF,
   subject: { encounter: "enc-t", name: "A Patient", age: "34", sex: "female", village: "Sonpur",
-             token: "A02", abha_number: null, status: "in_progress", created_by: "seed" },
+             token: "2", abha_number: null, status: "in_progress", created_by: "seed" },
   flags: ["registered", "vitals.recorded", "abha.pending"],
   station: "doctor",
   line: [
@@ -182,7 +196,7 @@ assert.ok(summariesFor(cat, WF).length >= 1);
 
 // ------------------------------------------------------------------ header
 
-const head = header(thread, queue);
+const head = header(thread, queue, SAYS);
 assert.equal(head.name, "A Patient");
 assert.equal(head.initials, "AP");
 assert.ok(
@@ -190,7 +204,7 @@ assert.ok(
   "the queue view's columns decide the meta line, so plumbing never reaches it",
 );
 assert.deepEqual(head.meta, ["34", "female", "Sonpur"]);
-assert.ok(head.badges.some((b) => b.text === "A02"), "the token is a badge, not part of the meta");
+assert.ok(head.badges.some((b) => b.text === "2"), "the token is a badge, not part of the meta");
 assert.ok(
   head.badges.some((b) => b.text === "abha pending" && b.style === "warn"),
   "a flag is styled by the queue view's badge map, not by a regex over its name",
@@ -202,16 +216,62 @@ assert.ok(
 
 // A thread whose subject carries no name falls back to the id rather than
 // inventing one. bundles/LAB-LOG.md 12: a lab thread has no patient row.
-const nameless = header({ ...thread, subject: { encounter: "spec-1", token: "L07", status: "in_progress" } }, queue);
+const nameless = header({ ...thread, subject: { encounter: "spec-1", token: "L07", status: "in_progress" } }, queue, SAYS);
 assert.equal(nameless.name, "L07", "with no name column on the subject, the token is the headline");
 assert.ok(!nameless.badges.some((b) => b.text === "L07"), "and it is not also a badge");
 
 // With no queue view at all, nothing has declared what matters, so the first
 // field that is not obvious plumbing is the least-worst headline. It is a
 // worse screen than the declared one, which is the argument for declaring.
-const unguided = header({ ...thread, subject: { encounter: "spec-1", status: "x" } }, undefined);
+const unguided = header({ ...thread, subject: { encounter: "spec-1", status: "x" } }, undefined, SAYS);
 assert.equal(unguided.name, "spec-1");
-assert.equal(header({ ...thread, subject: {} }, undefined).name, "enc-t", "and with nothing, the id");
+assert.equal(header({ ...thread, subject: {} }, undefined, SAYS).name, "enc-t", "and with nothing, the id");
+
+// -- a declared answer draws under its own word, and a mark is never a word --
+//
+// Two defects shipped on one line of this header, and web/src/view/View.tsx
+// had always had both of them right off the same declaration.
+//
+// It drew the STORED CODE for every column it showed, so the patient the
+// queue called NCD read `ncd` on the one screen a clinician spends the visit
+// looking at. And it drew the PROVENANCE column as plain text, so how
+// somebody got into the queue -- which the view declares as a mark beside
+// their number, deliberately not a word -- turned up on screen as a word
+// nobody has ever been shown.
+const MARK = queue.provenance;
+assert.ok(MARK?.column && MARK.mark && MARK.label,
+  "this bundle's queue declares a provenance, or the two checks below are vacuous");
+const arrived: ThreadView = {
+  ...thread,
+  subject: { ...thread.subject, category: "ncd", [MARK!.column]: MARK!.mark },
+};
+// Non-vacuity first: the row really is carrying both of the things the
+// assertions below are about, so neither can pass by the value being absent.
+assert.equal(arrived.subject[MARK!.column], MARK!.mark);
+assert.equal(arrived.subject.category, "ncd");
+
+const drawn = header(arrived, queue, SAYS);
+assert.ok(drawn.meta.includes("The NCD one"),
+  "a declared answer draws under the word its declaration gives it");
+assert.ok(!drawn.meta.includes("ncd"),
+  "and never as the stored code, which is what this line used to print");
+assert.ok(!drawn.meta.includes(MARK!.mark),
+  "the provenance column is a mark on the queue row and is never a word here");
+assert.ok(!drawn.meta.some((m) => m.toLowerCase() === MARK!.label.toLowerCase()),
+  "nor its label, which belongs to the filter chip above the list");
+console.log("ok   the header draws a declared answer under its declared word, and "
+  + "draws the provenance column nowhere at all");
+
+// And the posted card, which is the third place this subject's answers are
+// drawn and had the same defect: it read `ncd` two inches under a header
+// saying NCD, off one answer of one record.
+const carded = valuesOf(ctx, "phc.op.patient-register", { name: "A Patient", category: "ncd" });
+const programme = carded.find((v) => v.link_id === "category")!;
+assert.equal(programme.value, "The NCD one",
+  "a posted card draws a declared answer under its declared word");
+assert.equal(carded.find((v) => v.link_id === "name")!.value, "A Patient",
+  "and an answer with no declared word is still its own value");
+console.log("ok   a posted card draws a declared answer the same way the header above it does");
 
 // ------------------------------------------------------------------ palette
 
@@ -219,30 +279,69 @@ const decl = queue;
 const result: ViewResult = {
   view: decl.id, kind: "queue", generated_at: "", groups: [],
   rows: [
-    { thread: "enc-1", subject: { name: "Kamala Devi", age: "34", sex: "female", village: "Sonpur", token: "A02" },
+    { thread: "enc-1", subject: { name: "Kamala Devi", age: "34", sex: "female", village: "Sonpur", token: "2",
+                                 category: "ncd", arrival: "poster" },
       station: "doctor", flags: [], badges: { "abha.pending": "warn" }, opened_at: "" },
-    { thread: "enc-2", subject: { name: "Rahul Yadav", age: "51", sex: "male", village: "Bela", token: "A03" },
+    { thread: "enc-2", subject: { name: "Rahul Yadav", age: "51", sex: "male", village: "Bela", token: "3" },
       station: "nurse", flags: [], badges: {}, opened_at: "" },
   ],
 };
 const nav: ViewDecl[] = [decl];
 
-const all = rows("", [{ decl, result }], nav);
+const all = rows("", [{ decl, result }], nav, SAYS);
 assert.equal(all.filter((r) => r.kind === "thread").length, 2, "an empty box lists today's line");
 assert.ok(all.some((r) => r.kind === "home"), "Home is always reachable");
 
-const hit = rows("kamala", [{ decl, result }], nav);
+const hit = rows("kamala", [{ decl, result }], nav, SAYS);
 assert.deepEqual(hit.filter((r) => r.kind === "thread").map((r) => r.id), ["enc-1"]);
 assert.equal(hit.find((r) => r.kind === "thread")!.group, "Matches");
 
-const village = rows("bela", [{ decl, result }], nav);
+const village = rows("bela", [{ decl, result }], nav, SAYS);
 assert.deepEqual(village.filter((r) => r.kind === "thread").map((r) => r.id), ["enc-2"],
   "any column the view declared is searchable, not only the name");
 
-const miss = rows("zzz", [{ decl, result }], nav);
+const miss = rows("zzz", [{ decl, result }], nav, SAYS);
 assert.equal(miss.filter((r) => r.kind === "thread").length, 0, "a miss is a miss");
 
-const question = rows("how many are waiting?", [{ decl, result }], nav);
+// The palette had the header's two defects, off the same columns of the same
+// rows: the stored code as the word, and the provenance column drawn as text.
+const shownRow = all.find((r) => r.id === "enc-1")!;
+assert.ok(shownRow.meta.includes("The NCD one"),
+  "a palette row draws a declared answer under its declared word");
+assert.ok(!/\bncd\b/.test(shownRow.meta),
+  "and never the stored code beside it");
+assert.ok(!shownRow.meta.includes(MARK!.mark),
+  "and never the provenance column, which is a mark on a row and not a word");
+// Searchable by BOTH spellings. A clerk types what they see; the code still
+// has to find the row, because naming a value was not meant to narrow what a
+// search matches.
+assert.ok(rows("the ncd one", [{ decl, result }], nav, SAYS).some((r) => r.id === "enc-1"),
+  "the displayed word finds the row");
+assert.ok(rows("ncd", [{ decl, result }], nav, SAYS).some((r) => r.id === "enc-1"),
+  "and so does the stored code");
+// But not the provenance value, which nobody has been shown and which would
+// match every row that wears the mark for a reason no one could explain.
+assert.ok(!rows(MARK!.mark, [{ decl, result }], nav, SAYS).some((r) => r.id === "enc-1"),
+  "and the provenance value is not a search term, because it is not a word on screen");
+console.log("ok   a palette row draws and matches the same way the queue beside it does");
+// WHICH declaration the palette is handed, which is where this actually went
+// wrong in the running app and where no assertion above could see it.
+//
+// `/facility` sends a view as four fields: id, kind, title, capability. No
+// columns, no labels, no provenance. The palette was reading that one, so it
+// ordered itself by whatever keys the adapter happened to put in the subject
+// and drew the provenance value as a word because nothing had told it there
+// was one. Every check over a FULL declaration passed while the screen was
+// wrong, because the defect was in which declaration arrived, not in what the
+// code did with it. So this is asserted on the source: the palette resolves
+// its view out of the catalogue, the way every other screen does.
+const khoj = read("web/src/app/Khoj.tsx");
+assert.ok(/cat\.views\?\.\[decl\.id\]/.test(khoj),
+  "the palette resolves each queue's FULL declaration out of the catalogue, "
+  + "rather than drawing from the short form /facility sends");
+console.log("ok   and it is handed the full declaration to draw from, not the short form");
+
+const question = rows("how many are waiting?", [{ decl, result }], nav, SAYS);
 assert.equal(question[0].kind, "ask", "a question offers the agent first");
 assert.equal(isAsk("Kamala"), false);
 

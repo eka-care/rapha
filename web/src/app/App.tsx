@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, currentRole, useAsync } from "../api";
 import { ask } from "../ask";
 import { createLabel, firstOperation } from "../search";
-import { load as loadDeclarations, questionnaire } from "../declarations";
+import { displayFor, load as loadDeclarations, questionnaire } from "../declarations";
 import { keep, type Recent } from "../loops";
 import { header, queueViewFor, type Ctx, type Said } from "../messages";
 import { Boundary, Failed, Loading } from "../parts";
@@ -166,6 +166,7 @@ export function App() {
   const ctx: Ctx = {
     operations: catalogue.operations ?? {},
     schema: questionnaire,
+    display: displayFor,
     badges: queueViewFor(catalogue, facility.data?.bundle.workflow)?.badges ?? {},
   };
 
@@ -366,7 +367,7 @@ function ThreadScreen({ id, cat, ctx, said, asking, nonce, onSay, onChanged, onR
   // declaration's own column order. Picking the first string off the subject
   // instead -- which is what this did -- returns the encounter id, because
   // that is the first key the adapter puts in the subject dict.
-  const name = data ? header(data, queueViewFor(cat as never, data.workflow)).name : id;
+  const name = data ? header(data, queueViewFor(cat as never, data.workflow), displayFor).name : id;
   useEffect(() => { if (data) onRemember({ id, name }); }, [data, id, name, onRemember]);
 
   if (loading) return <Loading what="this encounter" />;

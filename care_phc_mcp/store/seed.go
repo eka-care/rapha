@@ -234,6 +234,7 @@ func Seed(s *SQLite, threads []map[string]any) ([]string, error) {
 		}
 		if _, err := s.put("encounter", map[string]any{
 			"id": thread, "token": t["token"], "status": orDefault(textOf(t["status"]), "in_progress"),
+			"arrival": t["arrival"],
 			"created_by": SeedActor, "created_date": when}, thread); err != nil {
 			return nil, err
 		}

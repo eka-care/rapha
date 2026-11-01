@@ -19,13 +19,22 @@ export type ValueSet = { slug: string; system: string; concepts: Record<string, 
 export type Option = { value: string; display: string };
 
 export function optionsFrom(
-  q: { answer_option?: { value: string }[]; answer_value_set?: string },
+  q: { answer_option?: { value: string; display?: string }[]; answer_value_set?: string },
   sets: Record<string, ValueSet>,
 ): Option[] {
   // The form's own list wins when it has one, because a question declares one
   // or the other and a question with both is a question contradicting itself.
+  //
+  // An inline option carries its own display, exactly as a bound concept
+  // does, and this used to drop it and hand the stored code back as the word.
+  // That is what made a queue read GENERAL: not a renderer deciding to shout,
+  // but the one place a declared word could have arrived throwing it away. A
+  // code set in sentence case reads as a misspelling, which is why the chip
+  // was styled as a code -- the styling was right about the data and the data
+  // was wrong. The fallback stays for a question that declares no display,
+  // because an option with no word is still an option.
   if (q.answer_option?.length) {
-    return q.answer_option.map((o) => ({ value: o.value, display: o.value }));
+    return q.answer_option.map((o) => ({ value: o.value, display: o.display || o.value }));
   }
   const found = q.answer_value_set ? sets[q.answer_value_set] : undefined;
   if (!found) return [];

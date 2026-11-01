@@ -129,6 +129,11 @@ func (k *kernel) refOr404(w http.ResponseWriter, thread string) (store.ThreadRef
 		"encounter": thread,
 		"token":     rows[0]["token"],
 		"status":    rows[0]["status"],
+		// How the person reached the queue. Carried here as well as on
+		// Threads, because a panel and a queue row describe the same visit and
+		// a field on one and not the other is the two engines disagreeing
+		// about what a subject is.
+		"arrival": rows[0]["arrival"],
 	}
 	patient, err := k.store.SelectNullable("patient", &thread, nil, nil, 1)
 	if err != nil {

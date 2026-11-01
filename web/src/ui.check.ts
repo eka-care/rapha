@@ -88,6 +88,32 @@ function vocabulary(): { word: string; kind: string }[] {
   // bundle whose subject might be a specimen.
   for (const v of Object.values(catalogue.views ?? {})) {
     add("view column", (v as { columns?: string[] }).columns);
+    // How a row got into a queue, and what the chip for it is called. Both
+    // are a view's own, and both are exactly the kind of word a screen is
+    // tempted to type: the mark is a stored value and the label is a word a
+    // person reads, so a renderer that spells either one has stopped drawing
+    // what the declaration says and started knowing what a poster is.
+    const prov = (v as { provenance?: { mark?: string; label?: string } }).provenance;
+    if (prov) add("provenance", [prov.mark, prov.label].filter(Boolean) as string[]);
+  }
+  // What a declared answer is CALLED. A programme's display is the bundle's
+  // word for one of its own codes, so a screen may no more type "the
+  // antenatal one is called this" than it may name a station. Read off the
+  // questionnaires the kernel serves, because catalogue.json compiles an
+  // option's VALUE and drops its display.
+  for (const file of walk(join(ROOT, "questionnaires"), [".json"])) {
+    const form = JSON.parse(readFileSync(file, "utf8"));
+    const questions: { answer_option?: { display?: string }[] }[] = [];
+    const descend = (list: unknown) => {
+      for (const q of (list as { questions?: unknown }[]) ?? []) {
+        questions.push(q as { answer_option?: { display?: string }[] });
+        descend((q as { questions?: unknown }).questions);
+      }
+    };
+    descend(form.questions);
+    for (const q of questions) {
+      add("answer display", (q.answer_option ?? []).map((o) => o.display).filter(Boolean) as string[]);
+    }
   }
   return out;
 }

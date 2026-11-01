@@ -522,6 +522,14 @@ var served = []struct {
 	{"/roles/{role}", ""},
 	{"/threads", ""},
 	{"/threads/{thread_id}", ""},
+	// The arrival a patient makes for themselves at the printed poster, which
+	// issues a number out of the same day sequence the desk draws from and
+	// answers with it. The sequence rule is kernel/tokens.py and it reads
+	// nothing but Store.threads, so there is no seam missing here: what is
+	// missing is the port, and this engine must not answer an arrival with a
+	// number that was issued by nobody. It is named here so the route is
+	// visibly not served rather than silently absent.
+	{"/arrivals", "the day sequence is ported but the arrival route is not; a second engine issuing its own numbers is how one waiting room gets two number ones"},
 	{"/subjects/{subject_id}", ""},
 	{"/questionnaires", ""},
 	// The expansion seam is G4's; the ROUTE is G3's, because a bound choice

@@ -79,16 +79,20 @@
       "required": false,
       "answer_option": [
         {
-          "value": "general"
+          "value": "general",
+          "display": "General"
         },
         {
-          "value": "anc"
+          "value": "anc",
+          "display": "RCH"
         },
         {
-          "value": "ncd"
+          "value": "ncd",
+          "display": "NCD"
         },
         {
-          "value": "tb"
+          "value": "tb",
+          "display": "TB"
         }
       ]
     },

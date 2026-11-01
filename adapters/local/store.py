@@ -68,7 +68,15 @@ TABLES = {
     "patient": ("id", "name", "age", "sex", "phone", "village", "category",
                 "abha_number", "directory_id", "directory_synced",
                 "created_by", "created_date"),
-    "encounter": ("id", "patient", "status", "token", "created_by", "created_date"),
+    # `arrival` is how the person got into the queue: at the desk, or by
+    # themselves at the printed poster. It sits on the encounter and not on
+    # the patient because it is a fact about THIS visit: the same person
+    # scans the poster one week and is registered by a clerk the next, and a
+    # column on the patient row would quietly rewrite the earlier visit.
+    # Written once, when the thread is opened, which is the moment it is
+    # true; nothing else may set it.
+    "encounter": ("id", "patient", "status", "token", "arrival",
+                  "created_by", "created_date"),
     # A coding is three columns, not one: the code, the system it is from, and
     # the display the value set gave it. Flat, because a district count is
     # `WHERE code = '8480-6'` and a trend is an ORDER BY, and both want a
@@ -184,6 +192,26 @@ class SqliteStore:
             cols = ", ".join(
                 "%s TEXT%s" % (c, " PRIMARY KEY" if c == "id" else "") for c in columns)
             self.db.execute("CREATE TABLE IF NOT EXISTS %s (%s)" % (table, cols))
+            # A file written by an older build has the table but not a column
+            # added to it since, and CREATE TABLE IF NOT EXISTS does nothing
+            # about that. Every read here selects *, so the first query after a
+            # column is added fails on the developer's own database with
+            # "No item with that key" and on nothing a check would catch: a
+            # fresh file in CI always has every column. `arrival` is the
+            # addition that found this.
+            #
+            # Additive only, deliberately. It adds a column this build
+            # declares and the file lacks, and it never drops, renames or
+            # retypes one: those are migrations, they can lose a clinic's
+            # records, and they are not something a constructor may do on its
+            # own. A column it adds is NULL on every existing row, which is
+            # the truthful value, because nobody recorded that fact then.
+            have = {r["name"] for r in
+                    self.db.execute("PRAGMA table_info(%s)" % table).fetchall()}
+            for column in columns:
+                if column not in have:
+                    self.db.execute(
+                        "ALTER TABLE %s ADD COLUMN %s TEXT" % (table, column))
         self.roll_seed_forward()
 
     def roll_seed_forward(self):
@@ -333,7 +361,7 @@ class SqliteStore:
         out = []
         for row in self.db.execute(sql, params).fetchall():
             subject = {"encounter": row["id"], "token": row["token"],
-                       "status": row["status"]}
+                       "status": row["status"], "arrival": row["arrival"]}
             if row["patient"]:
                 patient = self.db.execute(
                     "SELECT * FROM patient WHERE id = ?", [row["patient"]]).fetchone()
@@ -450,17 +478,28 @@ class SqliteStore:
                 [record[k] for k in keys])
         return rid
 
-    def open_thread(self, *, token=None, actor=None):
+    def open_thread(self, *, token=None, arrival=None, actor=None):
         """Start an empty visit and return its thread id.
 
         Not one of the Store protocol's nine methods: the protocol has no way
         to say "open a thread", which is a gap worth reporting rather than
         working around. A thread being an encounter row is adapter knowledge,
         so making one lives here. It records no clinical fact.
+
+        `token` and `arrival` are both facts about the moment a person
+        arrived, and both are the caller's. `token` is the facility's day
+        sequence, issued by kernel/tokens.py; `arrival` is how they got here.
+
+        Neither is invented here any more. This used to fall back to the last
+        three characters of the generated row id, so an arrival that reached
+        the store without a number got one that was on no sequence, was issued
+        to nobody, and was not a number at all. A visit with no token now has
+        none, visibly, rather than a plausible one nobody ever called out.
         """
         thread = new_id("enc")
         self._put("encounter", {"id": thread, "status": "in_progress",
-                                "token": token or thread[-3:], "created_by": actor},
+                                "token": token, "arrival": arrival,
+                                "created_by": actor},
                   thread=thread)
         return thread
 
@@ -688,6 +727,7 @@ def seed(store, threads=None):
             if minutes_ago else stamp
         store._put("encounter", {"id": thread, "token": t.get("token"),
                                  "status": t.get("status") or "in_progress",
+                                 "arrival": t.get("arrival"),
                                  "created_by": SEED_ACTOR, "created_date": opened},
                    thread=thread)
         returning = t.get("same_patient_as")

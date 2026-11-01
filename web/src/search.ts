@@ -10,7 +10,8 @@
  *  change here; today the bundles declare only `scope: today`, so the palette
  *  searches today. That is a declaration to add, not code to write.
  */
-import type { Catalogue, QueueRow, ViewDecl, ViewResult } from "./types";
+import type { Catalogue, Display, QueueRow, ViewDecl, ViewResult } from "./types";
+import { provenanceOf } from "./loops.ts";
 import { title } from "./words.ts";
 
 export type Row =
@@ -31,6 +32,10 @@ export function rows(
   q: string,
   queues: { decl: ViewDecl; result: ViewResult }[],
   nav: ViewDecl[],
+  /** What a declared value is called. Required, for the reason the type says:
+   *  this list drew the stored code for every column, so the palette and the
+   *  queue disagreed about the same patient's programme. */
+  display: Display,
 ): Row[] {
   const query = q.trim();
   const lo = query.toLowerCase();
@@ -45,10 +50,23 @@ export function rows(
     const group = query ? "Matches" : decl.title ?? title(decl.id);
     for (const row of (result.rows ?? []) as QueueRow[]) {
       if (seen.has(row.thread)) continue;
-      const cols = (decl.columns?.length ? decl.columns : Object.keys(row.subject ?? {}))
-        .map((k) => text(row.subject?.[k]))
+      // How somebody arrived is a mark on the queue row and nowhere a word,
+      // so it is not a column this list may draw and not a word anybody can
+      // search for. Read off the view, the same declaration the mark is.
+      const mark = provenanceOf(decl)?.column;
+      const shown = (decl.columns?.length ? decl.columns : Object.keys(row.subject ?? {}))
+        .filter((k) => k !== mark);
+      const raw = shown.map((k) => text(row.subject?.[k]));
+      // Each one under the word its declaration gives it, which is what the
+      // row beside it in the queue has always drawn.
+      const cols = shown
+        .map((k, i) => (raw[i] ? display(k, raw[i]) : ""))
         .filter(Boolean);
-      const hay = [...cols, row.thread].join(" ").toLowerCase();
+      // Matched on BOTH spellings. A clerk types what they see, so the
+      // displayed word has to find the row; and the stored code still finds
+      // it too, because narrowing what a search matches is not what giving a
+      // value a name was for.
+      const hay = [...cols, ...raw.filter(Boolean), row.thread].join(" ").toLowerCase();
       if (query && !hay.includes(lo)) continue;
       seen.add(row.thread);
       out.push({

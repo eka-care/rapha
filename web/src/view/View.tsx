@@ -9,7 +9,7 @@ import { Lotus } from "../abha/Lotus";
 import { ABHA_LINKED } from "../abha/sdk";
 import { Icon } from "../icons";
 import { displayFor } from "../declarations";
-import { derivedStates, labelColumns, RISK_TONE } from "../loops";
+import { derivedStates, labelColumns, marked, provenanceOf, RISK_TONE } from "../loops";
 import { clock } from "../messages";
 import type {
   MetricValue, QueueRow, SectionResult, StepStatus, TaskRow, ViewDecl, ViewResult,
@@ -32,6 +32,7 @@ export function View({ result, decl, workflow, onOpenThread }: {
         decl={decl}
         derived={derivedStates(workflow)}
         labelCols={labelColumns(decl)}
+        provenance={provenanceOf(decl)}
         onOpenThread={onOpenThread}
       />
     );
@@ -51,7 +52,17 @@ export function View({ result, decl, workflow, onOpenThread }: {
  *  the subject carries, minus the plumbing. Nothing here decides what a
  *  patient is.
  */
-function fields(decl: ViewDecl | undefined, row: QueueRow, labelCols: string[] = []): {
+function fields(
+  decl: ViewDecl | undefined,
+  row: QueueRow,
+  labelCols: string[] = [],
+  /** The provenance column, if the view declared one. Kept out of the line
+   *  under the name for the same reason a label is: it is drawn elsewhere on
+   *  the row, and a fact drawn twice is a row saying the same thing twice.
+   *  Here it would be worse than a repeat, because the stored value is a code
+   *  nobody at a desk has ever been shown. */
+  provenanceCol?: string,
+): {
   name: string; meta: string; token: string;
 } {
   const subject = row.subject ?? {};
@@ -64,7 +75,8 @@ function fields(decl: ViewDecl | undefined, row: QueueRow, labelCols: string[] =
   const tokenKey = keys.find((k) => /token/i.test(k) && has(k));
   // A label column is drawn as a pill on the right, so repeating it in the
   // line underneath would put the same word on the row twice.
-  const rest = keys.filter((k) => k !== tokenKey && !labelCols.includes(k) && has(k));
+  const rest = keys.filter((k) => k !== tokenKey && k !== provenanceCol
+    && !labelCols.includes(k) && has(k));
   const nameKey = rest[0];
   return {
     name: nameKey ? String(subject[nameKey]) : row.thread,
@@ -88,11 +100,17 @@ function labels(row: QueueRow, derived: Set<string>): { flag: string; risk: bool
     .sort((a, b) => Number(b.risk) - Number(a.risk));
 }
 
-function Queue({ rows, decl, derived, labelCols, onOpenThread }: {
+function Queue({ rows, decl, derived, labelCols, provenance, onOpenThread }: {
   rows: QueueRow[]; decl?: ViewDecl; derived: Set<string>;
   /** The columns the VIEW declared as labels. This file is told which they
    *  are and nothing about what any of them means. */
   labelCols: string[];
+  /** Which column says how a row got here, and which of its values earns the
+   *  mark. Both the view's. This file draws a dot where they agree and has no
+   *  idea what the dot is about; the word for it is on the filter chip, which
+   *  is also the declaration's, and the legend under the list explains it in
+   *  whatever the declaration called it. */
+  provenance: { column: string; mark: string; label: string } | null;
   onOpenThread?: (t: string) => void;
 }) {
   if (!rows.length) {
@@ -101,10 +119,26 @@ function Queue({ rows, decl, derived, labelCols, onOpenThread }: {
   return (
     <div className="qlist">
       {rows.map((r) => {
-        const f = fields(decl, r, labelCols);
+        const f = fields(decl, r, labelCols, provenance?.column);
+        const wears = marked(r, provenance);
         return (
           <button className="qr" key={r.thread} onClick={() => onOpenThread?.(r.thread)}>
-            {f.token && <span className="qr-tk">{f.token}</span>}
+            {/* The mark rides on the number because that is the one thing on
+                this row the patient and the desk are both looking at. It is a
+                dot and not a word: it was the least important thing on the
+                line and as a word it shouted. It is never the only way the
+                fact is conveyed -- the number's accessible name carries the
+                declaration's own word for it, and the chip above filters by
+                it -- because a dot alone is invisible to a screen reader and
+                to anybody who has not read the legend. */}
+            {f.token && (
+              <span
+                className={`qr-tk${wears ? " qr-tk-mark" : ""}`}
+                aria-label={wears ? `${f.token}, ${provenance!.label}` : undefined}
+              >
+                {f.token}
+              </span>
+            )}
             <span className="qr-bd">
               <span className="qr-l1">
                 <span className="qr-nm">{f.name}</span>
@@ -117,11 +151,13 @@ function Queue({ rows, decl, derived, labelCols, onOpenThread }: {
                   person, and monochrome, because it is not a risk: in this
                   system red means a clinician should look sooner and nothing
                   else. The word is whatever the declaration calls the stored
-                  value, which today is the value itself. */}
+                  value, and it is set in the reading face rather than the
+                  flag face, because it is a name a person says out loud and
+                  not a state the engine worked out. */}
               {labelCols.map((col) => {
                 const value = String(r.subject?.[col] ?? "");
                 return value ? (
-                  <span className="qr-pg" key={col}>{displayFor(col, value)}</span>
+                  <span className="qr-pg dsp" key={col}>{displayFor(col, value)}</span>
                 ) : null;
               })}
               {labels(r, derived).map((l) => (
@@ -137,6 +173,17 @@ function Queue({ rows, decl, derived, labelCols, onOpenThread }: {
           </button>
         );
       })}
+      {/* What the dot means, in the declaration's own word, and only when some
+          row on the list actually wears one. A mark nobody can decode is a
+          mark that is not conveying anything, and the mockup
+          (docs/reference/front-desk/queue-labels.html) carries the same
+          legend for the same reason. */}
+      {provenance && rows.some((r) => marked(r, provenance)) && (
+        <div className="qkey">
+          <span className="qkey-dot" aria-hidden="true" />
+          {provenance.label}
+        </div>
+      )}
     </div>
   );
 }

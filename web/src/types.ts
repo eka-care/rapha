@@ -27,7 +27,11 @@ export type Question = {
   type: string;
   required?: boolean;
   repeats?: boolean;
-  answer_option?: { value: string }[];
+  /** A closed list declared inline. `display` is what the value is CALLED;
+   *  the stored answer is always `value`. A question that declares no display
+   *  is drawn as its own code, which is what every one of them did before any
+   *  of them carried a word. */
+  answer_option?: { value: string; display?: string }[];
   /** The value set this question's ANSWER is drawn from, when the answer
    *  carries the concept. A question that binds one declares no
    *  `answer_option`: the codes live in the value set and writing them into
@@ -111,6 +115,26 @@ export type MappingRecord = {
   fields: Record<string, Record<string, unknown>>;
 };
 
+/** What a declared answer is CALLED: a stored value in, the word a person
+ *  reads out.
+ *
+ *  A FUNCTION passed in, never an import, and that is the whole point of it.
+ *  `declarations.displayFor` answers out of a registry the app fetches before
+ *  the first screen draws, so it is loaded state; the modules that work out
+ *  what a row says (messages.ts, search.ts) are pure by instruction and run
+ *  under plain node in their own checks. If they imported it they would get
+ *  an EMPTY registry there, every display would fall back to the stored code,
+ *  and the check would pass green over exactly the defect it exists to catch
+ *  while the browser drew something else. Taking it as an argument is the
+ *  same move `optionsFrom` makes with its value sets and `kernel/terminology`
+ *  makes with its terminology, for the same reason: a check can hand over a
+ *  fake and assert the thing was really consulted.
+ *
+ *  It has no default. A new caller has to decide, because every one that
+ *  silently drew the stored code got there by not thinking about it.
+ */
+export type Display = (column: string, value: string) => string;
+
 export type ViewDecl = {
   id: string; kind: "queue" | "summary" | "dashboard" | "tasklist"; title: string; summary?: string;
   /** A queue view says which subject fields matter and how a flag is styled.
@@ -130,6 +154,21 @@ export type ViewDecl = {
    *  optional closed choice, which happened to pick the right column in this
    *  bundle and would have picked a second one the moment another was added. */
   labels?: string[];
+  /** How a row reached this queue, when the view distinguishes it. Three
+   *  things, all declared: `column` is which of `columns` carries the fact,
+   *  `mark` is the single value that earns a mark on the row's number, and
+   *  `label` is what a filter chip over those rows is called.
+   *
+   *  This renderer is told the column, the value and the word, and nothing at
+   *  all about what any of them mean. It draws a mark where the column equals
+   *  the value and offers one chip under that word; it does not know that the
+   *  value means a poster by a door, and a centre with no poster declares no
+   *  provenance and loses both with no edit here.
+   *
+   *  Not a `label`, deliberately: a mark on the number rather than a pill,
+   *  because it is the least important thing on the row. The declaration lint
+   *  refuses a column that is both. */
+  provenance?: { column: string; mark: string; label: string };
   badges?: Record<string, string>;
   workflow?: string | null;
   group_by?: string | null;

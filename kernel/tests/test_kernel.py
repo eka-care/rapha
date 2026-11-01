@@ -421,9 +421,11 @@ def test_a_queue_groups_in_line_order_with_a_trailing_finished_group():
     # declaration: a test that asks the bundle what it declares and then
     # asserts the kernel returned that is true for every bundle and says
     # nothing. "category" joined this list when the queue gained its
-    # programme filter, which is the only reason to touch this line.
+    # programme filter, and "arrival" when it gained the mark that says
+    # whether somebody registered themselves; those are the only reasons to
+    # touch this line.
     assert set(row.subject) == {"name", "age", "sex", "village", "token",
-                                "category"}
+                                "category", "arrival"}
     assert row.badges == {"abha.pending": "warn"}, "a declared badge did not fire"
 
 

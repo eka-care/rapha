@@ -9,7 +9,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  carriedInto, cue, derivedStates, filterOptions, filterRows, keep, mine, offered,
+  carriedInto, cue, derivedStates, filterOptions, filterRows, keep, marked, mine, offered,
+  provenanceOf,
   opensOnArrival, records, RISK_TONE, sortOptions, sortRows, weigh,
 } from "./loops.ts";
 import type { Operation, QueueRow, SectionResult, ViewDecl } from "./types";
@@ -207,6 +208,79 @@ ok(
   JSON.stringify(oneBadge.flags) !== JSON.stringify(twoBadges.flags),
   "the filter control set actually moved when the declaration did, not just its size",
 );
+
+// -- how a row got here: declared, marked, filterable ----------------------
+//
+// Three facts come off the declaration and none of them is written down here:
+// which column carries the provenance, which of its values earns the mark,
+// and what the chip is called. Every assertion below is phrased against a
+// made-up column and a made-up value, so nothing in this block would still
+// pass if the renderer started knowing a health centre's actual words.
+const PROV_DECL = {
+  columns: ["name", "howtheygothere"],
+  badges: {},
+  provenance: { column: "howtheygothere", mark: "by-themselves", label: "On their own" },
+};
+const arrived = (thread: string, how: string | undefined): QueueRow => ({
+  thread, subject: { name: thread, ...(how ? { howtheygothere: how } : {}) },
+  station: "A", flags: [], badges: {}, opened_at: "2026-11-01T09:00:00Z",
+});
+const mixed: QueueRow[] = [
+  arrived("t1", "by-themselves"),
+  arrived("t2", undefined),
+  arrived("t3", "by-themselves"),
+];
+
+assert.deepEqual(provenanceOf(PROV_DECL), PROV_DECL.provenance,
+  "FAIL the declaration's own three parts come back unchanged");
+checks++;
+ok(provenanceOf({ columns: ["name"], badges: {} }) === null,
+  "a view that declares no provenance offers none, so no mark and no chip are drawn");
+// Declared, but naming a column the view does not carry: no mark, rather than
+// a mark drawn off a field no row has.
+ok(provenanceOf({ columns: ["name"], badges: {},
+                  provenance: { column: "howtheygothere", mark: "x", label: "y" } }) === null,
+  "provenance naming a column this view does not carry draws nothing");
+// But a view that declares NO columns at all is not a view that excluded the
+// column; it is one that listed none, and a screen reading it falls back to
+// whatever the subject carries. The declaration about that subject still
+// holds, so the provenance still does. Guarding on the intersection alone
+// switched the rule OFF on exactly the screen that had no column list, which
+// is where the stored value went back to being drawn as a word.
+assert.deepEqual(
+  provenanceOf({ columns: [], badges: {}, provenance: PROV_DECL.provenance }),
+  PROV_DECL.provenance,
+  "FAIL a view that lists no columns keeps the provenance it declares");
+checks++;
+
+const prov = provenanceOf(PROV_DECL)!;
+ok(marked(mixed[0], prov) && marked(mixed[2], prov),
+  "a row whose column carries the declared value wears the mark");
+ok(!marked(mixed[1], prov),
+  "and a row whose column carries nothing does not, which is how the ordinary way in reads");
+ok(!marked(arrived("t4", "by-themselves-ish"), prov),
+  "a value that merely starts the same does not wear it: the match is the whole value");
+ok(!marked(mixed[0], null),
+  "and with no declaration nothing is marked at all, not everything");
+
+// The chip. One, under the declaration's own word, and only while somebody in
+// the room wears the mark.
+const chip = filterOptions(PROV_DECL, mixed, []).provenance;
+assert.deepEqual(chip, { column: "howtheygothere", value: "by-themselves", label: "On their own" },
+  "FAIL the chip carries the declared column, value and word");
+checks++;
+ok(filterOptions(PROV_DECL, [arrived("t9", undefined)], []).provenance === null,
+  "and a day when nobody registered themselves offers no chip, rather than one that can only say nought");
+ok(filterOptions({ columns: ["name"], badges: {} }, mixed, []).provenance === null,
+  "a view declaring no provenance offers no chip either");
+
+// Filterable, which is the reason it is a column. Both ends pinned: selecting
+// everybody and selecting nobody would each satisfy a membership test.
+const only = filterRows(mixed, { column: chip!.column, value: chip!.value });
+assert.deepEqual(ids(only), ["t1", "t3"], "FAIL filtering by the declared column keeps exactly those rows");
+checks++;
+ok(only.length > 0 && only.length < mixed.length,
+  "and the filter narrows the list rather than keeping all of it or none");
 
 // -- a guess never looks like a decision -----------------------------------
 //

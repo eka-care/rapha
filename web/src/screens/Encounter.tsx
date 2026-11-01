@@ -13,7 +13,7 @@ import { useMemo, useState } from "react";
 import { threadAsks } from "../agent";
 import type { Client } from "../api";
 import { OperationPanel } from "../form/Panel";
-import { questionnaire } from "../declarations";
+import { displayFor, questionnaire } from "../declarations";
 import { walk } from "../validate";
 import { Icon } from "../icons";
 import { carriedInto, weigh } from "../loops";
@@ -84,7 +84,7 @@ export function Encounter({
   const carry = (op: Operation): Payload | undefined =>
     carriedInto(carried, thread.id, walk(questionnaire(op.input)?.questions ?? [])) as Payload | undefined;
 
-  const head = useMemo(() => header(thread, queueViewFor(cat, thread.workflow)), [thread, cat]);
+  const head = useMemo(() => header(thread, queueViewFor(cat, thread.workflow), displayFor), [thread, cat]);
   const msgs = useMemo(() => messages(thread, ctx, said), [thread, ctx, said]);
   const line = useMemo(() => agentLine(thread, ctx), [thread, ctx]);
 
@@ -296,7 +296,7 @@ function Details({ thread, cat, spine }: { thread: ThreadView; cat: Catalogue; s
       if (spine && (op?.writes ?? []).includes(spine)) continue;
       // The real questionnaire resolver, so a value keeps its label and unit.
       // Passing () => null here dropped both and the panel read "Systolic 186".
-      const values = valuesOf({ operations: cat.operations ?? {}, schema: questionnaire, badges: {} },
+      const values = valuesOf({ operations: cat.operations ?? {}, schema: questionnaire, badges: {}, display: displayFor },
                               a.operation, a.payload);
       if (values.length) out.push({ id: a.id, title: op?.title ?? human(a.operation), values });
     }

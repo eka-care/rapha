@@ -19,8 +19,9 @@
  *  And nothing here names a station, a flag, an operation or a bundle.
  */
 import type {
-  AuditRecord, Catalogue, Operation, Proposal, Questionnaire, ThreadView, ViewDecl,
+  AuditRecord, Catalogue, Display, Operation, Proposal, Questionnaire, ThreadView, ViewDecl,
 } from "./types";
+import { provenanceOf } from "./loops.ts";   // pure, type-only imports of its own
 import { labelOf, phcOf, walk } from "./validate.ts";   // the extension is for node: messages.check.ts runs this file outside vite
 import { human, title } from "./words.ts";
 
@@ -80,6 +81,10 @@ export type Ctx = {
   schema: (input: string | undefined) => Questionnaire | null;
   /** flag to badge style, from the queue view that declares this workflow. */
   badges: Record<string, string>;
+  /** What a declared answer is called. Passed in for the same reason `schema`
+   *  is: this module runs under node in its own check, where importing the
+   *  registry would read an empty one and check the fallback. */
+  display: Display;
 };
 
 const DENIED = "denied:";
@@ -111,11 +116,23 @@ export function valuesOf(ctx: Ctx, op: string, payload: Record<string, unknown> 
     seen.add(q.link_id);
     if (!(q.link_id in given)) continue;
     const phc = phcOf(q);
+    const raw = given[q.link_id];
+    // A posted card draws a declared answer under the word its declaration
+    // gives it, the same as the queue row and the header beside it. This card
+    // said `ncd` two inches under a header saying NCD, off one answer of one
+    // record.
+    //
+    // Only for a PLAIN answer. A structured one is a list of rows that `fmt`
+    // has already composed into a sentence, so there is no single stored
+    // value left to give a name to, and handing that sentence to a lookup
+    // would be asking what a paragraph is called.
+    const plain = typeof raw === "string" || typeof raw === "number";
+    const shown = fmt(raw);
     out.push({
       link_id: q.link_id,
       label: labelOf(q),
-      value: fmt(given[q.link_id]) + (phc.unit ? ` ${phc.unit}` : ""),
-      crit: outsideCritical(phc.critical, given[q.link_id]),
+      value: (plain ? ctx.display(q.link_id, shown) : shown) + (phc.unit ? ` ${phc.unit}` : ""),
+      crit: outsideCritical(phc.critical, raw),
     });
   }
   for (const [k, v] of Object.entries(given)) {
@@ -339,7 +356,14 @@ const IDENTITY = /abha|abdm/i;
  *  national identifier, not a facility's concept, and the design rule reserves
  *  the only real blue on the screen for it.
  */
-export function header(thread: ThreadView, queue: ViewDecl | undefined): Header {
+export function header(
+  thread: ThreadView,
+  queue: ViewDecl | undefined,
+  /** What a declared value is called. Required: this header drew the stored
+   *  code for every column it showed, so a centre's NCD patient read `ncd` on
+   *  the one screen a clinician spends the visit looking at. */
+  display: Display,
+): Header {
   const subject = thread.subject ?? {};
   const has = (k: string) => {
     const v = subject[k];
@@ -351,12 +375,21 @@ export function header(thread: ThreadView, queue: ViewDecl | undefined): Header 
   // falls through to the token, which is the right answer and a declaration
   // to fix rather than a guess to make here.
   const plumbing = (k: string) => /(^|_)id$|_date$|_by$|^status$/.test(k) || k === thread.workflow;
-  const declared = (queue?.columns ?? []).filter((k) => !IDENTITY.test(k));
-  const fallback = Object.keys(subject).filter((k) => !IDENTITY.test(k) && !plumbing(k));
+  // How somebody got into the queue is a MARK beside their number and is
+  // nowhere a word: the view says so, and web/src/view/View.tsx has always
+  // honoured it. Drawing that column here put the stored value on the header
+  // in plain text, so a patient who registered themselves at the poster read
+  // as "61 · male · Bhagwanpur · poster". The rule is read off the same
+  // declaration rather than restated, so a centre that stops declaring
+  // provenance loses the mark and this exclusion together.
+  const mark = provenanceOf(queue)?.column;
+  const drawable = (k: string) => !IDENTITY.test(k) && k !== mark;
+  const declared = (queue?.columns ?? []).filter(drawable);
+  const fallback = Object.keys(subject).filter((k) => drawable(k) && !plumbing(k));
   const columns = declared.length ? declared : fallback;
 
   const nameKey = columns.find(has) ?? fallback.find(has);
-  const name = nameKey ? String(subject[nameKey]) : thread.id;
+  const name = nameKey ? display(nameKey, String(subject[nameKey])) : thread.id;
 
   const identityEntry = Object.entries(subject).find(
     ([k, v]) => IDENTITY.test(k) && v !== null && v !== undefined && v !== "",
@@ -378,7 +411,12 @@ export function header(thread: ThreadView, queue: ViewDecl | undefined): Header 
   return {
     name,
     initials: name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase(),
-    meta: columns.filter((k) => k !== nameKey && k !== token && has(k)).map((k) => String(subject[k])),
+    // Every one of these is a declared answer, so every one of them draws
+    // under the word its declaration gives it. This line read the stored code
+    // back out: the queue beside it said NCD and this said ncd, off the same
+    // column of the same row.
+    meta: columns.filter((k) => k !== nameKey && k !== token && has(k))
+      .map((k) => display(k, String(subject[k]))),
     identity: identityEntry
       ? { label: human(identityEntry[0]), value: String(identityEntry[1]) }
       : undefined,

@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createLabel, isAsk, rows as searchRows, type Row } from "../search";
 import type { Catalogue, ViewDecl, ViewResult } from "../types";
+import { displayFor } from "../declarations";
 
 export function Khoj({ queues, nav, cat, workflow, onClose, onOpenThread, onGoView, onAsk, onCreate }: {
   queues: { decl: ViewDecl; result: ViewResult }[];
@@ -26,7 +27,21 @@ export function Khoj({ queues, nav, cat, workflow, onClose, onOpenThread, onGoVi
 
   useEffect(() => { box.current?.focus(); }, []);
 
-  const rows = useMemo(() => searchRows(q, queues, nav), [q, queues, nav]);
+  // The FULL declaration for each queue, not the short form.
+  //
+  // `/facility` sends a view as four fields -- id, kind, title, capability --
+  // and `/catalogue` sends the rest, which is why every other screen reads
+  // its view out of `cat`. This list was drawing from the short form, so it
+  // had no `columns` to order itself by, no `labels` and no `provenance`:
+  // it fell back to whatever keys the subject happened to carry, in whatever
+  // order the adapter built them, and drew the provenance value as a word
+  // because nothing had told it there was one. The rules were not being
+  // ignored here so much as never delivered.
+  const full = useMemo(
+    () => queues.map(({ decl, result }) => ({ decl: cat.views?.[decl.id] ?? decl, result })),
+    [queues, cat],
+  );
+  const rows = useMemo(() => searchRows(q, full, nav, displayFor), [q, full, nav]);
   useEffect(() => { setPick(0); }, [q]);
 
   const choose = (r: Row) => {

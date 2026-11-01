@@ -429,7 +429,7 @@ def consulted():
     that had nothing to do with queues. One instant, no clock.
     """
     store = SqliteStore(":memory:")
-    thread = store.open_thread(token="A01", actor=A_DOCTOR)
+    thread = store.open_thread(token="1", actor=A_DOCTOR)
     assert proposals.commit(
         store, BUNDLE, "phc.op.patient-register", thread=thread,
         payload={"name": "Sunita Devi", "age": 34, "sex": "female",
@@ -656,7 +656,7 @@ ok("a correction made while the item waited is in the document that finally "
 # A visit with no person on it is a refusal, not a retry: no number of
 # attempts fixes it.
 empty = SqliteStore(":memory:")
-blank = empty.open_thread(token="A02", actor=A_DOCTOR)
+blank = empty.open_thread(token="2", actor=A_DOCTOR)
 try:
     queues.document_body(empty, BUNDLE,
                          QueueItem(id="q-x", kind="document", key=blank,

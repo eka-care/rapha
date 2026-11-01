@@ -50,6 +50,9 @@ REQUIRED = {
     "metric": ("id", "type", "title", "summary", "unit", "window", "numerator"),
 }
 BADGE_STYLES = ("warn", "crit", "ok", "mute")
+# What a queue view's `provenance` is made of. Closed, because each one is
+# something a renderer reads and a fourth key would be silently ignored.
+PROVENANCE_KEYS = ("column", "mark", "label")
 RULE_FORMS = ("stored", "exists", "gte", "all_of")
 
 
@@ -265,6 +268,36 @@ def _lint_view(fm, refs, fail, voc, ops):
     if stray:
         fail(f"labels name {stray}, which this view does not carry as columns")
 
+    # Provenance, same rule as labels and for the same reason: it is drawn
+    # from a column's value, so one naming a column the row does not carry
+    # draws nothing at all and reports nothing anywhere. The kernel narrows
+    # every row to exactly `columns`, so this is the only place the two can be
+    # compared.
+    #
+    # The other two keys are required when the first is, because a column with
+    # no `mark` marks nothing and a `mark` with no `label` gives the filter
+    # chip no word, and both failures are silent on screen. A view that
+    # distinguishes no arrivals declares the whole key or none of it.
+    provenance = fm.get("provenance") or {}
+    if provenance:
+        if not isinstance(provenance, dict):
+            fail("provenance must be a mapping of column, mark and label")
+        else:
+            unknown = sorted(k for k in provenance if k not in PROVENANCE_KEYS)
+            if unknown:
+                fail(f"provenance carries unknown keys {unknown}; "
+                     f"it takes exactly {list(PROVENANCE_KEYS)}")
+            for key in PROVENANCE_KEYS:
+                if not provenance.get(key):
+                    fail(f"provenance needs a '{key}'")
+            column = provenance.get("column")
+            if column and column not in (fm.get("columns") or []):
+                fail(f"provenance names column '{column}', "
+                     "which this view does not carry as columns")
+            if column and column in (fm.get("labels") or []):
+                fail(f"provenance names column '{column}', which is also a label; "
+                     "a column is drawn as a pill or as a mark, not as both")
+
     group_by = fm.get("group_by")
     if group_by is not None and group_by != "station" and group_by not in voc.states:
         fail(f"group_by '{group_by}' is neither 'station' nor a state")
@@ -463,7 +496,7 @@ def _lint_metric(fm, fail):
                resources=vocab.CARE_RESOURCES, allow_window=True)
 
 
-def _lint_seed(threads, manifest, voc, ops):
+def _lint_seed(threads, manifest, voc, ops, marks=frozenset()):
     """Check the demo day against the facility's own words.
 
     The one failure this exists for: a seeded proposal naming an operation
@@ -489,8 +522,17 @@ def _lint_seed(threads, manifest, voc, ops):
         seen.add(t["id"])
         for key in set(t) - {"id", "token", "status", "patient", "rows",
                              "flags", "proposals", "audit", "minutes_ago",
-                             "same_patient_as"}:
+                             "same_patient_as", "arrival"}:
             bad.append(f"{where}: unknown key '{key}'")
+        # A seeded arrival may only be a provenance mark one of this bundle's
+        # own views declares. A demo day that invented its own word for how
+        # somebody arrived would draw no mark and offer no chip, and would
+        # look exactly like a demo day that recorded nothing. The ordinary
+        # arrival is the ABSENCE of this key, which is what the desk writes,
+        # so there is no word here for "the clerk did it".
+        if t.get("arrival") and t["arrival"] not in marks:
+            bad.append(f"{where}: arrival '{t['arrival']}' is not a provenance "
+                       "mark any of this bundle's views declare")
         if "minutes_ago" in t and not isinstance(t["minutes_ago"], (int, float)):
             bad.append(f"{where}: minutes_ago must be a number")
         if "same_patient_as" in t:
@@ -557,7 +599,12 @@ def lint(manifest, decls, ops, seed=()):
     # how a released report came to be called `dispensed.complete`.
     voc = vocab.from_manifest(manifest)
     bad += voc.problems()
-    bad += _lint_seed(seed, manifest, voc, ops)
+    # The provenance marks this bundle's views declare, so a seeded arrival
+    # can be closed against them rather than being any string at all.
+    marks = {(fm.get("provenance") or {}).get("mark")
+             for fm, _ in decls.values() if fm.get("type") == "view"}
+    marks.discard(None)
+    bad += _lint_seed(seed, manifest, voc, ops, marks)
 
     listed = {i for k in ("workflows", "views", "instruments", "metrics")
               for i in manifest[k] or []}

@@ -223,6 +223,19 @@ class View:
     # silently the day a bundle added another optional choice. A bundle says
     # which, or none of them are labels. A subset of `columns`.
     labels: list = field(default_factory=list)
+    # How a row reached this queue, and the three things a screen needs to
+    # draw it without knowing what it means: `column` (which of `columns`
+    # carries the fact), `mark` (the single value that earns a mark on the
+    # row's number) and `label` (what a filter chip over those rows is
+    # called). Empty for a view that does not distinguish arrivals, and then
+    # no mark and no chip are drawn.
+    #
+    # Separate from `labels` because this is not a pill. It is the least
+    # important thing on a row, so it is a mark beside the number rather than
+    # a word competing with the programme; and it still has to be filterable,
+    # because "who walked in without the desk seeing them" is a question the
+    # queue is the only place to ask.
+    provenance: dict = field(default_factory=dict)
     badges: dict = field(default_factory=dict)    # flag -> warn | crit | ok | mute
     # summary
     sections: list = field(default_factory=list)  # of Section
