@@ -77,36 +77,47 @@ export function canFrameLogin(hostname: string): boolean {
   return hostname === "eka.care" || hostname.endsWith(".eka.care");
 }
 
-/** Where Eka sends a browser once the cookie is set, by environment.
+/** Where Eka sends the browser once the cookie is set: back here.
  *
- *  MEASURED, from the redirect login.eka.care issues for itself:
- *    GET https://login.dev.eka.care/  ->  /auth/login?audience=doc-web&next=https://docapp.eka.care
- *    GET https://login.eka.care/      ->  /auth/login?audience=doc-web&next=https://dr.eka.care
- *  so these two are the return addresses Eka hands out, which means they are
- *  the two it is certain to accept.
+ *  `next` is required -- the login answers 400 without one -- and it has to
+ *  be an address that RESOLVES, which is what went wrong before. Eka's own
+ *  default for dev is `https://docapp.eka.care`, read off the redirect
+ *  login.dev.eka.care issues for itself, and that name has no DNS record at
+ *  all: signing in worked and then dropped the frame on "server IP address
+ *  could not be found". Production's default, `https://dr.eka.care`, is a
+ *  real host but it is somebody else's dashboard.
+ *
+ *  So it comes back here. This origin certainly resolves -- the browser is
+ *  already on it -- and the login accepts it: it answers 200 for a `next`
+ *  of this app's own address.
  */
-export function landingAfterLogin(env: string | undefined): string {
-  return env === "PROD" ? "https://dr.eka.care" : "https://docapp.eka.care";
+export function returnTo(origin: string, path: string): string {
+  return origin + path;
 }
 
-/** Where the login goes, for the card on this screen.
+/** Did this page load because the login sent the browser back to it?
+ *
+ *  Eka appends `mode=login` to the return address, which is visible in the
+ *  `next_url` its own page computes. Inside the frame, that pair -- framed,
+ *  and carrying Eka's marker -- is the whole app being asked to load itself
+ *  inside its own sign in screen, which it must not do. It draws one line
+ *  instead, and the page around the frame notices the cookie and moves on.
+ *
+ *  BOTH HALVES MATTER. Framed alone is not enough: this app could one day
+ *  be embedded somewhere on purpose. The marker alone is not enough either:
+ *  it is on the address bar of the real page too once the login has been
+ *  through it.
+ */
+export function cameBackFromLogin(search: string, framed: boolean): boolean {
+  return framed && new URLSearchParams(search).get("mode") === "login";
+}
+
+/** Where the login goes.
  *
  *  `audience` is the surface asking, the same id every request carries, and
- *  `next` is required -- the page answers 400 without one.
- *
- *  WHY `next` IS NOT THIS APP. It used to be, and that was wrong twice.
- *  Once because a login that completed then loaded the whole app INSIDE the
- *  card, an app in a box in the app. And once because `next` is a return
- *  address Eka recognises or does not: login.dev.eka.care answers a path it
- *  does not serve with `{"message":"Forbidden"}`, which is exactly what the
- *  card was showing, and an origin somebody has pointed at their own laptop
- *  is not an address Eka has ever been told about.
- *
- *  So it uses the address Eka itself names, and nothing waits on the
- *  redirect: the cookie is the whole result, and the card is already asking
- *  every couple of seconds whether it has arrived.
+ *  `next` is where Eka sends the browser afterwards. See `returnTo`.
  */
-export function loginUrl(env: string | undefined, clientId: string): string {
-  const next = encodeURIComponent(landingAfterLogin(env));
+export function loginUrl(env: string | undefined, clientId: string, back: string): string {
+  const next = encodeURIComponent(back);
   return `${loginBase(env)}/auth/login?audience=${encodeURIComponent(clientId)}&next=${next}`;
 }

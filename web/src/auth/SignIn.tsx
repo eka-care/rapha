@@ -28,7 +28,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EXPANDS_TO, NAME } from "../brand";
-import { canFrameLogin, loginUrl } from "./client";
+import { canFrameLogin, loginUrl, returnTo } from "./client";
 import { Bloom } from "./Bloom";
 import { CLIENT_ID, ENV, LOGIN_URL, probe, type Answer } from "./session";
 
@@ -91,7 +91,7 @@ export function SignIn({ checking, onRetry }: {
             {/* No card. Eka's page IS the right hand side of this screen. */}
             <iframe
               className="way-in-frame"
-              src={loginUrl(ENV, CLIENT_ID)}
+              src={loginUrl(ENV, CLIENT_ID, returnTo(location.origin, location.pathname))}
               title="Sign in with Eka"
               onLoad={ask}
             />

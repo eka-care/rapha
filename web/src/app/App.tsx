@@ -19,7 +19,7 @@ import { ListScreen } from "../screens/ListScreen";
 import { Patient } from "../screens/Patient";
 import { Patients } from "../screens/Patients";
 import { seenTour, Tour } from "./Tour";
-import { gateApplies } from "../auth/client";
+import { cameBackFromLogin, gateApplies } from "../auth/client";
 import { SignIn } from "../auth/SignIn";
 import { signedIn } from "../auth/session";
 import { Roles } from "../screens/Settings";
@@ -313,6 +313,14 @@ export function App() {
   // the rail, the home screen and the desk cannot show three numbers.
   const deskQueue = queueViewFor(catalogue, facility.data?.bundle.workflow);
   const deskRows = (loaded.find((l) => l.decl.id === deskQueue?.id)?.result.rows ?? []) as QueueRow[];
+
+  // Eka has just sent the browser back, INSIDE the sign in frame. Drawing
+  // the app here would put the whole workspace in a box on its own sign in
+  // screen. One line, and the page around the frame notices the cookie and
+  // takes it from here.
+  if (cameBackFromLogin(location.search, window.top !== window.self)) {
+    return <div className="came-back">Signed in. One moment…</div>;
+  }
 
   // No Eka session: the one screen there is to show. In front of everything,
   // because a sign-in behind a half drawn workspace is not a sign-in.

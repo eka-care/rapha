@@ -246,6 +246,14 @@
 }
 @media (max-height: 760px) { .way-in-frame { height: 78dvh; } }
 
+/* What Eka's frame shows for the half second after a sign in, before the
+   page around it notices the cookie. */
+.came-back {
+  min-height: 100dvh; display: grid; place-items: center;
+  background: var(--color-bg-canvas); color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
 .way-in-wait {
   position: relative; z-index: 1;
   color: var(--color-text-tertiary); font-size: 13.5px; text-align: center;
