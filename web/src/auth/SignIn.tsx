@@ -24,7 +24,7 @@
  *  already asking for it.
  */
 import { useEffect, useRef } from "react";
-import { NAME } from "../brand";
+import { EXPANDS_TO, NAME } from "../brand";
 import { canFrameLogin, loginUrl } from "./client";
 import { Bloom } from "./Bloom";
 import { CLIENT_ID, ENV, LOGIN_URL, signedIn } from "./session";
@@ -58,9 +58,9 @@ export function SignIn({ checking, onRetry }: {
 
       <section className="way-in-say">
         <h1 className="way-in-t">{NAME}</h1>
-        <p className="way-in-b">
-          Every record committed by a person who was there.
-        </p>
+        {/* The abbreviation, not a promise. This is the one screen with room
+            for it and the one moment somebody meets the name cold. */}
+        <p className="way-in-b">{EXPANDS_TO}</p>
       </section>
 
       <section className="way-in-card" aria-label={`Sign in to ${NAME}`}>

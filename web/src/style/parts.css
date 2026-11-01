@@ -176,8 +176,9 @@
 .tour-again:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
 /* ---- the way in ---------------------------------------------------------
-   The mark and the promise on the left, Eka's own login in a card on the
-   right, and the flower opening behind both. */
+   The mark and the abbreviation on the left, Eka's own login in a card on
+   the right, and the border being sketched along the bottom and the left
+   behind both. */
 .way-in {
   position: fixed; inset: 0; z-index: 70; overflow: auto;
   background: var(--color-bg-canvas);
@@ -187,22 +188,27 @@
            max(24px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-right, 0px));
 }
 @media (min-width: 900px) {
-  /* TWO COLUMNS, the words and the card, held in the middle. The plant is
-     not one of them any more: it runs along the bottom and left edges as a
-     border, so it frames the pair instead of competing with them for a
-     third of the screen. */
+  /* TWO COLUMNS, the words and the card. The border is not one of them: it
+     runs along the bottom and the left, so it frames the pair rather than
+     competing with them for a third of the screen. */
   .way-in {
     grid-template-columns: minmax(260px, 380px) minmax(320px, 420px);
     justify-content: center; align-items: center;
     gap: var(--space-8);
   }
 }
+@media (min-width: 1180px) {
+  /* Wide enough to stand clear of the drawing, so it does: the corner is
+     the border's, and the words are not set on top of a petal. Below this
+     the two overlap, and the drawing is faint enough behind them to live
+     with. */
+  .way-in { padding-left: 560px; }
+}
 
 .way-in-say {
   position: relative; z-index: 1; text-align: center;
   display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
-@media (min-width: 900px) { .way-in-say { text-align: left; align-items: flex-start; } }
 .way-in-mark {
   width: 46px; height: 46px; color: var(--color-agent); opacity: .55;
   fill: none; stroke: currentColor; stroke-width: .6;
@@ -260,83 +266,58 @@
 .way-in-n b { color: var(--color-text-secondary); font-weight: 550; }
 
 /* ---- the bloom ----------------------------------------------------------
-   The mark becoming a garland: a few daffodils gathered at the bottom left
-   corner and thinning out along the bottom edge and up the left, once, over
-   half a minute, and then still. Only clip-path, opacity and transform
-   move, so none of it costs a layout. */
+   A seed at the bottom left corner, and then the border being sketched:
+   along the bottom, then up the left, one line at a time, over about half a
+   minute, and then still. */
 .bloom {
   /* Full width, so the drawing can never push the page sideways. The SVG
-     fits itself inside with `meet` and sits in the bottom left corner,
-     which is where the border starts. */
+     fits itself inside and sits in the bottom left corner, which is where
+     the border starts. */
   position: fixed; left: 0; right: 0; bottom: 0;
-  height: min(88vh, 720px);
+  height: min(64vh, 540px);
   pointer-events: none; z-index: 0;
 }
 .bloom-svg {
   display: block; height: 100%; width: 100%;
-  color: var(--color-agent); fill: none; stroke: currentColor;
-  stroke-width: 1; stroke-linecap: round; stroke-linejoin: round;
-  opacity: .34;
+  color: var(--color-agent); opacity: .38;
 }
-@media (min-width: 900px) { .bloom-svg { opacity: .55; } }
+@media (min-width: 900px) { .bloom-svg { opacity: .62; } }
 
-/* The drawing's own line weights, the way a pen study has them: the stem
-   and the blade outline firm, the midrib and the tendril faint. */
-.bloom-stem { stroke-width: .9; }
-.bloom-leaf { stroke-width: .8; }
-.bloom-rib, .bloom-tendril, .bloom-vein, .bloom-stamen { stroke-width: .55; opacity: .75; }
-.bloom-ruffle, .bloom-cup, .bloom-petal, .bloom-spathe { stroke-width: .75; }
-.bloom-spathe { opacity: .6; }
+/* THE SKETCHING. Stroked, never filled: the trace draws its ink as filled
+   regions, and the boundary of a hairline region is the hairline. The dash
+   is the whole run's length, pushed off the end, and walking it back on is
+   a line appearing at the speed a pen moves. Linear, because a hand does
+   not ease in and out of a petal.
+   The length, the duration and the delay are set on each element, from the
+   measurements in frame-strokes.ts. */
+.bloom-ink {
+  fill: none; stroke: currentColor; stroke-width: .9;
+  stroke-linecap: round; stroke-linejoin: round;
+  animation-name: sketch; animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes sketch { to { stroke-dashoffset: 0; } }
 
-/* The mark it opens as, and hands over from. */
+/* The mark it opens as, and hands over from: it appears, holds, then fades
+   and swells as the drawing takes its place. */
 .bloom-seed {
-  stroke-width: 1.1; transform-origin: 96px 556px;
-  animation: seed-go 7s var(--ease-out) 2.5s forwards;
+  fill: none; stroke: currentColor; stroke-width: 1.1; stroke-linejoin: round;
+  transform-box: fill-box; transform-origin: center;
+  opacity: 0; animation: seed-go 8s var(--ease-out) forwards;
 }
 @keyframes seed-go {
-  from { opacity: .9; transform: scale(1); }
-  to { opacity: 0; transform: scale(1.6); }
+  0% { opacity: 0; transform: scale(1); }
+  18% { opacity: .9; transform: scale(1); }
+  50% { opacity: .9; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.7); }
 }
 
-/* CLIMBING the left edge. The top inset falls to zero, so the band grows
-   upward out of the bottom. Leaves, tendrils and heads sit inside the
-   group, so each arrives as the stem reaches it. */
-.bloom-up {
-  clip-path: inset(100% 0 0 0);
-  animation: grow-up 14s var(--ease-out) forwards;
-}
-.bloom-up.a { animation-delay: 4s; }
-.bloom-up.b { animation-delay: 8s; }
-@keyframes grow-up {
-  from { clip-path: inset(100% 0 0 0); }
-  to { clip-path: inset(0 0 0 0); }
-}
-
-/* RUNNING along the bottom edge, left to right. */
-.bloom-across {
-  clip-path: inset(0 100% 0 0);
-  animation: grow-across 14s var(--ease-out) forwards;
-}
-.bloom-across.a { animation-delay: 3s; }
-.bloom-across.b { animation-delay: 6.5s; }
-@keyframes grow-across {
-  from { clip-path: inset(0 100% 0 0); }
-  to { clip-path: inset(0 0 0 0); }
-}
-
-/* The heads, after the stem carrying each has got there. The delay is on
-   the element, because each head waits on its own stem. */
-.bloom-head { opacity: 0; animation: head-in 3.5s var(--ease-out) forwards; }
-@keyframes head-in { to { opacity: 1; } }
-
-/* A plant that keeps redrawing itself is exactly the movement somebody who
-   asked for less of it meant. It arrives already grown. */
+/* A drawing that keeps redrawing itself is exactly the movement somebody who
+   asked for less of it meant. It arrives already drawn. */
 @media (prefers-reduced-motion: reduce) {
   .bloom-seed { animation: none; opacity: 0; }
-  .bloom-up, .bloom-across { animation: none; clip-path: none; }
-  .bloom-head { animation: none; opacity: 1; }
+  .bloom-ink { animation: none; stroke-dashoffset: 0; }
 }
-
 /* The small mark above the wordmark went: with the flower drawn behind it,
    two daffodils were on screen at once, one of them a thumbnail of the
    other. */
