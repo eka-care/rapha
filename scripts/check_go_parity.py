@@ -2688,14 +2688,19 @@ def _go_live_code(path):
 #
 # WHY THIS IS NOT COMPARED OVER A SOCKET EITHER
 # ---------------------------------------------
-# The outbox is SWITCHED OFF. kernel/queues.py is complete and proved and
-# api/scribe.py does not call it, because holding a recording through an
-# outage means writing consultation audio to a clinic's disk and the retention
-# window that would make that safe is unsigned. Nothing in cmd/api calls the Go
-# package either, by the same decision. So no route in either engine reaches an
-# outbox and there is nothing for e2e.py or check_live.py to compare, which
+# The outbox is SWITCHED ON since 2026-11-01 and is still on NO ROUTE, which
+# are different things. api/outbox.py holds a recording the line could not take
+# and sweeps on a timer started with the process, and cmd/api/outbox.go sweeps
+# the same spool; neither is reachable by a request, because an outbox is not
+# something a caller asks for, and the sweeper runs on a five minute timer
+# rather than in answer to one.
+#
+# So there is still nothing for e2e.py or check_live.py to compare, which
 # leaves the shape projection_parity above already uses: a Go test that asserts
-# nothing, fed inputs from here and read back for the diff.
+# nothing, fed inputs from here and read back for the diff. What that shape now
+# also carries is the retention ceiling, because the clamp and the swept states
+# are pure functions of their inputs and are exactly what two engines can
+# disagree about silently. They did: see the ceiling comparison below.
 #
 # WHAT IS COMPARED, AND WHAT IS DELIBERATELY NOT
 # ----------------------------------------------
@@ -2739,7 +2744,7 @@ def queue_cases():
     # The withheld map is the real one for the shape that runs fewest plugins,
     # so what is compared is this bundle's own subtraction rather than a
     # literal typed here.
-    from kernel import declarations
+    from kernel import contracts, declarations
 
     narrow = declarations.load("phc", facility="consulting-room-only")
     withheld = dict(narrow.withheld)
@@ -2753,6 +2758,20 @@ def queue_cases():
         # Past the end of the table as well as inside it, and nought and
         # negative, because the ceiling and the floor are both reachable.
         "backoff": [-1, 0, 1, 2, 3, 4, 5, 6, 7, 99],
+        # The owner's 24 hour ceiling on held audio
+        # (docs/DECISIONS-2026-11-01.md decision 2), which is a CLAMP and not
+        # a default, so both engines must clamp the same inputs the same way.
+        # Negative and nought are both in, because "use the default" and
+        # "delete on sight" are different answers and reading one as the other
+        # is how a facility ends up holding audio it meant to drop.
+        "ceiling": [-1, 0, 1, 3600, 6 * 3600, 24 * 3600, 24 * 3600 + 1,
+                    48 * 3600, 999999],
+        # Which states a held recording is swept out of. Every state an item
+        # can wear, so the pair is compared on the ONE that is left out as
+        # well as on the five that are not. `refused` is why this case exists:
+        # it was missing from both engines until 2026-11-01, so a recording the
+        # guard denied kept its bytes for as long as the disk lasted.
+        "retention": sorted(contracts.QUEUE_STATES),
         "refusal": [
             {"kind": "audio", "operation": "phc.op.consult-document",
              "capability": "encounter.document", "withheld": {}},
@@ -2894,6 +2913,11 @@ def queue_cases():
 
 QUEUE_NOW = "2026-11-01T10:00:00+00:00"
 QUEUE_LATER = "2026-11-01T14:00:00+00:00"
+# Two days on: past the owner's 24 hour ceiling on held audio, which the four
+# hours above is deliberately inside. The retention cases need a clock the
+# ceiling has actually expired under, and reusing QUEUE_LATER would have made
+# every one of them answer "nothing was swept" in both engines and agree.
+QUEUE_PAST_CEILING = "2026-11-03T10:00:00+00:00"
 # One moment per hour, long enough to walk an item past every backoff in the
 # table and reach the attempt limit.
 QUEUE_HOURS = tuple("2026-11-01T%02d:00:00+00:00" % hour
@@ -2958,6 +2982,33 @@ def python_outbox(cases):
                                       capability=one["capability"],
                                       withheld=one["withheld"])
                        for one in cases["refusal"]]}
+
+    out["ceiling"] = [queues.held_ceiling(n) for n in cases["ceiling"]]
+    out["swept_states"] = list(queues.SWEPT_STATES)
+
+    # One audio item in each state, swept past the ceiling: was its recording
+    # deleted, and what state did the row end in. `delete` records rather than
+    # unlinking, so the two engines are compared on the DECISION and not on
+    # two filesystems.
+    retention = []
+    for state in cases["retention"]:
+        spool = SqliteSpool(":memory:")
+        item = queues.enqueue(spool, kind="audio", key="k-" + state,
+                              thread="enc-1", operation="phc.op.consult-document",
+                              capability="encounter.document",
+                              facility="all-plugins", at=QUEUE_NOW,
+                              blob="/held/" + state)
+        if state != "ready":
+            spool.settle(item.id, state=state, at=QUEUE_NOW,
+                         receipt="r-1" if state == "sent" else "")
+        removed = []
+        gone = queues.sweep_audio(spool, now=QUEUE_PAST_CEILING,
+                                  delete=removed.append)
+        after = spool.get(item.id)
+        retention.append({"state": state, "swept": gone == [item.id],
+                          "deleted": removed, "final": after.state,
+                          "says": after.last_error or ""})
+    out["retention"] = retention
 
     admit = []
     for one in cases["admit"]:
@@ -3135,6 +3186,60 @@ def outbox_parity(tmp):
     ok("the outbox: the same waits after %d attempt counts, and the same "
        "admission refusals including the capability and the plugin naming it"
        % len(cases["backoff"]))
+
+    # --- the owner's 24 hour ceiling on held audio, which both engines must
+    # clamp to identically, and the states a recording is swept out of.
+    assert py["ceiling"] == gone["ceiling"], (
+        "the two engines clamp the retention window differently\nin:     %s\n"
+        "python: %s\ngo:     %s"
+        % (cases["ceiling"], py["ceiling"], gone["ceiling"]))
+    # And it really clamped, or this is two engines agreeing to pass a number
+    # through. The 48 hour case must come back as 24.
+    assert queues.AUDIO_CEILING_SECONDS in py["ceiling"], \
+        "no case reached the ceiling, so the clamp is unobserved"
+    assert py["ceiling"][cases["ceiling"].index(48 * 3600)] \
+        == queues.AUDIO_CEILING_SECONDS, \
+        "a 48 hour window was not clamped to 24: %s" % py["ceiling"]
+    assert list(py["swept_states"]) == list(gone["swept_states"]), (
+        py["swept_states"], gone["swept_states"])
+    assert "refused" in py["swept_states"], \
+        "the sweep does not walk `refused`, so a recording the guard denied " \
+        "keeps its bytes past the ceiling in this engine"
+    assert "sending" not in py["swept_states"], \
+        "the sweep walks `sending`, so it can delete bytes out from under a " \
+        "send that is in flight"
+    ok("the outbox: both engines clamp %d configured retention windows to the "
+       "same answers, a 48 hour window becoming the owner's %d hour ceiling in "
+       "each, and both sweep the same %d states and leave `sending` alone"
+       % (len(cases["ceiling"]), queues.AUDIO_CEILING_SECONDS // 3600,
+          len(py["swept_states"])))
+
+    for one, a, b in zip(cases["retention"], py["retention"], gone["retention"]):
+        assert a == b, ("sweeping a held recording in state %r differs\n"
+                        "python: %s\ngo:     %s" % (one, a, b))
+    swept = [a for a in py["retention"] if a["swept"]]
+    spared = [a for a in py["retention"] if not a["swept"]]
+    assert swept and spared, (
+        "every state was treated the same, so this case proves nothing: "
+        "%d swept, %d spared" % (len(swept), len(spared)))
+    # The two properties the decision turns on, asserted on the answers rather
+    # than on the implementation.
+    for a in swept:
+        assert a["deleted"], "%r was reported swept and nothing was deleted" % a
+        if a["state"] == "sent":
+            # The remote HAS it. Its bytes go, and the row is NOT rewritten to
+            # say nobody got a transcript, because somebody did.
+            assert a["final"] == "sent", a
+            assert "without being transcribed" not in a["says"], a
+        else:
+            assert a["final"] == "failed", a
+            assert "without being transcribed" in a["says"], a
+    for a in spared:
+        assert not a["deleted"], "%r was spared and something was deleted" % a
+    ok("the outbox: a held recording past the ceiling is swept identically "
+       "from %d states in both engines and spared in %d, the row left saying "
+       "nobody got a transcript, and a SENT row keeping its state because "
+       "somebody did" % (len(swept), len(spared)))
 
     for one, a, b in zip(cases["admit"], py["admit"], gone["admit"]):
         assert a == b, ("admitting %r differs\npython: %s\ngo:     %s"
@@ -3903,6 +4008,148 @@ def lint_parity(tmp):
           len(kplugins.PLUGIN_KEYS), "; ".join(unreachable)))
 
 
+def token_parity(tmp):
+    """The day sequence over both engines, and the counter they SHARE.
+
+    WHY THIS IS NOT JUST ANOTHER ROUTE DIFF
+    ---------------------------------------
+    Until 2026-11-01 this engine pair did not agree about numbers at all and
+    no check in this file said so. The Python issued one out of
+    kernel/tokens.py and ignored any token in the request; the Go read `token`
+    out of the request BODY and, given none, had its store invent one from the
+    last three characters of the generated row id. So the Go's numbers came
+    from whichever client asked, or from a row id, and in neither case from a
+    sequence.
+
+    Every other check here compares the two engines on one set of
+    declarations, and not one of them looked at the token, because `token` is
+    in VOLATILE_KEYS: it is normalised away before two answers are diffed, for
+    the good reason that two engines seeding their own file produce their own
+    row ids. A VALUE EXCLUDED FROM EVERY COMPARISON IS A VALUE NO COMPARISON
+    DEFENDS. That is the hole this function fills, and it is why the three
+    properties below are asserted directly rather than diffed.
+
+    1. EACH ENGINE ISSUES THE SAME SEQUENCE. Same declarations, same seeded
+       demo day, n arrivals each: the two lists of numbers must be equal. Not
+       normalised and not bagged. The actual numbers, in order.
+
+    2. NEITHER LETS THE CALLER CHOOSE. A body naming its own token is ignored
+       by both, because a number a client picks is a number nothing else knew
+       it had given out.
+
+    3. THEY SHARE ONE COUNTER IN ONE FILE. This is the property that matters
+       in a clinic and the one a per-engine check cannot see. A deployment
+       mid-migration has both engines over one database, so numbers are taken
+       ALTERNATELY here, python, go, python, go, against the same file, and the
+       whole run must still be consecutive with no duplicate and no hole. Two
+       engines each keeping their own sequence is how one waiting room gets two
+       number ones, and it would pass properties 1 and 2 comfortably.
+
+    PROVED TO FAIL, which is the only thing that makes any of it evidence.
+    Each mutation was applied, the old text asserted gone and the file
+    asserted changed before anything ran, and the file restored and compared
+    byte for byte afterwards.
+
+      - cmd/api/guard.go: restore the openThread this replaced, reading
+        `token` out of the request body and handing it to the store.
+        -> property 2 fails: "go honoured the token in the request body:
+           ['999', '999', '999', '999']".
+      - store/store.go IssueToken: key the counter on scope + "-go", so the
+        Go engine keeps its own row.
+        -> property 3 fails: "2 counter rows in one file: [(..., 'today', ...,
+           11), (..., 'today-go', ..., 12)]", which is the two-sequences
+           failure happening rather than being described.
+    """
+    import sqlite3
+
+    staff = {"X-PHC-Role": "frontdesk", "X-PHC-Actor": "user:frontdesk"}
+    arrivals = 4
+    numbers = {}
+
+    # ---------------------------------------------------------------- 1 and 2
+    for name in (backend.PYTHON, backend.GO):
+        os.environ[backend.ENV] = name
+        db = os.path.join(tmp, "tokens-%s.sqlite3" % name)
+        server = backend.launch(db, bundle="phc", facility="all-plugins")
+        try:
+            got = []
+            for _ in range(arrivals):
+                # A body naming its own number, every time. Both engines must
+                # ignore it. The value is deliberately one no sequence this
+                # short could reach, so honouring it would be unmistakable.
+                status, panel = call(server.base, PREFIX + "/threads",
+                                     method="POST", headers=staff,
+                                     body={"token": "999"})
+                assert status == 200, (name, status, str(panel)[:300])
+                got.append(panel["subject"]["token"])
+            numbers[name] = got
+            assert "999" not in got, (
+                "%s honoured the token in the request body: %s. A number a "
+                "client picks is a number nothing else knew it had given out."
+                % (name, got))
+        finally:
+            server.close()
+            os.environ.pop(backend.ENV, None)
+
+    assert numbers[backend.PYTHON] == numbers[backend.GO], (
+        "the two engines issued different numbers for the same arrivals on the "
+        "same declarations: python %s, go %s"
+        % (numbers[backend.PYTHON], numbers[backend.GO]))
+    ok("the day sequence: %d arrivals at each engine on one seeded demo day got "
+       "%s from both, and a token named in the request body is ignored by both"
+       % (arrivals, ", ".join(numbers[backend.PYTHON])))
+
+    # -------------------------------------------------------------------- 3
+    # One file, both engines, alternating. Each server is started and stopped
+    # around its own arrival so the two never hold the file at once: what is
+    # proved here is that the SEQUENCE is shared, not that SQLite tolerates two
+    # writers, which both adapters are deliberately configured against
+    # (care_phc_mcp/store/store.go caps the pool at one connection and says
+    # why).
+    shared = os.path.join(tmp, "tokens-shared.sqlite3")
+    order, issued = [], []
+    for i in range(6):
+        name = backend.PYTHON if i % 2 == 0 else backend.GO
+        os.environ[backend.ENV] = name
+        server = backend.launch(shared, bundle="phc", facility="all-plugins")
+        try:
+            status, panel = call(server.base, PREFIX + "/threads",
+                                 method="POST", headers=staff, body={})
+            assert status == 200, (name, status, str(panel)[:300])
+            issued.append(int(panel["subject"]["token"]))
+            order.append(name)
+        finally:
+            server.close()
+            os.environ.pop(backend.ENV, None)
+
+    assert len(set(issued)) == len(issued), (
+        "two engines against ONE file issued the same number twice: %s in the "
+        "order %s. This is two sequences in one waiting room." % (issued, order))
+    assert issued == sorted(issued), (
+        "the shared sequence went backwards: %s in the order %s" % (issued, order))
+    assert issued[-1] - issued[0] == len(issued) - 1, (
+        "the shared sequence has a hole: %s in the order %s. A hole is a number "
+        "called out to a room where nobody has it." % (issued, order))
+
+    # And ONE counter row, not one per engine. Read straight out of the file,
+    # because the whole claim is about what is on disk.
+    conn = sqlite3.connect(shared)
+    try:
+        rows = conn.execute(
+            "SELECT workflow, scope, day, last FROM day_sequence").fetchall()
+    finally:
+        conn.close()
+    assert len(rows) == 1, (
+        "%d counter rows in one file: %s. Two engines keeping their own row is "
+        "two sequences that will disagree by tomorrow." % (len(rows), rows))
+    assert int(rows[0][3]) == issued[-1], (
+        "the counter says %s and the last number issued was %s"
+        % (rows[0][3], issued[-1]))
+    ok("and both engines draw from ONE counter in one file: %d arrivals taken "
+       "alternately python, go came back %s, held in a single row of "
+       "day_sequence rather than one row each" % (len(issued), issued))
+
+
 def misspelt_facility(tmp):
     """A shape neither bundle declares, asked for by the environment.
 
@@ -4015,6 +4262,11 @@ def main():
         lint_parity(tmp)
         go_resolver_names_no_declared_word()
         misspelt_facility(tmp)
+        # The day sequence, which no other check in this file can defend:
+        # `token` is in VOLATILE_KEYS and is normalised away before two
+        # answers are diffed, so the one value the race was about is the one
+        # value every comparison drops. See the function.
+        token_parity(tmp)
         # Before the shapes, because it is the one pair of kernels that does
         # not start from a file seeded today, and a difference here is cheaper
         # to read than one found after three pairs have been started.

@@ -57,6 +57,7 @@ os.environ["PHC_DB"] = str(_DB)
 os.environ["PHC_DIRECTORY"] = "absent"
 
 from kernel import declarations, tokens                       # noqa: E402
+from kernel.contracts import Store                            # noqa: E402
 
 checks = 0
 
@@ -236,22 +237,41 @@ ok("a scan that does not say which counter it happened at is refused, because "
 # ---------------------------------------------------------------------------
 
 # The kernel's one known off-protocol Store call is held at exactly one by
-# scripts/check_queues.py. Issuing a number must not become the second, so it
-# is asserted here that the module reads a protocol method and nothing else.
+# scripts/check_queues.py. Issuing a number must not become the second.
+#
+# IT READS TWO PROTOCOL METHODS NOW AND BOTH ARE DECLARED. Until 2026-11-01
+# this section said the sequence "needed no eleventh method on the adapter
+# interface", and that was the sentence the race lived behind: computing the
+# number from reads alone is exactly what made issuing it two steps. The
+# eleventh method exists, it is `issue_token`, and the property worth holding
+# here was never "the protocol stays at ten" but "this module reaches nothing
+# PAST the protocol". That is what is asserted.
 source = (ROOT / "kernel" / "tokens.py").read_text()
 body_only = "\n".join(l for l in source.splitlines()
                       if not l.lstrip().startswith(("#", '"', "'")))
 assert "store.threads(" in body_only, "the sequence reads Store.threads"
+assert "store.issue_token(" in body_only, \
+    "the sequence reserves its number through the protocol rather than " \
+    "computing it from reads, which is the two-step race"
+declared = {n for n in vars(Store) if not n.startswith("_")}
+assert "issue_token" in declared, \
+    "issue_token must be ON the Store protocol, or the sequence has gained a " \
+    "second off-protocol call instead of losing the race"
 for off_protocol in ("open_thread", "record_directory_id", "_put", "db.", "execute("):
     assert off_protocol not in body_only, \
         "the sequence reaches past the Store protocol: %s" % off_protocol
-ok("and it is computed from Store.threads alone, so a facility's day sequence "
-   "needed no eleventh method on the adapter interface")
+ok("the day sequence reads Store.threads for the rule and Store.issue_token "
+   "for the number, both declared on the protocol, and reaches past it nowhere")
 
 # A day with nothing in it starts at the first number rather than at nothing.
+# The fake issues from the floor, which is what an atomic adapter does on the
+# first call of a day; what it may NOT do is invent a number of its own.
 class _Empty:
     def threads(self, *, workflow, scope):
         return []
+
+    def issue_token(self, *, workflow, scope, floor):
+        return floor
 
 assert tokens.issue(_Empty(), workflow=BUNDLE.workflow().id) == str(tokens.FIRST)
 ok("a facility opening its first morning issues %d rather than failing or "

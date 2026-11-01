@@ -4,13 +4,19 @@ package queues_test
 //
 // WHY A TEST AND NOT A COMMAND OR A ROUTE
 // ---------------------------------------
-// kernel/queues.py is on no HTTP route in either engine and the outbox is
-// SWITCHED OFF: api/scribe.py does not call it, nothing in cmd/api calls this
-// package, and flipping that over waits on a retention window nobody has
-// signed. So there is nothing for the socket checks to compare, and no route
-// may be invented so that a check can reach behind the service. That is the
-// same position kernel/fhir.py is in, and fhir/parity_test.go is the
-// precedent this file follows.
+// The outbox is SWITCHED ON since 2026-11-01 and is still on no HTTP ROUTE in
+// either engine, which are different things. api/outbox.py holds a recording
+// the line could not take and sweeps on a timer, and cmd/api/outbox.go sweeps
+// the same spool; neither exposes a route, because an outbox is not something
+// a caller asks for. So there is still nothing for the socket checks to
+// compare, and no route may be invented so that a check can reach behind the
+// service. That is the same position kernel/fhir.py is in, and
+// fhir/parity_test.go is the precedent this file follows.
+//
+// What the socket checks still cannot see is the SWEEPER running, because it
+// runs on a five minute timer rather than in answer to a request.
+// scripts/check_audio_ceiling.py drives a pass with its own clock instead, and
+// asserts against the source that both engines start one.
 //
 // So this is a test THAT ASSERTS NOTHING. It reads a file of inputs the
 // Python check wrote, runs them through this package, writes what came back,
@@ -104,6 +110,11 @@ type parityCases struct {
 		// window for anything to be stuck.
 		RecoverAt string `json:"recover_at"`
 	} `json:"sweeps"`
+
+	// The owner's 24 hour ceiling on held audio, which is a CLAMP and not a
+	// default, and which states a held recording is swept out of.
+	Ceiling   []int    `json:"ceiling"`
+	Retention []string `json:"retention"`
 }
 
 // sweepAnswer is one scenario's outcome: the sweep's own lists, and then the
@@ -194,6 +205,14 @@ func (s *scripted) Delivered(item queues.Item) (queues.Delivery, error) {
 	}
 }
 
+// The two clocks the retention cases use. parityPastCeiling is two days on,
+// past the owner's 24 hour ceiling; scripts/check_go_parity.py uses the same
+// two instants and the pair must agree about what expired.
+const (
+	parityNow         = "2026-11-01T10:00:00+00:00"
+	parityPastCeiling = "2026-11-03T10:00:00+00:00"
+)
+
 func TestTheOutboxAnswersForTheParityCheck(t *testing.T) {
 	in := os.Getenv("PHC_QUEUE_CASES")
 	out := os.Getenv("PHC_QUEUE_ANSWERS")
@@ -226,6 +245,66 @@ func TestTheOutboxAnswersForTheParityCheck(t *testing.T) {
 		backoff = append(backoff, queues.Backoff(n))
 	}
 	answers["backoff"] = backoff
+
+	// The ceiling clamp, input for input.
+	ceiling := []int{}
+	for _, n := range cases.Ceiling {
+		ceiling = append(ceiling, queues.HeldCeiling(n))
+	}
+	answers["ceiling"] = ceiling
+	answers["swept_states"] = queues.SweptStates
+
+	// One audio item in each state, swept past the ceiling: was its recording
+	// deleted, and what state did the row end in. The delete RECORDS rather
+	// than unlinking, so the two engines are compared on the decision and not
+	// on two filesystems.
+	retention := []map[string]any{}
+	for _, state := range cases.Retention {
+		box, err := spool.Open(":memory:")
+		if err != nil {
+			t.Fatal(err)
+		}
+		item, err := queues.Enqueue(box, queues.Enqueued{
+			Kind: "audio", Key: "k-" + state, Thread: "enc-1",
+			Operation:  "phc.op.consult-document",
+			Capability: "encounter.document", Facility: "all-plugins",
+			At: parityNow, Blob: "/held/" + state,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if state != "ready" {
+			receipt := ""
+			if state == "sent" {
+				receipt = "r-1"
+			}
+			if err := box.Settle(item.ID, state, parityNow, receipt, ""); err != nil {
+				t.Fatal(err)
+			}
+		}
+		removed := []string{}
+		gone, err := queues.SweepAudio(box, parityPastCeiling,
+			func(path string) error {
+				removed = append(removed, path)
+				return nil
+			}, queues.AudioMaxHoldSeconds)
+		if err != nil {
+			t.Fatal(err)
+		}
+		after, _, err := box.Get(item.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		retention = append(retention, map[string]any{
+			"state":   state,
+			"swept":   len(gone) == 1 && gone[0] == item.ID,
+			"deleted": removed,
+			"final":   after.State,
+			"says":    after.LastError,
+		})
+		box.Close()
+	}
+	answers["retention"] = retention
 
 	refusal := []string{}
 	for _, one := range cases.Refusal {

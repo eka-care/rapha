@@ -38,10 +38,10 @@ from starlette.concurrency import run_in_threadpool
 
 from adapters.local.store import SqliteStore, seed
 from agent import turn
-from api import scribe
+from api import outbox, scribe
 from catalogue import validate, vocab
-from kernel import (declarations, directory, plugins, spine, proposals, state,
-                    terminology, tokens, views)
+from kernel import (declarations, directory, plugins, queues, spine, proposals,
+                    state, terminology, tokens, views)
 from kernel.contracts import DirectoryError, ThreadRef
 
 BUNDLE = declarations.load(os.environ.get("PHC_BUNDLE", "phc"))
@@ -895,6 +895,19 @@ async def scribe_start(request: Request, thread: str = None, format: str = None,
     deleted in its `finally`. It is never written under this repository, never
     logged, and the transaction id that identifies it at the service is not
     returned to the browser.
+
+    WHEN THE LINE IS DOWN THE RECORDING IS HELD RATHER THAN LOST, which is new
+    on 2026-11-01 and is the gap kernel/queues.py named: this route used to
+    answer 503 and drop the only copy of a consultation in a `finally`, so an
+    outage cost the recording and not just the transcript. The bytes now go to
+    the spool, outside the repository and owner readable only, and the outbox
+    sends them when the line is back.
+
+    THE CLINICIAN IS STILL TOLD NOTHING WAS TRANSCRIBED. Holding it is not
+    succeeding: the answer is still a refusal, with a sentence saying the
+    recording is kept, that it will be sent, and that the note has to be typed
+    now. A route that returned success because something was queued would be
+    the "reported as sent when it was not" failure wearing a friendlier face.
     """
     user = caller(request)
     thread_id = thread_of({"thread": thread})
@@ -906,14 +919,43 @@ async def scribe_start(request: Request, thread: str = None, format: str = None,
         raise HTTPException(400, "Unknown language %r." % language)
     picked, instrument = scribe_pick(user, operations.split(","))
     audio = await request.body()
+    suffix = _suffix(format or request.headers.get("content-type"))
     try:
         txn = await run_in_threadpool(
-            scribe.start, audio, suffix=_suffix(format or request.headers.get("content-type")),
+            scribe.start, audio, suffix=suffix,
             languages=scribe.LANGUAGES[language])
     except scribe.ScribeError as broke:
-        raise HTTPException(503, str(broke))
+        raise HTTPException(503, hold_or_say(
+            audio, thread_id, user, picked, suffix, str(broke)))
     session = scribe.begin(thread_id, user["id"], txn, picked, instrument=instrument)
     return scribe.public(session)
+
+
+def hold_or_say(audio, thread_id, user, picked, suffix, why):
+    """Keep the recording if we can, and say which of the two happened.
+
+    The sentence is the whole value of this function. "We kept it and will send
+    it" and "it is gone" are different things to a doctor deciding whether to
+    re-record a consultation the patient is still sitting through, and
+    answering the same words either way is what makes a queue untrustworthy.
+
+    Holding can itself fail, and then it says so rather than implying a copy
+    exists. A plugin this centre does not run, a full disk, or no outbox at
+    all: in every one of those the answer is that there is no recording.
+    """
+    first = sorted(picked)[0] if picked else ""
+    operation = (BUNDLE.operations or {}).get(first) or {}
+    try:
+        OUTBOX.hold(audio, thread=thread_id, actor=user["id"],
+                    operation=first, capability=operation.get("capability", ""),
+                    suffix=suffix)
+    except Exception as broke:                       # noqa: BLE001
+        return ("%s The recording could not be kept either (%s), so there is no "
+                "copy of it. Type the note."
+                % (why, queues.scrubbed(str(broke))))
+    return ("%s The recording is kept and will be sent when the line is back. "
+            "Nothing has been transcribed yet, so type the note now: it is the "
+            "record either way." % why)
 
 
 def _suffix(content_type):
@@ -996,6 +1038,12 @@ def scribe_webhook(body: dict = Body(default={})):
 
 
 # ---------------------------------------------------------------------- app
+
+# The outbox, and the thread that sweeps it. Started at import, with the
+# process, because a retention ceiling that waits for a first request is off at
+# a clinic nobody is using yet, and audio from yesterday is exactly what is
+# sitting there. api/outbox.py argues the schedule and the order of a pass.
+OUTBOX = outbox.start(store, BUNDLE, senders=outbox.live_senders())
 
 app = FastAPI(title="care-phc kernel", version=BUNDLE.manifest.version)
 app.add_middleware(

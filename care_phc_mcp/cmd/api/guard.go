@@ -27,6 +27,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	carephc "github.com/eka-care/care_phc_mcp"
@@ -34,6 +35,7 @@ import (
 	"github.com/eka-care/care_phc_mcp/kstate"
 	"github.com/eka-care/care_phc_mcp/pyval"
 	"github.com/eka-care/care_phc_mcp/store"
+	"github.com/eka-care/care_phc_mcp/tokens"
 )
 
 // body reads the request's JSON object, which FastAPI's `Body(default={})`
@@ -218,18 +220,33 @@ func (k *kernel) badBody(w http.ResponseWriter) {
 // This writes an encounter row and no clinical fact whatsoever: an empty
 // thread asserts nothing about a person. Every fact still goes through the
 // guard, which is why opening one is not an operation in the catalogue.
+//
+// THE NUMBER IS ISSUED HERE AND IS NOT THE CALLER'S TO CHOOSE. A token in the
+// body is ignored, exactly as api/main.py's own route ignores one, and that is
+// the point: a number a client picks is a number nothing else knew it had
+// given out, and two clients each picking their own is how one waiting room
+// ends up with two people called seven.
+//
+// Until 2026-11-01 this route read body["token"] and handed it straight to the
+// store, which then made one up out of the row id if it was empty. So this
+// engine's numbers came from whichever client asked. The sequence rule is
+// package tokens and the reservation is Store.IssueToken; the body is not
+// consulted about it.
 func (k *kernel) openThread(w http.ResponseWriter, r *http.Request) {
 	person, ok := k.who(w, r)
 	if !ok {
 		return
 	}
-	in, parsed := body(r)
-	if !parsed {
+	if _, parsed := body(r); !parsed {
 		k.badBody(w)
 		return
 	}
-	token, _ := in["token"].(string)
-	thread, err := k.store.OpenThread(token, person.ID)
+	number, err := k.issueToken()
+	if err != nil {
+		detail(w, http.StatusInternalServerError, "%v", err)
+		return
+	}
+	thread, err := k.store.OpenThread(number, person.ID)
 	if err != nil {
 		detail(w, http.StatusInternalServerError, "%v", err)
 		return
@@ -237,6 +254,39 @@ func (k *kernel) openThread(w http.ResponseWriter, r *http.Request) {
 	if view, ok := k.panel(w, thread, person); ok {
 		writeJSON(w, http.StatusOK, view)
 	}
+}
+
+// issueToken is kernel/tokens.issue: the next number for this facility's day,
+// as the string a row stores.
+//
+// A string because that is what the token column holds and what a screen
+// draws; the sequence is arithmetic, the token is a label.
+//
+// Two steps, and only the second one decides. tokens.After reads the rows and
+// says the lowest number that would be honest; Store.IssueToken reserves one
+// not below it and is the only thing that can say which. A caller racing this
+// one may well compute the same floor, and that is not a defect: the store's
+// UNIQUE key means exactly one of them inserts it and the rest are incremented
+// past it.
+func (k *kernel) issueToken() (string, error) {
+	refs, err := k.store.Threads(k.workflow, "today")
+	if err != nil {
+		return "", err
+	}
+	seen := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		// The token lives in the subject map, which is where Threads puts it,
+		// and a thread with no number contributes an empty string. After()
+		// skips it rather than counting it, so a visit with no token spent no
+		// number: kernel/tokens.py's own rule.
+		text, _ := ref.Subject["token"].(string)
+		seen = append(seen, text)
+	}
+	number, err := k.store.IssueToken(k.workflow, "today", tokens.After(seen))
+	if err != nil {
+		return "", err
+	}
+	return strconv.Itoa(number), nil
 }
 
 func (k *kernel) getThread(w http.ResponseWriter, r *http.Request) {

@@ -149,6 +149,27 @@ TABLES = {
               "outcome", "at", "proposal"),
 }
 
+# The facility's day sequence counter, and the one table in this file whose
+# key is not a single `id` column. It is created by hand below rather than
+# through the TABLES loop for exactly that reason: the whole point of it is a
+# UNIQUE key on (workflow, scope, day), because that uniqueness is what makes
+# issuing a number atomic. A table whose primary key is a generated row id
+# would let two writers both insert and both think they were first.
+#
+# It is not a resource and is not in vocab.CARE_RESOURCES or
+# vocab.KERNEL_RESOURCES, so no declaration can read it and no metric can
+# count it. That is deliberate: it holds no fact about anybody, only the
+# high water mark of a counter, and a query grammar that could reach it would
+# be a declaration reading this adapter's bookkeeping.
+SEQUENCE_TABLE = "day_sequence"
+SEQUENCE_DDL = (
+    "CREATE TABLE IF NOT EXISTS %s ("
+    " workflow TEXT NOT NULL,"
+    " scope TEXT NOT NULL,"
+    " day TEXT NOT NULL,"
+    " last INTEGER NOT NULL,"
+    " PRIMARY KEY (workflow, scope, day))" % SEQUENCE_TABLE)
+
 # The adapter's private knowledge: which column ties a row to its thread.
 # "encounter" is the thread itself; a patient is reached through it.
 THREAD_COLUMN = {"encounter": "id", "thread_flag": "thread", "patient": None}
@@ -212,6 +233,7 @@ class SqliteStore:
                 if column not in have:
                     self.db.execute(
                         "ALTER TABLE %s ADD COLUMN %s TEXT" % (table, column))
+        self.db.execute(SEQUENCE_DDL)
         self.roll_seed_forward()
 
     def roll_seed_forward(self):
@@ -502,6 +524,50 @@ class SqliteStore:
                                 "created_by": actor},
                   thread=thread)
         return thread
+
+    def issue_token(self, *, workflow, scope="today", floor=1):
+        """Hand out one number, and never hand the same one out twice.
+
+        ONE SQL STATEMENT, and that is the whole of the fix. The upsert below
+        is indivisible: SQLite takes a write lock for the duration of a single
+        statement, so of two connections arriving in the same instant exactly
+        one inserts the row and the other is made to take the UPDATE branch
+        and increment what the first one wrote. Neither can read a counter,
+        be overtaken, and write back a number the other already has, because
+        neither reads it at all. There is no SELECT here on purpose.
+
+        `floor` is the kernel's arithmetic (kernel/tokens.py: one past the
+        highest number already issued, skipping tokens that are not on the
+        sequence) and this method does not second-guess it. `MAX(last + 1,
+        excluded.last)` is why it is passed at all: the counter alone would be
+        wrong the first time a day is issued against rows that already carry
+        numbers, which is every day a seed has been rolled forward into. So
+        the counter supplies the atomicity and the floor supplies the
+        starting point, and a number below the floor can never come back.
+
+        Keyed on (workflow, scope, day) rather than on the workflow alone,
+        because a facility's sequence restarts with its day and `scope` is
+        the kernel's own word for which arrivals count. A counter row for a
+        past day is left where it is: it is four values and no fact about
+        anybody, and deleting rows on open is not a thing a constructor may do.
+
+        WHY NOT A TRANSACTION. This connection is autocommit and the class
+        docstring says "no multi row invariants", which was true and is the
+        reason the race existed. Wrapping a read and a write in BEGIN
+        IMMEDIATE would also work and would be worse: it would make every
+        caller hold a write lock across two statements, and it would put the
+        invariant in the caller rather than in the schema. The UNIQUE key is
+        what enforces this, so an adapter cannot implement the method wrongly
+        and still pass.
+        """
+        day = _start_of("day")[:10]
+        row = self.db.execute(
+            "INSERT INTO %s (workflow, scope, day, last) VALUES (?, ?, ?, ?)"
+            " ON CONFLICT(workflow, scope, day)"
+            " DO UPDATE SET last = MAX(last + 1, excluded.last)"
+            " RETURNING last" % SEQUENCE_TABLE,
+            [workflow, scope, day, int(floor)]).fetchone()
+        return int(row["last"])
 
     def raise_flag(self, thread, flag, *, actor=None):
         """Idempotent: raising a flag twice is one row, not two.

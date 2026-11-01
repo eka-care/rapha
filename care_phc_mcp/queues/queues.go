@@ -48,15 +48,18 @@
 // THAT DECISION IS READ FROM kernel/queues.py's OWN PROSE AND CARRIED. It is
 // not re-derived here and this package is not the place it is argued.
 //
-// Still switched off by default, and that is not this package's call
-// -----------------------------------------------------------------
-// kernel/queues.py is complete and proved and api/scribe.py does not call it,
-// because wiring it in contradicts three sentences that file states as rules
-// and because surviving an outage MEANS holding the recording. The retention
-// window that would make it safe is unsigned. The Go side is wired in exactly
-// as far: nothing in cmd/api calls Pump, no route reaches this package, and
-// flipping that over is a person's decision in the order the Python names,
-// which is sign the retention window and then wire the route.
+// Switched ON, 2026-11-01, and the retention window is what unblocked it
+// ----------------------------------------------------------------------
+// This package was complete, proved, and wired to nothing, because surviving
+// an outage MEANS holding consultation audio on a clinic's disk and the
+// retention window that made that safe was unsigned. The order named was
+// "sign the retention window, then wire the route".
+//
+// docs/DECISIONS-2026-11-01.md decision 2 signed it: a recording may be held
+// for 24 hours, with the ceiling enforced rather than documented. So the
+// ceiling is AudioCeilingSeconds below, it is a clamp applied by the code that
+// deletes, and cmd/api runs SweepAudio on a timer. api/outbox.py is the
+// Python's half and carries the same schedule and the same order of a pass.
 //
 // Pure: everything takes a Spool, a Sender and a clock, and returns values.
 // Opens no socket, reads no environment except the spool root, imports no
@@ -647,10 +650,73 @@ func Recover(spool Spool, senders map[string]Sender, now string,
 
 // AudioMaxHoldSeconds is care_phc/connectors/scribe/base.AUDIO_MAX_HOLD_SECONDS,
 // carried here because this package has no connector to import and may not grow
-// one. SIX HOURS, AND UNSIGNED: that file's own sentence is that how long
-// unconfirmed consultation audio may be kept has no clinical or legal sign-off,
-// and copying the number does not sign it.
+// one. Six hours: the OPERATIONAL WINDOW, which a deployment may lower.
 const AudioMaxHoldSeconds = 6 * 60 * 60
+
+// AudioCeilingSeconds is kernel/queues.AUDIO_CEILING_SECONDS, and it is SIGNED.
+//
+// docs/DECISIONS-2026-11-01.md decision 2: a recording may be held for 24
+// hours, and that ceiling must be "enforced rather than documented". So it is
+// a CLAMP and not a default, applied by the code that deletes: a caller asking
+// for 48 hours gets 24. The window above is the operational number under it.
+//
+// The distinction matters because AudioMaxHoldSeconds was six hours all along
+// and nothing called SweepAudio, so audio would have been held for as long as
+// the disk lasted. A number that the deleting code does not apply is a
+// documented rule.
+const AudioCeilingSeconds = 24 * 60 * 60
+
+// HeldCeiling is the longest a recording may be held, whatever was asked for.
+//
+// Three inputs that are not the same thing, and conflating any two of them is a
+// way to lose recordings or to keep them:
+//
+//   - a NEGATIVE number is nonsense and is treated as unconfigured, so the
+//     operational window is used. Not as zero: reading a typo in a config file
+//     as "delete everything on the next pass" is a worse surprise than holding
+//     for the default.
+//   - ZERO is a supported window meaning "delete as soon as the sweep sees
+//     it", which is why it is a separate case rather than folded into the
+//     default.
+//   - anything above the ceiling comes back as the ceiling.
+//
+// The negative case is pinned by scripts/check_go_parity.py, which compares
+// this against kernel/queues.held_ceiling input by input. Its first run found
+// the two engines disagreeing about exactly that input: Python answered 0 and
+// this answered the operational window. Both were defensible, one had to be
+// true, and this is the one that was kept.
+func HeldCeiling(seconds int) int {
+	if seconds < 0 {
+		seconds = AudioMaxHoldSeconds
+	}
+	if seconds > AudioCeilingSeconds {
+		return AudioCeilingSeconds
+	}
+	return seconds
+}
+
+// SweptStates is which states a held recording is swept OUT OF, which is every
+// state it can wear except one.
+//
+// IT WAS ready, held, failed UNTIL 2026-11-01 AND THAT LEFT A HOLE THE CEILING
+// COULD NOT COVER. `refused` was missing, and `refused` is not an exotic case:
+// it is what Pump writes when the guard denies an item at the moment of
+// sending, which is what happens to a recording for an operation whose
+// preconditions no longer hold on that visit. Such an item stopped with its
+// bytes still on the disk and no state that any sweep walked, so the recording
+// sat there for as long as the disk did. Found by driving the Python's
+// production path, not by reading either implementation.
+//
+// `sent` is swept for a smaller reason: its bytes go when the receipt is
+// written, and Pump deliberately ignores a failure on that delete rather than
+// throwing away the record of a send that really happened, so a `sent` row can
+// keep a file. Its STATE is not rewritten in that case; see SweepAudio.
+//
+// `sending` is left out on purpose: a send may be in flight against those
+// bytes. Nothing is stranded, because InFlightSeconds is fifteen minutes
+// against a ceiling of twenty-four hours, so Recover has moved any such item
+// out of `sending` long before its window is up.
+var SweptStates = []string{"ready", "held", "failed", "refused", "sent"}
 
 // SweepAudio deletes recordings held longer than the retention backstop allows.
 //
@@ -661,15 +727,17 @@ const AudioMaxHoldSeconds = 6 * 60 * 60
 func SweepAudio(spool Spool, now string, delete func(string) error,
 	maxHold int) ([]string, error) {
 
-	if maxHold <= 0 {
+	// The clamp, and it is not optional. A caller passing 48 hours gets 24.
+	if maxHold == 0 {
 		maxHold = AudioMaxHoldSeconds
 	}
+	maxHold = HeldCeiling(maxHold)
 	// EVERY CANDIDATE IS LISTED BEFORE ANY OF THEM IS SETTLED. Settling moves
 	// an item into `failed`, which is one of the states being walked, so
 	// listing and settling in the same loop found the same recording twice and
 	// reported it deleted twice. The Python's check caught exactly that.
 	var waiting []Item
-	for _, state := range []string{"ready", "held", "failed"} {
+	for _, state := range SweptStates {
 		rows, err := spool.Items(state, "audio", 500)
 		if err != nil {
 			return nil, err
@@ -687,7 +755,15 @@ func SweepAudio(spool Spool, now string, delete func(string) error,
 				continue
 			}
 		}
-		if item.State != "failed" {
+		// A `sent` row stays `sent` and is not rewritten to say nobody got a
+		// transcript: somebody did. See SweptStates.
+		//
+		// EVERY OTHER STATE IS SETTLED, INCLUDING ONE ALREADY `failed`, which
+		// replaces whatever sentence that row carried. Deliberate, and
+		// kernel/queues.py argues it: "this was tried six times and the line
+		// was down" and "the recording is gone" are different facts, and the
+		// second is the one a person reading the row needs.
+		if item.State != "sent" {
 			if err := spool.Settle(item.ID, "failed", now, "",
 				"the recording was held longer than the retention backstop "+
 					"allows and was deleted without being transcribed"); err != nil {

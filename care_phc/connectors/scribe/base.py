@@ -49,6 +49,20 @@ AUDIO_GRACE_SECONDS = 15 * 60
 # crashed browser, a draft the doctor ignored. Unconfirmed audio is deleted
 # after this whether or not anything was derived from it, because keeping it
 # longer has no clinical use and every day of it is a liability.
+#
+# SIGNED AS A CEILING, 2026-11-01, AND THIS SIX HOURS IS NOT THE CEILING.
+# docs/DECISIONS-2026-11-01.md decision 2 says a recording may be held for 24
+# hours and that the ceiling must be enforced rather than documented. The
+# ceiling is `kernel.queues.AUDIO_CEILING_SECONDS` and it is applied by the
+# code that deletes; this number is the operational window under it, and a
+# deployment may lower it but cannot raise it past the ceiling. The clamp is
+# `kernel.queues.held_ceiling`, which both this class and the queue's own
+# sweep run everything through.
+#
+# Six hours rather than twenty-four on purpose: the signature is a maximum, not
+# an instruction to keep audio as long as it allows, and unconfirmed audio has
+# no clinical use after a session. Whoever raises it should say what they
+# measured.
 AUDIO_MAX_HOLD_SECONDS = 6 * 60 * 60
 
 # Polling bounds for transcribe(). Two live runs of the same 92 second
@@ -166,7 +180,13 @@ class AudioRetention:
                  max_hold_seconds=AUDIO_MAX_HOLD_SECONDS, directory=None,
                  remove=os.remove, clock=time.time, scan=_scan):
         self.grace_seconds = grace_seconds
-        self.max_hold_seconds = max_hold_seconds
+        # CLAMPED, not trusted. A deployment that configures 48 hours gets 24:
+        # the ceiling is the owner's and a facility's configuration may not
+        # reach around it. Imported from the kernel rather than restated,
+        # because one rule with two spellings is two rules.
+        from kernel.queues import held_ceiling
+
+        self.max_hold_seconds = held_ceiling(max_hold_seconds)
         self.directory = directory
         self._remove = remove
         self._clock = clock
