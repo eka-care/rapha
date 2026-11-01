@@ -238,9 +238,16 @@
    nothing here can reach into it. */
 .way-in-frame {
   width: 100%; border: 0; display: block;
-  height: min(560px, 74dvh);
+  /* Tall enough for Eka's whole page where the screen allows it. It was a
+     fixed 520, which clipped their page top and bottom and left the frame
+     scrolling inside itself. */
+  height: min(820px, 82dvh);
+  /* Eka's page, turned over so a white sheet is not glued into a black
+     screen. The frame is a different origin and cannot be styled, so this
+     is the one lever there is. See `--eka-page` in tokens.css. */
+  filter: var(--eka-page);
 }
-@media (max-height: 720px) { .way-in-frame { height: 68dvh; } }
+@media (max-height: 760px) { .way-in-frame { height: 78dvh; } }
 .way-in-wait, .way-in-out { padding: 28px 24px; text-align: center; }
 .way-in-wait { color: var(--color-text-tertiary); font-size: 13.5px; }
 .way-in-out { display: flex; flex-direction: column; align-items: center; gap: 10px; }

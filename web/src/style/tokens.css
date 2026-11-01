@@ -169,6 +169,17 @@
      allowed to name a colour and an animation is not an exception. */
   --ring-rec-a: 0 0 0 0 rgba(194,42,31,.35);
   --ring-rec-b: 0 0 0 13px rgba(194,42,31,0);
+
+  /* ---- somebody else's page ----
+     Eka's sign in page is framed on the way in screen. It is a different
+     origin, so nothing here can style it: this is a filter applied to the
+     FRAME from outside, which is the only lever there is. Eka's own
+     stylesheet carries a `doctor-dark` theme and their login never turns it
+     on, so until it does, a white page in a black screen is turned over
+     here. In light it is left exactly as Eka drew it.
+     It is in this file because it changes with the theme and this file is
+     where the theme lives. */
+  --eka-page: none;
 }
 
 [data-theme="dark"] {
@@ -237,6 +248,12 @@
 
   --ring-rec-a: 0 0 0 0 rgba(255,107,94,.35);
   --ring-rec-b: 0 0 0 13px rgba(255,107,94,0);
+
+  /* Eka's page, turned over. The hue rotation puts the blues back after the
+     inversion; their logo and the Google and Apple marks come out wrong, and
+     the owner chose this knowing it on 2026-11-02, until Eka turn on the
+     dark theme they already have. */
+  --eka-page: invert(1) hue-rotate(180deg);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -306,5 +323,11 @@
 
     --ring-rec-a: 0 0 0 0 rgba(255,107,94,.35);
     --ring-rec-b: 0 0 0 13px rgba(255,107,94,0);
+
+    /* Eka's page, turned over. The hue rotation puts the blues back after the
+       inversion; their logo and the Google and Apple marks come out wrong, and
+       the owner chose this knowing it on 2026-11-02, until Eka turn on the
+       dark theme they already have. */
+    --eka-page: invert(1) hue-rotate(180deg);
   }
 }
