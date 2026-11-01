@@ -13,6 +13,7 @@
  *  rows, in the same order, as the view behind them.
  */
 import { useState } from "react";
+import { NAME } from "../brand";
 import { Icon } from "../icons";
 import type { Facility, QueueRow, ViewDecl } from "../types";
 import { fields } from "../view/View";
@@ -82,8 +83,12 @@ export function Sidebar({
       <div className="sb-top">
         <span className="brand-mark"><Icon name="mark" /></span>
         <div style={{ minWidth: 0 }}>
-          <div className="brand-n">{facility?.bundle.title ?? "Workspace"}</div>
-          <div className="brand-s">{facility?.bundle.version ?? ""} · Workspace</div>
+          {/* The product, then the centre. It was the centre and a version
+              string: the version is a developer's fact, and the name of the
+              building is not what a person wants in the largest word on the
+              rail when they are standing in it. */}
+          <div className="brand-n">{NAME}</div>
+          <div className="brand-s">{facility?.bundle.title ?? "Workspace"}</div>
         </div>
       </div>
 

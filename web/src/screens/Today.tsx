@@ -9,6 +9,7 @@
  *  composes the prose; this file lays it out.
  */
 import { brief, facilityAsks, initialsOf, line, type Loaded } from "../agent";
+import { NAME } from "../brand";
 import { Icon } from "../icons";
 import type { Recent } from "../loops";
 import { Loading } from "../parts";
@@ -113,7 +114,9 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
             It is now the button's own label. */}
         <button className="hero-ask" onClick={() => onAsk("")}>
           <Icon name="search" className="i lg" />
-          <span className="hero-ask-l">Ask about the facility, or find a patient</span>
+          {/* The same box the command bar opens, so it is called the same
+              thing. Two names for one control is two controls. */}
+          <span className="hero-ask-l">Ask {NAME}, or find a patient</span>
           <span className="kbd">⌘K</span>
         </button>
         <div className="chips">

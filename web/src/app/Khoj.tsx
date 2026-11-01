@@ -6,6 +6,7 @@
  *  browser.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { NAME } from "../brand";
 import { trapTab } from "../parts";
 import { createLabel, isAsk, rows as searchRows, type Row } from "../search";
 import type { Catalogue, ViewDecl, ViewResult } from "../types";
@@ -99,8 +100,8 @@ export function Khoj({ queues, nav, cat, workflow, onClose, onOpenThread, onGoVi
           ref={box}
           className="khoj__input"
           value={q}
-          placeholder="Search patients, lists, or ask a question"
-          aria-label="Search patients, lists, or ask a question"
+          placeholder={`Ask ${NAME}, or find a patient`}
+          aria-label={`Ask ${NAME}, or find a patient`}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Escape") { e.preventDefault(); onClose(); return; }

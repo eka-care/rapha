@@ -12,6 +12,7 @@
  *  title, where it tells a person with six tabs open which tab this is --
  *  which is the one place it was actually doing work.
  */
+import { NAME } from "../brand";
 import { Icon } from "../icons";
 
 export function Topbar({ title, theme, views, route, deskLabel, onSearch, onTheme, onMenu,
@@ -62,7 +63,7 @@ export function Topbar({ title, theme, views, route, deskLabel, onSearch, onThem
       </button>
       <button className="pill" onClick={onSearch}>
         <Icon name="search" className="i sm" />
-        Search or ask
+        Ask {NAME}
         <span className="kbd">⌘K</span>
       </button>
       <button

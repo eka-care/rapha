@@ -42,6 +42,7 @@
 import { useEffect, useState } from "react";
 import type { Client } from "../api";
 import { inert, inertReason, type Withheld } from "../grants";
+import { EXPANDS_TO, NAME } from "../brand";
 import type { Catalogue } from "../types";
 import { title } from "../words";
 
@@ -178,6 +179,9 @@ export function Roles({
         Take the tour again
       </button>
       <div className="mod-h">
+        {/* The one place the name is spelled out. Beside the mark on every
+            screen it would be a gloss nobody needs twice. */}
+        <div className="eyebrow">{NAME} · {EXPANDS_TO}</div>
         <div className="mod-t">Roles</div>
         <p className="mod-sub">
           What a person in each role may do at this centre. Saving applies at
