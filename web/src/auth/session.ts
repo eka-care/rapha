@@ -91,10 +91,17 @@ export interface Answer {
 export async function probe(): Promise<Answer> {
   if (await throughTheApp()) return { ok: true, said: "the app" };
   try {
+    // NO HEADERS. Not an oversight, and not a simplification: nectar's own
+    // refresh sends the cookie and nothing else -- apps/abdm-parent's
+    // refreshToken() and apps/abdm-records' fetchWrapper are both
+    // `{ method: "POST", credentials: "include" }`. Sending `client-id` as
+    // well is what this did, and with a real session Eka answered 400: the
+    // call got past the gate and was then refused as malformed. It also
+    // made the request non simple, so every poll was a preflight and then
+    // a call. The cookie is the whole credential.
     const res = await fetch(REFRESH_URL, {
       method: "POST",
       credentials: "include",
-      headers: { "client-id": CLIENT_ID },
     });
     return { ok: res.ok, said: res.status };
   } catch {
