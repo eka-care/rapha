@@ -130,6 +130,12 @@
      behind, so it reads the same on a card and on the canvas. */
   --color-agent-tint: rgba(91,69,201,.12);
   --color-agent-tint-hover: rgba(91,69,201,.18);
+  /* The wash across the foot of the hero. The owner likes the floor and
+     could not see it: it was the agent tint at a stop past the card's
+     own edge, which is a colour mixed almost entirely out. This is its
+     own token so it can be lifted without moving every violet surface
+     with it, and it is decoration -- nothing is ever read on it. */
+  --color-hero-floor: rgba(91,69,201,.26);
 
   /* National identity, and nothing else. */
   --color-abdm: #1A50E6;
@@ -213,6 +219,7 @@
   --color-agent-hover: #241F36;
   --color-agent-tint: rgba(160,140,255,.14);
   --color-agent-tint-hover: rgba(160,140,255,.20);
+  --color-hero-floor: rgba(160,140,255,.30);
 
   --color-abdm: #6B93FF;
   --color-abdm-soft: #141A28;
@@ -281,6 +288,7 @@
     --color-agent-hover: #241F36;
     --color-agent-tint: rgba(160,140,255,.14);
     --color-agent-tint-hover: rgba(160,140,255,.20);
+    --color-hero-floor: rgba(160,140,255,.30);
 
     --color-abdm: #6B93FF;
     --color-abdm-soft: #141A28;

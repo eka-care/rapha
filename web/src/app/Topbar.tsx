@@ -44,6 +44,12 @@ export function Topbar({ title, theme, views, route, deskLabel, onSearch, onThem
       <nav className="tb-nav" aria-label="Views">
         <button className={`tb-nv${route === "" || route === "today" ? " on" : ""}`}
                 onClick={() => onGo("#/")}>Home</button>
+        {/* The register. Not a declared view -- it is every patient this
+            centre holds rather than a slice of today -- so it is named here,
+            beside the views, in the one place the app's own destinations
+            live. */}
+        <button className={`tb-nv${route === "patients" ? " on" : ""}`}
+                onClick={() => onGo("#/patients")}>Patients</button>
         {views.map((v) => (
           <button key={v.id}
                   className={`tb-nv${route === `views/${v.id}` ? " on" : ""}`}

@@ -12,8 +12,11 @@
 .hero {
   position: relative; overflow: hidden;
   border-radius: var(--radius-xl); border: 1px solid var(--color-border-subtle);
-  background: linear-gradient(122deg,
-    var(--color-bg-surface) 0%, var(--color-bg-canvas) 58%, var(--color-agent-tint) 165%);
+  /* The floor stops INSIDE the card now. At 165% the wash was mixed almost
+     entirely out before it reached an edge anybody sees, which is why the
+     owner liked it and could not find it. */
+  background: linear-gradient(160deg,
+    var(--color-bg-surface) 0%, var(--color-bg-canvas) 46%, var(--color-hero-floor) 112%);
   padding: 30px 26px 26px; box-shadow: var(--shadow-sm);
   /* The owner's call: the hero's own text is centred. Everything in this
      card centres on its axis -- eyebrow, statement, the line under it and the

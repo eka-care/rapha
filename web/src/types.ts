@@ -319,3 +319,17 @@ export type SubjectView = {
     did: { operation: string; title: string }[];
   }[];
 };
+
+/** The register: a person, and how many times they have been. The visits
+ *  themselves come from `GET /subjects/{id}` when a row is opened, so this
+ *  list and the thread's own spine cannot disagree about somebody's
+ *  history. */
+export type RegisterRow = {
+  id: string;
+  subject: Record<string, unknown>;
+  visits: number;
+  /** When they were last here. Empty for somebody registered and not seen. */
+  last: string;
+};
+
+export type Register = { patients: RegisterRow[]; total: number };

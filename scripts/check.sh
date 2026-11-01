@@ -53,6 +53,13 @@ python3 -m kernel.tokens
 # routes each numbering their own arrivals is the failure that leaves every
 # check above green and puts two people called four in one waiting room.
 python3 scripts/check_front_desk.py
+# And no check writes the developer's own demo day. One of them did: it
+# registered a patient through the real route with no PHC_DB set, so a gate
+# run added a patient to the database a person opens the app against, which
+# looks exactly like the duplicate-patient defect this repository had just
+# fixed. Read from the syntax, because the first draft read the text and a
+# COMMENT about PHC_DB satisfied it.
+python3 scripts/check_isolation.py
 # And the number issued ONCE, proved by racing rather than by inspection: real
 # parallel processes against a real file, asserting no duplicate and no hole.
 # A sequential test passed against the broken code for as long as it shipped.

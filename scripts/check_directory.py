@@ -38,6 +38,16 @@ sys.path.insert(0, str(ROOT))
 # share.
 os.environ["PHC_DIRECTORY"] = "absent"
 
+# AND ITS OWN DATABASE FILE. This check registers a patient through the real
+# route, and without this it registered her into whatever PHC_DB defaults to
+# -- which, run from the repository, is the developer's own demo day. One
+# Sunita Devi per gate run, accumulating silently, indistinguishable from the
+# duplicate-patient defect this repository had just fixed. Every other check
+# that writes already does this; this one did not.
+import tempfile                                                   # noqa: E402
+os.environ["PHC_DB"] = str(
+    pathlib.Path(tempfile.mkdtemp(prefix="directory-")) / "phc.sqlite3")
+
 from adapters.local.store import SqliteStore                      # noqa: E402
 from care_phc.connectors.directory import eka                     # noqa: E402
 from catalogue import validate, vocab                             # noqa: E402

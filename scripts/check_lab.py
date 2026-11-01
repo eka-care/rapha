@@ -408,8 +408,16 @@ except ImportError:                      # pragma: no cover
     print("warn starlette missing: the route half of this check did not run")
 else:
     import os
+    import tempfile
 
     os.environ.setdefault("PHC_DIRECTORY", "absent")
+    # Its own database file. This half only READS a value set, so it wrote
+    # nothing -- but importing api.main opens whatever PHC_DB points at, and
+    # from the repository that is the developer's demo day: on a machine
+    # where it does not exist yet, running this check creates and seeds one.
+    # A check should leave no trace of having run.
+    os.environ.setdefault(
+        "PHC_DB", str(pathlib.Path(tempfile.mkdtemp(prefix="lab-")) / "phc.sqlite3"))
     from api.main import app
 
     client = TestClient(app)

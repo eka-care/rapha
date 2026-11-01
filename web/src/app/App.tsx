@@ -17,6 +17,7 @@ import { Encounter } from "../screens/Encounter";
 import { Desk } from "../screens/Desk";
 import { ListScreen } from "../screens/ListScreen";
 import { Patient } from "../screens/Patient";
+import { Patients } from "../screens/Patients";
 import { Roles } from "../screens/Settings";
 import { Today } from "../screens/Today";
 import type { Facility, QueueRow, ViewDecl, ViewResult, Workflow } from "../types";
@@ -30,6 +31,7 @@ type Route =
   | { kind: "view"; id: string }
   | { kind: "thread"; id: string }
   | { kind: "patient"; id: string }
+  | { kind: "patients" }
   | { kind: "desk" }
   | { kind: "settings" }
   | { kind: "notfound"; id: string };
@@ -39,6 +41,8 @@ function parse(hash: string): Route {
   if (head === "threads" && id) return { kind: "thread", id };
   if (head === "views" && id) return { kind: "view", id };
   if (head === "patients" && id) return { kind: "patient", id };
+  // The register itself, which is the top of the patients hierarchy.
+  if (head === "patients") return { kind: "patients" };
   if (head === "settings") return { kind: "settings" };
   if (head === "desk") return { kind: "desk" };
   if (!head || head === "today") return { kind: "today" };
@@ -370,6 +374,13 @@ export function App() {
                 {route.kind === "patient" && (
                   <Patient id={route.id} cat={catalogue} onOpenThread={(t) => go(`#/threads/${t}`)} />
                 )}
+                {route.kind === "patients" && (
+                  <Patients
+                    cat={catalogue}
+                    onOpenThread={(t) => go(`#/threads/${t}`)}
+                    onOpenSubject={(sid) => go(`#/patients/${sid}`)}
+                  />
+                )}
                 {route.kind === "desk" && (
                   <Desk
                     cat={catalogue}
@@ -443,6 +454,7 @@ function titleFor(route: Route, views: ViewDecl[]): string {
   if (route.kind === "settings") return "Settings";
   if (route.kind === "view") return views.find((v) => v.id === route.id)?.title ?? "List";
   if (route.kind === "thread") return "Encounter";
+  if (route.kind === "patients") return "Patients";
   if (route.kind === "patient") return "Patient";
   return "Not found";
 }

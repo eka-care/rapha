@@ -6,7 +6,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import type { Resolution } from "./desk";
-import type { Catalogue, Facility, Questionnaire, SubjectView, ThreadView, ViewResult } from "./types";
+import type { Catalogue, Facility, Questionnaire, Register, SubjectView, ThreadView, ViewResult } from "./types";
 
 export const API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
@@ -131,6 +131,9 @@ export const api = {
   /** The spine: one subject and every visit it has had. 404 when the bundle
    *  declares no spine, which is a real answer and not an error to hide. */
   subject: (id: string) => req<SubjectView>(`/subjects/${id}/`),
+  /** This centre's own register, newest first. The top of the patients
+   *  screen's hierarchy; a row's visits are fetched when it opens. */
+  register: (limit = 200) => req<Register>(`/patients/?limit=${limit}`),
   /** The rendered surface's write. `confirmed` is only ever true because a
    *  person ticked an empty box on this screen. */
   commit: (op: string, body: { thread: string; payload: unknown; confirmed: boolean }) =>

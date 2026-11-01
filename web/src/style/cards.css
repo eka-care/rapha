@@ -201,3 +201,81 @@
   letter-spacing: .06em; text-transform: uppercase;
   color: var(--color-text-tertiary); white-space: nowrap;
 }
+
+
+/* ---- the register: a person, their visits, their records ---------------- */
+.reg-page { display: flex; flex-direction: column; gap: var(--space-4); }
+.reg-h { display: flex; align-items: baseline; gap: var(--space-3); }
+.reg-t {
+  font-family: var(--font-serif); font-size: 26px; font-weight: 420;
+  line-height: 1.1; margin: 0; color: var(--color-text-primary);
+}
+.reg-n {
+  font-family: var(--font-mono); font-size: 11px; color: var(--color-text-tertiary);
+}
+.reg-list {
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-lg);
+  background: var(--color-bg-surface); overflow: hidden;
+}
+.reg-p + .reg-p { border-top: 1px solid var(--color-border-subtle); }
+.reg-p.on { background: var(--color-bg-subtle); }
+.reg-row {
+  display: flex; align-items: center; gap: var(--space-3); width: 100%;
+  text-align: left; padding: 11px 14px; background: none; border: 0;
+  font: inherit; color: inherit; cursor: pointer;
+}
+.reg-row:hover { background: var(--color-bg-hover); }
+.reg-row:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.reg-row .chev {
+  color: var(--color-text-tertiary); font-size: 12px; line-height: 1;
+  transition: transform var(--duration-slow) var(--ease-out); display: inline-block;
+}
+.reg-row[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.reg-av {
+  width: 30px; height: 30px; border-radius: var(--radius-md); flex: 0 0 auto;
+  display: grid; place-items: center; background: var(--color-ghost);
+  font-family: var(--font-mono); font-size: 10px; color: var(--color-text-secondary);
+}
+.reg-b { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.reg-nm { font-size: 14px; font-weight: 550; color: var(--color-text-primary); }
+.reg-meta {
+  font-size: 12px; color: var(--color-text-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.reg-v {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .05em;
+  color: var(--color-text-tertiary); white-space: nowrap;
+}
+
+/* The visits under a person. Indented to the avatar, so the hierarchy is
+   the shape of the page and not a word on it. */
+.reg-visits {
+  padding: 2px 14px 12px 56px; display: flex; flex-direction: column; gap: 2px;
+}
+.reg-visit {
+  display: flex; align-items: baseline; gap: var(--space-3); width: 100%;
+  text-align: left; padding: 7px 10px; background: none; border: 0;
+  border-radius: var(--radius-md); font: inherit; color: inherit; cursor: pointer;
+}
+.reg-visit:hover { background: var(--color-bg-hover); }
+.reg-visit:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.reg-d {
+  font-size: 12.5px; font-weight: 550; font-variant-numeric: tabular-nums;
+  white-space: nowrap; color: var(--color-text-primary); flex: 0 0 auto;
+}
+.reg-did {
+  font-size: 12px; color: var(--color-text-tertiary); flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.reg-at {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--color-text-tertiary); white-space: nowrap;
+}
+.reg-all {
+  display: flex; align-items: center; gap: 6px; margin-top: 4px;
+  padding: 6px 10px; background: none; border: 0; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--color-agent);
+  border-radius: var(--radius-md);
+}
+.reg-all:hover { background: var(--color-agent-tint); }
+.reg-all:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }

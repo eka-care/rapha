@@ -808,6 +808,39 @@ def test_a_role_write_refuses_a_capability_the_bundle_does_not_declare():
     assert "frontdesk" not in main.OVERRIDES
 
 
+def test_the_register_lists_every_patient_and_counts_their_visits():
+    """The top of the patients screen's hierarchy: a person, and how many
+    times they have been. The visits themselves are NOT in this answer --
+    `GET /subjects/{id}` is what opening a row asks for, so the list and the
+    thread's own spine cannot disagree about somebody's history."""
+    body = client.get("/api/patients?limit=50").json()
+    assert body["total"] >= 1, body
+    by_id = {p["id"]: p for p in body["patients"]}
+    # enc-003 and enc-000 are the same person in the seed, which is the whole
+    # reason this screen exists: two visits, one row.
+    returning = by_id["seed-0003"]
+    assert returning["visits"] == 2, returning
+    assert returning["subject"]["name"] == "Ramesh Kumar"
+    assert "id" not in returning["subject"], "the id is the row's, not a field on it"
+    # Newest first, so whoever was here today is who somebody is looking for.
+    stamps = [p["last"] for p in body["patients"] if p["last"]]
+    assert stamps == sorted(stamps, reverse=True), stamps
+
+
+def test_the_register_is_refused_without_the_capability_to_find_a_patient():
+    """Every role this bundle ships holds `patient.find`, so the refusal can
+    only be reached by asking as somebody who does not -- which is what the
+    guard is for the day a bundle declares such a role."""
+    import api.main as main
+    role = "no-find"
+    main.ROLES[role] = []
+    try:
+        assert client.get(f"/api/patients?role={role}").status_code == 403
+        assert client.get(f"/api/subjects/seed-0003?role={role}").status_code == 403
+    finally:
+        del main.ROLES[role]
+
+
 if __name__ == "__main__":
     ran = 0
     for name, fn in sorted(globals().items()):

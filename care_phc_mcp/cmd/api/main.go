@@ -567,6 +567,7 @@ var served = []struct {
 	// That is the designed degraded path and not a stub; see package
 	// directory. Publishing is the one verb that sends a person's details OFF
 	// this machine, so it waits for a connector rather than being faked.
+	{"/patients", "the register: every patient this centre holds, which the patients screen reads"},
 	{"/patients/search", ""},
 	{"/patients/pending", ""},
 	{"/patients/publish", "a publish needs a directory to publish TO, and Go has no vendor behind that seam"},

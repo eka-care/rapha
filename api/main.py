@@ -296,6 +296,57 @@ def get_subject(subject_id: str, request: Request):
     return found
 
 
+@router.get("/patients")
+def patients_route(request: Request, limit: int = 200):
+    """This centre's own register: every patient it holds, newest first.
+
+    The patients screen is a hierarchy -- a person, and the visits they have
+    had -- and this is the top of it. The visits are NOT here: a register of
+    two thousand people would carry every encounter any of them ever had to
+    draw a list, so a row says how many and when the last one was, and
+    `GET /subjects/{id}` is what opening one asks for. That is the same
+    endpoint the thread's own spine uses, so the two cannot disagree about
+    somebody's history.
+
+    Guarded on `patient.find`, like the spine and for the same reason: this
+    answers "who has this centre seen", which is more than any one visit
+    shows and is not a more public question than one patient's record.
+
+    A SCAN, and honest about it, exactly as kernel/directory.cached is: the
+    query grammar has equality and presence and no ordering, so the rows are
+    read and sorted here. Right for a health centre's own register, which is
+    thousands of rows at the outside, and wrong for a district. The fix when
+    it matters is in the grammar, in one place.
+    """
+    user = caller(request)
+    if "patient.find" not in set(user["capabilities"]):
+        raise HTTPException(403, "missing capability patient.find")
+    spine_resource = spine.declared(WORKFLOW)
+    if not spine_resource:
+        raise HTTPException(404, "this bundle declares no spine")
+
+    rows = store.select(spine_resource, thread=None, where={}, fields=(), limit=5000)
+    visits = {}
+    for enc in store.select("encounter", thread=None, where={}, fields=(), limit=5000):
+        who = enc.get("patient")
+        if not who:
+            continue
+        seen = visits.setdefault(who, {"visits": 0, "last": ""})
+        seen["visits"] += 1
+        seen["last"] = max(seen["last"], str(enc.get("created_date") or ""))
+
+    out = []
+    for row in rows:
+        counted = visits.get(row.get("id")) or {"visits": 0, "last": ""}
+        out.append({"id": row.get("id"),
+                    "subject": {k: v for k, v in dict(row).items() if k != "id"},
+                    **counted})
+    # Whoever was here most recently is who somebody is looking for.
+    out.sort(key=lambda r: (r["last"], str(r["subject"].get("created_date") or "")),
+             reverse=True)
+    return {"patients": out[:max(1, min(int(limit), 500))], "total": len(out)}
+
+
 def declared_provenance() -> dict:
     """What this facility's queue says about where an arrival came from.
 
