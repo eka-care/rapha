@@ -213,6 +213,12 @@ def facility(request: Request):
             "capabilities": sorted(vocab.CAPABILITIES),
             "views": [{"id": v.id, "kind": v.kind, "title": v.title,
                        "capability": v.capability} for v in BUNDLE.views.values()],
+            # Who covers which habitation at THIS centre, as its own
+            # declaration wrote it. Facility configuration, not a patient's
+            # record: it says which sub-centre, ANM and ASHA a village has,
+            # and a centre that declares none sends none.
+            "catchment": ((BUNDLE.facilities.get("declared") or {})
+                          .get(BUNDLE.facility) or {}).get("catchment"),
             "roles": sorted(ROLES), "user": user}
 
 

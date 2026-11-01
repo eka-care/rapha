@@ -372,6 +372,37 @@ facilities:
   all-plugins:
     title: Every plugin this bundle ships
     without: []
+    # WHO COVERS THIS PATIENT, looked up rather than stored on them. An
+    # Indian PHC covers about 30,000 people through sub-centres of about
+    # 5,000, each with an ANM, and an ASHA covers roughly 1,000 within a
+    # habitation. So a patient's village already implies their sub-centre,
+    # their ANM and their ASHA: the clerk types one thing and the other
+    # three are read off this, never retyped and never asked for.
+    #
+    # `column` is which of the subject's own columns names the habitation.
+    # The screen is told that and nothing else: it looks the value up and
+    # draws what it finds, and a centre that renames the column or declares
+    # no catchment at all changes this file and no code.
+    #
+    # THESE NAMES ARE THIS DEMO'S, not a real register. A deployment
+    # declares its own sub-centres and its own workers.
+    catchment:
+      column: village
+      areas:
+        - area: SC Yadiki
+          anm: B. Jyothi
+          villages:
+            Yadiki: G. Saroja
+            Sonpur: M. Anjali
+        - area: SC Bhagwanpur
+          anm: P. Lalitha
+          villages:
+            Bhagwanpur: T. Bhagya
+            Kottala: R. Devi
+        - area: SC Tadpatri East
+          anm: K. Suneetha
+          villages:
+            Tadpatri: ""        # nobody assigned, and the screen says so
   no-laboratory:
     title: A centre with no laboratory
     without: [orders]

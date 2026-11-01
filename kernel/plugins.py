@@ -76,7 +76,14 @@ PLUGIN_REQUIRED = ("title", "capabilities")
 # withholds nothing. It is refused by name below rather than as an unknown
 # key, because "unknown key 'False'" tells a reader nothing about what they
 # typed. That is how this was found.
-FACILITY_KEYS = ("title", "without")
+# `catchment` is who covers which habitation: the sub-centres of this
+# centre, the ANM on each, and the ASHA on each village under it. It is
+# facility configuration and not a patient's record -- a village already
+# implies all three, so the clerk types one thing and nobody retypes the
+# rest -- and it is declared rather than coded because the names are a
+# particular centre's and change without anybody touching this kernel. A
+# centre that declares none has none, and the screen draws nothing.
+FACILITY_KEYS = ("title", "without", "catchment")
 FACILITY_REQUIRED = ("title",)
 # The two bare words YAML turns into booleans and a reader does not expect to.
 YAML_BOOLEAN_KEYS = (False, True)

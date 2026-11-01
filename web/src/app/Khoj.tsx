@@ -11,7 +11,7 @@ import { createLabel, isAsk, rows as searchRows, type Row } from "../search";
 import type { Catalogue, ViewDecl, ViewResult } from "../types";
 import { displayFor } from "../declarations";
 
-export function Khoj({ queues, nav, cat, workflow, onClose, onOpenThread, onGoView, onAsk, onCreate }: {
+export function Khoj({ queues, nav, cat, workflow, onClose, onOpenThread, onGoView, onAnswer, onCreate }: {
   queues: { decl: ViewDecl; result: ViewResult }[];
   nav: ViewDecl[];
   cat: Catalogue;
@@ -19,10 +19,18 @@ export function Khoj({ queues, nav, cat, workflow, onClose, onOpenThread, onGoVi
   onClose: () => void;
   onOpenThread: (thread: string) => void;
   onGoView: (view: string) => void;
-  onAsk: (question: string) => void;
+  /** Ask, and get the answer back HERE. The box offered to ask and then
+   *  navigated away to do it, so a question emptied the screen and put its
+   *  answer at the bottom of somebody's visit. It is the same planner either
+   *  way -- the kernel's own, which is the model when a key is set and the
+   *  deterministic router when it is not -- and this is that answer, read
+   *  where it was asked for. */
+  onAnswer: (question: string) => Promise<{ said: string; thread: string } | null>;
   onCreate: () => void;
 }) {
   const [q, setQ] = useState("");
+  const [asked, setAsked] = useState<{ q: string; said: string; thread: string } | null>(null);
+  const [asking, setAsking] = useState(false);
   const [pick, setPick] = useState(0);
   const box = useRef<HTMLInputElement>(null);
 
@@ -55,11 +63,23 @@ export function Khoj({ queues, nav, cat, workflow, onClose, onOpenThread, onGoVi
   const rows = useMemo(() => searchRows(q, full, nav, displayFor), [q, full, nav]);
   useEffect(() => { setPick(0); }, [q]);
 
+  const answer = async (question: string) => {
+    setAsking(true);
+    setAsked(null);
+    try {
+      const got = await onAnswer(question);
+      if (got) setAsked({ q: question, ...got });
+    } finally {
+      setAsking(false);
+    }
+  };
+
   const choose = (r: Row) => {
+    // An ask stays in the box; everything else is a destination.
+    if (r.kind === "ask") { void answer(r.name); return; }
     onClose();
     if (r.kind === "thread") onOpenThread(r.id);
     else if (r.kind === "view") onGoView(r.id);
-    else if (r.kind === "ask") onAsk(r.name);
     else onGoView("");
   };
 
@@ -90,6 +110,20 @@ export function Khoj({ queues, nav, cat, workflow, onClose, onOpenThread, onGoVi
             if (e.key === "Enter") { e.preventDefault(); choose(rows[pick]); }
           }}
         />
+        {(asking || asked) && (
+          <div className="khoj__said" role="status" aria-live="polite">
+            {asking ? (
+              <span className="khoj__thinking">Reading the record…</span>
+            ) : (
+              <>
+                <p className="khoj__ans">{asked!.said}</p>
+                <button className="khoj__go" onClick={() => { onClose(); onOpenThread(asked!.thread); }}>
+                  Open the visit it read
+                </button>
+              </>
+            )}
+          </div>
+        )}
         <div className="khoj__list" role="listbox">
           {groups.map((g) => (
             <div key={g.name}>
@@ -125,7 +159,7 @@ export function Khoj({ queues, nav, cat, workflow, onClose, onOpenThread, onGoVi
                 </>
               )}
               {q.trim() && isAsk(q) && (
-                <button className="btn" onClick={() => { onClose(); onAsk(q.trim()); }}>
+                <button className="btn" onClick={() => void answer(q.trim())}>
                   Ask the agent
                 </button>
               )}

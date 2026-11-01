@@ -15,10 +15,11 @@
   background: linear-gradient(122deg,
     var(--color-bg-surface) 0%, var(--color-bg-canvas) 58%, var(--color-agent-tint) 165%);
   padding: 30px 26px 26px; box-shadow: var(--shadow-sm);
-  /* Left, not centre. The artifact's hero reads like the top of a page: an
-     eyebrow, a statement, a line of prose, then the one control. Centred, the
-     eyebrow and the lede both looked like captions on the heading. */
-  display: flex; flex-direction: column; align-items: flex-start; text-align: left;
+  /* The owner's call: the hero's own text is centred. Everything in this
+     card centres on its axis -- eyebrow, statement, the line under it and the
+     ask -- so the card reads as one block rather than a left edge with a
+     clock floating off it. */
+  display: flex; flex-direction: column; align-items: center; text-align: center;
 }
 .hero-mark {
   position: absolute; top: -62px; right: -52px; width: 290px; height: 290px;
@@ -187,7 +188,7 @@
    the one place a person arriving at a shift will read it. */
 .hero-lede {
   font-size: 13.5px; line-height: 1.6; color: var(--color-text-secondary);
-  max-width: 52ch; margin: 9px 0 0;
+  max-width: 52ch; margin: 9px auto 0; text-wrap: balance;
 }
 .hero-eye { margin-bottom: 7px; }
 .fl-more {

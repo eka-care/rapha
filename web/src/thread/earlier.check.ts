@@ -5,7 +5,10 @@
  *  the whole reason the deciding is in past.ts and not in the component.
  */
 import assert from "node:assert/strict";
-import { carriedForward, heights, series, STRIP, team, trendable, type Visit } from "./earlier.ts";
+import {
+  carriedForward, covers, heights, series, STRIP, team, trendable,
+  type Catchment, type Visit,
+} from "./earlier.ts";
 
 let checks = 0;
 const ok = (cond: unknown, what: string) => { checks++; assert.ok(cond, `FAIL ${what}`); };
@@ -89,5 +92,29 @@ checks++;
 ok(who[0].did === "vitals-record", "a person is named by the first thing they did, not the last");
 ok(!team([rows[3]], () => "", () => "").length, "a refusal puts nobody on the team");
 ok(!team([rows[4]], () => "", () => "").length, "and neither does an actor nobody recorded");
+
+
+// -- who covers this patient ----------------------------------------------
+
+const CATCH: Catchment = {
+  column: "village",
+  areas: [
+    { area: "SC Yadiki", anm: "B. Jyothi", villages: { Yadiki: "G. Saroja", Sonpur: "M. Anjali" } },
+    { area: "SC Tadpatri East", anm: "K. Suneetha", villages: { Tadpatri: "" } },
+  ],
+};
+
+const mine = covers(CATCH, { village: "Sonpur" });
+ok(mine?.anm === "B. Jyothi" && mine?.asha === "M. Anjali",
+   "a village says which sub-centre, which ANM and which ASHA");
+ok(covers(CATCH, { village: "Nowhere" }) === null,
+   "a village nobody declared is not guessed at");
+ok(covers(null, { village: "Sonpur" }) === null,
+   "a centre that declares no catchment has none, rather than an empty frame");
+ok(covers(CATCH, {}) === null, "a patient with no village is not placed");
+const gap = covers(CATCH, { village: "Tadpatri" });
+ok(gap !== null && gap.asha === "",
+   "a habitation with nobody assigned is an ANSWER, not a dropped row: it is "
+   + "the one worth seeing");
 
 console.log(`ok   past visits: ${checks} checks`);

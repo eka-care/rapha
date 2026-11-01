@@ -19,7 +19,7 @@ import { ListScreen } from "../screens/ListScreen";
 import { Patient } from "../screens/Patient";
 import { Roles } from "../screens/Settings";
 import { Today } from "../screens/Today";
-import type { QueueRow, ViewDecl, ViewResult, Workflow } from "../types";
+import type { Facility, QueueRow, ViewDecl, ViewResult, Workflow } from "../types";
 import { IconSheet } from "../icons";
 import { Khoj } from "./Khoj";
 import { Sidebar } from "./Sidebar";
@@ -341,6 +341,7 @@ export function App() {
                 onChanged={reload}
                 onOpenSubject={(sid) => go(`#/patients/${sid}`)}
                 onRemember={remember}
+                catchment={facility.data?.catchment}
               />
             ) : (
               <div>
@@ -416,9 +417,15 @@ export function App() {
           onClose={() => setKhojOpen(false)}
           onOpenThread={(t) => go(`#/threads/${t}`)}
           onGoView={(v) => go(v ? `#/views/${v}` : "#/")}
-          onAsk={(q) => {
-            const first = shownRecents[0]?.id ?? liveThreads[0];
-            if (first) { go(`#/threads/${first}`); onSay(first, q); }
+          onAnswer={async (question) => {
+            // The visit a question is about, as far as this box can tell:
+            // the one somebody had open, else the first on today's line. The
+            // answer names it, so a wrong guess is visible rather than
+            // silent.
+            const thread = shownRecents[0]?.id ?? liveThreads[0];
+            if (!thread) return null;
+            const got = await ask({ utterance: question, thread, role: currentRole() });
+            return { said: got.said, thread };
           }}
           /* A search miss goes to the desk, not straight to an empty visit.
              The palette searches today's line; the desk searches the whole
@@ -454,9 +461,10 @@ function ViewScreen({ id, decl, workflow, nonce }: {
   );
 }
 
-function ThreadScreen({ id, cat, ctx, said, asking, nonce, onSay, onChanged, onRemember, onOpenSubject }: {
+function ThreadScreen({ id, cat, ctx, said, asking, nonce, catchment, onSay, onChanged, onRemember, onOpenSubject }: {
   id: string; cat: ReturnType<typeof Object>; ctx: Ctx; said: Said[];
   asking: boolean; nonce: number;
+  catchment?: Facility["catchment"];
   onSay: (t: string) => void; onChanged: () => void; onRemember: (r: Recent) => void;
   onOpenSubject: (subjectId: string) => void;
 }) {
@@ -478,6 +486,7 @@ function ThreadScreen({ id, cat, ctx, said, asking, nonce, onSay, onChanged, onR
       client={api}
       said={said}
       asking={asking}
+      catchment={catchment}
       onSay={onSay}
       onChanged={() => { reload(); onChanged(); }}
       onOpenSubject={onOpenSubject}

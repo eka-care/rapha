@@ -115,6 +115,1104 @@
     "vitals.record",
     "worklist.read"
   ],
+  "documents": {
+    "consultation": {
+      "profile": "OPConsultRecord",
+      "sections": [
+        {
+          "queries": [
+            {
+              "resource": "condition",
+              "where": {}
+            }
+          ],
+          "slice": "ChiefComplaints"
+        },
+        {
+          "queries": [
+            {
+              "resource": "medication_request",
+              "where": {}
+            }
+          ],
+          "slice": "Medications"
+        },
+        {
+          "queries": [
+            {
+              "resource": "notes",
+              "where": {}
+            }
+          ],
+          "slice": "DocumentReference"
+        }
+      ]
+    }
+  },
+  "facilities": {
+    "declared": {
+      "all-plugins": {
+        "catchment": {
+          "areas": [
+            {
+              "anm": "B. Jyothi",
+              "area": "SC Yadiki",
+              "villages": {
+                "Sonpur": "M. Anjali",
+                "Yadiki": "G. Saroja"
+              }
+            },
+            {
+              "anm": "P. Lalitha",
+              "area": "SC Bhagwanpur",
+              "villages": {
+                "Bhagwanpur": "T. Bhagya",
+                "Kottala": "R. Devi"
+              }
+            },
+            {
+              "anm": "K. Suneetha",
+              "area": "SC Tadpatri East",
+              "villages": {
+                "Tadpatri": ""
+              }
+            }
+          ],
+          "column": "village"
+        },
+        "title": "Every plugin this bundle ships",
+        "without": []
+      },
+      "consulting-room-only": {
+        "title": "A consulting room, with no laboratory and no outreach",
+        "without": [
+          "orders",
+          "outreach",
+          "reporting"
+        ]
+      },
+      "no-laboratory": {
+        "title": "A centre with no laboratory",
+        "without": [
+          "orders"
+        ]
+      }
+    },
+    "default": "all-plugins"
+  },
+  "instruments": {
+    "phc.inst.consent-speak": {
+      "commit": "tap",
+      "fallback": "text",
+      "fields": [
+        "capture_consent",
+        "capture_declined"
+      ],
+      "grammar": null,
+      "id": "phc.inst.consent-speak",
+      "kind": "spoken-prompt",
+      "operations": [
+        "phc.op.patient-register"
+      ],
+      "readback": "required",
+      "requires": null,
+      "says": "May we record this visit to write your notes? You can say no, or stop it any time.",
+      "spoken": true,
+      "summary": "The agent asks; the clerk taps what the patient answered.",
+      "title": "Ask for consent aloud",
+      "type": "instrument",
+      "types": []
+    },
+    "phc.inst.consult-scribe": {
+      "commit": "tap",
+      "fallback": "form",
+      "fields": [],
+      "grammar": null,
+      "id": "phc.inst.consult-scribe",
+      "kind": "scribe",
+      "operations": [
+        "phc.op.patient-register",
+        "phc.op.vitals-record",
+        "phc.op.consult-document",
+        "phc.op.ncd-review",
+        "phc.op.antenatal-visit",
+        "phc.op.followup",
+        "phc.op.rx-prescribe",
+        "phc.op.household-visit"
+      ],
+      "readback": "required",
+      "requires": "capture.consented",
+      "says": null,
+      "spoken": true,
+      "summary": "Transcribes a recording into the station's template.",
+      "title": "Scribe",
+      "type": "instrument",
+      "types": []
+    },
+    "phc.inst.vitals-device": {
+      "commit": "tap",
+      "fallback": "keypad",
+      "fields": [
+        "systolic",
+        "diastolic",
+        "pulse",
+        "spo2"
+      ],
+      "grammar": null,
+      "id": "phc.inst.vitals-device",
+      "kind": "device",
+      "operations": [
+        "phc.op.vitals-record"
+      ],
+      "readback": "required",
+      "requires": null,
+      "says": null,
+      "spoken": true,
+      "summary": "A paired cuff or oximeter fills the field.",
+      "title": "Read from a connected monitor",
+      "type": "instrument",
+      "types": []
+    },
+    "phc.inst.vitals-voice": {
+      "commit": "tap",
+      "fallback": "keypad",
+      "fields": [
+        "systolic",
+        "diastolic",
+        "pulse",
+        "spo2",
+        "weight",
+        "temperature"
+      ],
+      "grammar": "number",
+      "id": "phc.inst.vitals-voice",
+      "kind": "constrained-voice",
+      "operations": [
+        "phc.op.vitals-record"
+      ],
+      "readback": "required",
+      "requires": null,
+      "says": null,
+      "spoken": true,
+      "summary": "Say one number into one field.",
+      "title": "Speak a reading",
+      "type": "instrument",
+      "types": [
+        "integer",
+        "decimal"
+      ]
+    }
+  },
+  "manifest": {
+    "id": "phc",
+    "instruments": [
+      "phc.inst.vitals-voice",
+      "phc.inst.vitals-device",
+      "phc.inst.consult-scribe",
+      "phc.inst.consent-speak"
+    ],
+    "khoj": {
+      "description": "Searches, answers, and proposes. It never commits: every write it returns is a proposal for a clinician to review and confirm on screen, exactly like every other write tool here.",
+      "endpoint": "/api/v1/phc/khoj",
+      "tool": "khoj"
+    },
+    "metrics": [
+      "phc.metric.visits",
+      "phc.metric.abha-coverage",
+      "phc.metric.vitals-flagged-rate"
+    ],
+    "operations": [
+      "phc.op.patient-register",
+      "phc.op.abha-link",
+      "phc.op.vitals-record",
+      "phc.op.consult-document",
+      "phc.op.capture-withdraw",
+      "phc.op.rx-prescribe",
+      "phc.op.lab-order",
+      "phc.op.lab-result-enter",
+      "phc.op.pharmacy-dispense",
+      "phc.op.household-visit",
+      "phc.op.handover",
+      "phc.op.handover-reply",
+      "phc.op.ncd-review",
+      "phc.op.antenatal-visit",
+      "phc.op.followup"
+    ],
+    "title": "Primary health centre",
+    "version": "2026.09.10",
+    "views": [
+      "phc.view.station-queue",
+      "phc.view.visit-summary",
+      "phc.view.facility-dashboard",
+      "phc.view.today-tasks"
+    ],
+    "workflows": [
+      "phc.wf.outpatient"
+    ]
+  },
+  "mapping": {
+    "phc.op.abha-link": [
+      {
+        "fields": {
+          "abha_number": {
+            "answer": "abha_number"
+          },
+          "created_by": {
+            "actor": "id"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "patient"
+      }
+    ],
+    "phc.op.antenatal-visit": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "in_progress"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "encounter"
+      },
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "text": {
+            "note": [
+              "history",
+              "examination",
+              "assessment",
+              "plan"
+            ]
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "notes"
+      }
+    ],
+    "phc.op.capture-withdraw": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "payload": {
+            "json": "payload"
+          },
+          "questionnaire": {
+            "const": "phc.schema.capture-withdraw-v1"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "questionnaire_response"
+      }
+    ],
+    "phc.op.consult-document": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "in_progress"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "encounter"
+      },
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "text": {
+            "note": [
+              "history",
+              "examination",
+              "assessment",
+              "plan"
+            ]
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "notes"
+      },
+      {
+        "fields": {
+          "clinical_status": {
+            "answer_code": "clinical_status"
+          },
+          "clinical_status_system": {
+            "answer_code_system": "clinical_status"
+          },
+          "code": {
+            "answer_code": "condition"
+          },
+          "code_display": {
+            "answer_code_display": "condition"
+          },
+          "code_system": {
+            "answer_code_system": "condition"
+          },
+          "created_by": {
+            "actor": "id"
+          },
+          "onset": {
+            "answer": "onset"
+          },
+          "verification_status": {
+            "answer_code": "verification_status"
+          },
+          "verification_status_system": {
+            "answer_code_system": "verification_status"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": "diagnosis",
+        "questions": {
+          "clinical_status": {
+            "answer_value_set": "condition-clinical-status",
+            "link_id": "clinical_status"
+          },
+          "condition": {
+            "answer_value_set": "condition-code",
+            "link_id": "condition"
+          },
+          "verification_status": {
+            "answer_value_set": "condition-verification-status",
+            "link_id": "verification_status"
+          }
+        },
+        "resource": "condition"
+      }
+    ],
+    "phc.op.followup": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "in_progress"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "encounter"
+      },
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "text": {
+            "note": [
+              "history",
+              "assessment",
+              "plan"
+            ]
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "notes"
+      },
+      {
+        "fields": {
+          "clinical_status": {
+            "answer_code": "clinical_status"
+          },
+          "clinical_status_system": {
+            "answer_code_system": "clinical_status"
+          },
+          "code": {
+            "answer_code": "condition"
+          },
+          "code_display": {
+            "answer_code_display": "condition"
+          },
+          "code_system": {
+            "answer_code_system": "condition"
+          },
+          "created_by": {
+            "actor": "id"
+          },
+          "onset": {
+            "answer": "onset"
+          },
+          "verification_status": {
+            "answer_code": "verification_status"
+          },
+          "verification_status_system": {
+            "answer_code_system": "verification_status"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": "diagnosis",
+        "questions": {
+          "clinical_status": {
+            "answer_value_set": "condition-clinical-status",
+            "link_id": "clinical_status"
+          },
+          "condition": {
+            "answer_value_set": "condition-code",
+            "link_id": "condition"
+          },
+          "verification_status": {
+            "answer_value_set": "condition-verification-status",
+            "link_id": "verification_status"
+          }
+        },
+        "resource": "condition"
+      }
+    ],
+    "phc.op.handover": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "payload": {
+            "json": "payload"
+          },
+          "questionnaire": {
+            "const": "phc.schema.handover-v1"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "questionnaire_response"
+      }
+    ],
+    "phc.op.handover-reply": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "payload": {
+            "json": "payload"
+          },
+          "questionnaire": {
+            "const": "phc.schema.handover-reply-v1"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "questionnaire_response"
+      }
+    ],
+    "phc.op.household-visit": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "in_progress"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "encounter"
+      },
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "payload": {
+            "json": "payload"
+          },
+          "questionnaire": {
+            "const": "phc.schema.household-visit-v1"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "questionnaire_response"
+      }
+    ],
+    "phc.op.lab-order": [
+      {
+        "fields": {
+          "code": {
+            "item": [
+              "code",
+              "test"
+            ]
+          },
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "active"
+          }
+        },
+        "per_item": "investigations",
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "service_request"
+      }
+    ],
+    "phc.op.lab-result-enter": [
+      {
+        "fields": {
+          "category": {
+            "const": "laboratory"
+          },
+          "code": {
+            "answer_code": "analyte"
+          },
+          "code_display": {
+            "answer_code_display": "analyte"
+          },
+          "code_system": {
+            "answer_code_system": "analyte"
+          },
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "preliminary"
+          },
+          "unit": {
+            "answer_code": "unit"
+          },
+          "unit_system": {
+            "answer_code_system": "unit"
+          },
+          "value": {
+            "answer": "value"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {
+          "analyte": {
+            "answer_value_set": "lab-analyte",
+            "link_id": "analyte"
+          },
+          "unit": {
+            "answer_value_set": "ucum-units",
+            "link_id": "unit"
+          }
+        },
+        "resource": "observation"
+      },
+      {
+        "fields": {
+          "code": {
+            "answer_code": "analyte"
+          },
+          "code_system": {
+            "answer_code_system": "analyte"
+          },
+          "conclusion": {
+            "answer": "note"
+          },
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "preliminary"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {
+          "analyte": {
+            "answer_value_set": "lab-analyte",
+            "link_id": "analyte"
+          }
+        },
+        "resource": "diagnostic_report"
+      },
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "available"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "specimen"
+      }
+    ],
+    "phc.op.ncd-review": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "in_progress"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "encounter"
+      },
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "text": {
+            "note": [
+              "history",
+              "examination",
+              "assessment",
+              "plan"
+            ]
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "notes"
+      },
+      {
+        "fields": {
+          "clinical_status": {
+            "answer_code": "clinical_status"
+          },
+          "clinical_status_system": {
+            "answer_code_system": "clinical_status"
+          },
+          "code": {
+            "answer_code": "condition"
+          },
+          "code_display": {
+            "answer_code_display": "condition"
+          },
+          "code_system": {
+            "answer_code_system": "condition"
+          },
+          "created_by": {
+            "actor": "id"
+          },
+          "onset": {
+            "answer": "onset"
+          },
+          "verification_status": {
+            "answer_code": "verification_status"
+          },
+          "verification_status_system": {
+            "answer_code_system": "verification_status"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": "diagnosis",
+        "questions": {
+          "clinical_status": {
+            "answer_value_set": "condition-clinical-status",
+            "link_id": "clinical_status"
+          },
+          "condition": {
+            "answer_value_set": "condition-code",
+            "link_id": "condition"
+          },
+          "verification_status": {
+            "answer_value_set": "condition-verification-status",
+            "link_id": "verification_status"
+          }
+        },
+        "resource": "condition"
+      }
+    ],
+    "phc.op.patient-register": [
+      {
+        "fields": {
+          "age": {
+            "answer": "age"
+          },
+          "category": {
+            "answer": "category"
+          },
+          "created_by": {
+            "actor": "id"
+          },
+          "directory_id": {
+            "answer": "directory_id"
+          },
+          "id": {
+            "answer": "patient_id"
+          },
+          "name": {
+            "answer": "name"
+          },
+          "phone": {
+            "answer": "phone"
+          },
+          "sex": {
+            "answer": "sex"
+          },
+          "village": {
+            "answer": "village"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "patient"
+      }
+    ],
+    "phc.op.pharmacy-dispense": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "medication": {
+            "item": [
+              "medication",
+              "drug",
+              "code"
+            ]
+          },
+          "quantity": {
+            "item": [
+              "quantity",
+              "qty"
+            ]
+          },
+          "status": {
+            "const": "completed"
+          }
+        },
+        "per_item": "dispenses",
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "medication_dispense"
+      },
+      {
+        "fields": {
+          "code": {
+            "item": [
+              "medication",
+              "drug",
+              "code"
+            ]
+          },
+          "created_by": {
+            "actor": "id"
+          },
+          "quantity": {
+            "minus": [
+              "quantity",
+              "qty"
+            ]
+          },
+          "status": {
+            "const": "issued"
+          }
+        },
+        "per_item": "dispenses",
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "inventory_item"
+      }
+    ],
+    "phc.op.rx-prescribe": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "dose": {
+            "answer": "dose"
+          },
+          "dose_unit": {
+            "answer_code": "dose_unit"
+          },
+          "dose_unit_system": {
+            "answer_code_system": "dose_unit"
+          },
+          "duration": {
+            "answer": "duration"
+          },
+          "duration_unit": {
+            "answer_code": "duration_unit"
+          },
+          "duration_unit_system": {
+            "answer_code_system": "duration_unit"
+          },
+          "frequency": {
+            "answer_code": "frequency"
+          },
+          "frequency_display": {
+            "answer_code_display": "frequency"
+          },
+          "frequency_system": {
+            "answer_code_system": "frequency"
+          },
+          "intent": {
+            "const": "order"
+          },
+          "medication": {
+            "answer_code": "drug"
+          },
+          "medication_display": {
+            "answer_code_display": "drug"
+          },
+          "medication_system": {
+            "answer_code_system": "drug"
+          },
+          "route": {
+            "answer_code": "route"
+          },
+          "route_display": {
+            "answer_code_display": "route"
+          },
+          "route_system": {
+            "answer_code_system": "route"
+          },
+          "status": {
+            "const": "active"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": "medications",
+        "questions": {
+          "dose_unit": {
+            "answer_value_set": "dose-unit",
+            "link_id": "dose_unit"
+          },
+          "drug": {
+            "answer_value_set": "medication-code",
+            "link_id": "drug"
+          },
+          "duration_unit": {
+            "answer_value_set": "duration-unit",
+            "link_id": "duration_unit"
+          },
+          "frequency": {
+            "answer_value_set": "medication-frequency",
+            "link_id": "frequency"
+          },
+          "route": {
+            "answer_value_set": "medication-route",
+            "link_id": "route"
+          }
+        },
+        "resource": "medication_request"
+      }
+    ],
+    "phc.op.vitals-record": [
+      {
+        "fields": {
+          "category": {
+            "const": "vital-signs"
+          },
+          "code": {
+            "question": "code"
+          },
+          "code_display": {
+            "question": "code_display"
+          },
+          "code_system": {
+            "question": "code_system"
+          },
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "final"
+          },
+          "unit": {
+            "question": "unit"
+          },
+          "unit_system": {
+            "question": "unit_system"
+          },
+          "value": {
+            "question": "answer"
+          }
+        },
+        "per_item": null,
+        "per_question": [
+          {
+            "code": "8480-6",
+            "code_display": "Systolic blood pressure",
+            "code_system": "http://loinc.org",
+            "link_id": "systolic",
+            "unit": "mm[Hg]",
+            "unit_system": "http://unitsofmeasure.org"
+          },
+          {
+            "code": "8462-4",
+            "code_display": "Diastolic blood pressure",
+            "code_system": "http://loinc.org",
+            "link_id": "diastolic",
+            "unit": "mm[Hg]",
+            "unit_system": "http://unitsofmeasure.org"
+          },
+          {
+            "code": "8867-4",
+            "code_display": "Heart rate",
+            "code_system": "http://loinc.org",
+            "link_id": "pulse",
+            "unit": "/min",
+            "unit_system": "http://unitsofmeasure.org"
+          },
+          {
+            "code": "2708-6",
+            "code_display": "Oxygen saturation in Arterial blood",
+            "code_system": "http://loinc.org",
+            "link_id": "spo2",
+            "unit": "%",
+            "unit_system": "http://unitsofmeasure.org"
+          },
+          {
+            "code": "29463-7",
+            "code_display": "Body weight",
+            "code_system": "http://loinc.org",
+            "link_id": "weight",
+            "unit": "kg",
+            "unit_system": "http://unitsofmeasure.org"
+          },
+          {
+            "code": "8310-5",
+            "code_display": "Body temperature",
+            "code_system": "http://loinc.org",
+            "link_id": "temperature",
+            "unit": "Cel",
+            "unit_system": "http://unitsofmeasure.org"
+          }
+        ],
+        "per_row": null,
+        "questions": {},
+        "resource": "observation"
+      }
+    ]
+  },
+  "metrics": {
+    "phc.metric.abha-coverage": {
+      "certified_by": "bundle author, unverified against any reference count",
+      "denominator": {
+        "resource": "patient",
+        "where": {
+          "created_date": {
+            "gte": "window.start"
+          }
+        }
+      },
+      "id": "phc.metric.abha-coverage",
+      "numerator": {
+        "resource": "patient",
+        "where": {
+          "abha_number": "*",
+          "created_date": {
+            "gte": "window.start"
+          }
+        }
+      },
+      "summary": "Patients seen with an ABHA linked.",
+      "title": "ABHA coverage",
+      "type": "metric",
+      "unit": "percent",
+      "window": "week"
+    },
+    "phc.metric.visits": {
+      "certified_by": "bundle author, unverified against any reference count",
+      "denominator": null,
+      "id": "phc.metric.visits",
+      "numerator": {
+        "resource": "encounter",
+        "where": {
+          "created_date": {
+            "gte": "window.start"
+          }
+        }
+      },
+      "summary": "Encounters opened.",
+      "title": "Visits",
+      "type": "metric",
+      "unit": "count",
+      "window": "day"
+    },
+    "phc.metric.vitals-flagged-rate": {
+      "certified_by": "bundle author, unverified against any reference count",
+      "denominator": {
+        "resource": "encounter",
+        "where": {
+          "created_date": {
+            "gte": "window.start"
+          }
+        }
+      },
+      "id": "phc.metric.vitals-flagged-rate",
+      "numerator": {
+        "resource": "thread_flag",
+        "where": {
+          "created_date": {
+            "gte": "window.start"
+          },
+          "flag": "vitals.flagged"
+        }
+      },
+      "summary": "Visits where a vital crossed a critical band.",
+      "title": "Flagged vitals rate",
+      "type": "metric",
+      "unit": "percent",
+      "window": "week"
+    }
+  },
   "operations": {
     "lab.op.referral-accession": {
       "capability": "order.accession",
@@ -1561,6 +2659,80 @@
       ]
     }
   },
+  "plugins": {
+    "baseline": {
+      "always": true,
+      "capabilities": [
+        "patient.find",
+        "patient.register",
+        "abha.link",
+        "vitals.record",
+        "assessment.record",
+        "encounter.document",
+        "appointment.book",
+        "handover",
+        "facility.admin"
+      ],
+      "title": "The line itself"
+    },
+    "orders": {
+      "capabilities": [
+        "lab.order",
+        "lab.result.enter",
+        "lab.result.validate"
+      ],
+      "title": "Laboratory orders and results"
+    },
+    "outreach": {
+      "capabilities": [
+        "visit.household"
+      ],
+      "title": "Household visits"
+    },
+    "prescriptions": {
+      "capabilities": [
+        "rx.prescribe",
+        "pharmacy.dispense"
+      ],
+      "title": "Prescribing and dispensing"
+    },
+    "reporting": {
+      "capabilities": [
+        "reporting.view"
+      ],
+      "title": "The facility's own numbers"
+    }
+  },
+  "scribe": {
+    "community": {
+      "choose": [
+        "phc.op.household-visit"
+      ],
+      "default": null
+    },
+    "doctor": {
+      "choose": [
+        "phc.op.consult-document",
+        "phc.op.ncd-review",
+        "phc.op.antenatal-visit",
+        "phc.op.followup",
+        "phc.op.rx-prescribe"
+      ],
+      "default": "phc.op.consult-document"
+    },
+    "nurse": {
+      "choose": [
+        "phc.op.vitals-record"
+      ],
+      "default": "phc.op.vitals-record"
+    },
+    "reception": {
+      "choose": [
+        "phc.op.patient-register"
+      ],
+      "default": "phc.op.patient-register"
+    }
+  },
   "states": [
     "abha.linked",
     "abha.pending",
@@ -1587,5 +2759,590 @@
     "specimen.collected",
     "vitals.flagged",
     "vitals.recorded"
-  ]
+  ],
+  "views": {
+    "phc.view.facility-dashboard": {
+      "badges": {},
+      "capability": "reporting.view",
+      "columns": [],
+      "escalate_minutes": null,
+      "group_by": null,
+      "id": "phc.view.facility-dashboard",
+      "kind": "dashboard",
+      "labels": [],
+      "metrics": [
+        "phc.metric.visits",
+        "phc.metric.abha-coverage",
+        "phc.metric.vitals-flagged-rate"
+      ],
+      "provenance": {},
+      "scope": "today",
+      "sections": [],
+      "summary": "Visits, ABHA coverage and flagged vitals.",
+      "target_minutes": null,
+      "tasks": [],
+      "title": "Facility today",
+      "type": "view",
+      "window": "week",
+      "workflow": null
+    },
+    "phc.view.station-queue": {
+      "badges": {
+        "abha.pending": "warn",
+        "capture.declined": "mute",
+        "dispensed.partial": "mute",
+        "lab.critical": "crit",
+        "vitals.flagged": "crit"
+      },
+      "capability": "patient.find",
+      "columns": [
+        "name",
+        "age",
+        "sex",
+        "village",
+        "token",
+        "category",
+        "arrival"
+      ],
+      "escalate_minutes": null,
+      "group_by": "station",
+      "id": "phc.view.station-queue",
+      "kind": "queue",
+      "labels": [
+        "category"
+      ],
+      "metrics": [],
+      "provenance": {
+        "column": "arrival",
+        "label": "Scanned",
+        "mark": "poster"
+      },
+      "scope": "today",
+      "sections": [],
+      "summary": "Today, grouped by station.",
+      "target_minutes": 30,
+      "tasks": [],
+      "title": "Lines",
+      "type": "view",
+      "window": "day",
+      "workflow": "phc.wf.outpatient"
+    },
+    "phc.view.today-tasks": {
+      "badges": {},
+      "capability": "patient.find",
+      "columns": [],
+      "escalate_minutes": null,
+      "group_by": null,
+      "id": "phc.view.today-tasks",
+      "kind": "tasklist",
+      "labels": [],
+      "metrics": [],
+      "provenance": {},
+      "scope": "today",
+      "sections": [],
+      "summary": "What is waiting across today's visits, not what is waiting on one.",
+      "target_minutes": null,
+      "tasks": [
+        {
+          "operation": "phc.op.lab-result-enter",
+          "title": "Waiting on a lab result",
+          "where": {
+            "flag": "lab.ordered",
+            "not": "lab.resulted"
+          }
+        }
+      ],
+      "title": "Needs you",
+      "type": "view",
+      "window": "day",
+      "workflow": "phc.wf.outpatient"
+    },
+    "phc.view.visit-summary": {
+      "badges": {},
+      "capability": "patient.find",
+      "columns": [],
+      "escalate_minutes": null,
+      "group_by": null,
+      "id": "phc.view.visit-summary",
+      "kind": "summary",
+      "labels": [],
+      "metrics": [],
+      "provenance": {},
+      "scope": "today",
+      "sections": [
+        {
+          "fields": [],
+          "resource": null,
+          "show": "line",
+          "title": "Visit",
+          "where": {}
+        },
+        {
+          "fields": [],
+          "resource": null,
+          "show": "flags",
+          "title": "Flags",
+          "where": {}
+        },
+        {
+          "fields": [
+            "code_display",
+            "value",
+            "unit",
+            "created_date"
+          ],
+          "resource": "observation",
+          "show": null,
+          "title": "Vitals",
+          "where": {
+            "category": "vital-signs"
+          }
+        },
+        {
+          "fields": [
+            "text",
+            "created_by",
+            "created_date"
+          ],
+          "resource": "notes",
+          "show": null,
+          "title": "Notes",
+          "where": {}
+        },
+        {
+          "fields": [
+            "medication_display",
+            "dose",
+            "dose_unit",
+            "frequency_display",
+            "route_display",
+            "duration",
+            "duration_unit",
+            "status"
+          ],
+          "resource": "medication_request",
+          "show": null,
+          "title": "Prescription",
+          "where": {
+            "status": "active"
+          }
+        },
+        {
+          "fields": [
+            "code",
+            "status",
+            "created_date"
+          ],
+          "resource": "service_request",
+          "show": null,
+          "title": "Investigations",
+          "where": {}
+        },
+        {
+          "fields": [
+            "code_display",
+            "value",
+            "unit",
+            "created_date"
+          ],
+          "resource": "observation",
+          "show": null,
+          "title": "Lab results",
+          "where": {
+            "category": "laboratory"
+          }
+        },
+        {
+          "fields": [
+            "conclusion",
+            "status",
+            "created_date"
+          ],
+          "resource": "diagnostic_report",
+          "show": null,
+          "title": "Reports",
+          "where": {}
+        },
+        {
+          "fields": [],
+          "resource": null,
+          "show": "proposals",
+          "title": "Awaiting confirmation",
+          "where": {}
+        },
+        {
+          "fields": [],
+          "resource": null,
+          "show": "actions",
+          "title": "What you can do",
+          "where": {}
+        },
+        {
+          "fields": [],
+          "resource": null,
+          "show": "audit",
+          "title": "Audit trail",
+          "where": {}
+        }
+      ],
+      "summary": "One visit on one page.",
+      "target_minutes": null,
+      "tasks": [],
+      "title": "Visit summary",
+      "type": "view",
+      "window": "day",
+      "workflow": "phc.wf.outpatient"
+    }
+  },
+  "vocabulary": {
+    "capabilities": [
+      "abha.link",
+      "appointment.book",
+      "assessment.record",
+      "encounter.document",
+      "facility.admin",
+      "handover",
+      "lab.order",
+      "lab.result.enter",
+      "lab.result.validate",
+      "patient.find",
+      "patient.register",
+      "pharmacy.dispense",
+      "reporting.view",
+      "rx.prescribe",
+      "visit.household",
+      "vitals.record"
+    ],
+    "capability_titles": {
+      "abha.link": "Create or link an ABHA",
+      "appointment.book": "Book an appointment",
+      "assessment.record": "Record an assessment",
+      "encounter.document": "Document a consultation",
+      "facility.admin": "Administer this centre",
+      "handover": "Hand over to a colleague",
+      "lab.order": "Order an investigation",
+      "lab.result.enter": "Enter a laboratory result",
+      "lab.result.validate": "Validate a laboratory result",
+      "patient.find": "Find a patient",
+      "patient.register": "Register a new patient",
+      "pharmacy.dispense": "Dispense a prescription",
+      "reporting.view": "Read this centre's numbers",
+      "rx.prescribe": "Write a prescription",
+      "visit.household": "Record a household visit",
+      "vitals.record": "Record vitals and triage"
+    },
+    "role_titles": {
+      "anm": "ANM",
+      "asha": "ASHA",
+      "cho": "Community health officer",
+      "frontdesk": "Front desk",
+      "lab": "Laboratory technician",
+      "lab_incharge": "Laboratory in charge",
+      "mo": "Medical officer",
+      "nurse": "Staff nurse",
+      "pharmacist": "Pharmacist"
+    },
+    "roles": {
+      "anm": [
+        "patient.find",
+        "patient.register",
+        "abha.link",
+        "visit.household",
+        "assessment.record",
+        "appointment.book",
+        "vitals.record"
+      ],
+      "asha": [
+        "patient.find",
+        "patient.register",
+        "abha.link",
+        "visit.household",
+        "assessment.record",
+        "appointment.book"
+      ],
+      "cho": [
+        "patient.find",
+        "patient.register",
+        "abha.link",
+        "visit.household",
+        "assessment.record",
+        "appointment.book",
+        "vitals.record",
+        "encounter.document",
+        "lab.order",
+        "rx.prescribe"
+      ],
+      "frontdesk": [
+        "patient.find",
+        "patient.register",
+        "abha.link",
+        "appointment.book",
+        "handover"
+      ],
+      "lab": [
+        "patient.find",
+        "lab.result.enter",
+        "handover"
+      ],
+      "lab_incharge": [
+        "patient.find",
+        "lab.result.enter",
+        "lab.result.validate",
+        "handover"
+      ],
+      "mo": [
+        "patient.find",
+        "encounter.document",
+        "rx.prescribe",
+        "lab.order",
+        "assessment.record",
+        "reporting.view",
+        "handover"
+      ],
+      "nurse": [
+        "patient.find",
+        "patient.register",
+        "abha.link",
+        "appointment.book",
+        "vitals.record",
+        "assessment.record",
+        "handover"
+      ],
+      "pharmacist": [
+        "patient.find",
+        "pharmacy.dispense",
+        "handover"
+      ]
+    },
+    "states": [
+      "abha.linked",
+      "abha.pending",
+      "capture.agreed",
+      "capture.consented",
+      "capture.declined",
+      "capture.withdrawn",
+      "consult.documented",
+      "dispensed.complete",
+      "dispensed.partial",
+      "followup.booked",
+      "handover.raised",
+      "lab.critical",
+      "lab.ordered",
+      "lab.resulted",
+      "lab.validated",
+      "registered",
+      "rx.confirmed",
+      "vitals.flagged",
+      "vitals.recorded"
+    ]
+  },
+  "workflows": {
+    "phc.wf.outpatient": {
+      "id": "phc.wf.outpatient",
+      "spine": "patient",
+      "state_order": [
+        "registered",
+        "abha.linked",
+        "abha.pending",
+        "vitals.recorded",
+        "consult.documented",
+        "handover.raised",
+        "rx.confirmed",
+        "lab.ordered",
+        "lab.resulted",
+        "lab.validated",
+        "dispensed.complete",
+        "dispensed.partial",
+        "followup.booked",
+        "capture.agreed",
+        "capture.declined",
+        "capture.withdrawn",
+        "capture.consented",
+        "vitals.flagged",
+        "lab.critical"
+      ],
+      "states": {
+        "abha.linked": {
+          "exists": {
+            "resource": "patient",
+            "where": {
+              "abha_number": "*"
+            }
+          }
+        },
+        "abha.pending": {
+          "all_of": [
+            "registered",
+            "not abha.linked"
+          ]
+        },
+        "capture.agreed": {
+          "stored": true
+        },
+        "capture.consented": {
+          "all_of": [
+            "not capture.declined",
+            "not capture.withdrawn"
+          ]
+        },
+        "capture.declined": {
+          "stored": true
+        },
+        "capture.withdrawn": {
+          "stored": true
+        },
+        "consult.documented": {
+          "exists": {
+            "resource": "notes"
+          }
+        },
+        "dispensed.complete": {
+          "gte": [
+            {
+              "resource": "medication_dispense"
+            },
+            {
+              "resource": "medication_request",
+              "where": {
+                "status": "active"
+              }
+            }
+          ]
+        },
+        "dispensed.partial": {
+          "all_of": [
+            {
+              "exists": {
+                "resource": "medication_dispense"
+              }
+            },
+            "not dispensed.complete"
+          ]
+        },
+        "followup.booked": {
+          "exists": {
+            "resource": "token_booking",
+            "where": {
+              "status": "booked"
+            }
+          }
+        },
+        "handover.raised": {
+          "exists": {
+            "resource": "questionnaire_response",
+            "where": {
+              "questionnaire": "phc.schema.handover-v1"
+            }
+          }
+        },
+        "lab.critical": {
+          "stored": true
+        },
+        "lab.ordered": {
+          "exists": {
+            "resource": "service_request"
+          }
+        },
+        "lab.resulted": {
+          "exists": {
+            "resource": "diagnostic_report"
+          }
+        },
+        "lab.validated": {
+          "exists": {
+            "resource": "diagnostic_report",
+            "where": {
+              "status": "final"
+            }
+          }
+        },
+        "registered": {
+          "exists": {
+            "resource": "patient"
+          }
+        },
+        "rx.confirmed": {
+          "exists": {
+            "resource": "medication_request",
+            "where": {
+              "status": "active"
+            }
+          }
+        },
+        "vitals.flagged": {
+          "stored": true
+        },
+        "vitals.recorded": {
+          "exists": {
+            "resource": "observation",
+            "where": {
+              "category": "vital-signs"
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "applies_when": null,
+          "done_when": "registered",
+          "operations": [
+            "phc.op.patient-register",
+            "phc.op.abha-link"
+          ],
+          "station": "reception"
+        },
+        {
+          "applies_when": null,
+          "done_when": "vitals.recorded",
+          "operations": [
+            "phc.op.vitals-record"
+          ],
+          "station": "nurse"
+        },
+        {
+          "applies_when": null,
+          "done_when": "consult.documented",
+          "operations": [
+            "phc.op.consult-document",
+            "phc.op.ncd-review",
+            "phc.op.antenatal-visit",
+            "phc.op.followup",
+            "phc.op.rx-prescribe",
+            "phc.op.lab-order",
+            "phc.op.capture-withdraw",
+            "phc.op.handover",
+            "phc.op.handover-reply"
+          ],
+          "station": "doctor"
+        },
+        {
+          "applies_when": "lab.ordered",
+          "done_when": "lab.resulted",
+          "operations": [
+            "phc.op.lab-result-enter"
+          ],
+          "station": "lab"
+        },
+        {
+          "applies_when": "rx.confirmed",
+          "done_when": "dispensed.complete",
+          "operations": [
+            "phc.op.pharmacy-dispense"
+          ],
+          "station": "pharmacy"
+        }
+      ],
+      "stored": [
+        "capture.agreed",
+        "capture.declined",
+        "capture.withdrawn",
+        "vitals.flagged",
+        "lab.critical"
+      ],
+      "subject": "encounter",
+      "summary": "Reception, vitals, doctor, then lab and pharmacy when ordered.",
+      "title": "Outpatient line",
+      "type": "workflow"
+    }
+  }
 }

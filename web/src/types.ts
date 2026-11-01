@@ -212,6 +212,12 @@ export type Catalogue = {
 
 /** GET /facility: which bundle this kernel loaded, and who is asking. */
 export type Facility = {
+  /** Who covers which habitation at this centre, as its own declaration
+   *  wrote it. Absent for a centre that declares none. */
+  catchment?: {
+    column: string;
+    areas: { area: string; anm: string; villages: Record<string, string> }[];
+  } | null;
   bundle: { id: string; title: string; version: string; workflow: string };
   /** Which shape of this facility the kernel is running, and what that shape
    *  withholds: `withheld` is capability to the plugin withholding it,

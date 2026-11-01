@@ -277,6 +277,7 @@ func (k *kernel) facility_(w http.ResponseWriter, r *http.Request) {
 		"without":      k.without,
 		"capabilities": k.caps,
 		"views":        views,
+		"catchment":    k.cat.Facilities.Declared[k.facility].Catchment,
 		"roles":        roles,
 		"user":         who,
 	})

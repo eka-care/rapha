@@ -163,6 +163,24 @@ type Plugin struct {
 type Facility struct {
 	Title   string   `json:"title"`
 	Without []string `json:"without"`
+	// Who covers which habitation at this centre: the sub-centres, the ANM on
+	// each, and the ASHA on each village under it. Staffing and geography,
+	// not a clinical declaration, and a pointer so a centre that declares
+	// none answers null exactly as the Python does.
+	Catchment *Catchment `json:"catchment"`
+}
+
+// Catchment is a facility's own answer to "who is responsible for this
+// person between visits". `Column` is which of the subject's columns names
+// the habitation; nothing here or in either engine knows what a sub-centre
+// is, which is the point of it being declared.
+type Catchment struct {
+	Column string `json:"column"`
+	Areas  []struct {
+		Area     string            `json:"area"`
+		ANM      string            `json:"anm"`
+		Villages map[string]string `json:"villages"`
+	} `json:"areas"`
 }
 
 // Facilities carries the shapes a bundle declares and the one its own

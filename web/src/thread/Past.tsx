@@ -15,7 +15,10 @@ import { displayFor, questionnaire } from "../declarations";
 import { valuesOf } from "../messages";
 import type { Catalogue, ThreadView } from "../types";
 import { human } from "../words";
-import { carriedForward, heights, series, team, trendable, type Visit } from "./earlier";
+import {
+  carriedForward, covers, heights, series, team, trendable,
+  type Catchment, type Visit,
+} from "./earlier";
 
 /** How far back to read. A PHC patient can have years of visits and this
  *  screen wants a trend, not an archive. */
@@ -113,18 +116,48 @@ export function Trend({ now, visits }: { now: Visit; visits: Visit[] }) {
   );
 }
 
-/** In the rail: who has been near this visit. */
-export function Team({ thread, cat }: { thread: ThreadView; cat: Catalogue }) {
+/** In the rail: who covers this patient, and who has been near this visit.
+ *
+ *  The two halves are different kinds of fact and are drawn as such. The
+ *  catchment is who is RESPONSIBLE for them between visits -- their ASHA and
+ *  the ANM on their sub-centre -- read off the centre's own declaration from
+ *  the village already on their record. The record is who actually saw them
+ *  today. A centre that declares no catchment draws only the second.
+ */
+export function Team({ thread, cat, catchment }: {
+  thread: ThreadView; cat: Catalogue; catchment?: Catchment | null;
+}) {
+  const who = covers(catchment, thread.subject);
   const members = team(
     thread.audit,
     (op) => cat.operations?.[op]?.title ?? human(op),
     (actor) => human(actor.replace(/^user:/, "")),
   );
-  if (!members.length) return null;
+  if (!members.length && !who) return null;
   return (
     <div className="card">
-      <div className="card-h"><div className="card-t">Who has seen them</div></div>
+      <div className="card-h"><div className="card-t">Who reaches them</div></div>
       <div style={{ padding: "6px 12px 10px" }}>
+        {who && (
+          <>
+            <div className="team">
+              <span className="av">{initials(who.asha || "?")}</span>
+              <span style={{ minWidth: 0 }}>
+                <b>{who.asha || "Nobody assigned"}</b>
+                <span className="team-s">{who.village}</span>
+              </span>
+              <span className="team-r">ASHA</span>
+            </div>
+            <div className="team">
+              <span className="av">{initials(who.anm)}</span>
+              <span style={{ minWidth: 0 }}>
+                <b>{who.anm}</b>
+                <span className="team-s">{who.area}</span>
+              </span>
+              <span className="team-r">ANM</span>
+            </div>
+          </>
+        )}
         {members.map((m) => (
           <div className="team" key={m.actor}>
             <span className="av">{initials(m.actor)}</span>
@@ -132,6 +165,7 @@ export function Team({ thread, cat }: { thread: ThreadView; cat: Catalogue }) {
               <b>{m.role}</b>
               <span className="team-s">{m.did}</span>
             </span>
+            <span className="team-r">Today</span>
           </div>
         ))}
       </div>

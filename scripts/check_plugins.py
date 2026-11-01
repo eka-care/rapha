@@ -21,6 +21,7 @@ Mutations this is built to fail under are listed at the bottom of the file.
 from __future__ import annotations
 
 import copy
+import json
 import os
 import pathlib
 import sys
@@ -76,7 +77,12 @@ for path in sorted((ROOT / "bundles" / "phc").glob("*.md")):
 # value set, a unit, a range, a threshold, an interval, a question or a
 # section heading, which is what keeps a facility's shape a composition
 # decision rather than a clinical one made by whoever installed the software.
-assert set(plugins.FACILITY_KEYS) == {"title", "without"}, plugins.FACILITY_KEYS
+# `catchment` joined them on 2026-11-01: which sub-centre, ANM and ASHA cover
+# each habitation. It is staffing and geography -- who is responsible for a
+# person between visits -- and it is here because those names belong to one
+# centre and change without anybody touching the kernel. The set is pinned so
+# that a key cannot be added without somebody reading the paragraph above.
+assert set(plugins.FACILITY_KEYS) == {"title", "without", "catchment"}, plugins.FACILITY_KEYS
 assert set(plugins.PLUGIN_KEYS) == {"title", "capabilities", "always"}, plugins.PLUGIN_KEYS
 CLINICAL = ("code", "system", "display", "value", "unit", "range", "threshold",
             "interval", "binding", "valueset", "value_set", "question",
@@ -88,6 +94,20 @@ for key in plugins.FACILITY_KEYS + plugins.PLUGIN_KEYS:
 ok("a facility declaration holds %d keys and a plugin %d, and not one of them "
    "can carry a code, a value set, a threshold, an interval, a question or a "
    "section heading" % (len(plugins.FACILITY_KEYS), len(plugins.PLUGIN_KEYS)))
+
+# The key name passing the test above is not enough for the one key that
+# carries a nested declaration rather than a list of ids. What a centre writes
+# UNDER `catchment` is checked too: it may name a place and a person and
+# nothing a clinician would read as an instruction.
+for fid, decl in (WHOLE.facilities.get("declared") or {}).items():
+    where = json.dumps(decl.get("catchment") or {}).lower()
+    for word in CLINICAL:
+        assert word not in where, (fid, word, "a catchment carried a clinical word")
+    for area in (decl.get("catchment") or {}).get("areas") or []:
+        assert set(area) == {"area", "anm", "villages"}, (fid, sorted(area))
+        assert all(isinstance(v, str) for v in (area.get("villages") or {}).values()), fid
+ok("and a catchment carries places and people and nothing else: no code, no "
+   "threshold, no question, and three keys on an area")
 
 # Every word a plugin names is one this bundle already declares, each claimed
 # once, and a capability no plugin claims is always on. The last is the default

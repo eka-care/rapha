@@ -4006,7 +4006,12 @@ def lint_parity(tmp):
     unreachable = ("an unknown key on a plugin or a facility",
                    "a declaration that is not a mapping",
                    "the `off:` spelling YAML 1.1 reads as the boolean false")
-    assert set(kplugins.FACILITY_KEYS) == {"title", "without"}, kplugins.FACILITY_KEYS
+    # `catchment` joined them on 2026-11-01. It is the one facility key that
+    # carries a nested declaration rather than a list of ids, and BOTH engines
+    # serve it on GET /facility, so the body diff above is what proves they
+    # agree about it rather than this list.
+    assert set(kplugins.FACILITY_KEYS) == {"title", "without", "catchment"}, \
+        kplugins.FACILITY_KEYS
     ok("and %d of its refusals cannot cross the port at all, because they are "
        "about the SHAPE of a declaration and catalogue.json carries only the "
        "%d keys a facility and the %d a plugin may have: %s"

@@ -18,7 +18,7 @@ import { walk } from "../validate";
 import { Icon } from "../icons";
 import { carriedInto, weigh } from "../loops";
 import { agentLine, header, messages, queueViewFor, type Ctx, type Said } from "../messages";
-import type { Catalogue, Operation, Payload, ThreadView } from "../types";
+import type { Catalogue, Facility, Operation, Payload, ThreadView } from "../types";
 import { Composer } from "../thread/Composer";
 import { ScribeBar } from "../scribe/ScribeBar";
 import { mergeDrafts, type Opened } from "../scribe/session";
@@ -45,10 +45,12 @@ const TAG: Record<string, string> = {
 };
 
 export function Encounter({
-  thread, cat, ctx, client, said, asking, onSay, onChanged, onOpenSubject,
+  thread, cat, ctx, client, said, asking, catchment, onSay, onChanged, onOpenSubject,
 }: {
   thread: ThreadView;
   cat: Catalogue;
+  /** This centre's own declaration of who covers which habitation. */
+  catchment?: Facility["catchment"];
   ctx: Ctx;
   client: Client;
   said: Said[];
@@ -239,7 +241,7 @@ export function Encounter({
 
         <Trend now={todayVisit} visits={past} />
 
-        <Team thread={thread} cat={cat} />
+        <Team thread={thread} cat={cat} catchment={catchment} />
 
         {/* WHAT USED TO BE HERE: the 16 raw capability codes this caller holds,
             and the audit trail. Both are true and neither is a clinician's.

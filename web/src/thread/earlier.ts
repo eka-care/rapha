@@ -143,3 +143,37 @@ export function team(
   }
   return [...seen.values()];
 }
+
+// ---------------------------------------------------------------- catchment
+
+/** A centre's own declaration of who covers which habitation. */
+export type Catchment = {
+  /** Which of the subject's columns names the habitation. */
+  column: string;
+  areas: { area: string; anm: string; villages: Record<string, string> }[];
+};
+
+export type Covers = { area: string; anm: string; asha: string; village: string };
+
+/** Who covers this patient, from the village already on their record.
+ *
+ *  THE SCREEN IS TOLD THE COLUMN AND NOTHING ELSE. It does not know what a
+ *  sub-centre is, that an ANM runs one, or that an ASHA covers a habitation
+ *  within it: it looks a value up in the centre's own declaration and draws
+ *  what comes back. A centre that declares no catchment has none here, and a
+ *  village nobody declared is not guessed at.
+ *
+ *  An empty `asha` is a real answer and is kept: a habitation with nobody
+ *  assigned is the thing worth seeing, and dropping the row would hide it.
+ */
+export function covers(catchment: Catchment | null | undefined,
+                       subject: Record<string, unknown> | undefined): Covers | null {
+  if (!catchment?.column) return null;
+  const village = String(subject?.[catchment.column] ?? "").trim();
+  if (!village) return null;
+  for (const area of catchment.areas ?? []) {
+    if (village in (area.villages ?? {}))
+      return { area: area.area, anm: area.anm, asha: area.villages[village], village };
+  }
+  return null;
+}
