@@ -812,18 +812,35 @@ def _compiled_documents(documents):
     return out
 
 
-def write_catalogue(bundle):
-    """Merge the five declaration keys into the catalogue.json that
+def write_catalogue(bundle, out=None):
+    """Merge this bundle's declaration keys into the catalogue.json that
     catalogue/build.py just wrote, and into the copy the Go server embeds.
 
     This runs here and not in build.py because the layering only goes one way:
     kernel imports catalogue, so catalogue importing kernel.declarations back
     would be a circular import. Run build first, then this; check.sh does.
+
+    `out` writes ONE file at that path and leaves the two tracked copies
+    alone. Added 2026-11-01 for the fifth seam: a Go kernel reads
+    catalogue.json from the tree, so serving a SECOND bundle means compiling
+    that bundle's catalogue somewhere and pointing the process at it. The
+    compiler is the only thing that may write that file, so it is the thing
+    that gained the argument, rather than a caller learning to merge the keys
+    itself.
+
+    The base is still the tracked catalogue.json either way, which is correct
+    and is worth saying: its `operations`, `capabilities`, `bundles` and
+    `states` are the UNION over every bundle, so they are already the second
+    bundle's too. What `out` replaces is exactly the per bundle keys.
     """
     import json
-    out = ROOT / "catalogue" / "catalogue.json"
-    cat = json.loads(out.read_text())
+    base = ROOT / "catalogue" / "catalogue.json"
+    cat = json.loads(base.read_text())
     cat.update(compile_json(bundle))
+    if out is not None:
+        blob = json.dumps(cat, indent=2, sort_keys=True) + "\n"
+        pathlib.Path(out).write_text(blob)
+        return sorted(compile_json(bundle))
     # The four original keys stay catalogue wide, because `operations` is: the
     # Go server embeds every bundle's atoms and narrows at runtime by asking
     # the kernel which bundle it loaded (/facility), and its own test asserts
@@ -832,7 +849,7 @@ def write_catalogue(bundle):
     # the five keys added above are the one loaded bundle's. The API is the
     # place that answers per bundle: it serves vocab for the bundle it loaded.
     blob = json.dumps(cat, indent=2, sort_keys=True) + "\n"
-    out.write_text(blob)
+    base.write_text(blob)
     (ROOT / "care_phc_mcp" / "catalogue.json").write_text(blob)
     return sorted(compile_json(bundle))
 
@@ -840,7 +857,19 @@ def write_catalogue(bundle):
 def main():
     import json
     import sys
-    named = [a for a in sys.argv[1:] if not a.startswith("-")]
+    argv = sys.argv[1:]
+    # `--out PATH` writes ONE catalogue there and leaves the tracked copies
+    # alone, which is how a second bundle is compiled for a Go kernel to read.
+    # See write_catalogue.
+    out = None
+    if "--out" in argv:
+        at = argv.index("--out")
+        if at + 1 >= len(argv):
+            print("FAIL --out needs a path to write the catalogue to")
+            return 1
+        out = argv[at + 1]
+        argv = argv[:at] + argv[at + 2:]
+    named = [a for a in argv if not a.startswith("-")]
     try:
         bundle = load(named[0] if named else "phc")
     except DeclarationError as e:
@@ -848,7 +877,9 @@ def main():
             print(f"FAIL {line}")
         return 1
     if "--json" not in sys.argv:
-        print("ok   catalogue.json now carries %s" % ", ".join(write_catalogue(bundle)))
+        where = out or "catalogue.json"
+        print("ok   %s now carries %s"
+              % (where, ", ".join(write_catalogue(bundle, out=out))))
     print("ok   %d records mapped from %d operations' answers to their columns"
           % (sum(len(op["mapping"]) for op in bundle.operations.values()),
              sum(1 for op in bundle.operations.values() if op["mapping"])),

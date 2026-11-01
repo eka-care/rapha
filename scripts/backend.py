@@ -30,6 +30,21 @@ The environment contract is the backend's, not this file's
 PHC_DB, PHC_BUNDLE and PHC_FACILITY mean the same thing to both backends, and
 a caller sets them the same way for either. That is deliberate: a check that
 had to know which backend it was configuring would be back where it started.
+
+WHICH IS WHY THE SECOND BUNDLE'S CATALOGUE IS COMPILED HERE
+-----------------------------------------------------------
+A Go kernel reads catalogue.json from the tree, and the tracked one is
+compiled for ONE bundle at a time. So starting the Go backend on a second
+bundle needs that bundle's catalogue compiled somewhere and the process
+pointed at it, which is exactly the kind of per backend launch detail this
+file exists to own: `PHC_BUNDLE=lab` goes on meaning the same thing to a
+caller, and what it takes to honour it stops being the caller's problem.
+
+The compile is the PYTHON'S, and that is the architecture rather than a
+shortcut. Declarations compile to catalogue.json and an engine reads it; the
+Go engine does not recompile anything, and `python3 -m kernel.declarations
+<bundle> --out <path>` is the compiler writing its artifact where it is
+wanted. Nothing tracked is touched.
 """
 from __future__ import annotations
 
@@ -114,6 +129,41 @@ def build_go() -> pathlib.Path:
     return GO_API_BINARY
 
 
+# The artifact the compile step writes and a Go kernel reads, and the variable
+# that points one process at a different copy of it. Spelled here to match
+# care_phc_mcp's CatalogueEnv and CataloguePath.
+CATALOGUE = ROOT / "catalogue" / "catalogue.json"
+CATALOGUE_ENV = "PHC_CATALOGUE"
+
+
+def compiled_bundle() -> str:
+    """Which bundle the tracked catalogue.json was compiled for."""
+    import json
+    with open(CATALOGUE) as f:
+        return str(json.load(f)["manifest"]["id"])
+
+
+def catalogue_for(bundle: str, at) -> pathlib.Path:
+    """Compile `bundle`'s catalogue to `at`, and say where it is.
+
+    Loud on failure, for the reason build_go is: a check that quietly carried
+    on would start the Go kernel on the tracked catalogue, which is a
+    DIFFERENT BUNDLE, and the kernel's own refusal would then read as the
+    check's failure rather than as this step's.
+    """
+    at = pathlib.Path(at)
+    done = subprocess.run(
+        [sys.executable, "-m", "kernel.declarations", bundle, "--out", str(at)],
+        cwd=str(ROOT), capture_output=True, text=True)
+    if done.returncode != 0 or not at.exists():
+        raise SystemExit(
+            "\nthe %r bundle's catalogue did not compile, so the Go backend "
+            "has nothing to serve it from.\n\n  python3 -m kernel.declarations "
+            "%s --out %s\n\n%s%s\n"
+            % (bundle, bundle, at, done.stdout, done.stderr))
+    return at
+
+
 def command(port: int) -> list:
     """The argv that starts the chosen backend on `port`."""
     if chosen() == GO:
@@ -147,6 +197,18 @@ class Server:
             where["PHC_BUNDLE"] = bundle
         if facility is not None:
             where["PHC_FACILITY"] = facility
+
+        # A Go kernel reads catalogue.json from the tree, and the tracked one
+        # holds ONE bundle's declarations. So a second bundle gets its own
+        # compiled copy beside this server's database, and this process alone
+        # is pointed at it. Only when it is actually a different bundle: the
+        # ordinary case reads the tracked file, which is what every other
+        # check already measures.
+        if (self.backend == GO and bundle is not None
+                and bundle != compiled_bundle()
+                and CATALOGUE_ENV not in (env or {})):
+            where[CATALOGUE_ENV] = str(catalogue_for(
+                bundle, str(db) + ".catalogue.json"))
         where.update(env or {})
 
         self.proc = subprocess.Popen(

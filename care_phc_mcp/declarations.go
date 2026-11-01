@@ -138,8 +138,15 @@ func (c *Catalogue) LoadDeclarations() error {
 		Metrics    json.RawMessage            `json:"metrics"`
 		Documents  json.RawMessage            `json:"documents"`
 	}
-	if err := json.Unmarshal(catalogueJSON, &raw); err != nil {
-		return fmt.Errorf("the embedded catalogue is not an object: %w", err)
+	// c.raw and not the embedded copy: Load may have read the tree, and two
+	// readers reaching for different bundles would serve one bundle's manifest
+	// over the other's workflow with nothing saying so.
+	if len(c.raw) == 0 {
+		return fmt.Errorf("this catalogue was not built by Load, so there are " +
+			"no bytes to read the declarations out of")
+	}
+	if err := json.Unmarshal(c.raw, &raw); err != nil {
+		return fmt.Errorf("the catalogue at %s is not an object: %w", c.Source, err)
 	}
 	c.Workflow = nil
 	c.MappingRaw = raw.Mapping
@@ -313,8 +320,9 @@ func (c *Catalogue) CompiledJSON() (map[string]any, error) {
 			"call LoadDeclarations before serving GET /catalogue")
 	}
 	body := map[string]any{}
-	if err := pyval.Decode(catalogueJSON, &body); err != nil {
-		return nil, fmt.Errorf("the embedded catalogue is not an object: %w", err)
+	if err := pyval.Decode(c.raw, &body); err != nil {
+		return nil, fmt.Errorf("the catalogue at %s is not an object: %w",
+			c.Source, err)
 	}
 	caps := append([]string(nil), c.Vocabulary.Capabilities...)
 	sort.Strings(caps)
