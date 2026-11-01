@@ -11,9 +11,16 @@
  *  What this does NOT change, because it is the whole safety property of the
  *  voice instrument: a number heard is a number in an editable field, drawn
  *  as unconfirmed, committed by a tap and validated exactly as a typed one.
- *  Nothing here commits, and the number grammar in packages/voice still
- *  decides what reaches a field, so a transcript this file cannot parse fills
- *  nothing at all. Only the source of the words changed.
+ *  Nothing here commits.
+ *
+ *  WHAT COMES BACK IS THE SERVICE'S OWN ANSWER FOR THIS FORM, not its raw
+ *  transcript. The template it filled is built from the operation's declared
+ *  questions, so it answers the questions and ignores everything else said in
+ *  the room, with the words it took each value from beside it. A number
+ *  grammar used to re-read the transcript here and refused the whole reading
+ *  over a stray phrase, which is a worse reading of the same recording and
+ *  threw away the evidence. `narrow()` holds the answer to the fields this
+ *  instrument declares.
  *
  *  Consent is not re-implemented here and must not be. The upload is the
  *  kernel's own `/scribe/sessions`, which refuses a visit without
@@ -84,7 +91,7 @@ export function recordReading(thread: string, operation: string, language = "en-
         await wait(POLL_MS);
         s = await pollSession(id);
       }
-      if (keep) finish(heardFrom(s));
+      if (keep) finish(heardFrom(s, operation));
     } catch (e) {
       // The kernel's own words, which on a visit with no consent are the
       // refusal itself. Shown as they came rather than paraphrased here.

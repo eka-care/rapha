@@ -135,7 +135,11 @@ for (const f of sources) {
     const hit = line.match(OUTSIDE);
     if (!hit) continue;
     ok(
-      ["../scribe/reading", "../types", "../validate.ts"].includes(hit[1]) || hit[1].startsWith("../../"),
+      // ../scribe/session is the pure half: shapes and the two decisions
+      // about what a reading says and what an instrument may take from it.
+      // It is already held to the no-write rule by the loop above this one.
+      ["../scribe/reading", "../scribe/session", "../types", "../validate.ts"]
+        .includes(hit[1]) || hit[1].startsWith("../../"),
       `${f} imports ${hit[1]}, which is not on the short list the voice path may reach for`,
     );
   }

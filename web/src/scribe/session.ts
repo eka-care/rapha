@@ -263,23 +263,59 @@ export function preview(value: unknown): string {
   return String(value ?? "");
 }
 
-/** Words from one spoken reading, or the reason there are none.
+/** One spoken reading: what the service filled, the words, or the reason
+ *  there are none.
  *
  *  An empty `reason` means the person stopped it themselves and is owed no
  *  sentence; every other empty transcript carries one. */
-export type Heard = { transcript: string; reason?: string };
+export type Heard = { transcript: string; reason?: string; draft?: ScribeDraft };
 
 /** A reading session's outcome, in the words the station shows.
  *
  *  Pure, and separate from web/src/scribe/reading.ts for the reason the rest
  *  of this file is: the microphone cannot be checked without a microphone,
  *  and this is the half that decides what a nurse is told. */
-export function heardFrom(s: ScribeSession): Heard {
+export function heardFrom(s: ScribeSession, operation: string): Heard {
   if (s.status === "withdrawn") return { transcript: "", reason: "" };
   if (s.status === "running")
     return { transcript: "", reason: "Transcribing is taking too long. Type the values." };
   if (s.status === "failed")
     return { transcript: "", reason: s.reason || "The reading was not transcribed. Type the values." };
-  if (s.transcript.trim()) return { transcript: s.transcript };
+  const draft = draftFor(s, operation) ?? undefined;
+  if (draft && Object.keys(draft.values).length) return { transcript: s.transcript, draft };
+  if (s.transcript.trim())
+    return { transcript: s.transcript, draft,
+             reason: s.reason || "Nothing in that was for this form." };
   return { transcript: "", reason: s.reason || "Nothing was said. Type the values." };
+}
+
+/** The declared half of a draft, for an instrument that may fill only some of
+ *  an operation's questions.
+ *
+ *  THIS IS WHERE `fields:` ON THE INSTRUMENT STOPS BEING DECORATION. The
+ *  template the service filled is built from the operation's whole
+ *  questionnaire, so its answer can carry questions this instrument was never
+ *  declared for. A narrowed declaration has to narrow what reaches the form,
+ *  or `fields:` is a comment. Anything dropped is NAMED in `unfilled` rather
+ *  than discarded in silence, which is the same rule the service's own
+ *  answer follows.
+ *
+ *  Values that are not numbers are dropped by the same rule, because the
+ *  instruments that use this declare `grammar: number`: a sentence of prose
+ *  put in a blood pressure box is not a reading.
+ */
+export function narrow(draft: ScribeDraft, fields: string[]): ScribeDraft {
+  const declared = new Set(fields);
+  const keep = (id: string) => declared.has(id) && typeof draft.values[id] === "number";
+  const ids = Object.keys(draft.values);
+  const pick = <T,>(bag: Record<string, T>) =>
+    Object.fromEntries(Object.entries(bag).filter(([id]) => keep(id)));
+  return {
+    ...draft,
+    values: pick(draft.values),
+    confidence: pick(draft.confidence),
+    evidence: pick(draft.evidence),
+    tick: draft.tick.filter(keep),
+    unfilled: [...draft.unfilled, ...ids.filter((id) => !keep(id))],
+  };
 }

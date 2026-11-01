@@ -119,7 +119,13 @@ export function OperationPanel({
   const schema = questionnaire(op.input);
   const [payload, setPayload] = useState<Payload>({ ...(proposal?.payload ?? draft?.values ?? seed ?? start ?? {}) });
   const [ticked, setTicked] = useState<Set<string>>(new Set());
-  const unticked = mustTick(draft ?? null, ticked, payload);
+  /** A reading spoken into THIS panel, as against one the encounter handed
+   *  down in `draft`. Both are the same thing from the same service, and the
+   *  tick rule does not care which arrived first: a value a recording filled
+   *  is confirmed field by field, or it is not committed. */
+  const [spoken, setSpoken] = useState<ScribeDraft | null>(null);
+  const heardDraft = spoken ?? draft ?? null;
+  const unticked = mustTick(heardDraft, ticked, payload);
   /** Per link_id, how sure the instrument that produced the value was. A
    *  value under 0.9 draws the field as unconfirmed. Typing over a value
    *  clears its entry: a number a person typed is not a heard number. */
@@ -254,9 +260,13 @@ export function OperationPanel({
   /** What an instrument produced. It lands in the same editable fields a
    *  person types into and it is committed by the same tap. There is no other
    *  path from here: this sets state, and state is not a write. */
-  const fromInstrument = (values: Record<string, unknown>, confidence: Record<string, number>) => {
-    setPayload((was) => ({ ...was, ...values }));
-    setHeard((was) => ({ ...was, ...confidence }));
+  const fromInstrument = (heardNow: ScribeDraft) => {
+    setPayload((was) => ({ ...was, ...heardNow.values }));
+    setHeard((was) => ({ ...was, ...heardNow.confidence }));
+    // A second reading owes its own ticks. Carrying the first one's over
+    // would commit a number nobody read.
+    setTicked(new Set());
+    setSpoken(heardNow);
     invalidate();
   };
 
@@ -393,7 +403,7 @@ export function OperationPanel({
           payload={payload}
           disabled={busy}
           ids={ids}
-          onValues={fromInstrument}
+          onDraft={fromInstrument}
         />
 
         {/* Gone the moment the form is showing. What is left of it by then is
@@ -449,7 +459,7 @@ export function OperationPanel({
           problems={tried ? problems : []}
           confidence={{ ...(proposal?.confidence ?? {}), ...heard }}
           sources={fromAbha}
-          evidence={draft?.evidence ?? found?.evidence}
+          evidence={heardDraft?.evidence ?? found?.evidence}
           ticks={{ need: unticked, ticked, onTick: (id) => setTicked((s) => new Set(s).add(id)) }}
           disabled={busy}
         />}
@@ -487,8 +497,8 @@ export function OperationPanel({
       </div>
 
       {unticked.length > 0 && <div className="f-hint unsure">Tick each heard value to commit ({unticked.length} left).</div>}
-      {draft && draft.unfilled.length > 0 && (
-        <div className="f-hint">Heard but not filled: {draft.unfilled.map((id) => labels.get(id) ?? id).join(", ")}</div>
+      {heardDraft && heardDraft.unfilled.length > 0 && (
+        <div className="f-hint">Heard but not filled: {heardDraft.unfilled.map((id) => labels.get(id) ?? id).join(", ")}</div>
       )}
       <div className="mod-f">
         <span style={{ flex: 1 }} />

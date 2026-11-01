@@ -22,8 +22,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   apply,
-  at, draftFor, elsewhere, heardFrom, mergeDrafts, mustTick, pickMime, preview, reasonFor,
-  sentence,
+  at, draftFor, elsewhere, heardFrom, mergeDrafts, mustTick, narrow, pickMime, preview,
+  reasonFor, sentence,
   type ScribeDraft, type ScribeSession,
 } from "./session.ts";
 import type { Questionnaire } from "../types";
@@ -348,24 +348,71 @@ ok(!/mic-live/.test(rec) && !/Microphone live/.test(rec),
 // owner's decision that every aspect of scribing goes through the medical
 // scribe service. What a nurse is told about a reading is decided here, and
 // the one case that must never carry a sentence is the one they caused.
+const VITALS = "phc.op.vitals-record";
+const spoke = (values: Record<string, unknown>, over: Partial<ScribeDraft> = {}): ScribeDraft =>
+  ({ instrument: "phc.inst.vitals-voice", operation: VITALS, values,
+     confidence: Object.fromEntries(Object.keys(values).map((k) => [k, 0.89])),
+     evidence: Object.fromEntries(Object.keys(values).map((k) => [k, "said " + k])),
+     tick: Object.keys(values), unfilled: [], transcript: "", ...over });
+
 const reading = (over: Partial<ScribeSession>): ScribeSession =>
   ({ session: "scr-1", status: "ready", reason: "", drafts: [], transcript: "",
-     operations: ["phc.op.vitals-record"], ...over });
+     operations: [VITALS], ...over });
 
-ok(heardFrom(reading({ transcript: "one forty over ninety" })).transcript === "one forty over ninety",
-   "a ready reading hands the words up");
-ok(heardFrom(reading({ transcript: "one forty" })).reason === undefined,
-   "words need no sentence under them");
-ok(heardFrom(reading({ transcript: "   " })).reason?.includes("Type the values"),
+const filled = heardFrom(reading({ transcript: "Systolic BP 138.",
+                                   drafts: [spoke({ systolic: 138 })] }), VITALS);
+ok(filled.draft?.values.systolic === 138, "a ready reading hands the service's answer up");
+ok(filled.reason === undefined, "an answer needs no sentence under it");
+
+// The reading this was written for. The service answered the form and left
+// the rest of the sentence alone; a number grammar re-reading the transcript
+// refused all of it over "what do I get".
+const chatty = heardFrom(reading({
+  transcript: "What do I get? Systolic BP 95, Diastolic BP 100. Systolic.",
+  drafts: [spoke({ systolic: 95, diastolic: 100 })] }), VITALS);
+ok(Object.keys(chatty.draft?.values ?? {}).length === 2,
+   "words that answered no question do not refuse the words that did");
+
+ok(heardFrom(reading({ transcript: "the patient walked in",
+                       drafts: [spoke({})] }), VITALS).reason?.includes("for this form"),
+   "a recording about something else says so, and is not a failure");
+ok(heardFrom(reading({ transcript: "Systolic 138", drafts: [spoke({ systolic: 1 })] }),
+             "phc.op.consult-document").reason !== undefined,
+   "a draft for another operation is not this form's answer");
+ok(heardFrom(reading({ transcript: "   " }), VITALS).reason?.includes("Type the values"),
    "a reading with no words says so, and says what to do instead");
-ok(heardFrom(reading({ status: "failed", reason: "The service refused it." })).reason
+ok(heardFrom(reading({ status: "failed", reason: "The service refused it." }), VITALS).reason
      === "The service refused it.",
    "the kernel's own reason is shown, not a paraphrase of it");
-ok(heardFrom(reading({ status: "failed", reason: "" })).reason?.includes("Type the values"),
+ok(heardFrom(reading({ status: "failed", reason: "" }), VITALS).reason?.includes("Type the values"),
    "a failure with no reason still tells the nurse what to do");
-ok(heardFrom(reading({ status: "running" })).reason?.includes("too long"),
+ok(heardFrom(reading({ status: "running" }), VITALS).reason?.includes("too long"),
    "a reading still running when the polling gave up says so");
-ok(heardFrom(reading({ status: "withdrawn" })).reason === "",
+ok(heardFrom(reading({ status: "withdrawn" }), VITALS).reason === "",
    "a nurse who stopped it themselves is owed no sentence");
+
+// -- and narrowed to what the instrument declares --------------------------
+// `fields:` on the instrument is the whole point of this: the template is
+// built from the operation's questions, so the answer can carry a question
+// this instrument was never declared for.
+const wide = spoke({ systolic: 138, diastolic: 86, pulse: 88 });
+const three = narrow(wide, ["systolic", "diastolic", "pulse"]);
+ok(Object.keys(three.values).length === 3 && three.unfilled.length === 0,
+   "a declaration naming every field drops nothing");
+const one = narrow(wide, ["pulse"]);
+assert.deepEqual(Object.keys(one.values), ["pulse"]);
+checks++;
+assert.deepEqual(one.tick, ["pulse"]);
+checks++;
+assert.deepEqual(Object.keys(one.evidence), ["pulse"]);
+checks++;
+ok(one.unfilled.includes("systolic") && one.unfilled.includes("diastolic"),
+   "what the declaration excluded is NAMED, not silently dropped");
+ok(!one.confidence.systolic, "a dropped value drops its score with it");
+
+// `grammar: number` is a rule about what may reach a field, so it is one here.
+const prose = narrow(spoke({ systolic: "quite high" as unknown as number }), ["systolic"]);
+ok(Object.keys(prose.values).length === 0 && prose.unfilled.includes("systolic"),
+   "prose in a number field is named rather than filled");
 
 console.log(`ok   scribe: ${checks} checks`);
