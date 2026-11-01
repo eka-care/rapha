@@ -178,6 +178,21 @@ type Facilities struct {
 // `capabilities`, `bundles` and `states` below are the union over every
 // bundle, because this file is embedded whole and narrowed at runtime; these
 // are the one bundle's, which is what api/main.py has always served.
+//
+// THIS STRUCT IS NOT THE WHOLE OF THAT KEY, AND THAT IS SAID HERE SO IT IS
+// NOT DISCOVERED. `vocabulary` also carries `capability_titles` and
+// `role_titles`: what a person reads for a capability and for a role, which
+// bundles/<id>/bundle.yaml declares beside the id. They are NOT typed here,
+// because nothing in Go reads a word a person reads. They still reach the
+// browser from this engine: CompiledJSON serves the catalogue body whole and
+// substitutes exactly four keys, so `vocabulary` travels as the Python
+// compiled it. scripts/check_go_parity.py compares GET /catalogue between the
+// two engines byte for byte, which is what holds that true.
+//
+// The three fields below keep their shapes for the same reason the titles
+// sit beside them rather than inside them: GET /roles serves `Roles` as the
+// shipped presets and a save is validated against `Capabilities`, so a name
+// is a new fact about a word and never a new shape for the word.
 type Vocabulary struct {
 	Capabilities []string            `json:"capabilities"`
 	Roles        map[string][]string `json:"roles"`

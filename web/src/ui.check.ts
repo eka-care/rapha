@@ -76,6 +76,12 @@ function vocabulary(): { word: string; kind: string }[] {
   add("capability", catalogue.capabilities);
   add("flag", catalogue.states);
   add("role", Object.keys(catalogue.bundles ?? {}));
+  // What a capability and a role are CALLED. The same rule as a view's title
+  // just below: the bundle chose the word, so a screen may print it and may
+  // never type it. Without this, declaring the words would have handed the
+  // renderer sixteen new strings it could hard-code and nothing would notice.
+  add("capability title", Object.values(catalogue.vocabulary?.capability_titles ?? {}));
+  add("role title", Object.values(catalogue.vocabulary?.role_titles ?? {}));
   const stations = new Set<string>();
   for (const wf of Object.values(catalogue.workflows ?? {}) as { steps?: { station: string }[] }[]) {
     for (const step of wf.steps ?? []) stations.add(step.station);
@@ -244,6 +250,35 @@ const IMPLEMENTED = [
   // that would get it wrong.
   assert.ok(!/facility: Withheld = /.test(grants),
     "the withheld map has no default; 'nothing is withheld' must never be assumed");
+
+  // The role editor again, and the other half of the same rule. `inert()` is
+  // about whether a switch does anything; this is about what it is CALLED. A
+  // capability and a role each declare their own `title:`, and the editor
+  // reads it first, before the derivations it used to rely on entirely. Four
+  // capabilities had nothing to print but their identifier and two had five
+  // screen names joined with a dot, and the fix for both was a declaration.
+  assert.match(settings, /cat\.vocabulary\?\.capability_titles\?\.\[cap\]/,
+    "a switch is named by the capability's own declared title, first of all");
+  assert.match(settings, /cat\.vocabulary\?\.role_titles\?\.\[role\]/,
+    "and a role in the picker by the role's own");
+  // And the words really are declared, for every one of them, so no row in
+  // that panel and no option in that picker falls through to a machine
+  // identifier. This reads the compiled catalogue and not the screen: a
+  // renderer that prefers a declaration is only half the promise, and the
+  // other half is that the declaration is there.
+  const titled = catalogue.vocabulary?.capability_titles ?? {};
+  const roleWords = catalogue.vocabulary?.role_titles ?? {};
+  const nameless = [
+    ...((catalogue.vocabulary?.capabilities ?? []) as string[])
+      .filter((cap) => !titled[cap]).map((cap) => `capability ${cap}`),
+    ...Object.keys((catalogue.vocabulary?.roles ?? {}) as Record<string, string[]>)
+      .filter((role) => !roleWords[role]).map((role) => `role ${role}`),
+  ];
+  assert.deepEqual(nameless, [],
+    "this bundle declares no word for: " + nameless.join(", "));
+  ok(`roles: the editor reads declared titles, and all ${
+    Object.keys(titled).length} capabilities and ${
+    Object.keys(roleWords).length} roles have one`);
 
   // The patient screen. It chose three subject fields to show, which made it a
   // second opinion about what a subject is; messages.header() already reads

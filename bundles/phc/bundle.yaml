@@ -216,43 +216,92 @@ states:
 # What a person may do here. An atom naming anything else fails the per bundle
 # closure check in kernel/declarations.py.
 # addendum SSC. `handover` is the prototype's; it is a real operation, not a role.
+#
+# A capability carries its own `title:`, which is the words a person reads for
+# it. The shape is `plugins:` below: an id, and the bundle's own word for it.
+# A bundle may still write a plain list of ids, which is what bundles/lab
+# does, and then nothing declares a name and every reader falls back to what
+# it fell back to before. Mixing the two inside one bundle is refused:
+# kernel/declarations.py fails a mapping entry whose title is missing, in the
+# same sentence `plugins:` already fails under.
+#
+# WHY A CAPABILITY DECLARES ITS NAME RATHER THAN BORROWING ONE. The roles
+# control panel used to derive a switch's label from whichever declarations
+# named the capability: one operation lent its title, several lent their
+# `short`s joined with a dot, and a capability no operation named borrowed a
+# view's title instead. That is not a rule, it is an accident of how many
+# declarations happen to name a word. It printed `assessment.record` and three
+# others raw, because nothing named them; it printed "Lines, Needs you, Visit
+# summary" for `patient.find` and five screens joined for
+# `encounter.document`, because too much did. Both failures are the same
+# failure. A capability is a declaration in its own right, so the name is the
+# declaration's to give, and adding an operation can no longer rewrite it.
 capabilities:
-  - patient.find
-  - patient.register
-  - abha.link
-  - vitals.record
-  - assessment.record
-  - encounter.document
-  - rx.prescribe
-  - lab.order
-  - lab.result.enter
-  - lab.result.validate
-  - pharmacy.dispense
-  - visit.household
-  - appointment.book
-  - handover
-  - facility.admin
-  - reporting.view
+  patient.find:         {title: Find a patient}
+  patient.register:     {title: Register a new patient}
+  abha.link:            {title: Create or link an ABHA}
+  vitals.record:        {title: Record vitals and triage}
+  assessment.record:    {title: Record an assessment}
+  encounter.document:   {title: Document a consultation}
+  rx.prescribe:         {title: Write a prescription}
+  lab.order:            {title: Order an investigation}
+  lab.result.enter:     {title: Enter a laboratory result}
+  lab.result.validate:  {title: Validate a laboratory result}
+  pharmacy.dispense:    {title: Dispense a prescription}
+  visit.household:      {title: Record a household visit}
+  appointment.book:     {title: Book an appointment}
+  handover:             {title: Hand over to a colleague}
+  facility.admin:       {title: Administer this centre}
+  reporting.view:       {title: Read this centre's numbers}
 
 # Role bundles. Default bundles ship as CARE roles with is_system=True. A
 # facility's own combination is an is_system=False role in the DB, which CARE's
 # sync_permissions_roles command deliberately does not touch.
+#
+# A role carries its own `title:` beside its capabilities, which is again the
+# shape `plugins:` uses, and for the same reason: a role id is a machine name,
+# and the picker in the control panel could only case it, so it offered "Anm"
+# and "Mo" where a person expects the name of a job. These titles are the
+# standard job names in an Indian primary health centre. ASHA and ANM are
+# initialisms and stay upper case.
+#
+# A plain `role: [capabilities]` is still valid, which is what bundles/lab
+# writes, and a bundle that writes it declares no name.
 roles:
-  frontdesk: [patient.find, patient.register, abha.link, appointment.book, handover]
-  nurse: [patient.find, patient.register, abha.link, appointment.book,
-          vitals.record, assessment.record, handover]
-  mo: [patient.find, encounter.document, rx.prescribe, lab.order,
-       assessment.record, reporting.view, handover]
-  lab: [patient.find, lab.result.enter, handover]
-  lab_incharge: [patient.find, lab.result.enter, lab.result.validate, handover]
-  pharmacist: [patient.find, pharmacy.dispense, handover]
-  asha: [patient.find, patient.register, abha.link, visit.household,
-         assessment.record, appointment.book]
-  anm: [patient.find, patient.register, abha.link, visit.household,
-        assessment.record, appointment.book, vitals.record]
-  cho: [patient.find, patient.register, abha.link, visit.household,
-        assessment.record, appointment.book, vitals.record,
-        encounter.document, lab.order, rx.prescribe]
+  frontdesk:
+    title: Front desk
+    capabilities: [patient.find, patient.register, abha.link, appointment.book,
+                   handover]
+  nurse:
+    title: Staff nurse
+    capabilities: [patient.find, patient.register, abha.link, appointment.book,
+                   vitals.record, assessment.record, handover]
+  mo:
+    title: Medical officer
+    capabilities: [patient.find, encounter.document, rx.prescribe, lab.order,
+                   assessment.record, reporting.view, handover]
+  lab:
+    title: Laboratory technician
+    capabilities: [patient.find, lab.result.enter, handover]
+  lab_incharge:
+    title: Laboratory in charge
+    capabilities: [patient.find, lab.result.enter, lab.result.validate, handover]
+  pharmacist:
+    title: Pharmacist
+    capabilities: [patient.find, pharmacy.dispense, handover]
+  asha:
+    title: ASHA
+    capabilities: [patient.find, patient.register, abha.link, visit.household,
+                   assessment.record, appointment.book]
+  anm:
+    title: ANM
+    capabilities: [patient.find, patient.register, abha.link, visit.household,
+                   assessment.record, appointment.book, vitals.record]
+  cho:
+    title: Community health officer
+    capabilities: [patient.find, patient.register, abha.link, visit.household,
+                   assessment.record, appointment.book, vitals.record,
+                   encounter.document, lab.order, rx.prescribe]
 
 # --------------------------------------------------------------------------
 # A facility's shape

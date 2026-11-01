@@ -788,7 +788,20 @@ def _vocabulary(bundle_id):
     v = vocab.for_bundle(bundle_id)
     return {"capabilities": sorted(v.capabilities),
             "roles": {role: list(caps) for role, caps in dict(v.roles).items()},
-            "states": sorted(v.states)}
+            "states": sorted(v.states),
+            # What a person reads for a capability and for a role, which is the
+            # only thing these two declarations gained. Carried BESIDE them and
+            # not inside them, so `capabilities` is still the sorted list of
+            # ids and `roles` is still role to capability ids: GET /roles
+            # serves `roles` as the shipped presets, the Go engine types it as
+            # map[string][]string, and a save is validated against the list.
+            # A name is a new fact about a word, not a new shape for the word.
+            #
+            # Empty for a bundle that declares a plain list of ids, which is
+            # bundles/lab, and then a reader has no word to print and falls
+            # back exactly as it did before.
+            "capability_titles": dict(sorted(v.capability_titles.items())),
+            "role_titles": dict(sorted(v.role_titles.items()))}
 
 
 def compile_json(bundle):

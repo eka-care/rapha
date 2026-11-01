@@ -9,19 +9,28 @@
  *
  *  WHAT A SWITCH IS CALLED, and why this file names nothing. A capability id
  *  is a machine name; an administrator reads the declaration's own words or
- *  reads nothing. Three sources, in order, and all three are the kernel's:
+ *  reads nothing. Four sources, in order, and all four are the kernel's:
  *
- *    one operation holds it   -> that operation's `title`
- *    several hold it          -> each operation's `short`, joined
- *    no operation, but a view -> the view's own `title`
+ *    the capability's own `title`  -> that word
+ *    one operation holds it        -> that operation's `title`
+ *    several hold it               -> each operation's `short`, joined
+ *    no operation, but a view      -> the view's own `title`
  *
- *  A capability nothing declares a word for falls through to its identifier,
- *  drawn in the mono face so it is visibly an identifier and not a name. That
- *  is a MISSING DECLARATION rather than a licence to type a word here: a
- *  capability carries no `title:` of its own today, which is why
- *  `appointment.book`, `assessment.record` and `facility.admin` have nothing
- *  better to show. The same is true of a role, which is why the picker can
- *  only case an id.
+ *  THE FIRST ONE IS NEW AND IT IS THE ONE THAT SHOULD ANSWER. A capability
+ *  declares its own `title:` in bundle.yaml, so a switch is named by the thing
+ *  it switches rather than by whatever happens to hold it. The three
+ *  derivations below it were the whole answer until now and they failed at
+ *  both ends: nothing named `assessment.record`, `appointment.book`,
+ *  `facility.admin` or `lab.result.validate`, so all four printed raw; and too
+ *  much named `patient.find` and `encounter.document`, so those printed three
+ *  and five screen names joined with a dot. They are kept only for a bundle
+ *  that declares no titles, which is bundles/lab.
+ *
+ *  A capability nothing declares a word for still falls through to its
+ *  identifier, drawn in the mono face so it is visibly an identifier and not a
+ *  name. That is a MISSING DECLARATION rather than a licence to type a word
+ *  here. The same is true of a role: the picker reads the role's declared
+ *  `title:` and can still only case an id when a bundle declares none.
  *
  *  HOW THEY ARE GROUPED. By the plugin that declares them, under the plugin's
  *  own `title:`. A plugin is already "a named group of this bundle's own
@@ -45,17 +54,31 @@ type Row = { cap: string; label: string; declared: boolean; hasOp: boolean };
 
 function rowFor(cap: string, cat: Catalogue): Row {
   const ops = Object.values(cat.operations ?? {}).filter((o) => o.capability === cap);
-  if (ops.length === 1) {
-    return { cap, label: ops[0].title, declared: true, hasOp: true };
-  }
-  if (ops.length > 1) {
-    return { cap, label: ops.map((o) => o.short).join(" · "), declared: true, hasOp: true };
-  }
   const views = Object.values(cat.views ?? {}).filter((v) => v.capability === cap);
-  if (views.length) {
-    return { cap, label: views.map((v) => v.title).join(" · "), declared: true, hasOp: false };
+  // Whether an operation names this capability is a fact about the
+  // declarations and NOT about what the row is called, so it is settled before
+  // the label and never from it. Deriving it from whichever naming source won
+  // would make a declared title say "an operation holds this", and the
+  // workflow would then be asked why a capability it has never heard of is
+  // inert.
+  const hasOp = ops.length > 0;
+  const declaredTitle = cat.vocabulary?.capability_titles?.[cap];
+  if (declaredTitle) return { cap, label: declaredTitle, declared: true, hasOp };
+  if (ops.length === 1) return { cap, label: ops[0].title, declared: true, hasOp };
+  if (ops.length > 1) {
+    return { cap, label: ops.map((o) => o.short).join(" · "), declared: true, hasOp };
   }
-  return { cap, label: cap, declared: false, hasOp: false };
+  if (views.length) {
+    return { cap, label: views.map((v) => v.title).join(" · "), declared: true, hasOp };
+  }
+  return { cap, label: cap, declared: false, hasOp };
+}
+
+/** What a role is called: its own declared `title:`, or a cased id when the
+ *  bundle declares none. Nothing is typed here either way, which is why the
+ *  picker offered "Anm" and "Mo" until the declaration carried the words. */
+function roleName(role: string, cat: Catalogue): string {
+  return cat.vocabulary?.role_titles?.[role] || title(role);
 }
 
 type Group = { key: string; title: string | null; rows: Row[] };
@@ -161,7 +184,9 @@ export function Roles({
             onChange={(e) => setRole(e.target.value)}
           >
             {editable.length
-              ? editable.map((r) => <option key={r} value={r}>{title(r)}</option>)
+              ? editable.map((r) => (
+                  <option key={r} value={r}>{roleName(r, cat)}</option>
+                ))
               : <option>No roles to edit</option>}
           </select>
         </label>

@@ -198,6 +198,16 @@ export type Catalogue = {
    *  is the grouping a centre already thinks in; the role editor reads it
    *  rather than inventing headings of its own. */
   plugins?: Record<string, { title: string; always?: boolean; capabilities?: string[] }>;
+  /** The LOADED bundle's own words, as opposed to `capabilities` and
+   *  `bundles` above, which GET /catalogue narrows but catalogue.json keeps as
+   *  the union over every bundle. Only the two title maps are read here: what
+   *  a person reads for a capability and for a role, declared in bundle.yaml
+   *  beside the id. A bundle that declares a plain list of ids sends neither,
+   *  and the screens that print them say what they do instead. */
+  vocabulary?: {
+    capability_titles?: Record<string, string>;
+    role_titles?: Record<string, string>;
+  };
 };
 
 /** GET /facility: which bundle this kernel loaded, and who is asking. */

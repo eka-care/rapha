@@ -125,14 +125,24 @@ BODY_SECTIONS = (
 class Vocabulary:
     """One bundle's own closed lists. Frozen after construction."""
 
-    __slots__ = ("id", "stations", "states", "capabilities", "roles")
+    __slots__ = ("id", "stations", "states", "capabilities", "roles",
+                 "capability_titles", "role_titles")
 
-    def __init__(self, id, stations, states, capabilities, roles):
+    def __init__(self, id, stations, states, capabilities, roles,
+                 capability_titles=None, role_titles=None):
         self.id = id
         self.stations = tuple(stations)
         self.states = frozenset(states)
         self.capabilities = frozenset(capabilities)
         self.roles = {k: list(v) for k, v in (roles or {}).items()}
+        # What a person reads for a capability and for a role. Empty for a
+        # bundle that declares its words as a plain list of ids, which is the
+        # whole of the backward compatibility: no title, no entry, and every
+        # reader falls back to what it fell back to before. A key present
+        # with an empty value is a declaration that forgot its title, which
+        # `problems()` refuses rather than passes on to a screen.
+        self.capability_titles = dict(capability_titles or {})
+        self.role_titles = dict(role_titles or {})
 
     def __repr__(self):
         return "Vocabulary(%r, %d stations, %d states, %d capabilities, %d roles)" % (
@@ -152,6 +162,16 @@ class Vocabulary:
                 if cap not in self.capabilities:
                     bad.append("bundle.yaml: role '%s' holds '%s', which this bundle "
                                "does not declare" % (role, cap))
+        # A capability or a role declared in the mapping form has said it
+        # carries a name, so a missing one is a declaration half written and
+        # not a bundle that chose the plain list. Same sentence
+        # kernel/plugins.py fails a titleless plugin under, because it is the
+        # same mistake.
+        for key, titles in (("capabilities", self.capability_titles),
+                            ("roles", self.role_titles)):
+            for id_, word in sorted(titles.items()):
+                if not str(word).strip():
+                    bad.append("bundle.yaml %s.%s: missing title" % (key, id_))
         return bad
 
 
@@ -159,11 +179,49 @@ def _manifest(bundle_id):
     return yaml.safe_load((BUNDLES_DIR / bundle_id / "bundle.yaml").read_text())
 
 
+def _capabilities(declared):
+    """`capabilities:` either way round, as (ids, {id: title}).
+
+    A mapping of id to the words a person reads for it is the shape
+    bundles/phc writes, and it is `plugins:`' shape. A plain list of ids is
+    what bundles/lab writes, and it declares no names, so the titles come back
+    empty and nothing downstream has a word to print. An entry whose title is
+    missing is carried as the empty string rather than dropped, so
+    `problems()` can refuse it.
+    """
+    if isinstance(declared, dict):
+        return (list(declared),
+                {cap: (body or {}).get("title") or "" for cap, body in declared.items()})
+    return list(declared or ()), {}
+
+
+def _roles(declared):
+    """`roles:` either way round, as ({role: capabilities}, {role: title}).
+
+    `role: {title, capabilities}` is bundles/phc's and is `plugins:`' shape; a
+    bare `role: [capabilities]` is bundles/lab's and names nothing. The
+    capability lists are identical either way, which is the point: a title is
+    the only thing being added, and what a role HOLDS has not changed shape
+    for anybody reading it.
+    """
+    roles, titles = {}, {}
+    for role, body in (declared or {}).items():
+        if isinstance(body, dict):
+            roles[role] = list(body.get("capabilities") or ())
+            titles[role] = body.get("title") or ""
+        else:
+            roles[role] = list(body or ())
+    return roles, titles
+
+
 def from_manifest(fm):
     """The vocabulary a parsed bundle.yaml declares."""
+    caps, cap_titles = _capabilities(fm.get("capabilities"))
+    roles, role_titles = _roles(fm.get("roles"))
     return Vocabulary(id=fm.get("id", "?"), stations=fm.get("stations") or (),
-                      states=fm.get("states") or (), capabilities=fm.get("capabilities") or (),
-                      roles=fm.get("roles") or {})
+                      states=fm.get("states") or (), capabilities=caps,
+                      roles=roles, capability_titles=cap_titles,
+                      role_titles=role_titles)
 
 
 @functools.lru_cache(maxsize=None)
@@ -182,14 +240,18 @@ def every():
     """The union over every bundle on disk. For linting catalogue/ops/*.md,
     which is shared, and for nothing else: a union is not a closure."""
     stations, states, caps, roles = [], set(), set(), {}
+    cap_titles, role_titles = {}, {}
     for bid in bundle_ids():
         v = for_bundle(bid)
         stations += [s for s in v.stations if s not in stations]
         states |= set(v.states)
         caps |= set(v.capabilities)
         roles.update(v.roles)
+        cap_titles.update(v.capability_titles)
+        role_titles.update(v.role_titles)
     return Vocabulary(id="*", stations=stations, states=states,
-                      capabilities=caps, roles=roles)
+                      capabilities=caps, roles=roles,
+                      capability_titles=cap_titles, role_titles=role_titles)
 
 
 ACTIVE = os.environ.get("PHC_BUNDLE", "phc")

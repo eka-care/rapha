@@ -3841,7 +3841,10 @@ def go_lint(cases, tmp):
             "plugins": manifest.get("plugins") or {},
             "facilities": {"default": manifest.get("facility") or "",
                            "declared": manifest.get("facilities") or {}},
-            "capabilities": manifest.get("capabilities") or [],
+            # `capabilities:` may be a mapping of id to its declared title,
+            # and the Go Shape takes the ids. Iterating either shape yields
+            # the ids, which is what both lints build a set from.
+            "capabilities": list(manifest.get("capabilities") or []),
             "operations": _catalogue_operations(),
             "workflows": [{"id": fm["id"], "steps": fm.get("steps") or []}
                           for fm in _workflow_frontmatter()],

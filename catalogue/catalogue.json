@@ -2986,6 +2986,35 @@
       "visit.household",
       "vitals.record"
     ],
+    "capability_titles": {
+      "abha.link": "Create or link an ABHA",
+      "appointment.book": "Book an appointment",
+      "assessment.record": "Record an assessment",
+      "encounter.document": "Document a consultation",
+      "facility.admin": "Administer this centre",
+      "handover": "Hand over to a colleague",
+      "lab.order": "Order an investigation",
+      "lab.result.enter": "Enter a laboratory result",
+      "lab.result.validate": "Validate a laboratory result",
+      "patient.find": "Find a patient",
+      "patient.register": "Register a new patient",
+      "pharmacy.dispense": "Dispense a prescription",
+      "reporting.view": "Read this centre's numbers",
+      "rx.prescribe": "Write a prescription",
+      "visit.household": "Record a household visit",
+      "vitals.record": "Record vitals and triage"
+    },
+    "role_titles": {
+      "anm": "ANM",
+      "asha": "ASHA",
+      "cho": "Community health officer",
+      "frontdesk": "Front desk",
+      "lab": "Laboratory technician",
+      "lab_incharge": "Laboratory in charge",
+      "mo": "Medical officer",
+      "nurse": "Staff nurse",
+      "pharmacist": "Pharmacist"
+    },
     "roles": {
       "anm": [
         "patient.find",
