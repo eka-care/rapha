@@ -90,6 +90,13 @@ export function tokens(transcript: string): string[] {
     .replace(/(\d)\s*\/\s*(\d)/g, "$1 over $2")   // "140/90"
     .replace(/[^a-z0-9./]+/g, " ")
     .split(" ")
+    // A full stop ENDING a token is the end of a sentence, never part of a
+    // number: "36.8" keeps its point and "86." does not. The browser's own
+    // recogniser returned no punctuation at all, so this never came up until
+    // the words started arriving from the scribe service, which punctuates.
+    // Without it one full stop refused a whole reading, and the nurse was
+    // told nothing was taken from it.
+    .map((t) => (t.endsWith(".") ? t.slice(0, -1) : t))
     .filter((t) => t.length > 0 && !FILLER.has(t));
 }
 

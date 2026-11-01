@@ -11,12 +11,19 @@
  * is absent code, not a remembered convention.
  *
  * Fails closed. An empty Draft means: show the numeric keypad. That happens
- * when the recogniser is unavailable, hears nothing, errors, returns a low
- * confidence, or returns something the grammar refuses to guess at.
+ * when nothing was heard, the transcription failed, the confidence is low,
+ * or the words are something the grammar refuses to guess at.
  *
- * Uses the browser Web Speech API, which needs no key and no server. Chrome
- * and Edge implement it; Firefox does not, and there `available()` is false
- * and the caller shows the keypad.
+ * This module no longer listens. It used to drive the browser's Web Speech
+ * API, which is one vendor's speech service wearing a browser interface, and
+ * on a health centre's line it answers `network` and the nurse is told to
+ * type. The owner's decision of 2026-11-01 is that every aspect of scribing
+ * goes through the medical scribe service, so the words now arrive from
+ * web/src/scribe/reading.ts and this file is the pure half it feeds: the
+ * decision about what a transcript is allowed to put in a field.
+ *
+ * That half is the one worth keeping. It is what refuses a plausible
+ * mishearing, and it runs under plain node with no microphone and no network.
  */
 import { parse, type FieldSpec } from "./grammar.ts";
 
@@ -62,133 +69,4 @@ export function toDraft(
     confidence[id] = combined;
   }
   return { ...meta, values: got.values, confidence, transcript };
-}
-
-type Recogniser = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  maxAlternatives: number;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((e: any) => void) | null;
-  onerror: ((e: any) => void) | null;
-  onend: (() => void) | null;
-};
-
-function recogniser(): Recogniser | null {
-  const w = globalThis as any;
-  const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
-  return Ctor ? (new Ctor() as Recogniser) : null;
-}
-
-export function available(): boolean {
-  return recogniser() !== null;
-}
-
-export type ListenOptions = {
-  fields: FieldSpec[];
-  instrument: string;
-  operation: string;
-  /** en-IN by default: the recogniser's Indian English acoustic model reads
-   *  "one forty" and Indian names markedly better than en-US does. */
-  lang?: string;
-  timeoutMs?: number;
-  /** Aborting stops the microphone and resolves with an empty Draft, which
-   *  means keypad. There is no shape of abort that commits anything. */
-  signal?: AbortSignal;
-};
-
-/**
- * Listen once for a value, and resolve with a Draft the caller must render.
- *
- * The caller's contract: draw every value in an editable field, highlight it
- * as unconfirmed, and commit only on a tap. An empty Draft means keypad.
- */
-export function captureValue(opts: ListenOptions): Promise<Draft> {
-  const meta = { instrument: opts.instrument, operation: opts.operation };
-  const rec = recogniser();
-  if (!rec) {
-    return Promise.resolve({
-      ...meta, values: {}, confidence: {},
-      reason: "this browser has no speech recognition",
-    });
-  }
-  rec.lang = opts.lang ?? "en-IN";
-  rec.continuous = false;
-  rec.interimResults = false;
-  rec.maxAlternatives = 1;
-
-  return new Promise<Draft>((resolve) => {
-    let done = false;
-    const finish = (d: Draft) => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      try { rec.abort(); } catch { /* already stopped */ }
-      resolve(d);
-    };
-    const timer = setTimeout(
-      () => finish({ ...meta, values: {}, confidence: {}, reason: "heard nothing" }),
-      opts.timeoutMs ?? 8000,
-    );
-    opts.signal?.addEventListener(
-      "abort",
-      () => finish({ ...meta, values: {}, confidence: {}, reason: "stopped" }),
-      { once: true },
-    );
-
-    rec.onresult = (e: any) => {
-      const alt = e.results?.[e.results.length - 1]?.[0];
-      if (!alt) return finish({ ...meta, values: {}, confidence: {}, reason: "heard nothing" });
-      finish(toDraft(String(alt.transcript ?? ""), Number(alt.confidence ?? 0), opts.fields, meta));
-    };
-    rec.onerror = (e: any) =>
-      finish({ ...meta, values: {}, confidence: {}, reason: `microphone: ${e?.error ?? "error"}` });
-    rec.onend = () =>
-      finish({ ...meta, values: {}, confidence: {}, reason: "heard nothing" });
-
-    rec.start();
-  });
-}
-
-/**
- * Narrative dictation. A separate mode, and separate on purpose: this produces
- * draft prose for a text field, such as the history in a consultation note. It
- * is not allowed anywhere near a discrete value, which is why it returns text
- * and never a Draft, and why the scribe instrument may not attach to vitals.
- *
- * The text still lands in an editable field that a clinician reads and taps.
- */
-export function dictate(opts: {
-  lang?: string;
-  onText?: (text: string) => void;
-  timeoutMs?: number;
-}): { stop: () => void; done: Promise<string> } {
-  const rec = recogniser();
-  if (!rec) return { stop: () => {}, done: Promise.resolve("") };
-  rec.lang = opts.lang ?? "en-IN";
-  rec.continuous = true;
-  rec.interimResults = true;
-  rec.maxAlternatives = 1;
-
-  let text = "";
-  let resolve!: (s: string) => void;
-  const done = new Promise<string>((r) => (resolve = r));
-  const stop = () => {
-    try { rec.stop(); } catch { /* already stopped */ }
-  };
-
-  rec.onresult = (e: any) => {
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      if (e.results[i].isFinal) text += e.results[i][0].transcript;
-    }
-    opts.onText?.(text);
-  };
-  rec.onerror = () => stop();
-  rec.onend = () => resolve(text.trim());
-  rec.start();
-  if (opts.timeoutMs) setTimeout(stop, opts.timeoutMs);
-  return { stop, done };
 }

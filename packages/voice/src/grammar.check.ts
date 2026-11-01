@@ -88,14 +88,31 @@ ok(toDraft("systolic sixty two five", 0.99, one("systolic"), META).reason !== un
 ok(Object.keys(toDraft("", 0.99, FIELDS, META).values).length === 0, "silence yields no value");
 ok(FAIL_CLOSED_BELOW > 0, "there is a floor");
 
-// The browser plumbing cannot be exercised here, but its fail closed branch
-// can: node has no SpeechRecognition, and that must read as "keypad", not as
-// a hang or a throw.
-import { available, captureValue } from "./v2dd.ts";
-ok(available() === false, "no recogniser outside a browser");
-const none = await captureValue({ fields: one("systolic"), ...META });
-ok(Object.keys(none.values).length === 0 && none.reason !== undefined,
-   "with no recogniser the caller is told to show the keypad");
+// A real answer from the scribe service, copied from a live reading on
+// 2026-11-01: five vitals in one punctuated sentence. The browser's own
+// recogniser punctuated nothing, so a trailing full stop had never been seen
+// here, and one of them refused the whole reading.
+const said = "Blood Pressure 138/86. Pulse 88. Weight 61 kg. Temperature 36.8.";
+const spoken = toDraft(said, 0, FIELDS, META);
+ok(JSON.stringify(spoken.values)
+     === JSON.stringify({ systolic: 138, diastolic: 86, pulse: 88, weight: 61, temperature: 36.8 }),
+   `all five vitals are read out of one punctuated sentence: ${JSON.stringify(spoken.values)}`);
+ok(Object.values(spoken.confidence).every((c) => c < 0.9),
+   "nothing heard reads as confirmed, whoever transcribed it");
+ok(toDraft("temperature 36.8", 0, one("temperature"), META).values.temperature === 36.8,
+   "a decimal point inside a number is still a decimal point");
+
+// This package listens to nothing any more. The words come from the medical
+// scribe service, through web/src/scribe/reading.ts, and the browser's own
+// speech recognition is gone rather than kept as a second engine: see the
+// head of v2dd.ts. What must stay gone is the listening, so check for its
+// absence the way the no-commit rule above is checked.
+const engine = await import("./v2dd.ts") as Record<string, unknown>;
+for (const name of ["captureValue", "dictate", "available"])
+  ok(!(name in engine), `v2dd no longer exports ${name}`);
+ok(!/SpeechRecognition|webkitSpeech/.test(
+     readFileSync(new URL("./v2dd.ts", import.meta.url), "utf8")),
+   "no module here reaches for a browser recogniser");
 
 // The property no test can restore once it is lost: nothing in this module
 // commits. Assert the shape of what it hands back, not just its contents.

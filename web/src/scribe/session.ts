@@ -262,3 +262,24 @@ export function preview(value: unknown): string {
     return Object.values(value as Record<string, unknown>).filter(Boolean).map(String).join(" ");
   return String(value ?? "");
 }
+
+/** Words from one spoken reading, or the reason there are none.
+ *
+ *  An empty `reason` means the person stopped it themselves and is owed no
+ *  sentence; every other empty transcript carries one. */
+export type Heard = { transcript: string; reason?: string };
+
+/** A reading session's outcome, in the words the station shows.
+ *
+ *  Pure, and separate from web/src/scribe/reading.ts for the reason the rest
+ *  of this file is: the microphone cannot be checked without a microphone,
+ *  and this is the half that decides what a nurse is told. */
+export function heardFrom(s: ScribeSession): Heard {
+  if (s.status === "withdrawn") return { transcript: "", reason: "" };
+  if (s.status === "running")
+    return { transcript: "", reason: "Transcribing is taking too long. Type the values." };
+  if (s.status === "failed")
+    return { transcript: "", reason: s.reason || "The reading was not transcribed. Type the values." };
+  if (s.transcript.trim()) return { transcript: s.transcript };
+  return { transcript: "", reason: s.reason || "Nothing was said. Type the values." };
+}

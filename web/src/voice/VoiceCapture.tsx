@@ -7,39 +7,38 @@
  *
  *  Every button below exists because a declaration said so. mountsFor() reads
  *  the instrument declarations; nothing here knows what a systolic is.
+ *
+ *  The words come from the medical scribe service, through the kernel, which
+ *  is web/src/scribe/reading.ts and is the only thing this file calls that
+ *  touches a network. The browser's own speech recognition used to do it and
+ *  does not any more: see that file for the owner's decision and for the
+ *  consent the upload inherits. What reaches a field is still decided here,
+ *  by the number grammar, and still needs a tap.
  */
 import { useEffect, useRef, useState } from "react";
-import { available, captureValue, type Draft } from "../../../packages/voice/src/index.ts";
+import { toDraft, type Draft } from "../../../packages/voice/src/index.ts";
+import { canRecord, recordReading, type Reading } from "../scribe/reading";
 import type { Mount } from "./instruments";
 import "./voice.css";
-
-/** Recogniser error codes to the one thing the person should do next. The
- *  codes are the Web Speech API's; anything unlisted is shown as it came. */
-function nextStep(reason: string): string {
-  if (/not-allowed|denied/.test(reason))
-    return "Allow the microphone in the address bar, or type the values.";
-  if (/audio-capture|no-speech-device/.test(reason))
-    return "No microphone. Type the values.";
-  if (/service-not-allowed/.test(reason))
-    return "Speech needs https or localhost. Type the values.";
-  if (/network/.test(reason))
-    return "Speech recognition could not reach the network. Type the values.";
-  return "Type the values.";
-}
 
 export function VoiceCapture({
   mounts,
   operation,
+  thread,
   payload,
   disabled,
   ids,
   onValues,
 }: {
-  /** Every mount except the scribe: a scribe is a recording that leaves this
-   *  machine, and web/src/scribe/Recorder draws it. Mixing the two controls on
-   *  one bar is exactly the confusion this file must not create. */
+  /** Every mount except the scribe: a scribe is a whole consultation and
+   *  web/src/scribe/ScribeBar draws it. Mixing the two controls on one bar is
+   *  exactly the confusion this file must not create, even now that both sets
+   *  of words come from the same service. */
   mounts: Mount[];
   operation: string;
+  /** The visit this reading belongs to. The upload is refused without its
+   *  recording consent, which is the kernel's check and not this file's. */
+  thread: string;
   payload: Record<string, unknown>;
   disabled?: boolean;
   /** The Form prefix, so the cursor lands in this panel's field and not in
@@ -47,44 +46,57 @@ export function VoiceCapture({
   ids: string;
   onValues: (values: Record<string, number>, confidence: Record<string, number>) => void;
 }) {
-  const [live, setLive] = useState<string | null>(null);
+  const [live, setLive] = useState<{ id: string; sending: boolean } | null>(null);
   const [heard, setHeard] = useState<Draft | null>(null);
-  const abort = useRef<AbortController | null>(null);
+  const reading = useRef<Reading | null>(null);
 
-  // Leaving the panel stops the microphone. A capture that outlived its screen
-  // would be a live mic with no indicator, which is the one thing this must
-  // never be.
-  useEffect(() => () => abort.current?.abort(), []);
+  // Leaving the panel stops the microphone and keeps nothing. A capture that
+  // outlived its screen would be a live mic with no indicator, which is the
+  // one thing this must never be.
+  useEffect(() => () => {
+    const r = reading.current;
+    reading.current = null;
+    r?.abandon();
+  }, []);
 
   if (!mounts.length) return null;
 
-  const supported = available();
-  const stop = () => abort.current?.abort();
+  const stop = () => {
+    setLive((l) => (l ? { ...l, sending: true } : l));
+    reading.current?.stop();
+  };
 
-  const listen = async (m: Extract<Mount, { kind: "constrained-voice" }>) => {
+  const listen = (m: Extract<Mount, { kind: "constrained-voice" }>) => {
     setHeard(null);
-    const ctrl = new AbortController();
-    abort.current = ctrl;
-    setLive(m.id);
-    const draft = await captureValue({
-      fields: m.fields,
-      instrument: m.id,
-      operation,
-      signal: ctrl.signal,
+    const meta = { instrument: m.id, operation };
+    const r = recordReading(thread, operation);
+    reading.current = r;
+    setLive({ id: m.id, sending: false });
+
+    void r.heard.then((h) => {
+      if (reading.current !== r) return;          // the panel closed; say nothing
+      reading.current = null;
+      setLive(null);
+      // The grammar still decides. A transcript it will not parse fills no
+      // field, exactly as before: the service is a better microphone, not a
+      // new authority. Nought is "this engine does not score words", which
+      // toDraft reads as unknown rather than as certainty.
+      const draft: Draft = h.transcript
+        ? toDraft(h.transcript, 0, m.fields, meta)
+        : { ...meta, values: {}, confidence: {}, reason: h.reason ?? "" };
+      if (!h.transcript && !h.reason) return;     // stopped by hand: nothing to report
+      setHeard(draft);
+      if (Object.keys(draft.values).length === 0) {
+        // Fail closed: nothing is guessed into a field, and the keypad for the
+        // first field still waiting for a value takes the cursor.
+        const next =
+          m.fields.find((f) => payload[f.linkId] === undefined || payload[f.linkId] === "") ??
+          m.fields[0];
+        document.getElementById(`${ids}-${next.linkId}`)?.focus();
+        return;
+      }
+      onValues(draft.values, draft.confidence);
     });
-    setLive(null);
-    abort.current = null;
-    setHeard(draft);
-    if (Object.keys(draft.values).length === 0) {
-      // Fail closed: nothing is guessed into a field, and the keypad for the
-      // first field still waiting for a value takes the cursor.
-      const next =
-        m.fields.find((f) => payload[f.linkId] === undefined || payload[f.linkId] === "") ??
-        m.fields[0];
-      document.getElementById(`${ids}-${next.linkId}`)?.focus();
-      return;
-    }
-    onValues(draft.values, draft.confidence);
   };
 
   return (
@@ -92,8 +104,8 @@ export function VoiceCapture({
       {live && (
         <div className="mic-live" role="status" aria-live="assertive">
           <span className="mic-dot" />
-          Microphone live
-          <button className="cq mic-stop" onClick={stop}>Stop</button>
+          {live.sending ? "Transcribing" : "Microphone live"}
+          {!live.sending && <button className="cq mic-stop" onClick={stop}>Stop</button>}
         </div>
       )}
 
@@ -110,7 +122,7 @@ export function VoiceCapture({
 
         if (m.kind !== "constrained-voice") return null;   // no other kind mounts here
 
-        if (!supported) {
+        if (!canRecord()) {
           return (
             <div className="v-row" key={m.id}>
               <span className="v-off">No microphone</span>
@@ -122,11 +134,13 @@ export function VoiceCapture({
         return (
           <div className="v-row" key={m.id}>
             <button
-              className={`cq v-mic${live === m.id ? " on" : ""}`}
-              disabled={disabled || (live !== null && live !== m.id)}
-              onClick={() => (live === m.id ? stop() : void listen(m))}
+              className={`cq v-mic${live?.id === m.id ? " on" : ""}`}
+              disabled={disabled || live?.sending || (live !== null && live.id !== m.id)}
+              onClick={() => (live?.id === m.id ? stop() : listen(m))}
             >
-              {live === m.id ? "Listening, tap to stop" : m.title}
+              {live?.id === m.id
+                ? (live.sending ? "Transcribing" : "Listening, tap to stop")
+                : m.title}
             </button>
           </div>
         );
@@ -152,7 +166,7 @@ export function VoiceCapture({
           <div className="eyebrow">Nothing was taken from that</div>
           {heard.transcript && <div className="transcript">"{heard.transcript}"</div>}
           <div className="state-t">{heard.reason ?? "did not hear that clearly"}</div>
-          <div className="f-hint">{nextStep(heard.reason ?? "")}</div>
+          <div className="f-hint">Type the values.</div>
         </div>
       )}
     </div>

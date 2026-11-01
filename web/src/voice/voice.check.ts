@@ -108,6 +108,14 @@ checks++;
 // -- no code path commits without a tap -----------------------------------
 // The voice modules have no writer in them at all. This is the property that
 // is kept by absent code, so the check is for absence.
+//
+// Since the owner's decision that every aspect of scribing goes through the
+// medical scribe service, a reading IS uploaded: the browser's own speech
+// recognition is gone and the words come from the kernel. So the rule is no
+// longer "these files touch no network", which would now be true only by
+// hiding the upload one import away. It is this, which is the rule that was
+// always meant: nothing on the voice path commits, and the ONE thing it may
+// call that reaches a network is the reading, named here by name.
 const WRITES = /\b(fetch|XMLHttpRequest|sendBeacon|navigator\.send|client\.(commit|confirm)|api\.(commit|confirm))\b/;
 const sources = [
   ...readdirSync(root + "packages/voice/src").map((f) => `packages/voice/src/${f}`),
@@ -118,6 +126,38 @@ for (const f of sources) {
   const hit = read(f).split("\n").find((l) => WRITES.test(l) && !l.trim().startsWith("*"));
   ok(!hit, `${f} contains no write: ${hit ?? ""}`);
 }
+
+// What the voice path is allowed to reach for outside itself. A new import
+// from anywhere that can write fails here rather than being discovered.
+const OUTSIDE = /^import\s[^;]*?\sfrom\s"(\.\.\/[^"]+)"/;
+for (const f of sources) {
+  for (const line of read(f).split("\n")) {
+    const hit = line.match(OUTSIDE);
+    if (!hit) continue;
+    ok(
+      ["../scribe/reading", "../types", "../validate.ts"].includes(hit[1]) || hit[1].startsWith("../../"),
+      `${f} imports ${hit[1]}, which is not on the short list the voice path may reach for`,
+    );
+  }
+}
+
+// And the reading itself: it uploads, so it is held to the same no-commit
+// rule as the files above, plus the two properties that make an upload from
+// the vitals station acceptable at all. Consent is the kernel's check, not a
+// second one written in a browser, and the audio does not outlive the words.
+const reading = read("web/src/scribe/reading.ts");
+ok(!/client\.(commit|confirm)|api\.(commit|confirm)/.test(reading), "the reading commits nothing");
+ok(/startSession\(/.test(reading) && /pollSession\(/.test(reading),
+   "the reading uploads through the scribe route, which is where the consent check lives");
+const readingCode = reading.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
+ok(!/capture\.consented/.test(readingCode),
+   "the reading does not re-implement the consent check the kernel already makes");
+ok(/dropSession\(/.test(reading), "the recording is dropped once the words are read");
+
+// The browser's own recogniser is gone from the whole voice path, not merely
+// unused. It is the thing that answered `network` on a health centre's line.
+for (const f of [...sources, "web/src/scribe/reading.ts"].filter((f) => !f.endsWith(".check.ts")))
+  ok(!/SpeechRecognition|webkitSpeech/.test(read(f)), `${f} reaches for no browser recogniser`);
 
 // And in the panel, the writes live in the one function the button calls.
 const panel = read("web/src/form/Panel.tsx");

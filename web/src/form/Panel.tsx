@@ -389,6 +389,7 @@ export function OperationPanel({
         <VoiceCapture
           mounts={mounts.filter((m) => m.kind !== "scribe" && m.kind !== "spoken-prompt")}
           operation={op.id}
+          thread={thread}
           payload={payload}
           disabled={busy}
           ids={ids}

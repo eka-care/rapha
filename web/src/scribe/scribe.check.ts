@@ -22,7 +22,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   apply,
-  at, draftFor, elsewhere, mergeDrafts, mustTick, pickMime, preview, reasonFor, sentence,
+  at, draftFor, elsewhere, heardFrom, mergeDrafts, mustTick, pickMime, preview, reasonFor,
+  sentence,
   type ScribeDraft, type ScribeSession,
 } from "./session.ts";
 import type { Questionnaire } from "../types";
@@ -341,5 +342,30 @@ ok(!/mic-live/.test(rec) && !/Microphone live/.test(rec),
   assert.deepEqual(draws, [], "candidates are declared and not yet drawn");
   checks += 6;
 }
+
+// -- one spoken reading, from the same service -----------------------------
+// The vitals station's microphone goes through this route too, since the
+// owner's decision that every aspect of scribing goes through the medical
+// scribe service. What a nurse is told about a reading is decided here, and
+// the one case that must never carry a sentence is the one they caused.
+const reading = (over: Partial<ScribeSession>): ScribeSession =>
+  ({ session: "scr-1", status: "ready", reason: "", drafts: [], transcript: "",
+     operations: ["phc.op.vitals-record"], ...over });
+
+ok(heardFrom(reading({ transcript: "one forty over ninety" })).transcript === "one forty over ninety",
+   "a ready reading hands the words up");
+ok(heardFrom(reading({ transcript: "one forty" })).reason === undefined,
+   "words need no sentence under them");
+ok(heardFrom(reading({ transcript: "   " })).reason?.includes("Type the values"),
+   "a reading with no words says so, and says what to do instead");
+ok(heardFrom(reading({ status: "failed", reason: "The service refused it." })).reason
+     === "The service refused it.",
+   "the kernel's own reason is shown, not a paraphrase of it");
+ok(heardFrom(reading({ status: "failed", reason: "" })).reason?.includes("Type the values"),
+   "a failure with no reason still tells the nurse what to do");
+ok(heardFrom(reading({ status: "running" })).reason?.includes("too long"),
+   "a reading still running when the polling gave up says so");
+ok(heardFrom(reading({ status: "withdrawn" })).reason === "",
+   "a nurse who stopped it themselves is owed no sentence");
 
 console.log(`ok   scribe: ${checks} checks`);
