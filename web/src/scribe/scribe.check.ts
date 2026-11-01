@@ -22,8 +22,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   apply,
-  at, draftFor, elsewhere, heardFrom, mergeDrafts, mustTick, narrow, pickMime, preview,
-  reasonFor, sentence,
+  draftFor, elsewhere, heardFrom, mergeDrafts, narrow, pickMime, preview, reasonFor,
+  sentence,
   type ScribeDraft, type ScribeSession,
 } from "./session.ts";
 import type { Questionnaire } from "../types";
@@ -31,6 +31,23 @@ import type { Questionnaire } from "../types";
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const read = (p: string) => readFileSync(root + p, "utf8");
 const schema = (id: string): Questionnaire => JSON.parse(read(`questionnaires/${id}.json`));
+
+/** One value a draft addressed, out of a payload: a key, or
+ *  `medications[1].dose` inside a repeating group.
+ *
+ *  This was production code serving the tick rule, which the owner removed on
+ *  2026-11-01. It is apparatus now, and it is here rather than in session.ts
+ *  because the renderer has no caller for it.
+ */
+const ROW_ID = /^([A-Za-z_][A-Za-z0-9_]*)\[(\d+)\]\.([A-Za-z_][A-Za-z0-9_]*)$/;
+function at(bag: Record<string, unknown>, id: string): unknown {
+  const found = ROW_ID.exec(id);
+  if (!found) return bag[id];
+  const listed = bag[found[1]];
+  if (!Array.isArray(listed)) return undefined;
+  const row = listed[Number(found[2])];
+  return row && typeof row === "object" ? (row as Record<string, unknown>)[found[3]] : undefined;
+}
 
 let checks = 0;
 const ok = (cond: unknown, what: string) => {
@@ -42,8 +59,15 @@ const ok = (cond: unknown, what: string) => {
 schema("phc.schema.consult-v1");
 schema("phc.schema.vitals-v1");
 
-// 1. A number a recording filled cannot be committed until it is ticked, and
-//    editing it to something else makes it the person's number, not a heard one.
+// 1. A number a recording filled goes into an editable field, marked
+//    unconfirmed, with the words it came from.
+//
+//    IT USED TO OWE A TICK OF ITS OWN BEFORE COMMIT WOULD LIGHT. The owner
+//    removed that on 2026-11-01: the field is editable, so a wrong value is
+//    corrected by typing over it. What is left is what every typed answer
+//    goes through -- the fields on screen and the one tap on Commit -- plus
+//    the two things a heard value carries that a typed one does not, which
+//    are checked here because they are now the whole of the readback.
 {
   const draft = {
     instrument: "i", operation: "phc.op.vitals-record",
@@ -52,18 +76,23 @@ schema("phc.schema.vitals-v1");
     evidence: { systolic: "BP is 140", history: "fever" },
     tick: ["systolic"], unfilled: [], transcript: "BP is 140, fever",
   };
-  assert.deepEqual(mustTick(draft, new Set(), { systolic: 140 }), ["systolic"]);
-  assert.deepEqual(mustTick(draft, new Set(["systolic"]), { systolic: 140 }), []);
-  assert.deepEqual(mustTick(draft, new Set(), { systolic: 120 }), [],
-    "typed over, so it is no longer a heard value");
-  assert.deepEqual(mustTick(null, new Set(), {}), []);
   const applied = apply(draft, {});
   assert.deepEqual(applied.fill, { systolic: 140, history: "fever" });
-  checks += 5;
+  checks++;
+  ok(Object.values(draft.confidence).every((c) => c < 0.9),
+     "every heard value is under the sure threshold, so the field draws unconfirmed");
+  ok(draft.evidence.systolic, "and carries the words it came from");
+
+  // What the person typed still wins. That was true under the tick rule and
+  // is the only thing standing between a heard number and a typed one now.
+  const over = apply(draft, { systolic: 120 });
+  assert.deepEqual(over.fill, { history: "fever" });
+  checks++;
+  assert.deepEqual(over.held, [{ link_id: "systolic", value: 140 }]);
+  checks++;
 }
-// 1b. A repeating group owes one tick per value per ROW, and the id addresses
-//     the row. A draft that heard three medicines owes three drug ticks; one
-//     tick on the question would commit two rows nobody read.
+// 1b. A repeating group's values are addressed per row, so a drafted
+//     prescription lands as rows rather than as one blurred answer.
 {
   const rows = {
     instrument: "i", operation: "phc.op.rx-prescribe",
@@ -74,23 +103,16 @@ schema("phc.schema.vitals-v1");
     unfilled: [], transcript: "paracetamol 500, amoxicillin 250",
   };
   const same = { medications: [{ drug: "777067000", dose: 500 }, { drug: "774586009", dose: 250 }] };
-  assert.deepEqual(mustTick(rows, new Set(), same), rows.tick,
-    "every value of every row is owed its own tick");
-  assert.deepEqual(mustTick(rows, new Set(["medications[0].drug"]), same),
-    ["medications[0].dose", "medications[1].drug", "medications[1].dose"],
-    "ticking one value of one row does not tick the rest of the prescription");
-  const edited = { medications: [{ drug: "777067000", dose: 650 }, { drug: "774586009", dose: 250 }] };
-  assert.deepEqual(mustTick(rows, new Set(), edited),
-    ["medications[0].drug", "medications[1].drug", "medications[1].dose"],
-    "a dose typed over is the person's number, and only that one");
-  const shorter = { medications: [{ drug: "777067000", dose: 500 }] };
-  assert.deepEqual(mustTick(rows, new Set(), shorter),
-    ["medications[0].drug", "medications[0].dose"],
-    "a row the person deleted is owed nothing, and its ticks do not slide onto another row");
+  assert.deepEqual(apply(rows, {}).fill, rows.values);
+  checks++;
+  // A typed list is held whole: half merging would make a row whose drug the
+  // doctor typed and whose dose the recording supplied.
+  assert.deepEqual(apply(rows, same).fill, {});
+  checks++;
   assert.equal(at(same, "medications[1].drug"), "774586009");
   assert.equal(at(same, "medications[9].drug"), undefined);
   assert.equal(at(same, "medications"), same.medications);
-  checks += 7;
+  checks += 3;
 }
 
 // Nothing in the renderer still refuses numbers by type.
@@ -261,19 +283,25 @@ ok(!/mic-live/.test(rec) && !/Microphone live/.test(rec),
     "and it sits between the thread and the composer that started it");
 }
 
-// 5. The mic does not open a form, and the panel refuses Commit while a heard number is unticked.
+// 5. The mic does not open a form, and the per-field tick is gone from every
+//    path to Commit rather than merely from the button.
 {
   const enc = read("web/src/screens/Encounter.tsx");
   assert.ok(!enc.includes("Dictation is not offered at this step"), "the mic no longer needs a scribe operation");
   assert.ok(enc.includes("<ScribeBar"), "the encounter owns the recording bar");
   const panel = read("web/src/form/Panel.tsx");
   assert.ok(!panel.includes("<Recorder"), "the form no longer starts recordings");
-  assert.ok(/disabled=\{[^}]*unticked\.length/.test(panel), "Commit waits on the ticks");
   assert.throws(() => read("web/src/scribe/Recorder.tsx"));
-  // The button is not the only way to commit: Enter calls send() directly.
+  // The owner's decision of 2026-11-01. Checked as an absence, in the panel
+  // and in the form, because a half removed gate is the worst of both: a
+  // Commit button that lights while something still refuses the commit.
+  for (const [file, src] of [["Panel.tsx", panel], ["Form.tsx", read("web/src/form/Form.tsx")]])
+    assert.ok(!/unticked|mustTick|onTick/.test(src), `${file} still owes a tick`);
   const send = panel.slice(panel.indexOf("const send = async"), panel.indexOf("const reject = async"));
-  assert.ok(/if \(unticked\.length\) return;/.test(send), "send() itself refuses while a tick is owed");
-  checks += 6;
+  assert.ok(!/return;\s*\/\/ .*tick/.test(send), "send() refuses nothing on a tick");
+  assert.ok(/disabled=\{busy \|\| \(stage === "confirm"/.test(panel),
+    "Commit waits on the work and on the irreversible confirm, and on nothing else");
+  checks += 8;
 }
 
 // 6. A new session replaces only the panels for its own operations, and a replaced one remounts.
@@ -313,11 +341,12 @@ ok(!/mic-live/.test(rec) && !/Microphone live/.test(rec),
     transcript: "Likely dengue fever, and her sugar is known",
   };
 
-  // (a) Nothing is owed a tick for it, because a tick CONFIRMS a value and
-  //     there is no value here to confirm. A candidate in the tick list would
-  //     mean a person could tick a suggestion into the record.
-  assert.deepEqual(mustTick(draft, new Set(), draft.values), [],
-    "a candidate is not owed a tick, because a tick confirms a value");
+  // (a) It is not in the draft's own tick list either. That list no longer
+  //     gates anything on screen, and this still holds: the kernel must not
+  //     describe a suggestion as a value somebody could confirm.
+  assert.deepEqual(draft.tick, [],
+    "a candidate is not a value, so it is not in the tick list");
+  checks++;
 
   // (b) It is not in the payload, under its own id or under the field's.
   assert.equal(at(draft.values, "diagnosis[1].condition"), undefined,

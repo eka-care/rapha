@@ -182,7 +182,7 @@ function Add({ disabled, onClick, what }: { disabled?: boolean; onClick: () => v
 }
 
 export function Form({
-  schema, op, value, onChange, problems, confidence, sources, evidence, ticks, disabled, ids = "f",
+  schema, op, value, onChange, problems, confidence, sources, evidence, disabled, ids = "f",
 }: {
   schema: Questionnaire;
   /** The operation this form commits. Only a structured question needs it, to
@@ -202,8 +202,6 @@ export function Form({
   /** The words a recording took each value from, drawn under the field so the
    *  person checks the value against what was said rather than against memory. */
   evidence?: Record<string, string>;
-  /** Heard values still owed a tick before Commit, and where the tick goes. */
-  ticks?: { need: string[]; ticked: Set<string>; onTick(id: string): void };
   disabled?: boolean;
   /** The prefix for every field's DOM id. Two of these forms can be on screen
    *  at once now, one per pending proposal, so the ids cannot be the link_id
@@ -288,12 +286,6 @@ export function Form({
                             disabled={disabled} />
                     {unsure && <span className="f-hint unsure">{unsureHint(score ?? 0)}</span>}
                     {heard && <span className="f-hint heard">“{heard}”</span>}
-                    {ticks?.need.includes(id) && (
-                      <span className="f-check">
-                        <input type="checkbox" checked={false} onChange={() => ticks.onTick(id)} />
-                        <span>Checked against what was said</span>
-                      </span>
-                    )}
                     {bad.map((b) => <span className="f-bad" key={b.message}>{b.message}</span>)}
                   </label>
                 );
@@ -365,12 +357,6 @@ export function Form({
           <div className="f-hint unsure">{from ?? unsureHint(confidence?.[q.link_id] ?? 0)}</div>
         )}
         {evidence?.[q.link_id] && <div className="f-hint heard">“{evidence[q.link_id]}”</div>}
-        {ticks?.need.includes(q.link_id) && (
-          <label className="f-check">
-            <input type="checkbox" checked={false} onChange={() => ticks.onTick(q.link_id)} />
-            <span>Checked against what was said</span>
-          </label>
-        )}
         {critical && !mine.length && (
           <span className="badge b-crit" data-act="">Outside range{phc.flags ? ` · ${phc.flags}` : ""}</span>
         )}

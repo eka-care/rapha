@@ -142,40 +142,6 @@ export function apply(draft: ScribeDraft | null, payload: Payload): Applied {
   return out;
 }
 
-/** The ticked fields still owed before Commit: values the kernel heard that
- *  have not been ticked, and have not been typed over either -- typing over
- *  one makes it the person's number, not a heard one, and it drops off this
- *  list without ever being ticked. */
-export function mustTick(draft: ScribeDraft | null, ticked: Set<string>, payload: Payload): string[] {
-  return (draft?.tick ?? []).filter(
-    (id) => !ticked.has(id) && JSON.stringify(at(payload, id)) === JSON.stringify(at(draft!.values, id)),
-  );
-}
-
-/** One value a draft addressed, out of a payload.
- *
- *  A top level answer is a key. A value inside a repeating group is
- *  `medications[1].dose`, because a tick is owed per value per row: a draft
- *  that heard five medicines owes five drug ticks, and one tick on the
- *  question would commit four unread rows.
- *
- *  Reading an id that does not resolve gives undefined, which is what an
- *  unanswered field gives, so a draft and a payload that disagree about
- *  whether a row exists do not accidentally match: the draft's value is
- *  defined and the payload's is not.
- */
-const ROW_ID = /^([A-Za-z_][A-Za-z0-9_]*)\[(\d+)\]\.([A-Za-z_][A-Za-z0-9_]*)$/;
-
-export function at(bag: Record<string, unknown>, id: string): unknown {
-  const found = ROW_ID.exec(id);
-  if (!found) return bag[id];
-  const listed = bag[found[1]];
-  if (!Array.isArray(listed)) return undefined;
-  const row = listed[Number(found[2])];
-  if (!row || typeof row !== "object") return undefined;
-  return (row as Record<string, unknown>)[found[3]];
-}
-
 /** The operation a doctor filled from a recording last time, at this station.
  *  Not a preference worth losing to a private window or a cleared cache: a
  *  wrong guess costs one extra tap, on the picker this restores. */

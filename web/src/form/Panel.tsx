@@ -31,7 +31,7 @@ import type { Operation, Payload, Proposal } from "../types";
 import { say } from "../announce";
 import { Failed } from "../parts";
 import { human } from "../words";
-import { mustTick, type ScribeDraft } from "../scribe/session";
+import { type ScribeDraft } from "../scribe/session";
 import { mountsFor } from "../voice/instruments";
 import { VoiceCapture } from "../voice/VoiceCapture";
 import { SpokenPrompt } from "../voice/SpokenPrompt";
@@ -118,14 +118,17 @@ export function OperationPanel({
 }) {
   const schema = questionnaire(op.input);
   const [payload, setPayload] = useState<Payload>({ ...(proposal?.payload ?? draft?.values ?? seed ?? start ?? {}) });
-  const [ticked, setTicked] = useState<Set<string>>(new Set());
   /** A reading spoken into THIS panel, as against one the encounter handed
-   *  down in `draft`. Both are the same thing from the same service, and the
-   *  tick rule does not care which arrived first: a value a recording filled
-   *  is confirmed field by field, or it is not committed. */
+   *  down in `draft`. Both are the same thing from the same service, and this
+   *  is what draws the words beside each value it filled.
+   *
+   *  A heard value used to owe a tick of its own before Commit would light.
+   *  The owner removed that on 2026-11-01: the value is in an editable field,
+   *  so a wrong one is corrected by typing over it. What is left is what the
+   *  field shows -- drawn unconfirmed, with the words it came from -- and the
+   *  one tap on Commit that every typed answer goes through. */
   const [spoken, setSpoken] = useState<ScribeDraft | null>(null);
   const heardDraft = spoken ?? draft ?? null;
-  const unticked = mustTick(heardDraft, ticked, payload);
   /** Per link_id, how sure the instrument that produced the value was. A
    *  value under 0.9 draws the field as unconfirmed. Typing over a value
    *  clears its entry: a number a person typed is not a heard number. */
@@ -263,9 +266,6 @@ export function OperationPanel({
   const fromInstrument = (heardNow: ScribeDraft) => {
     setPayload((was) => ({ ...was, ...heardNow.values }));
     setHeard((was) => ({ ...was, ...heardNow.confidence }));
-    // A second reading owes its own ticks. Carrying the first one's over
-    // would commit a number nobody read.
-    setTicked(new Set());
     setSpoken(heardNow);
     invalidate();
   };
@@ -287,7 +287,6 @@ export function OperationPanel({
   const send = async () => {
     setTried(true);
     if (problems.length) return;
-    if (unticked.length) return;      // every path to commit, Enter included, waits on the ticks
     if (irreversible && !confirmed) {
       setStage("confirm");
       return;
@@ -460,7 +459,6 @@ export function OperationPanel({
           confidence={{ ...(proposal?.confidence ?? {}), ...heard }}
           sources={fromAbha}
           evidence={heardDraft?.evidence ?? found?.evidence}
-          ticks={{ need: unticked, ticked, onTick: (id) => setTicked((s) => new Set(s).add(id)) }}
           disabled={busy}
         />}
 
@@ -496,7 +494,6 @@ export function OperationPanel({
         {error && <Failed error={error} what="Not saved" onRetry={() => setError(null)} />}
       </div>
 
-      {unticked.length > 0 && <div className="f-hint unsure">Tick each heard value to commit ({unticked.length} left).</div>}
       {heardDraft && heardDraft.unfilled.length > 0 && (
         <div className="f-hint">Heard but not filled: {heardDraft.unfilled.map((id) => labels.get(id) ?? id).join(", ")}</div>
       )}
@@ -509,7 +506,7 @@ export function OperationPanel({
         {showForm && <button
           className="cq rose"
           onClick={send}
-          disabled={busy || unticked.length > 0 || (stage === "confirm" && !confirmed)}
+          disabled={busy || (stage === "confirm" && !confirmed)}
         >
           {busy ? "Sending..." : stage === "confirm" ? "Commit" : proposal ? "Confirm" : irreversible ? "Continue" : "Commit"}
         </button>}
