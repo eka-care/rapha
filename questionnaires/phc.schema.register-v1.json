@@ -62,7 +62,7 @@
         "phc": {
           "readonly": true,
           "short": "From the directory",
-          "help": "Eka's own identifier for this person, carried by a directory suggestion. Empty for a patient the directory has not seen, which is a supported registration and not an incomplete one."
+          "help": "Carried by a directory suggestion. Empty for a walk-in."
         }
       }
     },

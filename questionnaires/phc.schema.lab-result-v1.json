@@ -20,7 +20,7 @@
       "styling_metadata": {
         "phc": {
           "short": "Test",
-          "help": "Which test was run. The list is the quantitative tests a primary health centre reports, each one a LOINC concept, so the result means the same thing in another facility."
+          "help": "Which test was run."
         }
       }
     },
@@ -48,7 +48,7 @@
         "phc": {
           "unit_of": "analyte",
           "short": "Unit",
-          "help": "The unit the analyte is reported in. It must be the unit LOINC reports that analyte in, because a value and its unit are one result and not two."
+          "help": "The unit this test is reported in."
         }
       }
     },
@@ -60,7 +60,7 @@
       "styling_metadata": {
         "phc": {
           "short": "Remark",
-          "help": "Anything the number does not say: a haemolysed sample, a repeat, a reading at the edge of the method. The value and the unit are stored as a quantity, so they do not belong here."
+          "help": "Anything the number does not say."
         }
       }
     },

@@ -159,6 +159,15 @@ export function App() {
   );
   const shownRecents = useMemo(() => keep(recents, liveThreads), [recents, liveThreads]);
 
+  /** The line, out of the rows already loaded for the counts. One fetch, one
+   *  order, one set of rows: the rail and the view behind it cannot disagree
+   *  about who is waiting. */
+  const line = useMemo(
+    () => loaded.filter((l) => l.decl.kind === "queue")
+      .flatMap((l) => ((l.result.rows ?? []) as QueueRow[]).map((row) => ({ decl: l.decl, row }))),
+    [loaded],
+  );
+
   const counts = useMemo(() => Object.fromEntries(
     loaded.map((l) => [l.decl.id, ((l.result.rows ?? []) as unknown[]).length]),
   ), [loaded]);
@@ -265,7 +274,7 @@ export function App() {
         facility={facility.data}
         views={navViews}
         route={location.hash.replace(/^#\/?/, "")}
-        recents={shownRecents}
+        line={line}
         counts={counts}
         open={drawer}
         onGo={go}

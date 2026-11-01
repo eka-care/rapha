@@ -1,26 +1,41 @@
-/** The rail, as the prototype draws it: brand, a New button, the declared
- *  views as nav, recents, and who you are at the foot.
+/** The rail: brand, a New button, the declared views as nav, THE LINE, and
+ *  who you are at the foot.
  *
  *  Every label is `v.title` off a declaration; this file types no view's name.
+ *
+ *  THE LINE, NOT RECENTS. The artifact this app is built from gives this
+ *  column to the people waiting, because that is a health centre's whole day
+ *  and a clinician does not navigate to it. What was here was a list of
+ *  threads this browser had opened, which on a shared device at a station is
+ *  whoever the last person looked at -- and which showed the same patient
+ *  twice when they had two visits, under one name, with nothing to tell them
+ *  apart. The rows below are the declared queue's own, so they are the same
+ *  rows, in the same order, as the view behind them.
  */
 import { Icon, type IconName } from "../icons";
-import type { Recent } from "../loops";
-import type { Facility, ViewDecl } from "../types";
+import type { Facility, QueueRow, ViewDecl } from "../types";
+import { fields } from "../view/View";
 import { human } from "../words";
 
-export type { Recent };
+/** How many of the line fit before the rail is a scroll rather than a
+ *  glance. The rest is one tap away in the view the rows came from. */
+const LINE = 9;
 
 const ICON: Record<string, IconName> = {
   queue: "users", tasklist: "list", dashboard: "vitals", summary: "doc",
 };
 
 export function Sidebar({
-  facility, views, route, recents, counts, open, onGo, onNew, onDesk, deskLabel, onSettings, onCloseDrawer,
+  facility, views, route, line, counts, open, onGo, onNew, onDesk, deskLabel,
+  onSettings, onCloseDrawer,
 }: {
   facility?: Facility;
   views: ViewDecl[];
   route: string;
-  recents: Recent[];
+  /** Today's line, already loaded for the counts above: the same rows the
+   *  queue view draws, with the declaration they came from so the name and
+   *  the number are read the same way here as there. */
+  line: { decl: ViewDecl; row: QueueRow }[];
   counts: Record<string, number>;
   open: boolean;
   onGo: (hash: string) => void;
@@ -38,6 +53,9 @@ export function Sidebar({
   onCloseDrawer: () => void;
 }) {
   const goTo = (hash: string) => { onGo(hash); onCloseDrawer(); };
+  // The queue this centre calls its line, in its own words. A facility with
+  // no queue view declared gets no section, not an empty one.
+  const lineTitle = line[0]?.decl.title ?? "";
   return (
     <nav className="sb" data-open={open} aria-label="Main">
       <div className="sb-top">
@@ -85,20 +103,34 @@ export function Sidebar({
         </button>
       </div>
 
-      <div className="sb-sec">Recents</div>
+      <div className="sb-sec">{lineTitle}</div>
       <div className="sb-list">
-        {recents.length === 0 ? (
-          <div className="sb-empty">No threads yet. Open a patient or start a workspace chat.</div>
-        ) : recents.map((r) => (
-          <button
-            key={r.id}
-            className={`th-row${route === `threads/${r.id}` ? " on" : ""}`}
-            onClick={() => goTo(`#/threads/${r.id}`)}
-          >
-            <Icon name="chat" className="i sm" />
-            <span className="th-n">{r.name}</span>
+        {line.length === 0 ? (
+          <div className="sb-empty">Nobody is waiting.</div>
+        ) : line.slice(0, LINE).map(({ decl, row }) => {
+          const f = fields(decl, row);
+          return (
+            <button
+              key={row.thread}
+              className={`th-row${route === `threads/${row.thread}` ? " on" : ""}`}
+              onClick={() => goTo(`#/threads/${row.thread}`)}
+            >
+              {f.token && <span className="th-tok">{f.token}</span>}
+              <span className="th-b">
+                <span className="th-n">{f.name}</span>
+                {row.station && <span className="th-s">{human(row.station)}</span>}
+              </span>
+              {row.flags?.some((x) => row.badges?.[x] === "crit") && (
+                <span className="th-flag" aria-label="needs attention" />
+              )}
+            </button>
+          );
+        })}
+        {line.length > LINE && (
+          <button className="sb-more" onClick={() => goTo(`#/views/${line[0].decl.id}`)}>
+            {line.length - LINE} more
           </button>
-        ))}
+        )}
       </div>
 
       <div className="sb-foot">

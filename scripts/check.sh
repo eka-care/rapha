@@ -217,6 +217,10 @@ if [ -d web/node_modules ]; then
   # on the voice path can write. Both are asserted here; neither needs a mic.
   (cd web && node --experimental-strip-types src/voice/voice.check.ts)
   (cd web && node --experimental-strip-types src/scribe/scribe.check.ts)
+  # What earlier visits say about this one: which values carry forward, which
+  # one is worth a trend, and who has been near the visit. Pure rules over
+  # two visits' values, so no browser and no kernel.
+  (cd web && node --experimental-strip-types src/thread/earlier.check.ts)
   # One primary action per station, everything else in overflow: pure rules
   # over declarations, checked without a browser.
   (cd web && node --experimental-strip-types src/loops.check.ts)

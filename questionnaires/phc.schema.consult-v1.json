@@ -39,7 +39,7 @@
         "phc": {
           "short": "Diagnosis",
           "row": "diagnosis",
-          "help": "One row per condition. A condition is four answers and not a phrase: what was found, whether the patient has it now, how sure you are, and since when. The list of conditions this build can code is short, and a condition that is not on it belongs in the assessment as narrative."
+          "help": "One row per condition. Each row needs all four answers."
         }
       },
       "questions": [
@@ -52,7 +52,7 @@
           "styling_metadata": {
             "phc": {
               "short": "Condition",
-              "help": "The finding, as a SNOMED CT clinical finding. The list is short because no published list of the conditions a health centre records was available to seed it."
+              "help": "The finding, from the coded list."
             }
           }
         },
@@ -78,7 +78,7 @@
           "styling_metadata": {
             "phc": {
               "short": "How sure",
-              "help": "Confirmed only when you are. A finding the patient denies is refuted, which records it without asserting it. A guess is unconfirmed. This answer is why a denied symptom cannot become a diagnosis."
+              "help": "Confirmed only when you are. Suspected is a real answer."
             }
           }
         },

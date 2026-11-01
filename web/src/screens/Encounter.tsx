@@ -23,6 +23,7 @@ import { Composer } from "../thread/Composer";
 import { ScribeBar } from "../scribe/ScribeBar";
 import { mergeDrafts, type Opened } from "../scribe/session";
 import { Stream } from "../thread/Thread";
+import { Carry, Team, Trend, usePast, visitOf } from "../thread/Past";
 import { Line } from "../view/View";
 import { human, title } from "../words";
 import { initialsOf } from "../agent";
@@ -95,6 +96,12 @@ export function Encounter({
 
   const spine = cat.workflows?.[thread.workflow]?.spine;
   const spineId = spine && typeof thread.subject?.id === "string" ? thread.subject.id : "";
+  /** This patient's earlier visits, for the strip under the name and the
+   *  trend in the rail. Empty until they arrive, and empty forever for a
+   *  first visit, which is why both draw nothing rather than a frame with
+   *  nothing in it. */
+  const past = usePast(thread, cat, spineId);
+  const todayVisit = useMemo(() => visitOf(thread, cat), [thread, cat]);
 
   return (
     <div className="chatgrid">
@@ -124,6 +131,8 @@ export function Encounter({
             </div>
           </div>
         </header>
+
+        <Carry now={todayVisit} visits={past} />
 
         <Stream
           msgs={msgs} thread={thread} client={client} ctx={ctx}
@@ -219,6 +228,10 @@ export function Encounter({
         </div>
 
         <Details thread={thread} cat={cat} spine={spine ?? null} />
+
+        <Trend now={todayVisit} visits={past} />
+
+        <Team thread={thread} cat={cat} />
 
         {/* WHAT USED TO BE HERE: the 16 raw capability codes this caller holds,
             and the audit trail. Both are true and neither is a clinician's.

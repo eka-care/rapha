@@ -21,7 +21,7 @@
         "phc": {
           "short": "Medicines",
           "row": "medicine",
-          "help": "One row per medicine. A medicine is a drug, a dose, a route, how often and for how long, and every one of those is checked. A row missing any of them is refused rather than stored half coded."
+          "help": "One row per medicine. Each row needs all six answers."
         }
       },
       "questions": [
@@ -34,7 +34,7 @@
           "styling_metadata": {
             "phc": {
               "short": "Medicine",
-              "help": "The medicine, as a SNOMED CT product with no strength and no form in it. The strength is the dose answer below, so the two cannot disagree. The list is a starter set of primary level essential medicines and is not this facility's formulary."
+              "help": "The medicine, without its strength or form."
             }
           }
         },
@@ -46,7 +46,7 @@
           "styling_metadata": {
             "phc": {
               "short": "Dose",
-              "help": "How much, as a number. No limit is checked here, because no authoritative dose range was available to check against and an invented one would be worse than none."
+              "help": "How much, as a number."
             }
           }
         },
@@ -59,7 +59,7 @@
           "styling_metadata": {
             "phc": {
               "short": "Unit",
-              "help": "The unit the dose is in. A separate list from the course length, so a dose cannot be given in weeks."
+              "help": "The unit the dose is in."
             }
           }
         },
@@ -85,7 +85,7 @@
           "styling_metadata": {
             "phc": {
               "short": "How often",
-              "help": "How many times a day, as the SNOMED concept ABDM's own example uses. It says the number of times and nothing else: no timing, no relation to meals and no 'as required'."
+              "help": "How many times a day."
             }
           }
         },

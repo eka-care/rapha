@@ -178,3 +178,28 @@
   background: var(--color-accent); opacity: .3;
 }
 @media (max-width: 900px) { .drawer-scrim { display: block; } }
+
+
+/* The line in the rail. A row is a number, a name, the station they are at,
+   and a dot when something on them is out of range -- the artifact's own
+   row, drawn from the declared queue's own columns. */
+.th-tok {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .04em;
+  color: var(--color-text-tertiary); background: var(--color-ghost);
+  border-radius: var(--radius-sm); padding: 2px 5px; flex: 0 0 auto;
+}
+.th-b { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.th-s {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--color-text-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.th-flag {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--color-critical);
+  flex: 0 0 auto;
+}
+.sb-more {
+  width: 100%; text-align: left; padding: 6px 10px; font-size: 11.5px;
+  color: var(--color-text-tertiary); background: none; border: 0; cursor: pointer;
+}
+.sb-more:hover { color: var(--color-text-secondary); }
