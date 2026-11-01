@@ -548,16 +548,77 @@ skipped beside the verdict.
   a hand-edited facility declaration.
 
 - **When the outbox is switched on.** Added 2026-11-01, after G8. Both
-  engines now have a complete, proved outbox and NEITHER IS WIRED TO
-  ANYTHING: `api/scribe.py` does not call the Python's, nothing in `cmd/api`
-  calls the Go's, and no route in either reaches one. That is the Python's own
-  decision carried, not an omission, and `kernel/queues.py` states the order:
-  surviving an outage MEANS holding consultation audio on a clinic's disk, the
-  retention backstop that makes that safe has no clinical or legal sign-off,
-  so sign the retention window and then wire the route. Porting it did not sign
-  anything. Until it is wired, the one thing neither engine can prove is that
-  the outbox is REACHED, and both parity checks say so rather than implying
-  otherwise.
+  engines had a complete, proved outbox and NEITHER WAS WIRED TO ANYTHING:
+  `api/scribe.py` did not call the Python's, nothing in `cmd/api` called the
+  Go's, and no route in either reached one. That was the Python's own decision
+  carried, not an omission, and `kernel/queues.py` stated the order: surviving
+  an outage MEANS holding consultation audio on a clinic's disk, the retention
+  backstop that makes that safe had no clinical or legal sign-off, so sign the
+  retention window and then wire the route.
+
+  **DECIDED BY THE OWNER AND CLOSED 2026-11-01. The window is signed and the
+  outbox is on.** `docs/DECISIONS-2026-11-01.md` decision 2: a recording may
+  be held for 24 hours, with that ceiling "enforced rather than documented".
+  The order it named was followed, so here is what the wiring is.
+
+  **The ceiling is a CLAMP applied by the code that deletes.**
+  `kernel.queues.AUDIO_CEILING_SECONDS` is the owner's 24 hours and
+  `held_ceiling()` is the clamp; `queues.AudioCeilingSeconds` and
+  `HeldCeiling()` are the Go's. A deployment asking for 48 hours gets 24, and
+  `care_phc/connectors/scribe/base.AudioRetention` runs its own configured
+  window through the same clamp so a facility cannot widen it by configuring
+  the class instead. The operational window under the ceiling is still that
+  file's six hours, which a deployment may lower.
+
+  **Something runs it, which is the half that was missing.** `api/outbox.py`
+  starts a daemon thread with the process; `care_phc_mcp/cmd/api/outbox.go`
+  starts a goroutine. Both do one pass every five minutes, in the order
+  recover, pump, sweep, so a recording that could have gone out in a pass is
+  never deleted a moment before its chance. The five minutes bounds how late a
+  deletion can be, so the effective ceiling is 24 hours plus up to one pass.
+  Until this slice the only callers of the sweep in the whole repository were
+  checks, which is what "enforced rather than documented" was pointing at.
+
+  **The Go engine sweeps but does not hold.** It serves no scribe route and has
+  no connector, so its sender map is empty. It sweeps anyway and that is the
+  point: both engines open the SAME spool, so a Go kernel beside or instead of
+  the Python's is looking at recordings the Python put there, and a Go-only
+  process with no sweeper would be a clinic where the ceiling silently is not
+  enforced.
+
+  **Two things were found by wiring it that reading it had not shown.** Both
+  were bugs in BOTH engines and both are fixed here.
+
+  - `sweep_audio` walked `ready`, `held` and `failed` only, and `refused` was
+    missing. `refused` is what `pump()` writes when the guard denies an item
+    at the moment of sending, which is the ordinary outcome for a recording
+    whose operation's preconditions no longer hold on that visit. Such an item
+    stopped with its bytes on the disk in a state no sweep looked at, so the
+    recording stayed for as long as the disk did. `SWEPT_STATES` is now every
+    state except `sending`, which is left out so a send in flight does not
+    have its bytes deleted under it.
+  - the two engines disagreed about a NEGATIVE configured window: the Python
+    read it as "delete on sight" and the Go as "unconfigured". Settled as
+    unconfigured, because a typo in a config file silently wiping every
+    recording in the clinic is a worse surprise than holding for the default,
+    and pinned input by input in `scripts/check_go_parity.py`.
+
+  **What is proved and what is not.** `scripts/check_audio_ceiling.py` is 16
+  checks over the production path: a real file on a real disk, the clock moved
+  forward rather than the window shortened, the recording GONE from the disk
+  rather than its row tidied up around it, the row left in `failed` with no
+  receipt saying the recording was deleted without being transcribed, and held
+  TEXT untouched a year on. Six mutations were applied against it and five
+  fail; the sixth passed and is recorded in that file as proving nothing, with
+  the reason and with the mutation that does bite.
+
+  What is still NOT proved is a recording actually reaching the speech service
+  from the queue, because that needs a live Eka credential and a real outage.
+  `ScribeSender.delivered()` answers `Delivery(known=False)` always, which is
+  honest rather than a stub: the service has no route that answers "do you
+  already have the recording I called X", so an item it cannot speak for is
+  parked in `held` for a person. For audio that is the right way round, and it
+  means a recovery after a crash mid-send asks a person rather than guessing.
 
 - **Whether the differential check may compare the sweep ORDER inside one
   pass.** Added 2026-11-01, after G8. `due()` reads items oldest first and

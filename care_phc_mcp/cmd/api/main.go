@@ -56,6 +56,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	carephc "github.com/eka-care/care_phc_mcp"
 	"github.com/eka-care/care_phc_mcp/planner"
@@ -809,6 +810,13 @@ func main() {
 	}
 	k.routes = append(k.routes, "/")
 	sort.Strings(k.routes)
+
+	// The outbox sweeper, started with the process and before the first
+	// request, because a retention ceiling that waits for a request is off at
+	// a clinic nobody is using yet and yesterday's audio is what is sitting
+	// there. See cmd/api/outbox.go for what this engine does and does not do.
+	stopSweeper := startSweeper(sweepSeconds * time.Second)
+	defer stopSweeper()
 
 	where := fmt.Sprintf("%s:%d", *host, *port)
 	shape := k.facility

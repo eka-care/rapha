@@ -6,6 +6,16 @@
 set -e
 cd "$(dirname "$0")/.."
 
+# The outbox's spool root, for the whole gate. api/main.py starts the retention
+# sweeper at import, so every check that imports the app opens a spool; without
+# this it would be the developer's own ~/.local/share/phc/spool, and a gate that
+# writes outside its own tree is a gate that can pass because of what an earlier
+# run left there. Removed with the directory when the shell exits.
+PHC_SPOOL=$(mktemp -d)/spool
+export PHC_SPOOL
+trap 'rm -rf "$(dirname "$PHC_SPOOL")"' EXIT
+
+
 echo "== compile the declarations =="
 # The templates first, because what they generate are ordinary operation atoms
 # and ordinary questionnaires that the two steps below then lint like any
@@ -124,6 +134,10 @@ PHC_FACILITY=consulting-room-only python3 scripts/check_plugins.py
 # mobile and OTP rules. No socket and no call to Eka or ABDM, and the file's
 # docstring says what that leaves unproved.
 python3 scripts/check_queues.py
+# And the outbox actually REACHED, with the owner's 24 hour ceiling on held
+# audio enforced by code that runs: real files on a real disk, the clock moved
+# forward, and the recording gone from the disk rather than its row tidied up.
+python3 scripts/check_audio_ceiling.py
 python3 -m kernel.queues
 python3 -m adapters.local.spool
 # The connector behind the seam, against a stand-in transport fed the vendor's

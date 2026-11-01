@@ -2688,14 +2688,19 @@ def _go_live_code(path):
 #
 # WHY THIS IS NOT COMPARED OVER A SOCKET EITHER
 # ---------------------------------------------
-# The outbox is SWITCHED OFF. kernel/queues.py is complete and proved and
-# api/scribe.py does not call it, because holding a recording through an
-# outage means writing consultation audio to a clinic's disk and the retention
-# window that would make that safe is unsigned. Nothing in cmd/api calls the Go
-# package either, by the same decision. So no route in either engine reaches an
-# outbox and there is nothing for e2e.py or check_live.py to compare, which
+# The outbox is SWITCHED ON since 2026-11-01 and is still on NO ROUTE, which
+# are different things. api/outbox.py holds a recording the line could not take
+# and sweeps on a timer started with the process, and cmd/api/outbox.go sweeps
+# the same spool; neither is reachable by a request, because an outbox is not
+# something a caller asks for, and the sweeper runs on a five minute timer
+# rather than in answer to one.
+#
+# So there is still nothing for e2e.py or check_live.py to compare, which
 # leaves the shape projection_parity above already uses: a Go test that asserts
-# nothing, fed inputs from here and read back for the diff.
+# nothing, fed inputs from here and read back for the diff. What that shape now
+# also carries is the retention ceiling, because the clamp and the swept states
+# are pure functions of their inputs and are exactly what two engines can
+# disagree about silently. They did: see the ceiling comparison below.
 #
 # WHAT IS COMPARED, AND WHAT IS DELIBERATELY NOT
 # ----------------------------------------------
@@ -2739,7 +2744,7 @@ def queue_cases():
     # The withheld map is the real one for the shape that runs fewest plugins,
     # so what is compared is this bundle's own subtraction rather than a
     # literal typed here.
-    from kernel import declarations
+    from kernel import contracts, declarations
 
     narrow = declarations.load("phc", facility="consulting-room-only")
     withheld = dict(narrow.withheld)
@@ -2753,6 +2758,20 @@ def queue_cases():
         # Past the end of the table as well as inside it, and nought and
         # negative, because the ceiling and the floor are both reachable.
         "backoff": [-1, 0, 1, 2, 3, 4, 5, 6, 7, 99],
+        # The owner's 24 hour ceiling on held audio
+        # (docs/DECISIONS-2026-11-01.md decision 2), which is a CLAMP and not
+        # a default, so both engines must clamp the same inputs the same way.
+        # Negative and nought are both in, because "use the default" and
+        # "delete on sight" are different answers and reading one as the other
+        # is how a facility ends up holding audio it meant to drop.
+        "ceiling": [-1, 0, 1, 3600, 6 * 3600, 24 * 3600, 24 * 3600 + 1,
+                    48 * 3600, 999999],
+        # Which states a held recording is swept out of. Every state an item
+        # can wear, so the pair is compared on the ONE that is left out as
+        # well as on the five that are not. `refused` is why this case exists:
+        # it was missing from both engines until 2026-11-01, so a recording the
+        # guard denied kept its bytes for as long as the disk lasted.
+        "retention": sorted(contracts.QUEUE_STATES),
         "refusal": [
             {"kind": "audio", "operation": "phc.op.consult-document",
              "capability": "encounter.document", "withheld": {}},
@@ -2894,6 +2913,11 @@ def queue_cases():
 
 QUEUE_NOW = "2026-11-01T10:00:00+00:00"
 QUEUE_LATER = "2026-11-01T14:00:00+00:00"
+# Two days on: past the owner's 24 hour ceiling on held audio, which the four
+# hours above is deliberately inside. The retention cases need a clock the
+# ceiling has actually expired under, and reusing QUEUE_LATER would have made
+# every one of them answer "nothing was swept" in both engines and agree.
+QUEUE_PAST_CEILING = "2026-11-03T10:00:00+00:00"
 # One moment per hour, long enough to walk an item past every backoff in the
 # table and reach the attempt limit.
 QUEUE_HOURS = tuple("2026-11-01T%02d:00:00+00:00" % hour
@@ -2958,6 +2982,33 @@ def python_outbox(cases):
                                       capability=one["capability"],
                                       withheld=one["withheld"])
                        for one in cases["refusal"]]}
+
+    out["ceiling"] = [queues.held_ceiling(n) for n in cases["ceiling"]]
+    out["swept_states"] = list(queues.SWEPT_STATES)
+
+    # One audio item in each state, swept past the ceiling: was its recording
+    # deleted, and what state did the row end in. `delete` records rather than
+    # unlinking, so the two engines are compared on the DECISION and not on
+    # two filesystems.
+    retention = []
+    for state in cases["retention"]:
+        spool = SqliteSpool(":memory:")
+        item = queues.enqueue(spool, kind="audio", key="k-" + state,
+                              thread="enc-1", operation="phc.op.consult-document",
+                              capability="encounter.document",
+                              facility="all-plugins", at=QUEUE_NOW,
+                              blob="/held/" + state)
+        if state != "ready":
+            spool.settle(item.id, state=state, at=QUEUE_NOW,
+                         receipt="r-1" if state == "sent" else "")
+        removed = []
+        gone = queues.sweep_audio(spool, now=QUEUE_PAST_CEILING,
+                                  delete=removed.append)
+        after = spool.get(item.id)
+        retention.append({"state": state, "swept": gone == [item.id],
+                          "deleted": removed, "final": after.state,
+                          "says": after.last_error or ""})
+    out["retention"] = retention
 
     admit = []
     for one in cases["admit"]:
@@ -3135,6 +3186,60 @@ def outbox_parity(tmp):
     ok("the outbox: the same waits after %d attempt counts, and the same "
        "admission refusals including the capability and the plugin naming it"
        % len(cases["backoff"]))
+
+    # --- the owner's 24 hour ceiling on held audio, which both engines must
+    # clamp to identically, and the states a recording is swept out of.
+    assert py["ceiling"] == gone["ceiling"], (
+        "the two engines clamp the retention window differently\nin:     %s\n"
+        "python: %s\ngo:     %s"
+        % (cases["ceiling"], py["ceiling"], gone["ceiling"]))
+    # And it really clamped, or this is two engines agreeing to pass a number
+    # through. The 48 hour case must come back as 24.
+    assert queues.AUDIO_CEILING_SECONDS in py["ceiling"], \
+        "no case reached the ceiling, so the clamp is unobserved"
+    assert py["ceiling"][cases["ceiling"].index(48 * 3600)] \
+        == queues.AUDIO_CEILING_SECONDS, \
+        "a 48 hour window was not clamped to 24: %s" % py["ceiling"]
+    assert list(py["swept_states"]) == list(gone["swept_states"]), (
+        py["swept_states"], gone["swept_states"])
+    assert "refused" in py["swept_states"], \
+        "the sweep does not walk `refused`, so a recording the guard denied " \
+        "keeps its bytes past the ceiling in this engine"
+    assert "sending" not in py["swept_states"], \
+        "the sweep walks `sending`, so it can delete bytes out from under a " \
+        "send that is in flight"
+    ok("the outbox: both engines clamp %d configured retention windows to the "
+       "same answers, a 48 hour window becoming the owner's %d hour ceiling in "
+       "each, and both sweep the same %d states and leave `sending` alone"
+       % (len(cases["ceiling"]), queues.AUDIO_CEILING_SECONDS // 3600,
+          len(py["swept_states"])))
+
+    for one, a, b in zip(cases["retention"], py["retention"], gone["retention"]):
+        assert a == b, ("sweeping a held recording in state %r differs\n"
+                        "python: %s\ngo:     %s" % (one, a, b))
+    swept = [a for a in py["retention"] if a["swept"]]
+    spared = [a for a in py["retention"] if not a["swept"]]
+    assert swept and spared, (
+        "every state was treated the same, so this case proves nothing: "
+        "%d swept, %d spared" % (len(swept), len(spared)))
+    # The two properties the decision turns on, asserted on the answers rather
+    # than on the implementation.
+    for a in swept:
+        assert a["deleted"], "%r was reported swept and nothing was deleted" % a
+        if a["state"] == "sent":
+            # The remote HAS it. Its bytes go, and the row is NOT rewritten to
+            # say nobody got a transcript, because somebody did.
+            assert a["final"] == "sent", a
+            assert "without being transcribed" not in a["says"], a
+        else:
+            assert a["final"] == "failed", a
+            assert "without being transcribed" in a["says"], a
+    for a in spared:
+        assert not a["deleted"], "%r was spared and something was deleted" % a
+    ok("the outbox: a held recording past the ceiling is swept identically "
+       "from %d states in both engines and spared in %d, the row left saying "
+       "nobody got a transcript, and a SENT row keeping its state because "
+       "somebody did" % (len(swept), len(spared)))
 
     for one, a, b in zip(cases["admit"], py["admit"], gone["admit"]):
         assert a == b, ("admitting %r differs\npython: %s\ngo:     %s"

@@ -82,11 +82,24 @@ BEFORE it claims, and an item the guard now denies becomes `refused` and is
 never sent. An item queued under capabilities somebody has since lost, or for
 a plugin this centre has since switched off, does not go out.
 
-NOT WIRED INTO THE LIVE SCRIBE ROUTE, AND THAT IS A DECISION FOR A PERSON
--------------------------------------------------------------------------
-This module is complete and proved, and `api/scribe.py` does not call it. That
-is deliberate, because wiring it in contradicts two sentences that file states
-as rules:
+WIRED IN, 2026-11-01, AND THE RETENTION WINDOW IS WHAT UNBLOCKED IT
+-------------------------------------------------------------------
+This module was complete and proved and reached by nothing for a month. It is
+wired now: `api/outbox.py` holds a recording the line could not take and sweeps
+the outbox on a timer started with the process, and
+`care_phc_mcp/cmd/api/outbox.go` sweeps the same spool on the Go side.
+
+What unblocked it is `docs/DECISIONS-2026-11-01.md` decision 2: a recording may
+be held for 24 hours, with that ceiling "enforced rather than documented". The
+order this file named was "sign the retention window, then wire the route", and
+that is the order it happened in. `AUDIO_CEILING_SECONDS` is the ceiling and
+`held_ceiling()` is the clamp, applied by the code that deletes rather than
+offered as a default.
+
+The contradiction below is REAL AND IS NOT RESOLVED BY THE SIGNATURE. It is
+resolved as narrowly as it can be, and the sentences are left standing because
+they are what the narrowing is measured against. Wiring this in contradicts two
+sentences `api/scribe.py` states as rules:
 
   "the recording never reaches the repository: it is written to one temporary
    file, handed to the connector, and deleted in a `finally`" (line 4)
@@ -107,13 +120,18 @@ says has no clinical or legal sign-off. That satisfies the letter of "never
 reaches the repository" and changes the substance of "no second copy to forget
 about" into "one copy, with a sweep that forgets it".
 
-Flipping the live route over is therefore not a code decision. It starts
-writing identifiable health data to a clinic's disk in a product whose scribe
-module says it never does, and the retention window that makes it safe is
-unsigned. Somebody has to decide that, and the right order is: sign the
-retention window, then wire the route. Said here rather than only in a
-handover note, because the next person to read this file is the one who will
-want to know why it is not plugged in.
+So what is true now, stated exactly. A recording DOES reach a clinic's disk,
+and only when the line could not take it: the ordinary path still uploads and
+keeps nothing. It waits outside the repository, owner readable only, under a
+ceiling the owner signed, swept by something that actually runs. "Nothing under
+this repository ever holds a recording" is still true. "There is no second copy
+to forget about" is now "one copy, outside the repository, with a sweep that
+forgets it", and the sweep is the part that had been missing.
+
+`scripts/check_audio_ceiling.py` is what holds this rather than this paragraph:
+real files on a real disk, the clock moved forward, and the recording gone from
+the disk with the row honest that nobody got a transcript. Two bugs in this
+very function were found by wiring it and are fixed; see `SWEPT_STATES`.
 
 Pure: everything takes a `Spool`, a `Sender` and a clock, and returns values.
 Opens no socket, reads no environment, imports no connector.
@@ -150,6 +168,102 @@ MAX_ATTEMPTS = 6
 # chosen against is a clinic session rather than a service level: the last
 # gap is long enough that an afternoon of outage costs a handful of attempts.
 BACKOFF_SECONDS = (0, 30, 120, 600, 1800, 3600)
+
+# THE CEILING ON HELD AUDIO, AND IT IS SIGNED.
+#
+# docs/DECISIONS-2026-11-01.md decision 2: a recording may be held for 24
+# hours, and the decision says that ceiling must be "enforced rather than
+# documented". This is the enforcement.
+#
+# It is a CEILING and not a window, and the difference is the whole of why it
+# is here rather than in the connector. The operational window is
+# `care_phc/connectors/scribe/base.AUDIO_MAX_HOLD_SECONDS`, six hours, and a
+# deployment may lower it: a clinic that wants an hour is a clinic being
+# careful. What no deployment may do is raise it past this line. So the
+# clamp lives in the kernel, on the path that actually deletes, where a
+# facility's configuration cannot reach around it.
+#
+# Why the clamp and not just a smaller default: a default is a number nobody
+# reads. `AUDIO_MAX_HOLD_SECONDS` was six hours all along and nothing ran,
+# so audio would have been held for as long as the disk lasted. A ceiling
+# that is not applied by the deleting code is the same sort of claim.
+#
+# What this does NOT apply to is TEXT, and that distinction is the decision's
+# own: "text and audio are now different questions, and only audio has a clock
+# on it". A household visit form held offline in a village is text, it has no
+# blob, and `sweep_audio` walks `kind="audio"` only. Nothing here expires a
+# document.
+AUDIO_CEILING_SECONDS = 24 * 60 * 60
+
+# Which states a held recording is swept OUT OF, which is every state it can
+# wear except one.
+#
+# IT WAS `ready`, `held`, `failed` UNTIL 2026-11-01 AND THAT LEFT A HOLE THE
+# CEILING COULD NOT COVER. `refused` was missing, and `refused` is not an
+# exotic case: it is what `pump()` writes when the guard denies an item at the
+# moment of sending, which is what happens to a recording for an operation
+# whose preconditions no longer hold on that visit. Such an item stopped with
+# its bytes still on the disk and no state that any sweep walked, so the
+# recording sat there for as long as the disk did. Found by driving the
+# production path rather than by reading this function: the first run of
+# scripts/check_audio_ceiling.py held one recording, let the guard refuse it,
+# moved the clock on a YEAR, and the file was still there.
+#
+# `sent` is swept for a different and smaller reason. Its bytes are deleted
+# when the receipt is written, and `pump()` deliberately swallows an OSError
+# on that delete rather than throwing away the record of a send that really
+# happened. So a `sent` row can keep a file, and this is the second chance at
+# it. The row's STATE is not rewritten in that case; see the sweep.
+#
+# `sending` is the one state left out, and it is left out on purpose: a send
+# may be in flight against those bytes, and deleting them under it would turn
+# a slow line into a lost recording. Nothing is stranded by the omission,
+# because `IN_FLIGHT_SECONDS` is fifteen minutes against a ceiling of
+# twenty-four hours, so `recover()` has moved any such item out of `sending`
+# long before its window is up.
+SWEPT_STATES = ("ready", "held", "failed", "refused", "sent")
+
+
+def held_ceiling(seconds=None):
+    """The longest a recording may be held, whatever was asked for.
+
+    Anything above the signed ceiling comes back as the ceiling: a
+    configuration asking for longer is not an error to raise in a clinic, it is
+    a number to refuse quietly and sweep on. The refusal is visible where it
+    matters, in what actually gets deleted and when.
+
+    THREE INPUTS THAT ARE NOT THE SAME THING, and conflating any two of them
+    is a way to lose recordings or keep them:
+
+    - `None` means "nobody configured a window", so the connector's
+      operational one is used.
+    - `0` means "delete as soon as the sweep sees it", and it is a SUPPORTED
+      window: `care_phc/connectors/scribe/base.py` says whoever signs the
+      retention rule should be allowed to choose zero. It is never read as
+      unset.
+    - a NEGATIVE number is nonsense, and it is treated as unconfigured rather
+      than as zero. Reading it as zero would be the privacy-safe reading of
+      the number and the wrong reading of the situation: a typo in a config
+      file would silently delete every recording in the clinic on the next
+      pass, which is a worse surprise than holding them for the default
+      window. The clamp above still applies, so a negative can never widen
+      anything.
+
+    That last case is in the gate because the two engines disagreed about it.
+    `scripts/check_go_parity.py` compares this function against
+    `queues.HeldCeiling` input by input, and the first run of that comparison
+    found Python answering 0 for -1 while Go answered the operational window.
+    Both were defensible and only one could be true, so it is settled here and
+    pinned there.
+    """
+    if seconds is None or int(seconds) < 0:
+        from care_phc.connectors.scribe import base
+        seconds = base.AUDIO_MAX_HOLD_SECONDS
+    seconds = int(seconds)
+    if seconds <= 0:
+        return 0
+    return min(seconds, AUDIO_CEILING_SECONDS)
+
 
 # How long an item may sit in `sending` before `recover()` considers it
 # abandoned rather than in flight. Longer than any single send should take and
@@ -775,29 +889,38 @@ def recover(spool, senders, *, now, seconds=IN_FLIGHT_SECONDS,
 # --------------------------------------------------------------------------
 
 def sweep_audio(spool, *, now, delete, max_hold=None):
-    """Delete recordings held longer than the retention backstop allows.
+    """Delete recordings held longer than retention allows. Returns their ids.
 
-    The backstop is `care_phc/connectors/scribe/base.py`'s
+    The operational window is `care_phc/connectors/scribe/base.py`'s
     AUDIO_MAX_HOLD_SECONDS, imported rather than chosen again here: how long
     unconfirmed consultation audio may be kept is one rule about one kind of
-    data, and that file already carries it with the sentence saying it needs a
-    sign-off. A queue that invented its own number would be a second answer to
-    a question that already has one unsigned answer, which is worse.
+    data, and that file already carries it.
+
+    EVERY WINDOW IS CLAMPED TO `AUDIO_CEILING_SECONDS` ON THE WAY IN, so this
+    function is where the owner's 24 hour ceiling is enforced and not merely
+    recorded. A caller that asks for longer gets the ceiling. See the constant
+    above for why the clamp is on the deleting path rather than in the
+    connector's default.
+
+    AND SOMETHING CALLS IT ON A SCHEDULE NOW. Until 2026-11-01 nothing did:
+    the only callers in the repository were checks, so a sweep that was
+    complete and proved had never run anywhere a recording actually sat.
+    `api/outbox.py` runs it, and `care_phc_mcp/cmd/api` runs the Go's. A
+    retention rule enforced by a function nobody calls is a documented rule.
 
     An item whose bytes are deleted this way is NOT marked sent, because it
     was not. It stops in `failed` saying the recording aged out, which is the
     honest record: the audio is gone, nobody got a transcript, and the note
     was typed or it was not.
     """
-    if max_hold is None:
-        from care_phc.connectors.scribe import base
-        max_hold = base.AUDIO_MAX_HOLD_SECONDS
+    # The clamp, and it is not optional. A caller passing 48 hours gets 24.
+    max_hold = held_ceiling(max_hold)
     # Every candidate is listed BEFORE any of them is settled. Settling moves
     # an item into `failed`, which is one of the states being walked, so
     # listing and settling in the same loop found the same recording twice and
     # reported it deleted twice. The check caught it.
     waiting = []
-    for state in ("ready", "held", "failed"):
+    for state in SWEPT_STATES:
         waiting += [i for i in spool.items(state=state, kind="audio", limit=500)
                     if i.blob and _waited(i.created_at, now, max_hold)]
 
@@ -807,7 +930,29 @@ def sweep_audio(spool, *, now, delete, max_hold=None):
             delete(item.blob)
         except OSError:
             continue
-        if item.state != "failed":
+        if item.state == "sent":
+            # The remote HAS it, so the row stays `sent` and is not rewritten
+            # to say nobody got a transcript: somebody did. Its bytes should
+            # have gone when the receipt was written, and `pump()` swallows an
+            # OSError on that delete rather than losing the record of a send
+            # that really happened. This is the second chance at it, and it is
+            # the reason `sent` is swept at all.
+            pass
+        else:
+            # EVERY OTHER STATE IS SETTLED, INCLUDING ONE ALREADY `failed`.
+            # That replaces whatever sentence the row carried, and the trade is
+            # deliberate: "this was tried six times and the line was down" and
+            # "the recording is gone" are different facts, and the second is
+            # the one a person reading this row needs. A row still saying only
+            # why a send failed cannot answer "is the recording still there",
+            # which is the question somebody actually has.
+            #
+            # The attempt count survives, so what is lost is the wording of the
+            # last failure and not the fact that there were failures. One
+            # constant string rather than a composed one, because
+            # scripts/check_queues.py reads the syntax tree and requires every
+            # `error=` reaching `settle()` to be a literal `scrubbed()` call or
+            # a constant: a rule a machine can check is worth a plainer message.
             spool.settle(item.id, state="failed", at=now,
                          error="the recording was held longer than the "
                                "retention backstop allows and was deleted "
