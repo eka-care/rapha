@@ -197,17 +197,16 @@
     gap: var(--space-8);
   }
 }
-@media (min-width: 1180px) {
-  /* Wide enough to stand clear of the drawing, so it does: the corner is
-     the border's, and the words are not set on top of a petal. Below this
-     the two overlap, and the drawing is faint enough behind them to live
-     with. */
-  .way-in { padding-left: 560px; }
-}
+
 
 .way-in-say {
   position: relative; z-index: 1; text-align: center;
   display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+/* Beside the card rather than above it, the name reads as a label on the
+   left of a pair, so it is set left like one. */
+@media (min-width: 900px) {
+  .way-in-say { text-align: left; align-items: flex-start; }
 }
 .way-in-mark {
   width: 46px; height: 46px; color: var(--color-agent); opacity: .55;
@@ -266,37 +265,61 @@
 .way-in-n b { color: var(--color-text-secondary); font-weight: 550; }
 
 /* ---- the bloom ----------------------------------------------------------
-   A seed at the bottom left corner, and then the border being sketched:
-   along the bottom, then up the left, one line at a time, over about half a
-   minute, and then still. */
+   A seed at the bottom left, the flowers gathering round it, and then two
+   boundary lines running out of them along the bottom and up the left,
+   about seven tenths of the way each. Once, over half a minute, then still. */
 .bloom {
-  /* Full width, so the drawing can never push the page sideways. The SVG
-     fits itself inside and sits in the bottom left corner, which is where
-     the border starts. */
-  position: fixed; left: 0; right: 0; bottom: 0;
-  height: min(64vh, 540px);
-  pointer-events: none; z-index: 0;
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  color: var(--color-agent);
 }
-.bloom-svg {
-  display: block; height: 100%; width: 100%;
-  color: var(--color-agent); opacity: .38;
-}
-@media (min-width: 900px) { .bloom-svg { opacity: .62; } }
 
-/* THE SKETCHING. Stroked, never filled: the trace draws its ink as filled
+/* The cluster keeps its own shape whatever the screen is, so it sits in the
+   corner at a fixed size rather than being stretched to fill it. */
+.bloom-plot {
+  position: absolute; left: 0; bottom: 0;
+  height: min(46vh, 400px); width: auto;
+  opacity: .4;
+}
+@media (min-width: 900px) { .bloom-plot { opacity: .62; } }
+
+/* THE PAINTING. Stroked, never filled: the trace draws its ink as filled
    regions, and the boundary of a hairline region is the hairline. The dash
    is the whole run's length, pushed off the end, and walking it back on is
-   a line appearing at the speed a pen moves. Linear, because a hand does
-   not ease in and out of a petal.
+   a line appearing at the speed a pen moves.
    The length, the duration and the delay are set on each element, from the
    measurements in frame-strokes.ts. */
 .bloom-ink {
   fill: none; stroke: currentColor; stroke-width: .9;
   stroke-linecap: round; stroke-linejoin: round;
-  animation-name: sketch; animation-timing-function: linear;
+  animation-name: sketch; animation-timing-function: var(--ease-out);
   animation-fill-mode: forwards;
 }
 @keyframes sketch { to { stroke-dashoffset: 0; } }
+
+/* THE BOUNDARY LINES. A hairline down each edge of a five pixel band, which
+   is the double rule the tracing's own frame is drawn with. Revealed by a
+   scale from the end they leave the cluster at, so nothing repaints: the
+   compositor stretches a finished layer. */
+.bloom-rail {
+  position: absolute; opacity: .22;
+  animation-duration: 13s; animation-timing-function: var(--ease-out);
+  animation-fill-mode: forwards;
+}
+@media (min-width: 900px) { .bloom-rail { opacity: .36; } }
+.bloom-rail.across {
+  left: 72px; right: 30%; bottom: 44px; height: 9px;
+  border-top: 1px solid currentColor; border-bottom: 1px solid currentColor;
+  transform-origin: left; transform: scaleX(0);
+  animation-name: rail-across;
+}
+.bloom-rail.up {
+  left: 44px; bottom: 72px; top: 30%; width: 9px;
+  border-left: 1px solid currentColor; border-right: 1px solid currentColor;
+  transform-origin: bottom; transform: scaleY(0);
+  animation-name: rail-up;
+}
+@keyframes rail-across { to { transform: scaleX(1); } }
+@keyframes rail-up { to { transform: scaleY(1); } }
 
 /* The mark it opens as, and hands over from: it appears, holds, then fades
    and swells as the drawing takes its place. */
@@ -313,10 +336,11 @@
 }
 
 /* A drawing that keeps redrawing itself is exactly the movement somebody who
-   asked for less of it meant. It arrives already drawn. */
+   asked for less of it meant. It arrives already painted. */
 @media (prefers-reduced-motion: reduce) {
   .bloom-seed { animation: none; opacity: 0; }
   .bloom-ink { animation: none; stroke-dashoffset: 0; }
+  .bloom-rail { animation: none; transform: none; }
 }
 /* The small mark above the wordmark went: with the flower drawn behind it,
    two daffodils were on screen at once, one of them a thumbnail of the
