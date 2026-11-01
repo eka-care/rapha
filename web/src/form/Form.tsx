@@ -25,8 +25,10 @@ const SURE = 0.9;
  *  measurement that does not exist. The field stays marked unconfirmed either
  *  way, because unconfirmed is the part that matters.
  *
- *  Nothing on the voice path lands here: packages/voice fails closed below its
- *  own floor, so every value it hands over carries a real score above zero. */
+ *  A value the scribe filled lands here with a score the kernel capped below
+ *  the sure threshold, so it reads as unconfirmed however plainly it was
+ *  said. Zero means the service scored nothing, and the words are shown
+ *  instead of a percentage nobody measured. */
 const unsureHint = (score: number) =>
   score > 0 ? `Unconfirmed · ${Math.round(score * 100)}%` : "Unconfirmed";
 

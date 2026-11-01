@@ -7,12 +7,14 @@
  *     edits a declaration in memory and asserts the mount changes with it,
  *     which a hard-coded list would fail.
  *  2. Nothing on the voice path can commit. That is asserted twice: no module
- *     under packages/voice or web/src/voice contains a write of any kind, and
+ *     under web/src/voice contains a write of any kind, and
  *     in OperationPanel the two calls that do write sit inside the one
  *     function bound to the Commit button's onClick.
  *
- *  The number grammar itself is checked in packages/voice/src/grammar.check.ts:
- *  numbers, decimals, units, and every ambiguous phrase refused.
+ *  There is no number grammar any more. It read "one forty" in the browser,
+ *  and the medical scribe service answers the form's own questions instead,
+ *  which is checked in web/src/scribe/scribe.check.ts. Its absence is checked
+ *  below, because an engine nothing calls is one somebody can call again.
  */
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
@@ -117,11 +119,10 @@ checks++;
 // always meant: nothing on the voice path commits, and the ONE thing it may
 // call that reaches a network is the reading, named here by name.
 const WRITES = /\b(fetch|XMLHttpRequest|sendBeacon|navigator\.send|client\.(commit|confirm)|api\.(commit|confirm))\b/;
-const sources = [
-  ...readdirSync(root + "packages/voice/src").map((f) => `packages/voice/src/${f}`),
-  ...readdirSync(root + "web/src/voice").map((f) => `web/src/voice/${f}`),
-].filter((f) => /\.tsx?$/.test(f) && !f.endsWith("voice.check.ts"));
-ok(sources.length >= 6, "the check is actually reading the voice modules");
+const sources = readdirSync(root + "web/src/voice")
+  .map((f) => `web/src/voice/${f}`)
+  .filter((f) => /\.tsx?$/.test(f) && !f.endsWith("voice.check.ts"));
+ok(sources.length === 3, "the check is actually reading the three voice modules");
 for (const f of sources) {
   const hit = read(f).split("\n").find((l) => WRITES.test(l) && !l.trim().startsWith("*"));
   ok(!hit, `${f} contains no write: ${hit ?? ""}`);
@@ -157,6 +158,22 @@ const readingCode = reading.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test
 ok(!/capture\.consented/.test(readingCode),
    "the reading does not re-implement the consent check the kernel already makes");
 ok(/dropSession\(/.test(reading), "the recording is dropped once the words are read");
+
+// THE NUMBER GRAMMAR IS GONE, not merely uncalled. It lived under
+// packages/voice and read "one forty" in the browser. It refused a whole
+// reading over four words that named no field, while the service had already
+// answered the form correctly, and once the service's answer was taken
+// directly it was 250 lines nothing called. An engine nothing calls is one
+// somebody calls again, so this is checked rather than remembered.
+//
+// `spoken.json` stays in that folder: the two planners read it, and the
+// grammar was only its third reader.
+const left = readdirSync(root + "packages/voice/src");
+assert.deepEqual(left, ["spoken.json"], "packages/voice holds no module any more");
+checks++;
+for (const f of sources)
+  ok(!/^import[^;]*packages\/voice/m.test(read(f)),
+     `${f} imports nothing from the deleted package`);
 
 // The browser's own recogniser is gone from the whole voice path, not merely
 // unused. It is the thing that answered `network` on a health centre's line.

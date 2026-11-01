@@ -206,12 +206,11 @@ else
 fi
 
 echo "\n== the browser side =="
-# The voice grammar is pure and runs under plain node. The microphone itself
-# is NOT checked here and cannot be: it needs a microphone. Every line around
-# it is, including that no voice path can write, and that the words now come
-# from the medical scribe service rather than from the browser's own
-# recogniser, which is gone rather than merely unused.
-node packages/voice/src/grammar.check.ts
+# The microphone itself is NOT checked here and cannot be: it needs a
+# microphone. Every line around it is, in src/voice/voice.check.ts and
+# src/scribe/scribe.check.ts below: that no voice path can write, that what
+# reaches a field is narrowed to what the instrument declares, and that the
+# browser's own number grammar is gone rather than merely unused.
 if [ -d web/node_modules ]; then
   (cd web && npm run check && npm run build >/dev/null)
   # Which fields take voice comes from the instrument declarations, and nothing

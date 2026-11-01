@@ -123,16 +123,20 @@ def keywords(op: dict) -> dict:
 
 
 # A number next to a field name. Deliberately narrow: digits only. Spoken
-# numbers ("one forty") are parsed at the point of capture by packages/voice,
-# where the value can be read back on screen before anyone commits it.
+# numbers ("one forty") are not this module's to read: a reading spoken at a
+# station is filled by the medical scribe service from the recording, with the
+# words it came from beside it, and read back on screen before anyone commits
+# it. A browser side number grammar used to do that and was deleted on
+# 2026-11-01.
 _NUM = r"(\d+(?:\.\d+)?)"
 _PAIR = re.compile(r"\b(\d{2,3})\s*(?:/|over)\s*(\d{2,3})\b")
 
 
 # Spoken names for a questionnaire field, keyed by link_id. ONE list, and it
-# lives in packages/voice because that is where it already existed, where it is
-# richest, and where it is data rather than code: grammar.ts imports this same
-# JSON. Two lists would drift, and the way you find out is a clinician saying
+# lives in packages/voice because that is where it already existed and where it
+# is data rather than code. The browser grammar that also read it is gone, so
+# this module and care_phc_mcp/planner are its two readers now. Two lists would
+# drift, and the way you find out is a clinician saying
 # "temp 37.2" into a box that only knows "temperature". The better home is the
 # questionnaire itself, beside the unit and the range that styling_metadata.phc
 # already carries; that is an edit to questionnaires/ and not part of this

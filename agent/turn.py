@@ -14,8 +14,8 @@ turn against a fake planner and a fake propose, so the ordering, the payload
 filter and the refusal wording are asserted with no database and no port.
 
 Honest about the confidence map. Nothing here recognises speech. A caller that
-dictated the utterance passes the recogniser's per-field confidence along
-(packages/voice emits exactly that shape, link_id -> 0..1) and this module
+dictated the utterance passes a per-field confidence along (the scribe path
+emits exactly that shape, link_id -> 0..1) and this module
 carries it to the card so the renderer can mark those fields unsure. A typed
 utterance has no confidences and the map is empty, which is the truth rather
 than a 1.0 nobody measured.

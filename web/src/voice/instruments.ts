@@ -9,7 +9,32 @@
  *  but the renderer is the thing that would actually put a microphone on
  *  screen, so it re-checks rather than trusting what it was handed.
  */
-import { fieldsFrom, type FieldSpec } from "../../../packages/voice/src/index.ts";
+/** A numeric question a constrained-voice instrument may fill.
+ *
+ *  This and `fieldsFrom` below came from `packages/voice`, which held a number
+ *  grammar that read "one forty" in the browser. The grammar is gone: every
+ *  aspect of scribing goes through the medical scribe service, which answers
+ *  the form's own questions, so nothing here reads words any more. What was
+ *  worth keeping is this -- which questions a spoken reading may touch -- and
+ *  it is renderer work, so it lives with the mounts it feeds.
+ *
+ *  The spoken aliases, the units and the ranges went with the grammar. The
+ *  form draws units and ranges from the questionnaire itself and always did;
+ *  the aliases stayed behind in `packages/voice/src/spoken.json`, whose
+ *  readers are now agent/planner.py and care_phc_mcp/planner. */
+export type FieldSpec = {
+  linkId: string;
+  type: "integer" | "decimal";
+};
+
+/** The numeric questions of the questionnaire the operation names. Only
+ *  integer and decimal come back: those are the discrete values voice is
+ *  allowed near, and the instrument's own `types:` narrows them further. */
+export function fieldsFrom(schema: { questions: Question[] }): FieldSpec[] {
+  return schema.questions
+    .filter((q) => q.type === "integer" || q.type === "decimal")
+    .map((q) => ({ linkId: q.link_id, type: q.type as FieldSpec["type"] }));
+}
 import type { Operation, Question, Questionnaire } from "../types";
 import { walk } from "../validate.ts";   // the extension is for node: voice.check.ts runs this file outside vite
 

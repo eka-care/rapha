@@ -633,8 +633,8 @@ def khoj(request: Request, body: dict = Body(default={})):
     commit, and api/tests/test_api.py proves it by making both explode for the
     duration of a turn.
 
-    `confidence` is the recogniser's per-field map when the utterance was
-    dictated (packages/voice emits link_id -> 0..1). Nothing on this side
+    `confidence` is the per-field map when the utterance was dictated (the
+    scribe path emits link_id -> 0..1). Nothing on this side
     recognises anything, so a typed utterance carries no confidences rather
     than a fabricated one.
 

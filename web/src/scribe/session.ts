@@ -1,9 +1,10 @@
 /** The consultation recording, from this browser to the kernel and back again.
  *
- *  This is not the voice path and it must not be confused with it.
- *  `packages/voice` is a constrained number grammar that runs in the browser
- *  and never leaves it. This is audio, uploaded, transcribed by a service, and
- *  returned as a draft. The Eka credentials are the kernel's and are never
+ *  This is the one recording path. It used to be one of two: a constrained
+ *  number grammar ran in the browser for a spoken reading and never left it.
+ *  That grammar was deleted on 2026-11-01, so a reading at the vitals station
+ *  and a whole consultation now come through here. This is audio, uploaded,
+ *  transcribed by a service, and returned as a draft. The Eka credentials are the kernel's and are never
  *  here: this file posts a blob to `/scribe/sessions` and reads what comes
  *  back, which is `api/scribe.py:public()` and carries no transaction id.
  *
