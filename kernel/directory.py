@@ -233,6 +233,20 @@ def cached(store, query, *, limit=10):
     rows = store.select("patient", thread=None, where={}, fields=(), limit=5000)
     hits = [dict(r) for r in rows if _row_matches(r, query)]
     hits.sort(key=lambda r: str(r.get("created_date") or ""), reverse=True)
+    # WHICH RECORD THIS IS, under the name the registration form asks for it
+    # by. A directory suggestion has carried its own identifier since the day
+    # it existed, and that is what makes a patient the directory knows one
+    # person across visits. A row from our OWN register carried none, so a
+    # clerk who searched, found the returning patient and picked her still
+    # registered a second her -- the form held her answers and nothing that
+    # said which record they came from.
+    #
+    # Composed here rather than in the renderer for the same reason the
+    # suggestion's is: the browser should not have to know the name of the
+    # question that carries an identity.
+    for hit in hits:
+        if hit.get("id"):
+            hit["patient_id"] = hit["id"]
     return hits[:limit]
 
 

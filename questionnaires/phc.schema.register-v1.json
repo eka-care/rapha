@@ -54,6 +54,19 @@
       "required": true
     },
     {
+      "link_id": "patient_id",
+      "text": "This centre's record",
+      "type": "string",
+      "required": false,
+      "styling_metadata": {
+        "phc": {
+          "readonly": true,
+          "short": "Already registered here",
+          "help": "Carried when the clerk picks somebody the desk found. Empty for a new patient."
+        }
+      }
+    },
+    {
       "link_id": "directory_id",
       "text": "Patient directory id",
       "type": "string",

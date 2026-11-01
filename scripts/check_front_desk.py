@@ -294,3 +294,92 @@ print("\n%d front desk checks passed" % checks)
 # 5. adapters/local/store.py: restore the token fallback that made one up out
 #    of the row id.
 #    -> section 3 fails: the number is not the next in the sequence.
+
+
+# ---------------------------------------------------------------------------
+# 6. Find before create, for real: a patient we already hold stays one person.
+#
+# THE DEFECT THIS EXISTS FOR. The desk searches this centre's own register and
+# finds a returning patient, the clerk picks her, and the registration that
+# follows wrote A SECOND PERSON: the form carries only the questionnaire's
+# answers, and a patient's own id is not one of them, so the adapter saw a
+# record with no id and no directory id and inserted. On a developer's own
+# demo day that had produced seventy-two rows for one woman, every one of
+# them identical, each with its own visit and its own half of her history.
+#
+# `directory_id` was the only cross-visit identity the adapter had, and no
+# patient in a deployment without Eka's directory has one: 0 of 78 on the day
+# this was found. So the dedupe branch was dead code and every registration
+# was a new person.
+# ---------------------------------------------------------------------------
+
+HER = {"name": "Sunita Devi", "age": 34, "sex": "female",
+       "phone": "9876500000", "village": "Yadiki", "category": "general"}
+
+
+def register(thread, payload):
+    reply = client.post("%s/operations/phc.op.patient-register/commit" % API,
+                        json={"thread": thread, "payload": payload}, headers=DESK)
+    assert reply.status_code == 200, reply.text
+    return reply.json()
+
+
+def her_rows():
+    """Every patient row with her name, by the route the desk itself uses."""
+    found = client.get("%s/patients/search" % API,
+                       params={"q": HER["name"]}, headers=DESK)
+    assert found.status_code == 200, found.text
+    return [r for r in found.json()["local"] if r.get("name") == HER["name"]]
+
+
+monday = client.post("%s/threads" % API, json={}, headers=DESK).json()["id"]
+register(monday, HER)
+first = her_rows()
+assert len(first) == 1, "she was registered once and the register holds %d" % len(first)
+hers = first[0]["id"]
+
+# Friday. The clerk types her mobile, the desk answers with the row above,
+# and the clerk picks it: that is the identity, and it travels in the form.
+#
+# Taken off the SEARCH RESULT, exactly as the screen does, rather than
+# constructed here. A fix that only worked when a test typed the id would
+# leave the clerk registering a second her, which is the whole defect.
+picked, = [r for r in client.get("%s/patients/search" % API,
+                                 params={"q": HER["phone"]}, headers=DESK).json()["local"]
+           if r.get("name") == HER["name"]]
+assert picked.get("patient_id") == hers, \
+    "the desk found her and did not say which record she is: %s" % sorted(picked)
+friday = client.post("%s/threads" % API, json={}, headers=DESK).json()["id"]
+register(friday, dict(HER, patient_id=picked["patient_id"]))
+
+again = her_rows()
+assert len(again) == 1, \
+    "picking the patient the desk found still created a second record of " \
+    "her: %d rows now, %s" % (len(again), [r["id"] for r in again])
+assert again[0]["id"] == hers, "she was replaced rather than kept"
+ok("a returning patient the clerk picked off the desk is the same person: "
+   "one record, not a second one with half her history")
+
+# And the two visits are hers, which is the whole point of it being one row:
+# the spine is what a doctor opens to see what happened last time.
+spine = client.get("%s/subjects/%s" % (API, hers), headers=DESK)
+assert spine.status_code == 200, spine.text
+visits = [e["thread"] for e in spine.json()["encounters"]]
+assert monday in visits and friday in visits, \
+    "one record, but her two visits did not land on it: %s" % visits
+ok("and both her visits hang off that one record, so the doctor on Friday "
+   "can see what Monday found")
+
+# The other half of the rule, and the one with a permanent cost: identity is
+# the clerk's CHOICE, never a guess this code makes. Somebody who shares her
+# mobile -- a daughter, a husband, the household's one handset -- registered
+# without that choice is their own person.
+daughter = client.post("%s/threads" % API, json={}, headers=DESK).json()["id"]
+register(daughter, dict(HER, name="Lakshmi Devi", age=19))
+shared = [r for r in client.get("%s/patients/search" % API,
+                                params={"q": HER["phone"]}, headers=DESK).json()["local"]
+          if r.get("phone") == HER["phone"]]
+assert len(shared) == 2, \
+    "two people on one household handset were merged into %d" % len(shared)
+ok("and a second person on the same mobile is a second person: nothing here "
+   "merges two patients on a number a household shares")

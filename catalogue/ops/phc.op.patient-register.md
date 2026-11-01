@@ -19,6 +19,22 @@ mapping:
     - resource: patient
       fields:
         created_by: {actor: id}
+        # THE PERSON THE CLERK PICKED. The desk searches this centre's own
+        # register before it offers to create anybody, and when the clerk
+        # takes one of those rows this carries which row it was. Without it
+        # the form carried only her answers, the adapter saw a record with no
+        # id, and finding her correctly still wrote a second her: seventy-two
+        # rows for one woman on the day this was found, each with its own
+        # visit and its own half of her history.
+        #
+        # Identity is the clerk's CHOICE and never a guess made here. Nothing
+        # matches on a name or a mobile: a household shares one handset, and
+        # merging a mother into her daughter is the one mistake in this
+        # product that cannot be undone.
+        #
+        # Blank for a new patient, and a blank answer is not a column, so a
+        # walk-in inserts exactly as it always did.
+        id: {answer: patient_id}
         name: {answer: name}
         age: {answer: age}
         sex: {answer: sex}
