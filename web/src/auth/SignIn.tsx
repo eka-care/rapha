@@ -18,9 +18,10 @@
  *  is open this asks, quietly, whether the session has appeared -- which is
  *  the same question the app asks on load, and the only one there is.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { NAME } from "../brand";
 import { canFrameLogin, loginUrl } from "./client";
+import { Bloom } from "./Bloom";
 import { CLIENT_ID, ENV, LOGIN_URL, signedIn } from "./session";
 
 /** How often the card asks whether the cookie has arrived. Slow on purpose:
@@ -33,7 +34,6 @@ export function SignIn({ checking, onRetry }: {
   onRetry: () => void;
 }) {
   const framed = canFrameLogin(location.hostname);
-  const [waiting, setWaiting] = useState(false);
   const alive = useRef(true);
 
   useEffect(() => () => { alive.current = false; }, []);
@@ -66,7 +66,6 @@ export function SignIn({ checking, onRetry }: {
             className="way-in-frame"
             src={loginUrl(ENV, CLIENT_ID, location.origin + location.pathname)}
             title="Sign in with Eka"
-            onLoad={() => setWaiting(true)}
           />
         ) : (
           <div className="way-in-out">
@@ -87,59 +86,20 @@ export function SignIn({ checking, onRetry }: {
             </p>
           </div>
         )}
-        {framed && waiting && (
-          <button className="way-in-again wide" onClick={onRetry}>I have signed in</button>
+        {framed && (
+          /* ALWAYS, not only once the frame reports a load. The card can
+             land on a page that refuses -- Eka answers a sign-in aimed at an
+             unregistered return address with its own 403, and a 403 inside a
+             frame is a dead end with no way out of it. The way out is here
+             whatever the frame is showing. */
+          <div className="way-in-foot">
+            <button className="way-in-again" onClick={onRetry}>I have signed in</button>
+            <a className="way-in-tab" href={LOGIN_URL} target="_blank" rel="noreferrer">
+              Open in a tab instead
+            </a>
+          </div>
         )}
       </section>
-    </div>
-  );
-}
-
-/** The motion: a daffodil opening, over and over, slowly.
- *
- *  Six petals drawn in sequence by running a dash along each outline, a
- *  trumpet that arrives last, and a slow breath under the whole head. It is
- *  the product's own mark rather than an animation bought in: a person
- *  waiting here should be looking at the thing they are signing in to.
- *
- *  Every part of it is one CSS property on one element, so the browser keeps
- *  it on the compositor, and all of it stops under `prefers-reduced-motion`.
- */
-function Bloom() {
-  // The petal, the trumpet and the ring come from the same geometry the mark
-  // is drawn from; kept here as numbers rather than imported so this file can
-  // stagger them without the icon sheet learning about animation.
-  const PETAL = "M12 8.3C10.3 7.6 9.6 5.7 9.6 4C9.6 2.3 10.7 1.2 12 1.1"
-    + "C13.3 1.2 14.4 2.3 14.4 4C14.4 5.7 13.7 7.6 12 8.3Z";
-  return (
-    <div className="bloom" aria-hidden="true">
-      <svg viewBox="0 0 24 24" className="bloom-svg">
-        <g className="bloom-head">
-          {[0, 60, 120, 180, 240, 300].map((a, i) => (
-            <path
-              key={a}
-              className="bloom-petal"
-              d={PETAL}
-              transform={`rotate(${a} 12 12)`}
-              style={{ animationDelay: `${i * 0.28}s` }}
-            />
-          ))}
-          <circle className="bloom-cup" cx="12" cy="12" r="3.5" />
-          <circle className="bloom-throat" cx="12" cy="12" r="1.9" />
-        </g>
-        {/* Three rings leaving the flower, one after another: the line
-            moving, which is what this product watches all day. */}
-        {[0, 1, 2].map((i) => (
-          <circle
-            key={i}
-            className="bloom-ring"
-            cx="12"
-            cy="12"
-            r="6"
-            style={{ animationDelay: `${i * 1.6}s` }}
-          />
-        ))}
-      </svg>
     </div>
   );
 }
