@@ -52,6 +52,10 @@ export function View({ result, decl, workflow, onOpenThread }: {
  *  the subject carries, minus the plumbing. Nothing here decides what a
  *  patient is.
  */
+/** What a row with nobody on it is called. One place, so the desk, the queue
+ *  and the rail cannot drift apart again. */
+export const NO_NAME = "No name yet";
+
 export function fields(
   decl: ViewDecl | undefined,
   row: QueueRow,
@@ -63,7 +67,7 @@ export function fields(
    *  nobody at a desk has ever been shown. */
   provenanceCol?: string,
 ): {
-  name: string; meta: string; token: string;
+  name: string; meta: string; token: string; named: boolean;
 } {
   const subject = row.subject ?? {};
   const has = (k: string) => subject[k] !== null && subject[k] !== undefined && subject[k] !== "";
@@ -79,7 +83,15 @@ export function fields(
     && !labelCols.includes(k) && has(k));
   const nameKey = rest[0];
   return {
-    name: nameKey ? String(subject[nameKey]) : row.thread,
+    // A THREAD NOBODY HAS REGISTERED YET HAS NO NAME, and this used to fall
+    // back to the thread id: an internal code, on screen, where a clerk reads
+    // a patient's name. The front desk already said "No name yet" in its own
+    // copy of this rule while the queue and the rail printed `enc-001`, which
+    // is three surfaces disagreeing about the same row. The rule is here now,
+    // once, and `named` is how a caller draws it differently without having
+    // to compare the name against an id to find out.
+    name: nameKey ? String(subject[nameKey]) : NO_NAME,
+    named: !!nameKey,
     meta: [...rest.slice(1, 4).map((k) => String(subject[k])), human(row.station)]
       .filter(Boolean).join(" · "),
     token: tokenKey ? String(subject[tokenKey]) : "",

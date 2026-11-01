@@ -117,7 +117,7 @@ export function Sidebar({
             >
               {f.token && <span className="th-tok">{f.token}</span>}
               <span className="th-b">
-                <span className="th-n">{f.name}</span>
+                <span className={`th-n${f.named ? "" : " u-mute"}`}>{f.name}</span>
                 {row.station && <span className="th-s">{human(row.station)}</span>}
               </span>
               {row.flags?.some((x) => row.badges?.[x] === "crit") && (

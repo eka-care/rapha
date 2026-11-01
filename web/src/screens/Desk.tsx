@@ -359,14 +359,11 @@ function Day({ decl, rows, loading, first, onOpenThread }: {
             {f.token}
           </span>
         )}
-        {/* A thread nobody has registered yet HAS no name, and `fields()`
-            falls back to the thread id -- which is an internal code and the
-            one thing a clerk must never be shown. This is exactly the row
-            this list exists for: somebody who arrived, took a number, and has
-            not been to the desk. Say that, rather than printing the code. */}
-        <span className={`desk-wr-nm${f.name === row.thread ? " u-mute" : ""}`}>
-          {f.name === row.thread ? "No name yet" : f.name}
-        </span>
+        {/* A thread nobody has registered yet has no name. This is exactly
+            the row this list exists for: somebody who arrived, took a number
+            and has not been to the desk. `fields()` says what to call them,
+            for every surface at once. */}
+        <span className={`desk-wr-nm${f.named ? "" : " u-mute"}`}>{f.name}</span>
         {(row.flags ?? []).includes(ABHA_LINKED) && <Lotus className="desk-hit-lotus" />}
         <span className="desk-wr-at">{human(row.station) || clock(row.opened_at)}</span>
       </button>
