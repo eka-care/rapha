@@ -2683,6 +2683,561 @@ def _go_live_code(path):
     return "".join(out)
 
 
+# ---------------------------------------------------------------------------
+# The outbox. G8.
+#
+# WHY THIS IS NOT COMPARED OVER A SOCKET EITHER
+# ---------------------------------------------
+# The outbox is SWITCHED OFF. kernel/queues.py is complete and proved and
+# api/scribe.py does not call it, because holding a recording through an
+# outage means writing consultation audio to a clinic's disk and the retention
+# window that would make that safe is unsigned. Nothing in cmd/api calls the Go
+# package either, by the same decision. So no route in either engine reaches an
+# outbox and there is nothing for e2e.py or check_live.py to compare, which
+# leaves the shape projection_parity above already uses: a Go test that asserts
+# nothing, fed inputs from here and read back for the diff.
+#
+# WHAT IS COMPARED, AND WHAT IS DELIBERATELY NOT
+# ----------------------------------------------
+# Compared: the scrubber sentence by sentence, the backoff, the admission
+# refusals, the plain English the outbox reads as, and whole scripted sweeps
+# down to each row's state, attempt count, receipt and reason.
+#
+# NOT compared: the item id, which is random on both sides; the claim and sent
+# stamps, which are the clock's, so what travels is whether a row was STAMPED
+# rather than when; and the sentence a failure that is not an Unsendable leaves,
+# because the Python writes `type(broke).__name__` and Go has no such name. What
+# both engines hold there is that the row names a KIND of failure and never the
+# sentence that came with it, and the scrub cases are where that is compared.
+# ---------------------------------------------------------------------------
+
+# The strings a gateway really does send back, plus the shapes that must NOT be
+# touched. Inputs, so this file may hold them; what is compared is what each
+# engine does to them.
+QUEUE_SCRUB_CASES = (
+    "Aadhaar 1234 5678 9012 is already linked",
+    "linking 123456789012 failed",
+    "no profile for mobile 9876543210",
+    "+91 98765 43210 is unknown",
+    "OTP 123456 has expired, request another",
+    "the one-time password 4821 was wrong",
+    "Aadhaar 1234 5678 9012 refused",
+    "status 404 on session scr-1",
+    "token 12345678",
+    "systolic 140 at 2026",
+    "call 9876543210 or 9123456780 back",
+    "ref 98765432109876543210 refused",
+    "x9876543210y",
+    # A body long enough that the truncation is observable.
+    "the gateway said: " + "x" * 600,
+    "",
+)
+
+
+def queue_cases():
+    """The inputs both outboxes are driven through."""
+    # The withheld map is the real one for the shape that runs fewest plugins,
+    # so what is compared is this bundle's own subtraction rather than a
+    # literal typed here.
+    from kernel import declarations
+
+    narrow = declarations.load("phc", facility="consulting-room-only")
+    withheld = dict(narrow.withheld)
+    one_withheld = sorted(withheld)[0] if withheld else "visit.household"
+    plugin_of = withheld.get(one_withheld, "outreach")
+    assert withheld, "no capability is withheld at the narrowest shape, so " \
+                     "the admission refusal below proves nothing"
+
+    return {
+        "scrub": list(QUEUE_SCRUB_CASES),
+        # Past the end of the table as well as inside it, and nought and
+        # negative, because the ceiling and the floor are both reachable.
+        "backoff": [-1, 0, 1, 2, 3, 4, 5, 6, 7, 99],
+        "refusal": [
+            {"kind": "audio", "operation": "phc.op.consult-document",
+             "capability": "encounter.document", "withheld": {}},
+            {"kind": "document", "operation": "phc.op.consult-document",
+             "capability": "encounter.document", "withheld": {}},
+            # A kind this outbox does not know.
+            {"kind": "video", "operation": "phc.op.consult-document",
+             "capability": "encounter.document", "withheld": {}},
+            # And the capability this centre has switched off.
+            {"kind": "audio", "operation": "phc.op.consult-document",
+             "capability": one_withheld, "withheld": {one_withheld: plugin_of}},
+        ],
+        "admit": [
+            {"case": "ordinary", "kind": "document", "key": "enc-1",
+             "operation": "phc.op.consult-document",
+             "capability": "encounter.document", "withheld": {}},
+            {"case": "no key", "kind": "document", "key": "",
+             "operation": "phc.op.consult-document",
+             "capability": "encounter.document", "withheld": {}},
+            {"case": "blank key", "kind": "document", "key": "   ",
+             "operation": "phc.op.consult-document",
+             "capability": "encounter.document", "withheld": {}},
+            {"case": "unknown kind", "kind": "video", "key": "enc-1",
+             "operation": "phc.op.consult-document",
+             "capability": "encounter.document", "withheld": {}},
+            {"case": "withheld plugin", "kind": "audio", "key": "enc-1",
+             "operation": "phc.op.consult-document",
+             "capability": one_withheld, "withheld": {one_withheld: plugin_of}},
+        ],
+        # The sentences, at nought, one, twelve and one of every state, because
+        # a count that reads correctly only at twelve is the defect
+        # web/src/agent.check.ts already holds the brief to.
+        "standing": [
+            {"case": "nothing", "rows": []},
+            {"case": "one recording", "rows": [
+                {"kind": "audio", "state": "ready", "attempts": 0}]},
+            {"case": "twelve recordings", "rows": [
+                {"kind": "audio", "state": "ready", "attempts": 0}
+                for _ in range(12)]},
+            {"case": "one of each state", "rows": [
+                {"kind": "audio", "state": "ready", "attempts": 0},
+                {"kind": "audio", "state": "sending", "attempts": 1},
+                {"kind": "audio", "state": "failed", "attempts": 6},
+                {"kind": "document", "state": "refused", "attempts": 0},
+                {"kind": "document", "state": "held", "attempts": 2},
+                {"kind": "document", "state": "sent", "attempts": 1}]},
+            {"case": "one failed after one attempt", "rows": [
+                {"kind": "document", "state": "failed", "attempts": 1}]},
+        ],
+        "sweeps": [
+            {"case": "one allowed item goes once with a receipt",
+             "now": QUEUE_NOW, "clock": [QUEUE_NOW, QUEUE_NOW],
+             "recover": False, "delivered": "known",
+             "items": [{"key": "enc-1", "kind": "document", "blob": "",
+                        "allow": True, "deny": ""}],
+             "send": {"enc-1": ["receipt"]}},
+            {"case": "a denial costs no attempt and sends nothing",
+             "now": QUEUE_NOW, "clock": [QUEUE_NOW], "recover": False,
+             "delivered": "known",
+             "items": [{"key": "enc-1", "kind": "document", "blob": "",
+                        "allow": False,
+                        "deny": "missing capability encounter.document"}],
+             "send": {"enc-1": ["receipt"]}},
+            {"case": "a dead line fails and keeps the item",
+             "now": QUEUE_NOW, "clock": [QUEUE_NOW], "recover": False,
+             "delivered": "known-empty",
+             "items": [{"key": "enc-1", "kind": "document", "blob": "",
+                        "allow": True, "deny": ""}],
+             "send": {"enc-1": ["unsendable"]}},
+            {"case": "an empty receipt is a failure, not a success",
+             "now": QUEUE_NOW, "clock": [QUEUE_NOW], "recover": False,
+             "delivered": "known-empty",
+             "items": [{"key": "enc-1", "kind": "document", "blob": "",
+                        "allow": True, "deny": ""}],
+             "send": {"enc-1": ["empty"]}},
+            {"case": "a failure carrying a response body keeps only its kind",
+             "now": QUEUE_NOW, "clock": [QUEUE_NOW], "recover": False,
+             "delivered": "known-empty",
+             "items": [{"key": "enc-1", "kind": "document", "blob": "",
+                        "allow": True, "deny": ""}],
+             "send": {"enc-1": ["boom"]}},
+            # The attempt limit, which needs the CLOCK to move: the backoff
+            # after the second attempt is thirty seconds and after the fifth is
+            # half an hour, so sweeps at one moment cannot reach it.
+            {"case": "a dead line stops at the attempt limit",
+             "now": QUEUE_NOW, "clock": QUEUE_HOURS, "recover": False,
+             "delivered": "known-empty",
+             "items": [{"key": "enc-1", "kind": "document", "blob": "",
+                        "allow": True, "deny": ""}],
+             "send": {"enc-1": ["unsendable"]}},
+            # And the three answers recovery can get, each from a crash that is
+            # MADE to happen by stranding the row in `sending`.
+            {"case": "a remote that cannot say holds the item",
+             "now": QUEUE_NOW, "clock": [], "strand": True, "recover": True,
+             "recover_at": QUEUE_LATER, "delivered": "unknown",
+             "items": [{"key": "enc-1", "kind": "document", "blob": "",
+                        "allow": True, "deny": ""}],
+             "send": {"enc-1": ["receipt"]}},
+            {"case": "a remote that has it settles without a second send",
+             "now": QUEUE_NOW, "clock": [], "strand": True, "recover": True,
+             "recover_at": QUEUE_LATER, "delivered": "known",
+             "items": [{"key": "enc-1", "kind": "document", "blob": "",
+                        "allow": True, "deny": ""}],
+             "send": {"enc-1": ["receipt"]}},
+            {"case": "a remote that does not have it tries again",
+             "now": QUEUE_NOW, "clock": [], "strand": True, "recover": True,
+             "recover_at": QUEUE_LATER, "delivered": "known-empty",
+             "items": [{"key": "enc-1", "kind": "document", "blob": "",
+                        "allow": True, "deny": ""}],
+             "send": {"enc-1": ["receipt"]}},
+            {"case": "a mixed sweep: one goes, one is denied, one has no line",
+             "now": QUEUE_NOW, "clock": [QUEUE_NOW], "recover": False,
+             "delivered": "known",
+             "items": [{"key": "enc-1", "kind": "document", "blob": "",
+                        "allow": True, "deny": ""},
+                       {"key": "enc-2", "kind": "document", "blob": "",
+                        "allow": False, "deny": "missing capability encounter.document"},
+                       {"key": "enc-3", "kind": "audio", "blob": "",
+                        "allow": True, "deny": ""}],
+             "send": {"enc-1": ["receipt"], "enc-2": ["receipt"],
+                      "enc-3": ["unsendable"]}},
+            {"case": "a recording is dropped only after its receipt",
+             "now": QUEUE_NOW, "clock": [QUEUE_NOW], "recover": False,
+             "delivered": "known",
+             "items": [{"key": "enc-9", "kind": "audio",
+                        "blob": "/tmp/phc-parity-recording.bin",
+                        "allow": True, "deny": ""}],
+             "send": {"enc-9": ["receipt"]}},
+            {"case": "and not after a failed one",
+             "now": QUEUE_NOW, "clock": [QUEUE_NOW], "recover": False,
+             "delivered": "known-empty",
+             "items": [{"key": "enc-9", "kind": "audio",
+                        "blob": "/tmp/phc-parity-recording.bin",
+                        "allow": True, "deny": ""}],
+             "send": {"enc-9": ["unsendable"]}},
+        ],
+    }
+
+
+QUEUE_NOW = "2026-11-01T10:00:00+00:00"
+QUEUE_LATER = "2026-11-01T14:00:00+00:00"
+# One moment per hour, long enough to walk an item past every backoff in the
+# table and reach the attempt limit.
+QUEUE_HOURS = tuple("2026-11-01T%02d:00:00+00:00" % hour
+                    for hour in range(10, 20))
+
+
+class _ScriptedSender:
+    """The remote both engines face, driven by the same word list."""
+
+    def __init__(self, words, delivered):
+        # Keyed by item key and not positional: the order items are swept in
+        # is not deterministic in either engine, because `due` breaks ties on
+        # the row id and that is random on both sides.
+        self.words = dict(words or {})
+        self.at = {}
+        self.delivered_as = delivered
+        self.handed = []
+
+    def send(self, item, body):
+        word = "receipt"
+        listed = self.words.get(item.key) or []
+        if listed:
+            n = self.at.get(item.key, 0)
+            word = listed[n] if n < len(listed) else listed[-1]
+        self.at[item.key] = self.at.get(item.key, 0) + 1
+        self.handed.append(item.key)
+        if word == "unsendable":
+            raise queues_module().Unsendable("there is no line")
+        if word == "empty":
+            return "   "
+        if word == "boom":
+            raise _ScriptedFailure(
+                "patient Asha Devi, mobile 9876543210, diagnosis hypertension")
+        return "r-" + item.key
+
+    def delivered(self, item):
+        answer = queues_module().Delivery
+        if self.delivered_as == "unknown":
+            return answer(known=False)
+        if self.delivered_as == "known-empty":
+            return answer(known=True, receipt="")
+        return answer(known=True, receipt="r-" + item.key)
+
+
+class _ScriptedFailure(RuntimeError):
+    """A failure that is NOT an Unsendable, carrying what must not be kept."""
+
+
+def queues_module():
+    from kernel import queues
+    return queues
+
+
+def python_outbox(cases):
+    """The same inputs through kernel/queues.py and adapters/local/spool.py."""
+    from adapters.local.spool import SqliteSpool
+    from kernel import contracts, queues
+
+    out = {"scrub": [queues.scrubbed(one) for one in cases["scrub"]],
+           "backoff": [queues.backoff(n) for n in cases["backoff"]],
+           "refusal": [queues.refusal(kind=one["kind"], operation=one["operation"],
+                                      capability=one["capability"],
+                                      withheld=one["withheld"])
+                       for one in cases["refusal"]]}
+
+    admit = []
+    for one in cases["admit"]:
+        spool = SqliteSpool(":memory:")
+        why = ""
+        try:
+            queues.enqueue(spool, kind=one["kind"], key=one["key"],
+                           thread="enc-1", operation=one["operation"],
+                           capability=one["capability"], facility="all-plugins",
+                           at=QUEUE_NOW, withheld=one["withheld"])
+        except queues.Unsendable as broke:
+            why = str(broke)
+        admit.append({"case": one["case"], "refused": why,
+                      "rows": len(spool.items())})
+    out["admit"] = admit
+
+    standing = []
+    for one in cases["standing"]:
+        spool = SqliteSpool(":memory:")
+        for n, row in enumerate(one["rows"]):
+            spool.put(contracts.QueueItem(
+                id="q-%s-%d" % (one["case"], n), kind=row["kind"],
+                key="%s-%d" % (one["case"], n), thread="enc-1",
+                operation="phc.op.consult-document",
+                capability="encounter.document", facility="all-plugins",
+                created_at=QUEUE_NOW, state=row["state"],
+                attempts=row["attempts"]))
+        standing.append({"case": one["case"],
+                         "lines": queues.status(spool).lines()})
+    out["standing"] = standing
+
+    sweeps = []
+    for one in cases["sweeps"]:
+        spool = SqliteSpool(":memory:")
+        verdict, deny, by_id = {}, {}, {}
+        for want in one["items"]:
+            item = queues.enqueue(
+                spool, kind=want["kind"], key=want["key"],
+                thread="enc-" + want["key"],
+                operation="phc.op.consult-document",
+                capability="encounter.document", facility="all-plugins",
+                at=one["now"], actor="user:mo", blob=want["blob"])
+            by_id[item.id] = want["key"]
+            verdict[want["key"]] = want["allow"]
+            deny[want["key"]] = want["deny"]
+        sender = _ScriptedSender(one["send"], one["delivered"])
+        senders = {"document": sender, "audio": sender}
+
+        class _Allowed:
+            allowed, reason = True, "allowed"
+
+        def permit(item, verdict=verdict, deny=deny):
+            if verdict.get(item.key):
+                return _Allowed()
+
+            class _Denied:
+                allowed = False
+                reason = deny.get(item.key) or ""
+            return _Denied()
+
+        dropped = []
+        got = {"case": one["case"], "sent": [], "failed": [], "refused": [],
+               "stopped": [], "held": [], "unrecorded": []}
+        for at in one["clock"]:
+            report = queues.pump(spool, senders, permit=permit,
+                                 bodies=lambda i: {"body": True},
+                                 now=at, delete=dropped.append)
+            for name in ("sent", "failed", "refused", "stopped", "held",
+                         "unrecorded"):
+                got[name] += ["%s %s" % (by_id[i], why)
+                              for i, why in getattr(report, name)]
+        if one.get("strand"):
+            # What a crash leaves: claimed and never settled. Without this
+            # nothing is in flight and recovery finds nothing to settle, which
+            # is how the `held` outcome went unproved the first time this was
+            # written.
+            for row in spool.items(state="ready"):
+                spool.settle(row.id, state="sending", at=one["now"])
+        if one["recover"]:
+            report = queues.recover(spool, senders,
+                                    now=one.get("recover_at") or one["now"])
+            for name in ("sent", "failed", "held", "stopped"):
+                got[name] += ["%s %s" % (by_id[i], why)
+                              for i, why in getattr(report, name)]
+        got["handed"] = list(sender.handed)
+        got["dropped"] = len(dropped)
+        got["rows"] = [
+            {"key": row.key, "kind": row.kind, "state": row.state,
+             "attempts": row.attempts, "receipt": row.receipt,
+             "last_error": row.last_error, "stamped": bool(row.sent_at)}
+            for state in contracts.QUEUE_STATES
+            for row in spool.items(state=state)]
+        got["lines"] = queues.status(spool).lines()
+        sweeps.append(got)
+    out["sweeps"] = sweeps
+    return out
+
+
+def go_outbox(cases, tmp):
+    cases_at = os.path.join(tmp, "queue-cases.json")
+    answers_at = os.path.join(tmp, "queue-answers.json")
+    with open(cases_at, "w") as f:
+        json.dump(cases, f)
+    done = subprocess.run(
+        ["go", "test", "./queues/", "-run", "TestTheOutboxAnswersForTheParityCheck",
+         "-count=1"],
+        cwd=str(backend.GO_MODULE), capture_output=True, text=True,
+        env=dict(os.environ, PHC_QUEUE_CASES=cases_at,
+                 PHC_QUEUE_ANSWERS=answers_at))
+    if done.returncode != 0 or not os.path.exists(answers_at):
+        raise SystemExit("\nthe Go engine could not answer the outbox cases:"
+                         "\n\n%s%s\n" % (done.stdout[-4000:], done.stderr[-2000:]))
+    with open(answers_at) as f:
+        return json.load(f)
+
+
+# The ONE sentence the two engines cannot spell alike, replaced by what both
+# of them actually promise. kernel/queues.pump writes
+# `type(broke).__name__` for a failure that is not an Unsendable, so the Python
+# says "_ScriptedFailure" and Go says "queues_test.scriptedFailure": there is no
+# name Go has that Python has. What both hold is that the row names a KIND of
+# failure and NEVER the sentence that came with it, and that is asserted on its
+# own below, over a sender whose failure carries a patient's name, a mobile
+# number and a diagnosis. Normalised here and named here rather than quietly
+# dropped from the comparison.
+_TYPE_NAMED = re.compile(r"the service failed with \S+")
+_TYPE_MARK = "the service failed with <a type name>"
+
+
+def _comparable(value):
+    """One engine's answer with only that sentence's type name flattened."""
+    if isinstance(value, str):
+        return _TYPE_NAMED.sub(_TYPE_MARK, value)
+    if isinstance(value, list):
+        return [_comparable(one) for one in value]
+    if isinstance(value, dict):
+        return {key: _comparable(one) for key, one in value.items()}
+    return value
+
+
+def outbox_parity(tmp):
+    cases = queue_cases()
+    py = python_outbox(cases)
+    gone = go_outbox(cases, tmp)
+
+    # --- the privacy decision, sentence by sentence. The row's one free text
+    # field, so this is the comparison that matters most.
+    for raw, a, b in zip(cases["scrub"], py["scrub"], gone["scrub"]):
+        assert a == b, ("the two engines scrub differently\nin:     %r\n"
+                        "python: %r\ngo:     %r" % (raw, a, b))
+    # The cases really did remove something, or this is two engines agreeing
+    # that nothing happened. Three rules, each one observed at least once.
+    from kernel import queues
+    from care_phc.connectors import redact
+    marks = {"aadhaar": redact.AADHAAR_MARK, "otp": queues.OTP_MARK,
+             "mobile": "<mobile ending "}
+    for what, mark in sorted(marks.items()):
+        assert any(mark in one for one in py["scrub"]), \
+            "no case exercised the %s rule, so it is unproved" % what
+    # And a long body really was truncated, or the ceiling is unobserved.
+    assert any(len(one) == queues.ERROR_CHARS for one in py["scrub"]), \
+        "no case reached the %d character ceiling" % queues.ERROR_CHARS
+    ok("the outbox: both engines scrub the same %d failure sentences "
+       "identically, removing an Aadhaar number whole, an OTP whole and a "
+       "mobile number to its last four, and truncating at %d"
+       % (len(cases["scrub"]), queues.ERROR_CHARS))
+
+    assert py["backoff"] == gone["backoff"], (py["backoff"], gone["backoff"])
+    assert py["refusal"] == gone["refusal"], (py["refusal"], gone["refusal"])
+    # A refusal really was given and really was withheld, or the list above is
+    # two engines agreeing on silence.
+    assert any(one for one in py["refusal"]), "no case was refused"
+    assert any("withheld by plugin" in one for one in py["refusal"]), \
+        "no case was refused for a plugin this centre does not run"
+    ok("the outbox: the same waits after %d attempt counts, and the same "
+       "admission refusals including the capability and the plugin naming it"
+       % len(cases["backoff"]))
+
+    for one, a, b in zip(cases["admit"], py["admit"], gone["admit"]):
+        assert a == b, ("admitting %r differs\npython: %s\ngo:     %s"
+                        % (one["case"], a, b))
+    kept = [a for a in py["admit"] if not a["refused"]]
+    turned = [a for a in py["admit"] if a["refused"]]
+    assert kept and turned, (len(kept), len(turned))
+    # Refusing means refusing to HOLD it, which is stronger than refusing to
+    # send it: a refused item leaves no row for a person to wonder about.
+    for a in turned:
+        assert a["rows"] == 0, \
+            "a refused item left %d rows behind: %s" % (a["rows"], a)
+    ok("the outbox: %d items are admitted and %d refused identically, and "
+       "every refusal leaves NO row, which is refusing to hold rather than "
+       "refusing to send" % (len(kept), len(turned)))
+
+    for one, a, b in zip(cases["standing"], py["standing"], gone["standing"]):
+        assert a == b, ("the outbox reads differently at %r\npython: %s\n"
+                        "go:     %s" % (one["case"], a["lines"], b["lines"]))
+    said = [one["lines"] for one in py["standing"]]
+    assert ["nothing is waiting to be sent"] in said, \
+        "no case read the empty outbox"
+    assert any(any("1 recording" in line for line in lines) for lines in said), \
+        "no case read at one, which is where a plural goes wrong"
+    assert any(any("12 recordings" in line for line in lines) for lines in said), \
+        "no case read at twelve"
+    ok("the outbox: it reads as the same plain English in both engines at "
+       "nought, at one, at twelve and with one row in every state")
+
+    for one, a, b in zip(cases["sweeps"], py["sweeps"], gone["sweeps"]):
+        # `lines` keeps its order, because the order of the sentences a person
+        # reads is the queue's own (QUEUE_KINDS, then the states) and is not
+        # the rows'. Everything else is compared as a BAG: within one sweep the
+        # order is `due`'s, which reads oldest first and breaks ties on the row
+        # id, and a row id is a random hex string in BOTH engines. So two
+        # items queued in the same second have no determined order on either
+        # side, and sorting is comparing the outbox rather than the randomness.
+        # Said here rather than silently sorting.
+        for key in ("sent", "failed", "refused", "stopped", "held",
+                    "unrecorded", "handed"):
+            assert sorted(_comparable(a[key])) == sorted(_comparable(b[key])), (
+                "%s: the %s of one sweep differs\npython: %s\ngo:     %s"
+                % (one["case"], key, a[key], b[key]))
+        for key in ("dropped", "lines"):
+            assert _comparable(a[key]) == _comparable(b[key]), (
+                "%s: the %s of one sweep differs\npython: %s\ngo:     %s"
+                % (one["case"], key, a[key], b[key]))
+        rows = lambda side: sorted(_comparable(side["rows"]),
+                                   key=lambda row: json.dumps(row, sort_keys=True))
+        assert rows(a) == rows(b), (
+            "%s: the rows differ after the sweep\npython: %s\ngo:     %s"
+            % (one["case"], json.dumps(rows(a), sort_keys=True),
+               json.dumps(rows(b), sort_keys=True)))
+
+    # Every one of the four properties was actually exercised, or the loop
+    # above is two engines agreeing about a scenario that did nothing.
+    rows = [row for one in py["sweeps"] for row in one["rows"]]
+    states = {row["state"] for row in rows}
+    for needed in ("sent", "ready", "failed", "refused", "held"):
+        assert needed in states, \
+            "no sweep left a row in %r, so that outcome is unproved: %s" \
+            % (needed, sorted(states))
+    # Nothing reported as sent when it was not: every `sent` row carries a
+    # receipt and a stamp, and no other row carries either.
+    for row in rows:
+        if row["state"] == "sent":
+            assert row["receipt"] and row["stamped"], row
+        else:
+            assert not row["stamped"], \
+                "a row that is %r carries a sent stamp: %s" % (row["state"], row)
+    # Nothing sent twice: no scenario handed one key over more than once.
+    for one in py["sweeps"]:
+        handed = [name.split(" ")[0] for name in one["handed"]] or one["handed"]
+        assert len(handed) == len(set(handed)) or one["case"].startswith(
+            "a dead line stops"), \
+            "%s handed a key over more than once: %s" % (one["case"], one["handed"])
+    # And a response body really did reach a sender and really did not reach a
+    # row.
+    leaked = [row for row in rows
+              if "Asha" in row["last_error"] or "hypertension" in row["last_error"]
+              or "9876543210" in row["last_error"]]
+    assert not leaked, "a response body reached an outbox row: %s" % leaked
+    assert any("the service failed with" in row["last_error"] for row in rows), \
+        "no sweep exercised a failure that was not an Unsendable"
+    ok("the outbox: %d scripted sweeps leave identical rows in both engines, "
+       "down to the state, the attempt count, the receipt and the reason, "
+       "across all %d states a row can be in"
+       % (len(cases["sweeps"]), len(states)))
+
+    # And the recording's bytes: deleted after a receipt, never after a
+    # failure. The two scenarios are the pair, and they are compared above;
+    # this says which pair proved it.
+    after_receipt = [one for one in py["sweeps"]
+                     if one["case"] == "a recording is dropped only after its receipt"]
+    after_failure = [one for one in py["sweeps"]
+                     if one["case"] == "and not after a failed one"]
+    assert after_receipt and after_failure
+    assert after_receipt[0]["dropped"] == 1, after_receipt[0]
+    assert after_failure[0]["dropped"] == 0, after_failure[0]
+    ok("the outbox: a recording's bytes are deleted after the receipt and not "
+       "after a failed send, identically in both engines")
+
+
 def go_names_no_clinical_word():
     """No Go engine file types a diagnosis, a drug, a route or a frequency.
 
@@ -3184,6 +3739,10 @@ def main():
         # same reason: neither opens a socket, and both are read more easily
         # before three pairs of kernels have been started.
         projection_parity(tmp)
+        # The outbox, for the same reason and in the same shape: it is on no
+        # route in either engine, so there is nothing for a socket check to
+        # compare.
+        outbox_parity(tmp)
         go_names_no_clinical_word()
         # The facility's shape, before the shapes themselves are started: the
         # lint is what decides whether a kernel may start at all, so a
