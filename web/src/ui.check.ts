@@ -848,8 +848,25 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   // A callback ref, because voice.check.ts asserts this file holds no effect
   // and no timer: the only thing that may reach a write in the panel is a tap
   // or the Enter key, and landing the focus must not weaken that.
-  assert.match(panel, /if \(!el \|\| inline \|\| landed\.current\) return;\s*landed\.current = true;\s*el\.focus\(\);/,
+  assert.match(panel, /landed\.current = true;[\s\S]{0,160}?el\.focus\(\);/,
     "opening the panel leaves the keyboard behind the scrim, where Escape does nothing");
+  // And it has to come back. A modal that takes the focus and does not return
+  // it leaves the keyboard on a node React has removed, and the next Tab
+  // starts again at the top of the document, which is worse than never having
+  // moved it.
+  assert.match(panel, /opener\.current = document\.activeElement/,
+    "the panel does not remember what had the keyboard before it covered the screen");
+  assert.match(panel, /opener\.current\?\.focus\(\)/,
+    "the panel never hands the keyboard back to whatever opened it");
+  // Tab out of a modal and you are in the page behind the scrim, where
+  // everything is still focusable and none of it is visible.
+  for (const [file, src] of [["form/Panel.tsx", panel],
+                             ["app/Khoj.tsx", readFileSync(join(SRC, "app", "Khoj.tsx"), "utf8")]] as const) {
+    assert.match(src, /trapTab\(/, `${file} covers the screen and lets Tab walk out behind it`);
+  }
+  assert.match(readFileSync(join(SRC, "app", "Khoj.tsx"), "utf8"),
+    /opener\.current\?\.focus\(\)/,
+    "the command bar never hands the keyboard back to whatever opened it");
   ok("a11y: the operation panel is a named dialog and the keyboard arrives in it");
 }
 

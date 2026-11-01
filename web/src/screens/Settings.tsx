@@ -215,12 +215,12 @@ export function Roles({
           return (
             <section className="roles-g" key={g.key}>
               {g.title && (
-                <h3 className="roles-g-h">
+                <h2 className="roles-g-h">
                   <span className="roles-g-t">{g.title}</span>
                   <span className="roles-g-n">
                     {g.rows.filter((r) => caps.has(r.cap)).length}/{g.rows.length}
                   </span>
-                </h3>
+                </h2>
               )}
               {whole && <p className="f-hint roles-g-why">{whole}</p>}
               <div className="roles-rows">

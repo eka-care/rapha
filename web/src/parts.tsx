@@ -59,6 +59,30 @@ export function Announcer() {
 
 /** Long enough that a fast answer never draws a skeleton, short enough that a
  *  slow one is explained before anybody wonders. */
+/** Keep Tab inside a thing that covers the screen.
+ *
+ *  A modal that does not hold the keyboard is a modal only for the mouse:
+ *  Tab walks straight out of it into the page behind the scrim, where
+ *  everything is still focusable and nothing is visible. This wraps the walk
+ *  at both ends. It reads the focusable elements on each press rather than
+ *  caching them, because a panel's fields appear and disappear as it is
+ *  filled in and a cached list would send the keyboard to an element that is
+ *  no longer there.
+ */
+export function trapTab(e: { key: string; shiftKey: boolean; preventDefault: () => void },
+                        box: HTMLElement | null) {
+  if (e.key !== "Tab" || !box) return;
+  const able = [...box.querySelectorAll<HTMLElement>(
+    'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),'
+    + 'textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')]
+    .filter((el) => el.offsetParent !== null || el === document.activeElement);
+  if (!able.length) return;
+  const first = able[0], last = able[able.length - 1];
+  const on = document.activeElement;
+  if (e.shiftKey && (on === first || on === box)) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && on === last) { e.preventDefault(); first.focus(); }
+}
+
 export const SETTLE = 250;
 
 /** True once `ms` has passed since this component mounted. */

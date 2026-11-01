@@ -4,16 +4,18 @@
 
 .home { display: flex; flex-direction: column; gap: 16px; padding-bottom: 20px; }
 
+/* The prototype's own wash: surface at the near corner, the canvas through
+   the middle, and the agent's violet tint off the far corner, which is the
+   only colour on it. The 3px rule that used to sit across the top of this
+   card was a mid grey hairline from a different design system, and it read
+   as a dark bar on the one thing on this screen that should feel open. */
 .hero {
   position: relative; overflow: hidden;
   border-radius: var(--radius-xl); border: 1px solid var(--color-border-subtle);
   background: linear-gradient(122deg,
-    var(--color-bg-surface) 0%, var(--color-bg-hover) 58%, var(--color-tint-warm) 128%);
-  padding: 26px 26px 22px; box-shadow: var(--shadow-sm);
-}
-.hero::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-  background: linear-gradient(90deg, var(--color-rule-warm), var(--color-eyebrow), var(--color-rule-warm));
+    var(--color-bg-surface) 0%, var(--color-bg-canvas) 58%, var(--color-agent-soft) 165%);
+  padding: 44px 26px 38px; box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; align-items: center; text-align: center;
 }
 .hero-mark {
   position: absolute; top: -62px; right: -52px; width: 290px; height: 290px;
@@ -30,25 +32,33 @@
    prototype's hero is Newsreader at 420, which is lighter than the body it
    sits above and reads as a greeting rather than as a banner. */
 .hero-h {
-  font-family: var(--font-serif); font-size: 31px; font-weight: 420;
-  letter-spacing: .012em; margin-top: 7px; line-height: 1.1;
+  font-family: var(--font-serif); font-size: 34px; font-weight: 420;
+  letter-spacing: .012em; margin-top: 0; line-height: 1.12;
+  /* Balanced rather than ragged: the second line of a greeting breaking
+     after the comma is the kind of thing nobody names and everybody feels. */
+  max-width: 30ch; text-wrap: balance;
 }
 .hero-h span { color: var(--color-text-tertiary); font-weight: 420; }
 .hero-sub { font-size: 12.5px; color: var(--color-text-tertiary); margin-top: 7px; line-height: 1.55; max-width: 560px; }
+/* The centre of this screen. Everything else on it is a read; this is the
+   one thing a person starts from, so it sits in the middle at the width of
+   the heading above it rather than hard against the left edge. */
 .hero-ask {
-  display: flex; align-items: center; gap: 11px;
+  display: flex; align-items: center; gap: 12px;
   background: var(--color-bg-surface); border: 1.5px solid var(--color-border-subtle);
-  border-radius: var(--radius-pill); padding: 12px 18px; margin-top: 20px;
-  max-width: 640px; cursor: text; position: relative; z-index: 1; width: 100%;
+  border-radius: var(--radius-pill); padding: 15px 22px; margin: 24px auto 0;
+  max-width: 680px; cursor: text; position: relative; z-index: 1; width: 100%;
+  box-shadow: var(--shadow-sm);
   transition: var(--duration-normal) var(--ease-out);
 }
 .hero-ask:hover { border-color: var(--color-accent); box-shadow: var(--shadow-md); }
-.hero-ask-l { flex: 1; min-width: 0; font-size: 14px; text-align: left;
+.hero-ask-l { flex: 1; min-width: 0; font-size: 15px; text-align: left;
   color: var(--color-text-tertiary); }
 .hero-ask:focus-visible {
   outline: 2px solid var(--color-accent); outline-offset: 2px;
 }
-.chips { display: flex; gap: 7px; margin-top: 13px; flex-wrap: wrap; position: relative; z-index: 1; }
+.chips { display: flex; gap: 7px; margin-top: 15px; flex-wrap: wrap; position: relative;
+  z-index: 1; justify-content: center; }
 
 /* The session clock. It is the one number on the screen that moves on its
    own, which is most of why the hero reads as live. */

@@ -24,6 +24,7 @@ import { Journey } from "../abha/Journey";
 import { ApiError, type Client } from "../api";
 import { Form, labelled, validate } from "./Form";
 import { walk } from "../validate";
+import { trapTab } from "../parts";
 import { questionnaire } from "../declarations";
 import { fmt } from "../messages";
 import type { Operation, Payload, Proposal } from "../types";
@@ -135,6 +136,10 @@ export function OperationPanel({
    *  key. Landing the focus on mount is done by the ref itself, which runs
    *  once, writes nothing, and leaves that property standing. */
   const landed = useRef(false);
+  // Who had the keyboard before this covered the screen, and the box itself,
+  // so Tab can be held inside it.
+  const opener = useRef<HTMLElement | null>(null);
+  const box = useRef<HTMLElement | null>(null);
 
   const problems = useMemo(() => (schema ? validate(schema, payload) : []), [schema, payload]);
 
@@ -277,9 +282,21 @@ export function OperationPanel({
          taken to the thing that had just covered the screen. The inline
          variant is not a modal and does not pretend to be. */
       ref={(el) => {
-        if (!el || inline || landed.current) return;
+        if (inline) return;
+        if (!el) {
+          // Closing. Whoever opened this gets the keyboard back; without
+          // this the focus is left on a node React has already removed and
+          // the next Tab starts again at the top of the document.
+          opener.current?.focus();
+          opener.current = null;
+          landed.current = false;
+          return;
+        }
+        if (landed.current) return;
         landed.current = true;
+        opener.current = document.activeElement as HTMLElement | null;
         el.focus();
+        box.current = el;
       }}
       tabIndex={inline ? undefined : -1}
       role={inline ? undefined : "dialog"}
@@ -288,6 +305,7 @@ export function OperationPanel({
       className={inline ? "mod inline" : "mod"}
       onKeyDown={(e) => {
         if (e.key === "Escape") { e.preventDefault(); onCancel?.(); return; }
+        if (!inline) trapTab(e, box.current);
         // Enter commits, except inside a textarea, where it is a newline. A
         // consultation note committed because someone pressed return
         // mid-sentence is worse than one extra tap.

@@ -6,6 +6,7 @@
  *  browser.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { trapTab } from "../parts";
 import { createLabel, isAsk, rows as searchRows, type Row } from "../search";
 import type { Catalogue, ViewDecl, ViewResult } from "../types";
 import { displayFor } from "../declarations";
@@ -25,7 +26,17 @@ export function Khoj({ queues, nav, cat, workflow, onClose, onOpenThread, onGoVi
   const [pick, setPick] = useState(0);
   const box = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { box.current?.focus(); }, []);
+  // The command bar is a modal too: it takes the keyboard on open, holds it
+  // while it is up, and hands it back to whatever opened it. Without the
+  // hand back, closing it leaves the focus on a removed node and the next
+  // Tab starts at the top of the document.
+  const opener = useRef<HTMLElement | null>(null);
+  const shell = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    opener.current = document.activeElement as HTMLElement | null;
+    box.current?.focus();
+    return () => { opener.current?.focus(); opener.current = null; };
+  }, []);
 
   // The FULL declaration for each queue, not the short form.
   //
@@ -62,7 +73,8 @@ export function Khoj({ queues, nav, cat, workflow, onClose, onOpenThread, onGoVi
   return (
     <>
       <div className="scrim" onClick={onClose} />
-      <div className="khoj" role="dialog" aria-modal="true" aria-label="Search">
+      <div className="khoj" role="dialog" aria-modal="true" aria-label="Search"
+        ref={shell} onKeyDown={(e) => trapTab(e, shell.current)}>
         <input
           ref={box}
           className="khoj__input"
