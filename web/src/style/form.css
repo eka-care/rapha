@@ -63,6 +63,15 @@
   color: var(--color-bg-surface);
 }
 .cq.rose:hover:not(:disabled) { background: var(--color-accent); opacity: .9; }
+/* The lightest of the three weights. A footer that offers an undo, a way out
+ * and a commit has to show which is which before it is read. */
+.cq.quiet {
+  background: transparent; border-color: transparent;
+  color: var(--color-text-secondary);
+}
+.cq.quiet:hover:not(:disabled) {
+  background: var(--color-bg-subtle); color: var(--color-text-primary);
+}
 
 /* ---- fields (§39) ------------------------------------------------------ */
 .f-form { display: grid; gap: var(--space-4); }
@@ -88,7 +97,7 @@
 }
 /* §39: a numeric field uses tabular numerals so a column of them lines up. */
 .f-in[inputmode="decimal"], .f-in[type="number"] { font-variant-numeric: tabular-nums; }
-.f-in:focus-visible { outline: 2px solid var(--color-agent); outline-offset: 1px; }
+.f-in:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 .f-in:disabled { color: var(--color-text-disabled); background: var(--color-bg-subtle); }
 
 .f-hint { font-size: 12px; line-height: 17px; color: var(--color-text-tertiary); }
@@ -117,6 +126,43 @@
 .f-check { display: flex; align-items: flex-start; gap: var(--space-2); font-size: 13px; }
 .f-check.big { font-size: 14px; font-weight: 500; }
 .f-check input { margin-top: 2px; width: 16px; height: 16px; flex: 0 0 auto; }
+
+/* The box itself, which was the browser's and therefore the browser's blue.
+ * Nothing else in this product is that blue, and a checked box is the
+ * selected state of a control, so it wears the accent: the hue that carries
+ * interactive chrome. The tick is a clipped square rather than a glyph,
+ * because a glyph is a font the device may not have. */
+.f-check input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none;
+  width: 18px; height: 18px; margin-top: 1px;
+  display: grid; place-content: center; cursor: pointer;
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+  transition: background var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out);
+}
+.f-check input[type="checkbox"]::after {
+  content: ""; width: 11px; height: 11px;
+  background: var(--color-bg-surface);
+  clip-path: polygon(13% 46%, 0 61%, 40% 100%, 100% 20%, 85% 7%, 39% 72%);
+  transform: scale(0);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.f-check input[type="checkbox"]:checked {
+  background: var(--color-accent); border-color: var(--color-accent);
+}
+.f-check input[type="checkbox"]:checked::after { transform: scale(1); }
+.f-check input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--color-accent); outline-offset: 2px;
+}
+.f-check input[type="checkbox"]:disabled {
+  background: var(--color-bg-subtle); border-color: var(--color-border-strong);
+  cursor: not-allowed;
+}
+.f-check input[type="checkbox"]:disabled:checked {
+  background: var(--color-text-disabled); border-color: var(--color-text-disabled);
+}
 
 .f-flags { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
@@ -163,3 +209,63 @@
   border: 0; background: transparent; padding: 0; cursor: pointer;
   color: var(--color-text-tertiary); font-size: 12px; text-decoration: underline;
 }
+
+/* ---- the role editor (screens/Settings.tsx) ---------------------------
+ *
+ * Eighteen switches of equal weight in one column is a list nobody reads.
+ * Three things fix it and none of them is a new control: the bundle's own
+ * plugin titles become headings, the switches run two to a line where there
+ * is room, and the foot of the panel says which of its three buttons is the
+ * commit.
+ */
+.mod.mod-roles { width: min(880px, calc(100vw - var(--space-8))); }
+.mod-roles .mod-h { padding-bottom: var(--space-4); border-bottom: 1px solid var(--color-border-subtle); }
+.mod-sub {
+  margin: var(--space-2) 0 0; max-width: 64ch;
+  font-size: 13px; line-height: 19px; color: var(--color-text-secondary);
+}
+/* The one thing every other row on this panel depends on, so it is the first
+ * control a person meets rather than a bare menu floating at the corner. */
+.roles-pick { margin-top: var(--space-4); max-width: 260px; }
+.roles-pick .f-in { min-height: 44px; }
+
+.roles-g { padding: var(--space-5) 0 var(--space-2); }
+.roles-g + .roles-g { border-top: 1px solid var(--color-border-subtle); }
+.roles-g-h {
+  display: flex; align-items: baseline; gap: var(--space-3);
+  margin: 0 0 var(--space-2);
+}
+.roles-g-t { font-size: 13px; line-height: 18px; font-weight: 600; }
+.roles-g-n {
+  margin-left: auto;
+  font: 500 11px/16px var(--font-mono); font-variant-numeric: tabular-nums;
+  color: var(--color-text-tertiary);
+}
+.roles-g-why { margin: 0 0 var(--space-2); }
+.roles-rows {
+  display: grid; gap: var(--space-1);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+}
+/* §68: a switch is a tap target before it is a tick. */
+.roles-row {
+  align-items: flex-start; gap: var(--space-3);
+  min-height: 44px; padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+}
+.roles-row:hover { background: var(--color-bg-subtle); }
+.roles-row.off { cursor: not-allowed; }
+.roles-row-b { display: grid; gap: 1px; min-width: 0; }
+.roles-row-t { font-size: 13px; line-height: 18px; font-weight: 500; }
+/* A capability no declaration carries a word for. Drawn as what it is -- an
+ * identifier -- rather than a humanised guess that reads like a name. */
+.roles-row-t.raw { font: 500 12px/18px var(--font-mono); }
+.roles-row-id {
+  font: 400 11px/15px var(--font-mono);
+  color: var(--color-text-tertiary); word-break: break-all;
+}
+.roles-row.off .roles-row-t,
+.roles-row.off .roles-row-id { color: var(--color-text-disabled); }
+
+.mod-roles .mod-f { gap: var(--space-3); }
+.mod-roles .cq { min-height: 44px; }
+.roles-f-end { display: flex; gap: var(--space-2); margin-left: auto; }

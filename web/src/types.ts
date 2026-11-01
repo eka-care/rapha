@@ -193,6 +193,11 @@ export type Catalogue = {
   /** role id to the capabilities it holds. vocab.BUNDLES, one list for the
    *  whole kernel, so a bundle's menu may name a role it has no use for. */
   bundles?: Record<string, string[]>;
+  /** A named group of this bundle's own capabilities, with the bundle's own
+   *  word for the group. The same declaration a facility switches off, so it
+   *  is the grouping a centre already thinks in; the role editor reads it
+   *  rather than inventing headings of its own. */
+  plugins?: Record<string, { title: string; always?: boolean; capabilities?: string[] }>;
 };
 
 /** GET /facility: which bundle this kernel loaded, and who is asking. */

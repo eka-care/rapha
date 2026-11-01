@@ -6,28 +6,75 @@
  *  because the thread screen already derives everything it draws from the
  *  capabilities a role holds. So this screen is a list of switches, one per
  *  capability, and the only prose is the reason a switch is disabled.
+ *
+ *  WHAT A SWITCH IS CALLED, and why this file names nothing. A capability id
+ *  is a machine name; an administrator reads the declaration's own words or
+ *  reads nothing. Three sources, in order, and all three are the kernel's:
+ *
+ *    one operation holds it   -> that operation's `title`
+ *    several hold it          -> each operation's `short`, joined
+ *    no operation, but a view -> the view's own `title`
+ *
+ *  A capability nothing declares a word for falls through to its identifier,
+ *  drawn in the mono face so it is visibly an identifier and not a name. That
+ *  is a MISSING DECLARATION rather than a licence to type a word here: a
+ *  capability carries no `title:` of its own today, which is why
+ *  `appointment.book`, `assessment.record` and `facility.admin` have nothing
+ *  better to show. The same is true of a role, which is why the picker can
+ *  only case an id.
+ *
+ *  HOW THEY ARE GROUPED. By the plugin that declares them, under the plugin's
+ *  own `title:`. A plugin is already "a named group of this bundle's own
+ *  words" (bundles/phc/bundle.yaml), which is exactly the grouping a centre
+ *  thinks in, and it is the same declaration the facility switches off. A
+ *  bundle that declares no plugins gets one ungrouped list, which is the
+ *  correct answer and not a missing feature.
  */
 import { useEffect, useState } from "react";
 import type { Client } from "../api";
 import { inert, inertReason, type Withheld } from "../grants";
-import type { Catalogue, Operation } from "../types";
-import { human } from "../words";
+import type { Catalogue } from "../types";
+import { title } from "../words";
 
-type Group = { title: string; rows: { cap: string; op?: Operation }[] };
+/** One switch. `label` is always the best declared words available; `declared`
+ *  says whether they ARE declared words, so the identifier is drawn once and
+ *  not twice. `hasOp` is kept because a capability no operation names gates a
+ *  view or nothing yet: the workflow has no opinion about it, so it is never
+ *  inert for the workflow's reason. */
+type Row = { cap: string; label: string; declared: boolean; hasOp: boolean };
 
-/** One row per capability the bundle declares, grouped by the operation it
- *  unlocks. A capability no operation names (it gates a view, or nothing yet)
- *  keeps its own row under its own name: `drawn_by` has no opinion about it,
- *  so it is never disabled here. */
+function rowFor(cap: string, cat: Catalogue): Row {
+  const ops = Object.values(cat.operations ?? {}).filter((o) => o.capability === cap);
+  if (ops.length === 1) {
+    return { cap, label: ops[0].title, declared: true, hasOp: true };
+  }
+  if (ops.length > 1) {
+    return { cap, label: ops.map((o) => o.short).join(" · "), declared: true, hasOp: true };
+  }
+  const views = Object.values(cat.views ?? {}).filter((v) => v.capability === cap);
+  if (views.length) {
+    return { cap, label: views.map((v) => v.title).join(" · "), declared: true, hasOp: false };
+  }
+  return { cap, label: cap, declared: false, hasOp: false };
+}
+
+type Group = { key: string; title: string | null; rows: Row[] };
+
+/** The bundle's own plugins, in the order it declares them, narrowed to the
+ *  capabilities this kernel actually carries. Anything no plugin claims keeps
+ *  a group of its own with no heading, because there is no declared word for
+ *  it and an invented one would be this file deciding something. */
 function groupsFor(cat: Catalogue): Group[] {
-  const ops = Object.values(cat.operations ?? {});
+  const left = new Set(cat.capabilities ?? []);
   const groups: Group[] = [];
-  for (const cap of cat.capabilities ?? []) {
-    const op = ops.find((o) => o.capability === cap);
-    const title = op?.title ?? human(cap);
-    let g = groups.find((x) => x.title === title);
-    if (!g) { g = { title, rows: [] }; groups.push(g); }
-    g.rows.push({ cap, op });
+  for (const [key, plugin] of Object.entries(cat.plugins ?? {})) {
+    const caps = (plugin.capabilities ?? []).filter((c) => left.has(c));
+    if (!caps.length) continue;
+    for (const c of caps) left.delete(c);
+    groups.push({ key, title: plugin.title, rows: caps.map((c) => rowFor(c, cat)) });
+  }
+  if (left.size) {
+    groups.push({ key: "", title: null, rows: [...left].map((c) => rowFor(c, cat)) });
   }
   return groups;
 }
@@ -96,61 +143,100 @@ export function Roles({
   };
 
   return (
-    <div className="mod">
+    <div className="mod mod-roles">
       <div className="mod-bar" />
-      <div className="mod-h" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+      <div className="mod-h">
         <div className="mod-t">Roles</div>
-        <select
-          className="f-in"
-          style={{ width: "auto" }}
-          value={role}
-          disabled={!editable.length}
-          onChange={(e) => setRole(e.target.value)}
-        >
-          {editable.length
-            ? editable.map((r) => <option key={r} value={r}>{human(r)}</option>)
-            : <option>No roles to edit</option>}
-        </select>
+        <p className="mod-sub">
+          What a person in each role may do at this centre. Saving applies at
+          once to everyone in that role; the shipped list stays untouched, so
+          Reset always works.
+        </p>
+        <label className="f-field roles-pick">
+          <span className="f-lab">Role</span>
+          <select
+            className="f-in"
+            value={role}
+            disabled={!editable.length}
+            onChange={(e) => setRole(e.target.value)}
+          >
+            {editable.length
+              ? editable.map((r) => <option key={r} value={r}>{title(r)}</option>)
+              : <option>No roles to edit</option>}
+          </select>
+        </label>
       </div>
 
       <div className="mod-b">
-        {groups.map((g) => (
-          <div key={g.title}>
-            <div className="eyebrow">{g.title}</div>
-            {g.rows.map(({ cap, op }) => {
-              // A capability this centre withholds is dead whether or not an
-              // operation names it: the kernel has already taken it off the
-              // caller. So the facility is asked first, and only then the
-              // workflow, which has nothing to say about a capability that
-              // gates a view.
-              const off = facility.withheld[cap] ? true : op ? inert(cap, cat, facility) : false;
-              return (
-                <label className="f-check" key={cap} style={off ? { opacity: 0.5 } : undefined}>
-                  <input
-                    type="checkbox"
-                    checked={caps.has(cap)}
-                    disabled={off || busy || !role}
-                    onChange={() => toggle(cap)}
-                  />
-                  <span>{human(cap)}</span>
-                  {off && <span className="f-hint">{inertReason(cap, cat, facility)}</span>}
-                </label>
-              );
-            })}
-          </div>
-        ))}
+        {groups.map((g) => {
+          // A capability this centre withholds is dead whether or not an
+          // operation names it: the kernel has already taken it off the
+          // caller. So the facility is asked first, and only then the
+          // workflow, which has nothing to say about a capability that gates
+          // a view.
+          const marks = g.rows.map(({ cap, hasOp }) => {
+            const off = facility.withheld[cap]
+              ? true
+              : hasOp ? inert(cap, cat, facility) : false;
+            return { off, why: off ? inertReason(cap, cat, facility) : "" };
+          });
+          // A plugin this centre does not run takes its whole group down, for
+          // one reason. Said once under the heading rather than three times
+          // down the column; a row that is dead on its own still says so
+          // beside itself.
+          const whole = marks.length > 1
+            && marks.every((m) => m.off && m.why === marks[0].why)
+            ? marks[0].why : "";
+          return (
+            <section className="roles-g" key={g.key}>
+              {g.title && (
+                <h3 className="roles-g-h">
+                  <span className="roles-g-t">{g.title}</span>
+                  <span className="roles-g-n">
+                    {g.rows.filter((r) => caps.has(r.cap)).length}/{g.rows.length}
+                  </span>
+                </h3>
+              )}
+              {whole && <p className="f-hint roles-g-why">{whole}</p>}
+              <div className="roles-rows">
+                {g.rows.map(({ cap, label, declared }, i) => (
+                  <label
+                    className={marks[i].off ? "f-check roles-row off" : "f-check roles-row"}
+                    key={cap}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={caps.has(cap)}
+                      disabled={marks[i].off || busy || !role}
+                      onChange={() => toggle(cap)}
+                    />
+                    <span className="roles-row-b">
+                      <span className={declared ? "roles-row-t" : "roles-row-t raw"}>
+                        {label}
+                      </span>
+                      {declared && <span className="roles-row-id">{cap}</span>}
+                      {marks[i].off && !whole && (
+                        <span className="f-hint">{marks[i].why}</span>
+                      )}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </section>
+          );
+        })}
         {err && <div className="f-bad block">{err}</div>}
       </div>
 
       <div className="mod-f">
         <button
-          className="cq"
+          className="cq quiet"
           disabled={busy || !role}
           onClick={() => setCaps(new Set(presets[role] ?? []))}
         >
           Reset to preset
         </button>
-        <div style={{ display: "flex", gap: 4, flex: 1, justifyContent: "flex-end" }}>
+        <div className="roles-f-end">
           <button className="cq" onClick={onClose} disabled={busy}>Close</button>
           <button className="cq rose" onClick={save} disabled={busy || !role}>Save</button>
         </div>

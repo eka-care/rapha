@@ -174,6 +174,13 @@ const PAIRS: [string, string, number, string][] = [
   ["--color-border-control", "--color-bg-subtle",    3.0, "§53 sidebar controls"],
   ["--color-agent",          "--color-bg-canvas",    3.0, "§51 :focus-visible ring"],
   ["--color-agent",          "--color-bg-surface",   3.0, "§51 :focus-visible ring"],
+  // The accent is the hue that carries interactive chrome: the focus ring on
+  // every field (parts.css .input, form.css .f-in) and the filled ground of a
+  // checked control (form.css .f-check input:checked, whose tick is drawn in
+  // --color-bg-surface, the same pair reversed). Painted in three stylesheets
+  // and, until the role editor was rebuilt, in none of these rows.
+  ["--color-accent",         "--color-bg-surface",   3.0, "SC 1.4.11 focus ring and checked control"],
+  ["--color-accent",         "--color-bg-canvas",    3.0, "SC 1.4.11 focus ring on the canvas"],
 ];
 
 {
