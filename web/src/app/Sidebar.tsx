@@ -12,50 +12,71 @@
  *  apart. The rows below are the declared queue's own, so they are the same
  *  rows, in the same order, as the view behind them.
  */
-import { Icon, type IconName } from "../icons";
+import { useState } from "react";
+import { Icon } from "../icons";
 import type { Facility, QueueRow, ViewDecl } from "../types";
 import { fields } from "../view/View";
 import { human } from "../words";
+
+/** The values a row wears as a label, which is the view's own `labels:`.
+ *  The screen is told which columns those are and nothing about what they
+ *  mean: a bundle that labels something else gets its own chips. */
+function labelValues(decl: ViewDecl, row: QueueRow): string[] {
+  return ((decl as { labels?: string[] }).labels ?? [])
+    .map((c) => String(row.subject?.[c] ?? "").trim())
+    .filter(Boolean);
+}
+
+/** One chip per declared label value in today's line, commonest first, plus
+ *  the one that clears them. A line where every row wears the same label has
+ *  nothing to narrow, and `pills.length > 1` is what drops the row entirely. */
+function chips(line: { decl: ViewDecl; row: QueueRow }[]):
+    { value: string; label: string; count: number }[] {
+  const seen = new Map<string, number>();
+  for (const { decl, row } of line)
+    for (const v of labelValues(decl, row)) seen.set(v, (seen.get(v) ?? 0) + 1);
+  const out = [...seen.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([value, count]) => ({ value, label: human(value), count }));
+  return out.length ? [{ value: "", label: "All", count: line.length }, ...out] : [];
+}
 
 /** How many of the line fit before the rail is a scroll rather than a
  *  glance. The rest is one tap away in the view the rows came from. */
 const LINE = 9;
 
-const ICON: Record<string, IconName> = {
-  queue: "users", tasklist: "list", dashboard: "vitals", summary: "doc",
-};
-
 export function Sidebar({
-  facility, views, route, line, counts, open, onGo, onNew, onDesk, deskLabel,
-  onSettings, onCloseDrawer,
+  facility, route, line, open, onGo, onCall, onCloseDrawer,
 }: {
   facility?: Facility;
-  views: ViewDecl[];
   route: string;
   /** Today's line, already loaded for the counts above: the same rows the
    *  queue view draws, with the declaration they came from so the name and
    *  the number are read the same way here as there. */
   line: { decl: ViewDecl; row: QueueRow }[];
-  counts: Record<string, number>;
   open: boolean;
   onGo: (hash: string) => void;
-  onNew: () => void;
-  /** The front desk: one box over this centre's register and the patient
-   *  directory. The button that used to open the palette twice now opens the
-   *  desk once, because "new" at a front desk means a person and not a
-   *  conversation. */
-  onDesk: () => void;
-  /** What that button says. The declared verb of the operation the desk
-   *  commits through, so a health centre reads "Register" and a laboratory
-   *  reads "Accession" with nothing here knowing either word. */
-  deskLabel: string;
-  onSettings: () => void;
+  /** A number called at the counter. The desk already searches by it, so
+   *  this is that search with the box already filled. */
+  onCall: (token: string) => void;
   onCloseDrawer: () => void;
 }) {
   const goTo = (hash: string) => { onGo(hash); onCloseDrawer(); };
   // The queue this centre calls its line, in its own words. A facility with
   // no queue view declared gets no section, not an empty one.
   const lineTitle = line[0]?.decl.title ?? "";
+  const [call, setCall] = useState("");
+  const [filter, setFilter] = useState("");
+  /** What this bundle calls the number on a row, off the declared columns,
+   *  so the box is labelled in the centre's own word and this file types none
+   *  of them. A bundle whose queue declares no such column has no number to
+   *  call, and the box is absent rather than asking for one by a name the
+   *  renderer made up. */
+  const tokenWord = (line[0]?.decl.columns ?? []).find((c) => /token/i.test(c)) ?? "";
+  const pills = chips(line);
+  const shown = filter
+    ? line.filter(({ decl, row }) => labelValues(decl, row).includes(filter))
+    : line;
   return (
     <nav className="sb" data-open={open} aria-label="Main">
       <div className="sb-top">
@@ -66,48 +87,48 @@ export function Sidebar({
         </div>
       </div>
 
-      <div className="sb-pad">
-        <button className="sb-btn" onClick={onDesk}>
-          <Icon name="plus" className="i sm" />
-          {deskLabel}
-        </button>
-      </div>
-      <div className="sb-pad" style={{ paddingTop: 0 }}>
-        <button className="sb-btn ghost" onClick={onNew}>
-          <Icon name="search" className="i sm" />
-          Search
-          <span className="kbd ml-auto">⌘K</span>
-        </button>
-      </div>
+      {/* THE LINE AND NOTHING ELSE. A Register button, a search row, six
+          view links and an account footer used to sit above the people
+          waiting -- eleven things to read before the one this column is for.
+          All of them are in the top bar now, which is where the artifact
+          keeps them, and this column is the line: call a number, narrow by
+          programme, and the people. */}
+      {tokenWord && (
+      <form className="sb-call" onSubmit={(e) => { e.preventDefault(); onCall(call.trim()); }}>
+        <input
+          className="sb-call-in"
+          value={call}
+          onChange={(e) => setCall(e.target.value)}
+          placeholder={`Call a ${human(tokenWord).toLowerCase()}`}
+          aria-label={`Call a ${human(tokenWord).toLowerCase()}`}
+        />
+        <button className="sb-call-go" type="submit">Call</button>
+      </form>
+      )}
 
-      <div className="sb-nav">
-        <button className={`nv${route === "" || route === "today" ? " on" : ""}`}
-          onClick={() => goTo("#/")}>
-          <Icon name="home" className="i sm" />
-          Home
-        </button>
-        {views.map((v) => (
-          <button
-            key={v.id}
-            className={`nv${route === `views/${v.id}` ? " on" : ""}`}
-            onClick={() => goTo(`#/views/${v.id}`)}
-          >
-            <Icon name={ICON[v.kind] ?? "list"} className="i sm" />
-            {v.title}
-            {counts[v.id] > 0 && <span className="ct">{counts[v.id]}</span>}
-          </button>
-        ))}
-        <button className={`nv${route === "settings" ? " on" : ""}`} onClick={() => goTo("#/settings")}>
-          <Icon name="cog" className="i sm" />
-          Control panel
-        </button>
-      </div>
+      {/* Narrowed by whatever the view declared as a label. The screen is
+          told the column and draws its values; it is told nothing about what
+          a programme IS, which is why a bundle that labels something else
+          gets its own chips with no edit here. */}
+      {pills.length > 1 && (
+        <div className="sb-pills">
+          {pills.map((p) => (
+            <button
+              key={p.value}
+              className={`sb-pill${filter === p.value ? " on" : ""}`}
+              onClick={() => setFilter(filter === p.value ? "" : p.value)}
+            >
+              {p.label} {p.count}
+            </button>
+          ))}
+        </div>
+      )}
 
-      <div className="sb-sec">{lineTitle}</div>
+      <div className="sb-sec">{lineTitle} · today</div>
       <div className="sb-list">
-        {line.length === 0 ? (
+        {shown.length === 0 ? (
           <div className="sb-empty">Nobody is waiting.</div>
-        ) : line.slice(0, LINE).map(({ decl, row }) => {
+        ) : shown.slice(0, LINE).map(({ decl, row }) => {
           const f = fields(decl, row);
           return (
             <button
@@ -126,25 +147,13 @@ export function Sidebar({
             </button>
           );
         })}
-        {line.length > LINE && (
+        {shown.length > LINE && (
           <button className="sb-more" onClick={() => goTo(`#/views/${line[0].decl.id}`)}>
-            {line.length - LINE} more
+            {shown.length - LINE} more
           </button>
         )}
       </div>
 
-      <div className="sb-foot">
-        <button className="rolebtn" onClick={onSettings}>
-          <span className="rb-av"><Icon name="user" className="i sm" /></span>
-          <div style={{ minWidth: 0, flex: 1, textAlign: "left" }}>
-            <div className="rb-n">{human(facility?.user.role ?? "account")}</div>
-            <div className="rb-s">
-              {facility?.user.capabilities.length ?? 0} capabilities
-            </div>
-          </div>
-          <Icon name="chev" className="i sm" />
-        </button>
-      </div>
     </nav>
   );
 }

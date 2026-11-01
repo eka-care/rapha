@@ -335,10 +335,18 @@ const IMPLEMENTED = [
   assert.match(encounter, /weigh\(thread\.actions, thread\.closes\)/,
     "§33's ordering is the declared rule in loops.ts, not a sort in the screen");
   assert.ok(!/\.sort\(/.test(encounter), "the screen does not re-rank the actions");
-  assert.match(encounter, /const QUICK = 6;/, "§33 caps the quick action row at six");
+  // §33 caps the row; it does not set the number, and this used to pin the
+  // literal six. Six equal buttons is a menu, and `weigh()` has already said
+  // which ONE of them closes this station, so the row draws that one. What
+  // the cap is for is that the rest are never dropped in silence, and that
+  // is what is asserted: a number, and the remainder named beside it.
+  const quick = /const QUICK = (\d+);/.exec(encounter);
+  assert.ok(quick && Number(quick[1]) >= 1 && Number(quick[1]) <= 6,
+    "§33 caps the quick action row between one and six");
   assert.match(encounter, /ranked\.length > QUICK/,
     "and says how many more are behind / rather than dropping them silently");
-  ok("quick actions: capped at six, ordered by the declared rule, remainder named");
+  ok("quick actions: %s offered, ordered by the declared rule, remainder named"
+     .replace("%s", quick![1]));
 }
 
 // --------------------------------------------------------- 3. accessibility

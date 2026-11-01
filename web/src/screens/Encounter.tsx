@@ -28,7 +28,15 @@ import { Line } from "../view/View";
 import { human, title } from "../words";
 import { initialsOf } from "../agent";
 
-const QUICK = 6;   // §33
+/** How many actions the agent's node offers.
+ *
+ *  ONE. `weigh()` already decides which of them closes this station, and that
+ *  decision is the declaration's; drawing six of them put the one thing the
+ *  doctor is here to do in a list of six equal buttons, which is a menu
+ *  rather than a next step. The rest are not hidden: the count and the way to
+ *  reach them are on the line under it, and the composer's `/` opens all of
+ *  them. */
+const QUICK = 1;
 
 /** Which tag an action's capture instrument earns. The words are the
  *  declaration's `instrument`, not a table of operations. */

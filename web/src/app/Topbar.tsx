@@ -14,12 +14,22 @@
  */
 import { Icon } from "../icons";
 
-export function Topbar({ title, theme, onSearch, onTheme, onMenu }: {
+export function Topbar({ title, theme, views, route, deskLabel, onSearch, onTheme, onMenu,
+                        onGo, onDesk, onSettings }: {
   title: string;
   theme: "light" | "dark";
+  /** The declared views. They were a permanent list down the rail, under the
+   *  people waiting; the artifact gives that column to the line alone and
+   *  carries everything else up here. */
+  views: { id: string; title: string }[];
+  route: string;
+  deskLabel: string;
   onSearch: () => void;
   onTheme: () => void;
   onMenu: () => void;
+  onGo: (hash: string) => void;
+  onDesk: () => void;
+  onSettings: () => void;
 }) {
   return (
     <header className="topbar">
@@ -31,7 +41,20 @@ export function Topbar({ title, theme, onSearch, onTheme, onMenu }: {
           {title}
         </h1>
       </div>
-      <button className="pill ml-auto" onClick={onSearch}>
+      <nav className="tb-nav" aria-label="Views">
+        <button className={`tb-nv${route === "" || route === "today" ? " on" : ""}`}
+                onClick={() => onGo("#/")}>Home</button>
+        {views.map((v) => (
+          <button key={v.id}
+                  className={`tb-nv${route === `views/${v.id}` ? " on" : ""}`}
+                  onClick={() => onGo(`#/views/${v.id}`)}>{v.title}</button>
+        ))}
+      </nav>
+      <button className="pill ml-auto" onClick={onDesk}>
+        <Icon name="plus" className="i sm" />
+        {deskLabel}
+      </button>
+      <button className="pill" onClick={onSearch}>
         <Icon name="search" className="i sm" />
         Search or ask
         <span className="kbd">⌘K</span>
@@ -42,6 +65,9 @@ export function Topbar({ title, theme, onSearch, onTheme, onMenu }: {
         aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
       >
         <Icon name={theme === "dark" ? "sun" : "moon"} className="i sm" />
+      </button>
+      <button className="icon-btn" onClick={onSettings} aria-label="Control panel">
+        <Icon name="cog" className="i sm" />
       </button>
     </header>
   );

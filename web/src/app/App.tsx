@@ -194,14 +194,19 @@ export function App() {
    *  order, one set of rows: the rail and the view behind it cannot disagree
    *  about who is waiting. */
   const line = useMemo(
+    // The CATALOGUE's declaration, not the short form `/facility` sends. The
+    // short one carries a title and a kind; `columns` and `labels` -- which
+    // say what a row is called and which of its values earn a filter chip --
+    // come with the full one, and without them the rail could draw a row but
+    // not narrow the line.
     () => loaded.filter((l) => l.decl.kind === "queue")
-      .flatMap((l) => ((l.result.rows ?? []) as QueueRow[]).map((row) => ({ decl: l.decl, row }))),
-    [loaded],
+      .flatMap((l) => {
+        const decl = cat.data?.views?.[l.decl.id] ?? l.decl;
+        return ((l.result.rows ?? []) as QueueRow[]).map((row) => ({ decl, row }));
+      }),
+    [loaded, cat.data],
   );
 
-  const counts = useMemo(() => Object.fromEntries(
-    loaded.map((l) => [l.decl.id, ((l.result.rows ?? []) as unknown[]).length]),
-  ), [loaded]);
 
   const remember = useCallback((r: Recent) => {
     setRecents((was) => {
@@ -303,16 +308,11 @@ export function App() {
       </button>
       <Sidebar
         facility={facility.data}
-        views={navViews}
         route={location.hash.replace(/^#\/?/, "")}
         line={line}
-        counts={counts}
         open={drawer}
         onGo={go}
-        onNew={() => setKhojOpen(true)}
-        onDesk={() => go("#/desk")}
-        deskLabel={createLabel(catalogue, facility.data?.bundle.workflow)}
-        onSettings={() => go("#/settings")}
+        onCall={(token) => { setKhojOpen(false); go(`#/desk?q=${encodeURIComponent(token)}`); }}
         onCloseDrawer={() => setDrawer(false)}
       />
       {drawer && <div className="drawer-scrim" onClick={() => setDrawer(false)} />}
@@ -320,9 +320,15 @@ export function App() {
         <Topbar
           title={title}
           theme={theme}
+          views={navViews}
+          route={location.hash.replace(/^#\/?/, "")}
+          deskLabel={createLabel(catalogue, facility.data?.bundle.workflow)}
           onSearch={() => setKhojOpen(true)}
           onTheme={flipTheme}
           onMenu={() => setDrawer((d) => !d)}
+          onGo={go}
+          onDesk={() => go("#/desk")}
+          onSettings={() => go("#/settings")}
         />
         <main id="workspace" tabIndex={-1} className={route.kind === "thread" ? "view" : "view scroll"}>
           <div className="wrap">
