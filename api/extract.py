@@ -73,12 +73,28 @@ def _norm(text):
     return _SPACE.sub(" ", str(text)).strip().lower()
 
 
+class NoReader(RuntimeError):
+    """Nothing read the transcript, so no field was even considered.
+
+    This used to be an empty answer, and an empty answer is indistinguishable
+    from "the doctor did not say anything that fits this form". The caller
+    turned that into the sentence "Nothing in the recording fills this form",
+    which told a clinician their consultation was off topic when the truth was
+    that this machine has no key to read it with. They are different facts and
+    they lead a person to do different things, so they are different outcomes
+    now.
+    """
+
+
 def extract(fields, transcript, *, client=None, model=MODEL):
     if not transcript.strip():
         return {}
     if client is None:
         if not os.environ.get("ANTHROPIC_API_KEY"):
-            return {}
+            raise NoReader(
+                "The recording was transcribed, and then nothing read it into "
+                "the form: this machine has no ANTHROPIC_API_KEY. The "
+                "transcript is below, and the note has to be typed.")
         import anthropic
         client = anthropic.Anthropic()
     brief = [{k: f.get(k) for k in ("link_id", "text", "description", "type",
@@ -203,9 +219,17 @@ def demo():
     assert "row_of" in stub.asked["messages"][0]["content"], \
         "the model is told which fields are rows"
 
+    # No key is a REFUSAL, not an empty answer. The empty answer is what made
+    # a machine with no key tell a doctor their consultation did not fit the
+    # form, which is the kind of wrong that a person acts on.
     saved = os.environ.pop("ANTHROPIC_API_KEY", None)
     try:
-        assert extract(fields, transcript) == {}, "no key, no answer"
+        try:
+            extract(fields, transcript)
+        except NoReader as broke:
+            assert "ANTHROPIC_API_KEY" in str(broke), str(broke)
+        else:
+            raise AssertionError("no key must refuse, not answer nothing")
     finally:
         if saved is not None:
             os.environ["ANTHROPIC_API_KEY"] = saved

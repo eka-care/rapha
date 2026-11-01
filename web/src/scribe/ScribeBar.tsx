@@ -147,7 +147,10 @@ export function ScribeBar({ thread, station, onDrafts, onClose }: {
           setSession(s);
           if (s.status === "ready") {
             setPhase("ready");
-            setNote("");
+            // Ready with drafts says nothing; ready with a reason says why
+            // there are none. Clearing this unconditionally is what hid a
+            // missing reader behind "Nothing to fill".
+            setNote(s.drafts.length ? "" : s.reason);
             onDrafts(s);
           } else {
             setPhase(s.status);

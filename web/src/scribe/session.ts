@@ -212,8 +212,15 @@ export function sentence(status: ScribeStatus | "idle" | "recording" | "uploadin
       // The spinner beside this already says it.
       return "";
     case "ready":
-      // The fields are marked unconfirmed. Saying it again here is decoration.
-      return "";
+      // A ready session with drafts needs no sentence: the fields are marked
+      // unconfirmed and saying it again here is decoration. A ready session
+      // the kernel gave a REASON is the other case, and that sentence used to
+      // be dropped on the floor: it is the only place a person is told that
+      // nothing read their consultation, or that nothing in it fitted. One of
+      // those is a machine with a key missing and the other is a recording
+      // about something else, and a doctor cannot tell them apart from a
+      // folded summary that says "Nothing to fill".
+      return reason;
     case "failed":
       return reason || "No draft. Type the note.";
     case "withdrawn":

@@ -343,17 +343,26 @@ def refill(session, operations, *, extractor=None, today=None):
     extractor = extractor or extractor_module.extract
     today = today or date.today()
     transcript = session["transcript"]
-    drafts = []
+    drafts, unread = [], ""
     for op_id, spec in sorted(operations.items()):
-        answers = extractor(filler.flatten(spec["schema"]), transcript)
+        try:
+            answers = extractor(filler.flatten(spec["schema"]), transcript)
+        except extractor_module.NoReader as broke:
+            # Nothing read it. The transcript is still real and still the
+            # record of what was said, so it is kept and shown; what changes
+            # is the sentence, which may not blame the recording for a
+            # missing key. See api/extract.py's NoReader.
+            unread = str(broke)
+            break
         d = filler.build_draft(op_id, spec["schema"], answers, transcript,
                                instrument=session["instrument"], today=today)
         if d:
             drafts.append(d)
     if session["status"] == "withdrawn":
         return session
-    reason = "" if drafts else ("Nothing in the recording fills this form. "
-                                "The transcript is below. Type the note.")
+    reason = unread or ("" if drafts else
+                        "Nothing in the recording fills this form. "
+                        "The transcript is below. Type the note.")
     session.update(operations=operations, drafts=drafts, status="ready", reason=reason)
     return session
 
@@ -523,6 +532,26 @@ def demo():
     finally:
         _client = was
     assert said.getvalue() == "", "the SDK's print never reaches stdout: %r" % said.getvalue()
+
+    # A reader that cannot run is not a recording that said nothing. This was
+    # live on 2026-11-01: a machine with no ANTHROPIC_API_KEY transcribed a
+    # consultation perfectly and told the doctor "Nothing in the recording
+    # fills this form", which blames the doctor for the deployment. The
+    # transcript is kept either way, and the sentence has to say which
+    # happened, because one of them is somebody's job to fix and the other is
+    # not.
+    def no_reader(fields, transcript):
+        raise extractor_module.NoReader("no ANTHROPIC_API_KEY on this machine")
+
+    held = begin("enc-x", "who", "phc-x", {"phc.op.vitals-record": {"schema": vitals}})
+    held.update(transcript="Blood Pressure 138/86.")
+    out = public(refill(held, held["operations"], extractor=no_reader))
+    assert out["status"] == "ready", out
+    assert out["drafts"] == [], out
+    assert "ANTHROPIC_API_KEY" in out["reason"], out["reason"]
+    assert "Nothing in the recording" not in out["reason"], out["reason"]
+    assert out["transcript"] == "Blood Pressure 138/86.", \
+        "the transcript is kept: it is the record of what was said"
 
     print("ok api.scribe")
 
