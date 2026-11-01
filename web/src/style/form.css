@@ -75,8 +75,29 @@
 
 /* ---- fields (§39) ------------------------------------------------------ */
 .f-form { display: grid; gap: var(--space-4); }
-.f-group { display: grid; gap: var(--space-3); }
 .f-field { display: grid; gap: var(--space-1); }
+
+/* A repeating group is a <fieldset>, and nothing here had ever styled one, so
+   every form that holds a diagnosis or a prescription drew the browser's own
+   2px groove border and its default legend in the middle of an otherwise
+   designed panel. That is the single thing that made these forms look
+   unfinished. */
+.f-group {
+  display: grid; gap: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-canvas);
+  padding: var(--space-4);
+  margin: 0; min-width: 0;
+}
+.f-group > legend {
+  padding: 0 var(--space-2); margin-left: calc(var(--space-2) * -1);
+  font-size: 13px; line-height: 18px; font-weight: 600;
+  color: var(--color-text-primary);
+}
+/* The declared help for a group is a paragraph, not a label: it earns the
+   reading width of one. */
+.f-group > .f-hint { max-width: 62ch; }
 
 .f-lab {
   display: flex; align-items: baseline; justify-content: space-between;
@@ -116,12 +137,43 @@
 
 /* repeating rows (a structured answer: medications, investigations) */
 .f-rows { display: grid; gap: var(--space-2); }
-.f-item { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-end; width: 100%; }
-.f-item-n {
-  flex: 0 0 auto; min-width: 18px;
-  font: 500 11px/16px var(--font-mono); color: var(--color-text-tertiary);
+
+/* One row of a repeating group is one condition, one medicine, one test, so
+   it is drawn as one card and not as a line of fields that happens to wrap.
+   It WAS a wrapping flex whose children could grow: four fields in a 620px
+   panel put three on one line and stretched the fourth across the full width
+   on its own, which is why a diagnosis read as three questions and then a
+   separate, more important looking one. Equal grid columns cannot do that:
+   the fourth field is the width of the other three whether it shares a line
+   with them or not. */
+.f-item {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: var(--space-3); align-items: start; width: 100%;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
 }
-.f-sub { flex: 1 1 140px; min-width: 0; display: grid; gap: var(--space-1); }
+/* The row's own number. It used to sit on the baseline of the first field,
+   which read as a stray digit beside a dropdown rather than as the label of
+   anything. It is the card's heading now. */
+.f-item-n {
+  grid-column: 1 / -1;
+  font: 700 10px/14px var(--font-mono); letter-spacing: .09em;
+  text-transform: uppercase; color: var(--color-eyebrow);
+}
+.f-item-n::before { content: "Row "; }
+/* Removing a row is not as important as filling one in. */
+.f-item > .cq {
+  grid-column: 1 / -1; justify-self: start;
+  min-height: 30px; padding: var(--space-1) var(--space-3);
+  font-size: 12px; border-color: transparent;
+  color: var(--color-text-secondary); background: transparent;
+}
+.f-item > .cq:hover:not(:disabled) {
+  background: var(--color-critical-soft); color: var(--color-critical);
+}
+.f-sub { min-width: 0; display: grid; gap: var(--space-1); align-content: start; }
 
 .f-check { display: flex; align-items: flex-start; gap: var(--space-2); font-size: 13px; }
 .f-check.big { font-size: 14px; font-weight: 500; }
