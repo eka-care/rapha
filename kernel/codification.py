@@ -55,7 +55,7 @@ service found nothing" and "the service found four things this build cannot
 code" are different sentences to put in front of a doctor.
 
   1. **No span.** The phrase a candidate was asked about must appear in the
-     transcript, by `api/extract.py`'s rule and for its reason: a code with no
+     transcript, by `api/shaped.py`'s rule and for its reason: a code with no
      words behind it is unarguable afterwards. This is the same `_norm`
      comparison, not a looser one.
   2. **Not resolvable.** The code must come back from `Terminology.bound()`,
@@ -113,7 +113,7 @@ _SPACE = re.compile(r"\s+")
 
 
 def _norm(text):
-    """The same normalisation `api/extract.py` compares spans with. Shared by
+    """The same normalisation `api/shaped.py` compares spans with. Shared by
     copy and not by import, because that module is in the api layer and the
     kernel may not import it; the shape is three lines and the rule is one
     sentence, so a wrapper would hide more than it saves."""
@@ -381,7 +381,7 @@ def demo():
         assert len(right) == 1, right
 
     # 5. A span that is not in the transcript takes the whole batch with it.
-    #    api/extract.py's rule, applied to a code instead of a value.
+    #    api/shaped.py's rule, applied to a code instead of a value.
     lied = resolve([{"code": "44054006", "term": "DM2", "tag": "disorder"}],
                    SLUG, transcript="the patient has a fever",
                    span="type two diabetes")

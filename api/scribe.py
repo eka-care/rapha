@@ -20,10 +20,12 @@ Doctrine this module enforces rather than documents
   renderer checks so the button is absent; api/main.py checks again before a
   single byte is uploaded, because that is the trust boundary and the
   renderer's check is a courtesy.
-- Eka is asked for the transcript only (`transcript_template`, no EMR JSON).
-  Structure is ours: `api/fill.py` and `api/extract.py` fill whatever
-  questionnaire the operation names from that transcript, so a field this
-  module was never told about is never guessed at from Eka's own parse of it.
+- Eka is asked for the transcript AND for a note shaped like the form
+  (`transcript_template` plus one template per operation, no EMR JSON).
+  Structure is ASKED OF THE SAME SERVICE, in a template built from the
+  operation's own questionnaire: `api/shaped.py` writes the template and reads
+  the table back with a parser. So a field this kernel was never told about is
+  never guessed at, and no second provider ever sees a consultation.
 
 What Eka actually answers, seen live against https://api.eka.care on
 2026-09-11 (not read from a document):
@@ -43,9 +45,9 @@ What Eka actually answers, seen live against https://api.eka.care on
               "template_results": {"custom": [...], "transcript": [...]}}}
            A job still running answers 202 with "output": [].
 
-  Confidence per field comes from `api/extract.py`'s model call against the
-  transcript, not from Eka: there is no per field recognition confidence
-  anywhere in Eka's response, only `audio_matrix.quality` about the audio.
+  Confidence per field is a column of the table this kernel's own template
+  asks for. Eka's response carries no per field recognition confidence of its
+  own, only `audio_matrix.quality` about the audio.
 
 Run the check: python3 -m api.scribe
 """
@@ -65,7 +67,6 @@ from datetime import date
 # call sites cannot drift apart on it. See care_phc/connectors/scribe/eka.py.
 from care_phc.connectors.scribe.eka import _scrub
 
-from api import extract as extractor_module
 from api import fill as filler
 from api import shaped
 
@@ -203,7 +204,8 @@ def client():
     return _client
 
 
-def start(audio, *, suffix=".webm", languages=("en-IN",), mode="consultation"):
+def start(audio, *, suffix=".webm", languages=("en-IN",), mode="consultation",
+          templates=()):
     """Upload one recording. Returns the transaction id to poll.
 
     `audio` is bytes and stays bytes: it is written to a temporary file only
@@ -222,7 +224,9 @@ def start(audio, *, suffix=".webm", languages=("en-IN",), mode="consultation"):
             [path], txn_id=txn, action=ACTION,
             extra_data={"mode": mode, "model_type": "pro"},
             output_format={"input_language": list(languages),
-                           "output_template": TEMPLATES}))
+                           "output_template": TEMPLATES + [
+                               {"template_id": t, "codification_needed": False}
+                               for t in dict.fromkeys(templates)]}))
     except ScribeError:
         raise
     except Exception as broke:
@@ -347,13 +351,14 @@ def transcript_of(status):
 SESSIONS = {}
 
 
-def begin(thread, actor, txn, operations, instrument=""):
+def begin(thread, actor, txn, operations, instrument="", templates=None):
     """A new session, already carrying its expiry. Set here and not only when a
     transcript arrives, because a session that fails, is withdrawn or is simply
     abandoned never gets a transcript and would otherwise never be dropped."""
     session = {"id": "scr-" + uuid.uuid4().hex[:12], "thread": thread,
                "actor": actor, "txn": txn, "operations": operations,
                "instrument": instrument, "status": "running", "reason": "",
+               "templates": dict(templates or {}),
                "drafts": [], "transcript": "",
                "expires": time.time() + TRANSCRIPT_SECONDS}
     SESSIONS[session["id"]] = session
@@ -376,43 +381,101 @@ def expire(now=None):
         del SESSIONS[sid]
 
 
-def refill(session, operations, *, extractor=None, today=None):
-    """Build drafts for these operations from the transcript already held. The
-    template switch: no re-recording, no second upload.
+def refill(session, operations, *, notes=None, today=None, reader=None):
+    """Build drafts for these operations from the notes the service shaped.
 
-    The model call takes seconds and a withdrawal can land in the middle of it.
-    So the drafts are built from a local copy of the transcript into a local
-    list, and written to the session only if it is still not withdrawn once
-    they exist. Writing as it went, and marking ready at the end, is how a
-    patient's stop used to be quietly undone by the model finishing."""
-    extractor = extractor or extractor_module.extract
+    `notes` is {template_id: text}, straight off the job. The template switch
+    arrives here with none, because the note it needs was never asked for when
+    the recording went up: that case asks the service to shape the transcript
+    it already holds, which is another call to the SAME service and not a
+    second opinion from a different one.
+
+    The fetch takes seconds and a withdrawal can land in the middle of it. So
+    the drafts are built from a local copy into a local list, and written to
+    the session only if it is still not withdrawn once they exist. Writing as
+    it went, and marking ready at the end, is how a patient's stop used to be
+    quietly undone by the reader finishing.
+    """
+    reader = reader or shaped.answers
     today = today or date.today()
     transcript = session["transcript"]
-    drafts, unread = [], ""
+    held = dict(notes or {})
+    drafts, unshaped = [], []
     for op_id, spec in sorted(operations.items()):
+        fields = filler.flatten(spec["schema"])
         try:
-            answers = extractor(filler.flatten(spec["schema"]), transcript)
-        except extractor_module.NoReader as broke:
-            # Nothing read it. The transcript is still real and still the
-            # record of what was said, so it is kept and shown; what changes
-            # is the sentence, which may not blame the recording for a
-            # missing key. See api/extract.py's NoReader.
-            unread = str(broke)
-            break
+            template = session["templates"].get(op_id) or shaped_template(op_id, fields)
+        except ScribeError as broke:
+            unshaped.append(str(broke))
+            continue
+        session["templates"][op_id] = template
+        note = held.get(template)
+        if note is None:
+            note = reshape(session, template)
+        if note is None:
+            unshaped.append("The scribe service has not shaped this form yet.")
+            continue
+        answers = reader(note, fields, transcript)
         d = filler.build_draft(op_id, spec["schema"], answers, transcript,
                                instrument=session["instrument"], today=today)
         if d:
             drafts.append(d)
     if session["status"] == "withdrawn":
         return session
-    reason = unread or ("" if drafts else
-                        "Nothing in the recording fills this form. "
-                        "The transcript is below. Type the note.")
-    session.update(operations=operations, drafts=drafts, status="ready", reason=reason)
+    session.update(operations=operations, drafts=drafts, status="ready",
+                   reason=_why(drafts, unshaped))
     return session
 
 
-def collect(session, *, extractor=None):
+def _why(drafts, unshaped):
+    """Why there are no drafts, in the words that tell a doctor what to do.
+
+    "The service never shaped this form" and "the consultation did not state
+    any of it" lead to different actions, and answering the same sentence for
+    both is what made a missing reader look like an off topic recording once
+    already. See the 2026-11-01 commit that split them.
+    """
+    if drafts:
+        return ""
+    if unshaped:
+        return ("%s The transcript is below, and the note has to be typed."
+                % " ".join(dict.fromkeys(unshaped)))
+    return ("Nothing in the recording fills this form. "
+            "The transcript is below. Type the note.")
+
+
+def reshape(session, template):
+    """Ask the service to shape the transcript it already holds into one more
+    template, and wait for it. Returns the note, or None.
+
+    This is the template switch. No audio moves: the service keeps the
+    transcript for the session and `convert-to-template` is the documented way
+    to ask it for another document from it. Bounded, because this runs inside
+    a request a doctor is waiting on, and answering "not yet" beats holding
+    the screen open.
+    """
+    try:
+        sdk(lambda: client().request(
+            "POST", "/voice/api/v1/transaction/%s/convert-to-template" % session["txn"],
+            json={"template_id": template}))
+    except Exception:                                      # noqa: BLE001
+        return None
+    for _ in range(RESHAPE_TRIES):
+        time.sleep(RESHAPE_WAIT)
+        try:
+            note = decoded(poll(session["txn"])).get(template)
+        except ScribeError:
+            return None
+        if note:
+            return note
+    return None
+
+
+RESHAPE_TRIES = 10
+RESHAPE_WAIT = 2.0
+
+
+def collect(session, *, reader=None):
     if session["status"] in ("ready", "failed", "withdrawn"):
         return session
     try:
@@ -432,7 +495,10 @@ def collect(session, *, extractor=None):
         return session
     # The day is counted from when the transcript arrives, not from the upload.
     session.update(transcript=transcript, expires=time.time() + TRANSCRIPT_SECONDS)
-    return refill(session, session["operations"], extractor=extractor)
+    # The shaped notes came back in the same body as the transcript, so the
+    # ordinary path needs no second call to anything.
+    return refill(session, session["operations"],
+                  notes=decoded(status), reader=reader)
 
 
 def withdraw(session):
@@ -476,15 +542,23 @@ def demo():
     text = decoded(PARTIAL)
     assert "Fever for three days" in text["transcript"], text
 
-    DONE = {"data": {"output": [], "template_results": {"transcript": [
-        {"template_id": "transcript", "status": "success",
-         "value": base64.b64encode(b"BP is 140 over 90. Fever for three days.").decode()}]}}}
+    # A finished job carries the transcript AND the note shaped to the form
+    # that was asked for, in the one body. That is the whole point of asking
+    # for both at upload: the ordinary path needs no second call to anything.
+    DONE = {"data": {"output": [
+        {"template_id": "tpl-v", "status": "success",
+         "value": base64.b64encode(b"| field | value | row | heard | sure |").decode()}],
+        "template_results": {"transcript": [
+            {"template_id": "transcript", "status": "success",
+             "value": base64.b64encode(
+                 b"BP is 140 over 90. Fever for three days.").decode()}]}}}
     assert transcript_of(DONE) == "BP is 140 over 90. Fever for three days."
+    assert "tpl-v" in decoded(DONE), "the shaped note rides with the transcript"
 
     vitals = {"questions": [{"link_id": "systolic", "text": "Systolic", "type": "integer"}]}
     consult = {"questions": [{"link_id": "history", "text": "History", "type": "text"}]}
 
-    def fake(fields, transcript):
+    def fake(note, fields, transcript):
         ids = {f["link_id"] for f in fields}
         said = {"systolic": {"value": 140, "confidence": 0.95, "evidence": "BP is 140"},
                 "history": {"value": "Fever for three days", "confidence": 0.9,
@@ -494,15 +568,20 @@ def demo():
     global poll
     real_poll, poll = poll, lambda txn: DONE
     try:
-        s = begin("enc-003", "user:mo", "phc-y", {"v.op": {"schema": vitals}}, instrument="i")
-        collect(s, extractor=fake)
+        # The template is already resolved on the session, so nothing here
+        # reaches the workspace: making one is a network call and a check that
+        # opens a socket is not a check.
+        s = begin("enc-003", "user:mo", "phc-y", {"v.op": {"schema": vitals}},
+                  instrument="i", templates={"v.op": "tpl-v"})
+        collect(s, reader=fake)
     finally:
         poll = real_poll
     assert s["status"] == "ready" and s["drafts"][0]["values"] == {"systolic": 140}, s
     assert s["drafts"][0]["tick"] == ["systolic"]
     assert s["expires"] - time.time() > 24 * 3600 - 5, "the transcript is kept a day"
 
-    refill(s, {"c.op": {"schema": consult}}, extractor=fake)
+    s["templates"]["c.op"] = "tpl-c"
+    refill(s, {"c.op": {"schema": consult}}, notes={"tpl-c": "note"}, reader=fake)
     assert [d["operation"] for d in s["drafts"]] == ["c.op"], "the switch rebuilds from the transcript"
     assert public(s)["transcript"].startswith("BP is 140")
 
@@ -522,11 +601,14 @@ def demo():
                    instrument="i")
     racing.update(status="ready", transcript="BP is 140 over 90.")
 
-    def withdrawn_midway(fields, transcript):
-        withdraw(racing)
-        return fake(fields, transcript)
+    racing["templates"]["v.op"] = "tpl-v"
 
-    refill(racing, racing["operations"], extractor=withdrawn_midway)
+    def withdrawn_midway(note, fields, transcript):
+        withdraw(racing)
+        return fake(note, fields, transcript)
+
+    refill(racing, racing["operations"], notes={"tpl-v": "note"},
+           reader=withdrawn_midway)
     assert racing["status"] == "withdrawn", racing
     assert racing["drafts"] == [] and racing["transcript"] == "", racing
 
@@ -578,25 +660,28 @@ def demo():
         _client = was
     assert said.getvalue() == "", "the SDK's print never reaches stdout: %r" % said.getvalue()
 
-    # A reader that cannot run is not a recording that said nothing. This was
-    # live on 2026-11-01: a machine with no ANTHROPIC_API_KEY transcribed a
-    # consultation perfectly and told the doctor "Nothing in the recording
-    # fills this form", which blames the doctor for the deployment. The
-    # transcript is kept either way, and the sentence has to say which
-    # happened, because one of them is somebody's job to fix and the other is
-    # not.
-    def no_reader(fields, transcript):
-        raise extractor_module.NoReader("no ANTHROPIC_API_KEY on this machine")
-
-    held = begin("enc-x", "who", "phc-x", {"phc.op.vitals-record": {"schema": vitals}})
-    held.update(transcript="Blood Pressure 138/86.")
-    out = public(refill(held, held["operations"], extractor=no_reader))
-    assert out["status"] == "ready", out
-    assert out["drafts"] == [], out
-    assert "ANTHROPIC_API_KEY" in out["reason"], out["reason"]
-    assert "Nothing in the recording" not in out["reason"], out["reason"]
-    assert out["transcript"] == "Blood Pressure 138/86.", \
+    # "The service never shaped this form" and "the consultation did not state
+    # any of it" are different facts and they were once the same sentence: a
+    # machine that could not read a transcript at all told the doctor their
+    # recording did not fit the form. Keep them apart.
+    short = begin("enc-x", "who", "phc-x", {"v.op": {"schema": vitals}},
+                  instrument="i", templates={"v.op": "tpl-v"})
+    short.update(transcript="BP is 140 over 90.")
+    none_shaped = public(refill(short, short["operations"], notes={},
+                                reader=lambda *a: {}))
+    assert none_shaped["status"] == "ready", none_shaped
+    assert "has not shaped this form yet" in none_shaped["reason"], none_shaped["reason"]
+    assert none_shaped["transcript"] == "BP is 140 over 90.", \
         "the transcript is kept: it is the record of what was said"
+
+    said_nothing = begin("enc-x", "who", "phc-x", {"v.op": {"schema": vitals}},
+                         instrument="i", templates={"v.op": "tpl-v"})
+    said_nothing.update(transcript="Good morning.")
+    empty = public(refill(said_nothing, said_nothing["operations"],
+                          notes={"tpl-v": "a note with nothing in it"},
+                          reader=lambda *a: {}))
+    assert "Nothing in the recording fills this form" in empty["reason"], empty["reason"]
+    assert "shaped" not in empty["reason"], empty["reason"]
 
     print("ok api.scribe")
 

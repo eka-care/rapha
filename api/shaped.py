@@ -1,8 +1,9 @@
 """Fields from the scribe service's own structured note, with no second model.
 
-The owner's decision of 2026-11-01: nothing but the scribe service may be asked
-to read a consultation. `api/extract.py` sends the transcript to a second
-provider and this module does not; it asks EkaScribe for a note already shaped
+The owner's decision of 2026-11-01: nothing but the scribe service may be
+asked to read a consultation. The module that used to send the transcript to a
+second provider is deleted, not merely unused, because an unused way to make
+that call is a way to make it. This asks EkaScribe for a note already shaped
 like the form, and reads that note with a parser.
 
 Why this can be a parser and not a model
@@ -23,8 +24,8 @@ a prompt in a string.
 
 What does NOT change, because it is what makes a draft safe to tap
 ------------------------------------------------------------------
-Every rule `api/extract.py` enforces AFTER its model answers is enforced here
-after the service answers, by the same code rather than a copy of it:
+Every rule the old module enforced AFTER its model answered is enforced here
+after the service answers, by the code carried over from it:
 
 - an answer is kept only if its `heard` span is really in the transcript;
 - a field the questionnaire does not declare is dropped;
@@ -41,7 +42,32 @@ from __future__ import annotations
 
 import re
 
-from api.extract import _ident, _norm
+from api import fill
+
+_SPACE = re.compile(r"\s+")
+
+
+def _norm(text):
+    return _SPACE.sub(" ", str(text)).strip().lower()
+
+
+def _ident(field, answer):
+    """The id this answer is filed under: row addressed, or the bare link_id.
+
+    A row field whose answer names no row keeps its bare link_id and is
+    therefore dropped by `api/fill.py`, which names it in `unfilled`. That is
+    deliberate: the alternative is choosing a row for it, and a dose on a
+    medicine nobody identified goes on whichever medicine was first. Dropped
+    and named beats placed and plausible.
+
+    Carried here verbatim from the module that used to send the transcript to
+    a second provider, which this one replaces.
+    """
+    group = field.get("row_of")
+    row = answer.get("row")
+    if not group or not isinstance(row, int) or isinstance(row, bool) or row < 0:
+        return field["link_id"]
+    return fill.row_id(group, row, field["link_id"])
 
 # The columns, in order. `field` and `heard` carry the two rules above; `row`
 # addresses a repeating group; `sure` is the service's own reading of how
@@ -107,8 +133,8 @@ _RULE = re.compile(r"^[\s:|-]+$")
 def answers(note, fields, transcript):
     """Read the service's note into the shape `api/fill.py` takes.
 
-    Same return as `api/extract.py`'s extract, and deliberately the same
-    guards. A note that is prose, empty, or a table with the wrong columns
+    The same return and the same guards as the model reader this replaces.
+    A note that is prose, empty, or a table with the wrong columns
     yields nothing: the caller then shows the transcript and says nothing
     filled the form, which is the truth and is already what it does.
     """
@@ -221,9 +247,8 @@ Here are the findings.
     assert got["diagnosis[0].condition"]["value"] == "Hypertension", got
     assert got["diagnosis[0].onset"]["value"] == "August", got
 
-    # THE GUARDS. Each of these is the reason a draft is safe to tap, and each
-    # is enforced after the service answers, exactly as it is after a model
-    # answers in api/extract.py.
+    # THE GUARDS. Each of these is the reason a draft is safe to tap, and not
+    # one of them was relaxed when the engine behind the answer changed.
     assert answers("""
 | field | value | row | heard | sure |
 |---|---|---|---|---|

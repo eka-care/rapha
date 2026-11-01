@@ -38,7 +38,7 @@ from starlette.concurrency import run_in_threadpool
 
 from adapters.local.store import SqliteStore, seed
 from agent import turn
-from api import outbox, scribe
+from api import fill, outbox, scribe
 from catalogue import validate, vocab
 from kernel import (declarations, directory, plugins, queues, spine, proposals,
                     state, terminology, tokens, views)
@@ -920,15 +920,32 @@ async def scribe_start(request: Request, thread: str = None, format: str = None,
     picked, instrument = scribe_pick(user, operations.split(","))
     audio = await request.body()
     suffix = _suffix(format or request.headers.get("content-type"))
+    # The template that shapes each of these forms, resolved BEFORE the audio
+    # goes up, because the upload has to name them. Resolving is a listing and
+    # at most one create against the workspace, and it is cached for the life
+    # of the process: it is not a call per consultation.
     try:
-        txn = await run_in_threadpool(
-            scribe.start, audio, suffix=suffix,
-            languages=scribe.LANGUAGES[language])
+        shapes = await run_in_threadpool(scribe_shapes, picked)
     except scribe.ScribeError as broke:
         raise HTTPException(503, hold_or_say(
             audio, thread_id, user, picked, suffix, str(broke)))
-    session = scribe.begin(thread_id, user["id"], txn, picked, instrument=instrument)
+    try:
+        txn = await run_in_threadpool(
+            scribe.start, audio, suffix=suffix,
+            languages=scribe.LANGUAGES[language],
+            templates=list(shapes.values()))
+    except scribe.ScribeError as broke:
+        raise HTTPException(503, hold_or_say(
+            audio, thread_id, user, picked, suffix, str(broke)))
+    session = scribe.begin(thread_id, user["id"], txn, picked,
+                           instrument=instrument, templates=shapes)
     return scribe.public(session)
+
+
+def scribe_shapes(picked):
+    """{operation: template_id} for the forms this recording will fill."""
+    return {op_id: scribe.shaped_template(op_id, fill.flatten(spec["schema"]))
+            for op_id, spec in sorted(picked.items())}
 
 
 def hold_or_say(audio, thread_id, user, picked, suffix, why):

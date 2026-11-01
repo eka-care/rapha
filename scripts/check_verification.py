@@ -559,7 +559,7 @@ assert "confirmed" in CERTAINTIES and "refuted" in CERTAINTIES, CERTAINTIES
 # answer to a published resource, which is where a certainty could be
 # manufactured, and the adapter's one occurrence is pinned below instead.
 ENGINE = ("kernel/fhir.py", "kernel/mapping.py", "kernel/codification.py",
-          "kernel/terminology.py", "api/fill.py", "api/extract.py",
+          "kernel/terminology.py", "api/fill.py", "api/shaped.py",
           "catalogue/validate.py")
 for name in ENGINE:
     live = engine_code(ROOT / name)
@@ -641,9 +641,15 @@ assert DRAWS == ["session.ts"], DRAWS
 assert "candidates?" in (ROOT / "web" / "src" / "scribe" / "session.ts").read_text(), \
     "the candidates key is declared as optional and read by nothing"
 
-# Route 3, a bundle arriving, needs Eka asked for one. It is asked for the
-# transcript only, which is also where the plan and the code disagree: the
-# plan's decision 4 says "both the bundle and the transcript".
+# Route 3, a bundle arriving, needs Eka asked for one. It is not: since
+# 2026-11-01 Eka is asked for the transcript AND for a note shaped by this
+# kernel's own template, and for neither its FHIR bundle nor its EMR JSON.
+# That distinction is the whole of this tripwire. A note this kernel described
+# carries values and the spoken words behind them, and every one of them is
+# checked against the transcript before it reaches a field. A bundle carries
+# CODES, which nobody here picked and nothing here can show the provenance of,
+# and the day one is read this must fail. The plan's decision 4 still says
+# "both the bundle and the transcript", and the code still does not.
 SCRIBE = engine_code(ROOT / "api" / "scribe.py")
 for shape in ("fhir", "Bundle", "emr_json", "entity"):
     assert shape not in SCRIBE, \
@@ -651,8 +657,9 @@ for shape in ("fhir", "Bundle", "emr_json", "entity"):
         "a code arriving in it did not come from a person picking it, and the " \
         "record has to say so: see section 6 for the Provenance shape." % shape
 ok("neither route that would need a provenance field is reachable: no "
-   "candidate is drawn for a person to accept, and Eka is asked for the "
-   "transcript only. Both are tripwires, not conclusions")
+   "candidate is drawn for a person to accept, and Eka is asked for a "
+   "transcript and a note this kernel shaped, never for its bundle or its "
+   "EMR JSON. Both are tripwires, not conclusions")
 
 
 print("ok   verification: %d checks passed" % checks)
