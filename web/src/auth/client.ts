@@ -57,3 +57,35 @@ export function gateApplies(hostname: string): boolean {
            || hostname === "[::1]" || hostname === "::1"
            || hostname.endsWith(".localhost"));
 }
+
+
+/** May this origin put the Eka login inside a frame?
+ *
+ *  MEASURED, not assumed. login.dev.eka.care answers with
+ *  `frame-ancestors 'self' https://eka.care https://*.dev.eka.care
+ *  https://*.eka.care`, so a page on an eka.care subdomain MAY frame it and
+ *  everywhere else is refused by the browser with a blank box and a console
+ *  line nobody reads. nectar's own eka-relay guessed the other way -- "it
+ *  almost certainly blocks framing" -- and opened a popup instead; the
+ *  header says otherwise, and the header is what the browser obeys.
+ *
+ *  The same origins that may frame it are the ones that receive the cookie,
+ *  which is not a coincidence: both are `.eka.care` and both are the reason
+ *  the dev server is run from a subdomain of it.
+ */
+export function canFrameLogin(hostname: string): boolean {
+  return hostname === "eka.care" || hostname.endsWith(".eka.care");
+}
+
+/** Where the login goes, for a card on this origin.
+ *
+ *  `audience` is the surface asking, the same id every request carries, and
+ *  `next` is where Eka sends the browser once the cookie is set -- back
+ *  here, so a login that completes inside the card lands on this app rather
+ *  than on somebody else's dashboard. Both are Eka's own parameters, read
+ *  off the redirect login.eka.care issues for itself.
+ */
+export function loginUrl(env: string | undefined, clientId: string, back: string): string {
+  const next = encodeURIComponent(back);
+  return `${loginBase(env)}/auth/login?audience=${encodeURIComponent(clientId)}&next=${next}`;
+}

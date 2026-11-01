@@ -23,7 +23,7 @@
  */
 import { apiBase, clientIdFor, loginBase } from "./client";
 
-const ENV = import.meta.env.VITE_APP_ENV as string | undefined;
+export const ENV = import.meta.env.VITE_APP_ENV as string | undefined;
 export const API_BASE = apiBase(ENV);
 export const LOGIN_URL = loginBase(ENV);
 export const CLIENT_ID = clientIdFor(

@@ -366,9 +366,11 @@ export function App() {
           onSearch={() => setKhojOpen(true)}
           onTheme={flipTheme}
           onMenu={() => setDrawer((d) => !d)}
+          facility={facility.data}
           onGo={go}
           onDesk={() => go("#/desk")}
           onSettings={() => go("#/settings")}
+          onSignOut={() => setSession(false)}
         />
         <main id="workspace" tabIndex={-1} className={route.kind === "thread" ? "view" : "view scroll"}>
           <div className="wrap">

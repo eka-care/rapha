@@ -3,7 +3,9 @@
  *  The session rules, against the user agents and the statuses they are for.
  */
 import assert from "node:assert/strict";
-import { apiBase, clientIdFor, gateApplies, loginBase, worthRefreshing } from "./client.ts";
+import {
+  apiBase, canFrameLogin, clientIdFor, gateApplies, loginBase, loginUrl, worthRefreshing,
+} from "./client.ts";
 
 let checks = 0;
 const ok = (cond: unknown, what: string) => { checks++; assert.ok(cond, `FAIL ${what}`); };
@@ -53,5 +55,26 @@ ok(gateApplies("abdm.eka.care"), "and so does production");
 ok(gateApplies("phc.example.org"),
    "and anywhere else is on too: a deployment that is not localhost gets the gate, "
    + "rather than losing it by being somewhere this file did not think of");
+
+// -- who may put the login in a card --------------------------------------
+// Read off the header login.dev.eka.care actually sends:
+//   frame-ancestors 'self' https://eka.care https://*.dev.eka.care https://*.eka.care
+ok(canFrameLogin("sam.eka.care"), "a dev subdomain may frame the login");
+ok(canFrameLogin("sam.dev.eka.care"), "and a dev one under dev.eka.care");
+ok(canFrameLogin("eka.care"), "and the bare domain, which the header names on its own");
+ok(!canFrameLogin("localhost"), "localhost may not, which is why it renders a blank box");
+ok(!canFrameLogin("phc.example.org"), "and nor may anywhere else");
+ok(!canFrameLogin("eka.care.evil.com"),
+   "and a name that merely ENDS in something like it is not a subdomain of it");
+
+// -- the login's own address ----------------------------------------------
+const url = loginUrl("DEV", "doc-web", "https://sam.eka.care/");
+ok(url.startsWith("https://login.dev.eka.care/auth/login?"), "it is Eka's own login path");
+ok(url.includes("audience=doc-web"), "the surface asking is named, as on every other call");
+ok(url.includes("next=https%3A%2F%2Fsam.eka.care%2F"),
+   "and it comes BACK here, encoded: a login that lands on somebody else's "
+   + "dashboard is a login that did not work");
+ok(loginUrl("PROD", "androiddoc", "https://x.eka.care").includes("login.eka.care/auth/login"),
+   "production follows the same switch as everything else");
 
 console.log(`ok   session rules: ${checks} checks`);

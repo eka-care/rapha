@@ -8,7 +8,8 @@
     "dev:lab": "VITE_API_BASE=http://localhost:8001 vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "check": "node --experimental-strip-types src/style.check.ts && node --experimental-strip-types src/pwa.check.ts && node --experimental-strip-types src/ui.check.ts && node --experimental-strip-types src/desk.check.ts && node --experimental-strip-types src/agent.check.ts && node --experimental-strip-types src/validate.check.ts && node --experimental-strip-types src/messages.check.ts && node --experimental-strip-types src/scribe/scribe.check.ts && node --experimental-strip-types src/abha/abha.check.ts"
+    "check": "node --experimental-strip-types src/style.check.ts && node --experimental-strip-types src/pwa.check.ts && node --experimental-strip-types src/ui.check.ts && node --experimental-strip-types src/desk.check.ts && node --experimental-strip-types src/agent.check.ts && node --experimental-strip-types src/validate.check.ts && node --experimental-strip-types src/messages.check.ts && node --experimental-strip-types src/scribe/scribe.check.ts && node --experimental-strip-types src/abha/abha.check.ts",
+    "dev:eka": "VITE_API_BASE= vite"
   },
   "dependencies": {
     "react": "^19.2.6",
@@ -17,6 +18,7 @@
   "devDependencies": {
     "@types/react": "^19.2.6",
     "@types/react-dom": "^19.2.6",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitejs/plugin-react": "^5.0.4",
     "typescript": "~5.9.3",
     "vite": "^7.1.14"

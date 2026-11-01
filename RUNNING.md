@@ -151,6 +151,46 @@ It reads `VITE_API_BASE`, default `http://localhost:8000`. The header carries a
 "Use demo data" toggle that draws every screen from a fixture and refuses every
 write, for when the API is not up.
 
+### Testing the Eka sign-in
+
+`npm run dev` does NOT ask anybody to sign in, and that is on purpose: the
+session is a cookie on `.eka.care`, a cookie for `.eka.care` is never sent to
+localhost, so a gate there could not be satisfied by anybody and would only
+lock you out of your own screen. Everywhere else the gate is on.
+
+To see it, do what nectar does for the same reason
+(`apps/abdm-parent/README.md`): serve the page from a subdomain of eka.care,
+over https, on port 443.
+
+1. Point a name at this machine, once. Pick your own:
+
+```sh
+echo "127.0.0.1 sam.eka.care" | sudo tee -a /etc/hosts
+```
+
+2. Sign in to the Eka doctor portal in the browser you are going to use. That
+   is what creates the cookie; nothing here can create it and nothing here has
+   a debug mode that pretends to.
+
+3. Run the kernel as usual, then the renderer in session mode. Port 443 needs
+   `sudo`, which is the only reason it is there:
+
+```sh
+(cd web && EKA_HOST=sam.eka.care sudo -E npm run dev:eka)
+```
+
+4. Open `https://sam.eka.care` in that same browser and accept the self-signed
+   certificate once.
+
+`/api` is proxied to the kernel on 8000 in this mode, because a page on https
+cannot call `http://localhost:8000` -- the browser blocks it as mixed content.
+So the kernel does not need its own certificate.
+
+What you should see: the workspace, if the cookie is good. The sign-in screen
+if it is not, with "Session expired" and a link to Eka. What you will NOT see
+is any difference in what the kernel allows: this gates the screen, and
+`caller()` in `api/main.py` still takes your word for which role you are.
+
 To watch both facilities at once, run a second Vite against the second kernel:
 
 ```sh

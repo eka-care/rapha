@@ -13,10 +13,12 @@
  *  which is the one place it was actually doing work.
  */
 import { NAME } from "../brand";
+import { Profile } from "../auth/Profile";
+import type { Facility } from "../types";
 import { Icon } from "../icons";
 
-export function Topbar({ title, theme, views, route, deskLabel, onSearch, onTheme, onMenu,
-                        onGo, onDesk, onSettings }: {
+export function Topbar({ title, theme, views, route, deskLabel, facility, onSearch, onTheme,
+                        onMenu, onGo, onDesk, onSettings, onSignOut }: {
   title: string;
   theme: "light" | "dark";
   /** The declared views. They were a permanent list down the rail, under the
@@ -25,12 +27,14 @@ export function Topbar({ title, theme, views, route, deskLabel, onSearch, onThem
   views: { id: string; title: string }[];
   route: string;
   deskLabel: string;
+  facility?: Facility;
   onSearch: () => void;
   onTheme: () => void;
   onMenu: () => void;
   onGo: (hash: string) => void;
   onDesk: () => void;
   onSettings: () => void;
+  onSignOut: () => void;
 }) {
   return (
     <header className="topbar">
@@ -76,6 +80,7 @@ export function Topbar({ title, theme, views, route, deskLabel, onSearch, onThem
       <button className="icon-btn" onClick={onSettings} aria-label="Control panel">
         <Icon name="cog" className="i sm" />
       </button>
+      <Profile facility={facility} onSignOut={onSignOut} />
     </header>
   );
 }
