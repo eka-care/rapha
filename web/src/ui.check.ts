@@ -405,8 +405,17 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.match(lotus, /role="img"/, "the lotus is a graphic, and says so");
   assert.match(lotus, /aria-label="[^"]{8,}"/, "§68: the lotus carries an accessible name");
   assert.match(lotus, /<title>[^<]{8,}<\/title>/, "and a title, for a tooltip and for older readers");
-  assert.ok(!/fill="(?!currentColor)[^"]+"/.test(lotus),
-    "every fill in the lotus is currentColor; tokens.css names the colour");
+  // The emblem is the one mark that does not take the interface's ink: a
+  // national lotus drawn in the accent is a different lotus. So the rule is
+  // not currentColor any more, it is that every colour on it still comes
+  // from a token, which is what keeps style/tokens.css the only file in
+  // web/src that names a colour.
+  const fills = [...lotus.matchAll(/(?:fill|stroke)="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(fills.length >= 6, "the lotus lost its artwork: " + fills.length + " fills");
+  const typed = fills.filter((f) => !/^var\(--[a-z-]+\)$/.test(f));
+  assert.deepEqual(typed, [],
+    "a colour on the lotus is typed into the component rather than taken "
+    + "from a token: " + typed.join(", "));
   ok("queue: the lotus reads a declared state, is named, and takes its colour from a token");
 
   // -- colour means clinical risk, and nothing else -------------------------

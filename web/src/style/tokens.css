@@ -46,6 +46,11 @@
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
     Consolas, monospace;
 
+  /* The grid the paper's dots sit on, and the dot itself. The prototype
+     draws both; without them the canvas is a flat fill and the screen has
+     no surface. */
+  --grid: 24px;
+
   --space-1: 4px;   --space-2: 8px;   --space-3: 12px;  --space-4: 16px;
   --space-5: 20px;  --space-6: 24px;  --space-8: 32px;  --space-10: 40px;
   --space-12: 48px; --space-16: 64px;
@@ -64,6 +69,10 @@
 
   /* ---- grounds ---- */
   --color-bg-canvas: #FAFAF9;
+  --color-dot: rgba(20,20,19,.07);
+  /* The chrome the content passes under. Translucent, so the canvas and the
+     list scrolling beneath it are both still there. */
+  --color-bg-nav: rgba(250,250,249,.72);
   --color-bg-surface: #FFFFFF;
   --color-bg-subtle: #F3F3F1;
   --color-bg-rail: #F6F6F4;
@@ -123,6 +132,18 @@
   --color-critical-soft: #FBECEA;
   --color-critical-border: #F3D2CE;
 
+  /* ---- the national emblem ----
+     The ABDM lotus's own three colours, and the hairline between its petals.
+     They are here because this file names every colour in the product, and
+     they are the only ones in it that do NOT change with the theme: an
+     emblem drawn in the interface's palette is a different emblem. The gap
+     is the surface the mark sits on, so it separates on paper and on a dark
+     screen without the artwork being redrawn. */
+  --emblem-lotus-leaf: #1F832D;
+  --emblem-lotus-leaf-soft: #7AB081;
+  --emblem-lotus-bud: #D34B08;
+  --emblem-lotus-gap: var(--color-bg-surface);
+
   /* The recording ring. A shadow carries its own alpha, so the two frames are
      tokens rather than a literal in a keyframe: this file is the only one
      allowed to name a colour and an animation is not an exception. */
@@ -137,6 +158,8 @@
   --shadow-overlay: 0 24px 70px rgba(0,0,0,.75);
 
   --color-bg-canvas: #0A0A0A;
+  --color-dot: rgba(255,255,255,.07);
+  --color-bg-nav: rgba(10,10,10,.66);
   --color-bg-surface: #111111;
   --color-bg-subtle: #1A1A19;
   --color-bg-rail: #0D0D0D;
@@ -198,6 +221,8 @@
     --shadow-overlay: 0 24px 70px rgba(0,0,0,.75);
 
     --color-bg-canvas: #0A0A0A;
+    --color-dot: rgba(255,255,255,.07);
+    --color-bg-nav: rgba(10,10,10,.66);
     --color-bg-surface: #111111;
     --color-bg-subtle: #1A1A19;
     --color-bg-rail: #0D0D0D;

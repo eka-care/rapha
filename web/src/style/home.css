@@ -26,8 +26,14 @@
   font-size: 10.5px; font-weight: 700; color: var(--color-eyebrow);
   text-transform: uppercase; letter-spacing: .1em;
 }
-.hero-h { font-size: 27px; font-weight: 800; letter-spacing: -.028em; margin-top: 7px; line-height: 1.15; }
-.hero-h span { color: var(--color-text-tertiary); font-weight: 600; }
+/* 800 weight at -.028em was a headline from a different design. The
+   prototype's hero is Newsreader at 420, which is lighter than the body it
+   sits above and reads as a greeting rather than as a banner. */
+.hero-h {
+  font-family: var(--font-serif); font-size: 31px; font-weight: 420;
+  letter-spacing: .012em; margin-top: 7px; line-height: 1.1;
+}
+.hero-h span { color: var(--color-text-tertiary); font-weight: 420; }
 .hero-sub { font-size: 12.5px; color: var(--color-text-tertiary); margin-top: 7px; line-height: 1.55; max-width: 560px; }
 .hero-ask {
   display: flex; align-items: center; gap: 11px;

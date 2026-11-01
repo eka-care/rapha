@@ -1,7 +1,10 @@
 /* The app frame: a Claude-style rail, a 56px topbar, and a centred view.
  * Ported from the prototype (.app/.sb/.main/.topbar/.view/.wrap). */
 
-.app { display: flex; height: 100%; width: 100%; overflow: hidden; }
+/* Above the paper. body::after fades the dot grid out under the middle of
+   the screen and covers everything; the application sits on top of it. */
+.app { display: flex; height: 100%; width: 100%; overflow: hidden;
+  position: relative; z-index: 1; }
 
 .sb {
   width: 248px; flex-shrink: 0;
@@ -89,15 +92,30 @@
 .rb-s { font-size: 9.5px; color: var(--color-text-tertiary); margin-top: 1px; }
 
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+/* Glass, as the prototype draws it: the canvas shows through and the content
+   scrolling under it stays legible. Anyone who has asked for less
+   transparency gets the flat surface instead, below. */
 .topbar {
   height: 56px; flex-shrink: 0;
-  background: var(--color-bg-surface);
+  background: var(--color-bg-nav);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
   border-bottom: 1px solid var(--color-border-subtle);
   display: flex; align-items: center; gap: 11px; padding: 0 18px;
   transition: background var(--duration-slow) var(--ease-out);
 }
-.tb-title { font-size: 14.5px; font-weight: 700; letter-spacing: -.01em; }
-.tb-sub { font-size: 10.5px; color: var(--color-text-tertiary); margin-top: 1px; }
+/* The screen's name is display type, not a bold label. Newsreader at 420 is
+   the prototype's own setting and the reason its chrome reads as considered.
+   The facility under it is the mono eyebrow, because it is a fact about where
+   you are rather than a heading. */
+.tb-title {
+  font-family: var(--font-serif); font-size: 18px; font-weight: 420;
+  letter-spacing: .012em; line-height: 1.2;
+}
+.tb-sub {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--color-text-tertiary); margin-top: 1px;
+}
 
 .pill {
   display: inline-flex; align-items: center; gap: 7px;
@@ -126,6 +144,11 @@
 .view { flex: 1; overflow: hidden; display: flex; justify-content: center; padding: 16px 20px; }
 .view.scroll { overflow-y: auto; }
 .wrap { max-width: 1280px; width: 100%; height: 100%; }
+
+@media (prefers-reduced-transparency: reduce) {
+  .topbar { background: var(--color-bg-surface); backdrop-filter: none;
+    -webkit-backdrop-filter: none; }
+}
 
 .topbar__menu { display: none; }
 @media (max-width: 900px) {

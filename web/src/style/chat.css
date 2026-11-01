@@ -13,7 +13,11 @@
   padding: 13px 15px; display: flex; align-items: flex-start; gap: 11px;
   border-bottom: 1px solid var(--color-border-subtle); flex-shrink: 0;
 }
-.pt-name { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
+/* A person's name is the display type on this screen. */
+.pt-name {
+  font-family: var(--font-serif); font-size: 19px; font-weight: 420;
+  letter-spacing: .012em; line-height: 1.15;
+}
 .pt-meta { font-size: 10.5px; color: var(--color-text-tertiary); margin-top: 2px; }
 .pt-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
 

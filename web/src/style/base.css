@@ -6,8 +6,27 @@ html, body, #root { width: 100%; height: 100%; }
 
 body {
   font-family: var(--font-sans);
+  /* The prototype's own measure. Geist at .015em and 1.6 is what makes it
+     read as a document rather than as a form; the default tracking is what
+     made every screen in this build look a little tighter and cheaper than
+     the design it was drawn from. */
+  letter-spacing: .015em;
+  line-height: 1.6;
   background: var(--color-bg-canvas);
   color: var(--color-text-primary);
+  /* The paper. A dot grid at the grid unit, and a vignette that lifts the
+     middle of the screen off it, exactly as the prototype draws them. Both
+     are quiet enough to be felt rather than seen. */
+  background-image: radial-gradient(circle at 1px 1px, var(--color-dot) 1px, transparent 0);
+  background-size: var(--grid) var(--grid);
+}
+/* The grid is a texture, not a pattern to be read: this fades it out under
+   the middle of the screen, where the work is. Pointer events off, because
+   it covers everything. */
+body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse 60% 70% at 50% 45%,
+    var(--color-bg-canvas) 35%, transparent 100%);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transition: background var(--duration-slow) var(--ease-out),
