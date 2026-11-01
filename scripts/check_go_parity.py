@@ -3900,6 +3900,148 @@ def lint_parity(tmp):
           len(kplugins.PLUGIN_KEYS), "; ".join(unreachable)))
 
 
+def token_parity(tmp):
+    """The day sequence over both engines, and the counter they SHARE.
+
+    WHY THIS IS NOT JUST ANOTHER ROUTE DIFF
+    ---------------------------------------
+    Until 2026-11-01 this engine pair did not agree about numbers at all and
+    no check in this file said so. The Python issued one out of
+    kernel/tokens.py and ignored any token in the request; the Go read `token`
+    out of the request BODY and, given none, had its store invent one from the
+    last three characters of the generated row id. So the Go's numbers came
+    from whichever client asked, or from a row id, and in neither case from a
+    sequence.
+
+    Every other check here compares the two engines on one set of
+    declarations, and not one of them looked at the token, because `token` is
+    in VOLATILE_KEYS: it is normalised away before two answers are diffed, for
+    the good reason that two engines seeding their own file produce their own
+    row ids. A VALUE EXCLUDED FROM EVERY COMPARISON IS A VALUE NO COMPARISON
+    DEFENDS. That is the hole this function fills, and it is why the three
+    properties below are asserted directly rather than diffed.
+
+    1. EACH ENGINE ISSUES THE SAME SEQUENCE. Same declarations, same seeded
+       demo day, n arrivals each: the two lists of numbers must be equal. Not
+       normalised and not bagged. The actual numbers, in order.
+
+    2. NEITHER LETS THE CALLER CHOOSE. A body naming its own token is ignored
+       by both, because a number a client picks is a number nothing else knew
+       it had given out.
+
+    3. THEY SHARE ONE COUNTER IN ONE FILE. This is the property that matters
+       in a clinic and the one a per-engine check cannot see. A deployment
+       mid-migration has both engines over one database, so numbers are taken
+       ALTERNATELY here, python, go, python, go, against the same file, and the
+       whole run must still be consecutive with no duplicate and no hole. Two
+       engines each keeping their own sequence is how one waiting room gets two
+       number ones, and it would pass properties 1 and 2 comfortably.
+
+    PROVED TO FAIL, which is the only thing that makes any of it evidence.
+    Each mutation was applied, the old text asserted gone and the file
+    asserted changed before anything ran, and the file restored and compared
+    byte for byte afterwards.
+
+      - cmd/api/guard.go: restore the openThread this replaced, reading
+        `token` out of the request body and handing it to the store.
+        -> property 2 fails: "go honoured the token in the request body:
+           ['999', '999', '999', '999']".
+      - store/store.go IssueToken: key the counter on scope + "-go", so the
+        Go engine keeps its own row.
+        -> property 3 fails: "2 counter rows in one file: [(..., 'today', ...,
+           11), (..., 'today-go', ..., 12)]", which is the two-sequences
+           failure happening rather than being described.
+    """
+    import sqlite3
+
+    staff = {"X-PHC-Role": "frontdesk", "X-PHC-Actor": "user:frontdesk"}
+    arrivals = 4
+    numbers = {}
+
+    # ---------------------------------------------------------------- 1 and 2
+    for name in (backend.PYTHON, backend.GO):
+        os.environ[backend.ENV] = name
+        db = os.path.join(tmp, "tokens-%s.sqlite3" % name)
+        server = backend.launch(db, bundle="phc", facility="all-plugins")
+        try:
+            got = []
+            for _ in range(arrivals):
+                # A body naming its own number, every time. Both engines must
+                # ignore it. The value is deliberately one no sequence this
+                # short could reach, so honouring it would be unmistakable.
+                status, panel = call(server.base, PREFIX + "/threads",
+                                     method="POST", headers=staff,
+                                     body={"token": "999"})
+                assert status == 200, (name, status, str(panel)[:300])
+                got.append(panel["subject"]["token"])
+            numbers[name] = got
+            assert "999" not in got, (
+                "%s honoured the token in the request body: %s. A number a "
+                "client picks is a number nothing else knew it had given out."
+                % (name, got))
+        finally:
+            server.close()
+            os.environ.pop(backend.ENV, None)
+
+    assert numbers[backend.PYTHON] == numbers[backend.GO], (
+        "the two engines issued different numbers for the same arrivals on the "
+        "same declarations: python %s, go %s"
+        % (numbers[backend.PYTHON], numbers[backend.GO]))
+    ok("the day sequence: %d arrivals at each engine on one seeded demo day got "
+       "%s from both, and a token named in the request body is ignored by both"
+       % (arrivals, ", ".join(numbers[backend.PYTHON])))
+
+    # -------------------------------------------------------------------- 3
+    # One file, both engines, alternating. Each server is started and stopped
+    # around its own arrival so the two never hold the file at once: what is
+    # proved here is that the SEQUENCE is shared, not that SQLite tolerates two
+    # writers, which both adapters are deliberately configured against
+    # (care_phc_mcp/store/store.go caps the pool at one connection and says
+    # why).
+    shared = os.path.join(tmp, "tokens-shared.sqlite3")
+    order, issued = [], []
+    for i in range(6):
+        name = backend.PYTHON if i % 2 == 0 else backend.GO
+        os.environ[backend.ENV] = name
+        server = backend.launch(shared, bundle="phc", facility="all-plugins")
+        try:
+            status, panel = call(server.base, PREFIX + "/threads",
+                                 method="POST", headers=staff, body={})
+            assert status == 200, (name, status, str(panel)[:300])
+            issued.append(int(panel["subject"]["token"]))
+            order.append(name)
+        finally:
+            server.close()
+            os.environ.pop(backend.ENV, None)
+
+    assert len(set(issued)) == len(issued), (
+        "two engines against ONE file issued the same number twice: %s in the "
+        "order %s. This is two sequences in one waiting room." % (issued, order))
+    assert issued == sorted(issued), (
+        "the shared sequence went backwards: %s in the order %s" % (issued, order))
+    assert issued[-1] - issued[0] == len(issued) - 1, (
+        "the shared sequence has a hole: %s in the order %s. A hole is a number "
+        "called out to a room where nobody has it." % (issued, order))
+
+    # And ONE counter row, not one per engine. Read straight out of the file,
+    # because the whole claim is about what is on disk.
+    conn = sqlite3.connect(shared)
+    try:
+        rows = conn.execute(
+            "SELECT workflow, scope, day, last FROM day_sequence").fetchall()
+    finally:
+        conn.close()
+    assert len(rows) == 1, (
+        "%d counter rows in one file: %s. Two engines keeping their own row is "
+        "two sequences that will disagree by tomorrow." % (len(rows), rows))
+    assert int(rows[0][3]) == issued[-1], (
+        "the counter says %s and the last number issued was %s"
+        % (rows[0][3], issued[-1]))
+    ok("and both engines draw from ONE counter in one file: %d arrivals taken "
+       "alternately python, go came back %s, held in a single row of "
+       "day_sequence rather than one row each" % (len(issued), issued))
+
+
 def misspelt_facility(tmp):
     """A shape neither bundle declares, asked for by the environment.
 
@@ -4012,6 +4154,11 @@ def main():
         lint_parity(tmp)
         go_resolver_names_no_declared_word()
         misspelt_facility(tmp)
+        # The day sequence, which no other check in this file can defend:
+        # `token` is in VOLATILE_KEYS and is normalised away before two
+        # answers are diffed, so the one value the race was about is the one
+        # value every comparison drops. See the function.
+        token_parity(tmp)
         # Before the shapes, because it is the one pair of kernels that does
         # not start from a file seeded today, and a difference here is cheaper
         # to read than one found after three pairs have been started.

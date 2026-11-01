@@ -320,10 +320,10 @@ func TestAQueryOnAFieldThatDoesNotExistIsRefused(t *testing.T) {
 }
 
 // Every method on the interface is implemented, and the interface declares the
-// eleventh, twelfth and thirteenth the Python's protocol does not. The assertion is on the
-// interface's own method set so a method added to the interface and not the
-// struct does not compile rather than failing here, and the names are listed
-// so a method SERVED and not DECLARED is visible.
+// ones the Python's protocol does not. The assertion is on the interface's own
+// method set so a method added to the interface and not the struct does not
+// compile rather than failing here, and the names are listed so a method
+// SERVED and not DECLARED is visible.
 func TestTheInterfaceDeclaresEveryMethodItServes(t *testing.T) {
 	declared := reflect.TypeOf((*Store)(nil)).Elem()
 	var names []string
@@ -332,21 +332,29 @@ func TestTheInterfaceDeclaresEveryMethodItServes(t *testing.T) {
 	}
 	sort.Strings(names)
 	want := []string{
-		"AppendAudit", "Audit", "Count", "OpenThread", "Proposal",
+		"AppendAudit", "Audit", "Count", "IssueToken", "OpenThread", "Proposal",
 		"Proposals", "PutProposal", "RaiseFlag", "RecordDirectoryID",
 		"Select", "SelectNullable", "StoredFlags", "Threads", "Write",
 	}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("the interface declares %v, want %v", names, want)
 	}
-	// Ten of these are kernel/contracts.py's Store protocol. The four that
+	// ELEVEN of these are kernel/contracts.py's Store protocol, which gained
+	// issue_token on 2026-11-01 when the token race was closed. The four that
 	// are not are named in the interface's own comments: RecordDirectoryID
 	// (contradiction 29, called by kernel/directory.py), OpenThread and
 	// Proposal (both called by api/main.py), and SelectNullable, which is
 	// Select without the NULL flattening for the one row that goes on the
 	// wire. Proposal was found porting the guard: api/main.py's
 	// proposal_or_404 reads it and the protocol's docstring still says ten.
-	if len(names) != 14 {
-		t.Fatalf("%d methods: the protocol is ten and this serves four more", len(names))
+	//
+	// IssueToken is on the protocol and is NOT a fifteenth gap, which is the
+	// distinction this count exists to keep. It was added to the protocol
+	// rather than bolted onto an adapter because what it promises (a number
+	// issued once, ever) is a property every adapter must hold, and an
+	// optional method cannot promise anything.
+	if len(names) != 15 {
+		t.Fatalf("%d methods: the protocol is eleven and this serves four more",
+			len(names))
 	}
 }

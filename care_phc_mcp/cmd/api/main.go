@@ -524,12 +524,21 @@ var served = []struct {
 	{"/threads/{thread_id}", ""},
 	// The arrival a patient makes for themselves at the printed poster, which
 	// issues a number out of the same day sequence the desk draws from and
-	// answers with it. The sequence rule is kernel/tokens.py and it reads
-	// nothing but Store.threads, so there is no seam missing here: what is
-	// missing is the port, and this engine must not answer an arrival with a
-	// number that was issued by nobody. It is named here so the route is
-	// visibly not served rather than silently absent.
-	{"/arrivals", "the day sequence is ported but the arrival route is not; a second engine issuing its own numbers is how one waiting room gets two number ones"},
+	// answers with it.
+	//
+	// THE SEQUENCE IS NOW ACTUALLY PORTED, which this line used to claim
+	// while it was not. Package tokens is kernel/tokens.py's rule and
+	// Store.IssueToken is the atomic reservation under it, so POST /threads
+	// here issues a real number out of the same counter in the same file
+	// that api/main.py draws from, and the two engines cannot disagree about
+	// whose turn it is.
+	//
+	// What is still missing is this ROUTE: the provenance mark a poster's
+	// arrival carries, and the unauthenticated surface that answers with the
+	// number and nothing else. Both are api/main.py's and neither is the
+	// sequence. Named here so the route is visibly not served rather than
+	// silently absent.
+	{"/arrivals", "the day sequence is ported and so is the atomic reservation under it; what is not ported is this route, its provenance mark and its unauthenticated surface"},
 	{"/subjects/{subject_id}", ""},
 	{"/questionnaires", ""},
 	// The expansion seam is G4's; the ROUTE is G3's, because a bound choice

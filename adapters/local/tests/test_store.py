@@ -296,13 +296,21 @@ def test_every_store_method_the_contract_names_is_here():
     too. kernel/contracts.py used to call the protocol "nine methods" while
     declaring ten; the count is asserted from the class rather than from the
     prose, which is how that was found.
+
+    ELEVEN SINCE 2026-11-01. `issue_token` joined it when the token race was
+    closed, and it is the first method here that an adapter can satisfy in
+    shape and still get wrong: returning a number is easy and returning a
+    number nobody else was given is the actual contract. This test holds the
+    NAME, which is all a name test can hold. What holds the behaviour is
+    scripts/check_tokens_race.py, which runs real parallel processes against a
+    real file, and the sequence test below.
     """
     from kernel.contracts import Store
 
     declared = sorted(n for n in vars(Store) if not n.startswith("_"))
-    assert declared == ["append_audit", "audit", "count", "proposals",
-                        "put_proposal", "raise_flag", "select", "stored_flags",
-                        "threads", "write"], declared
+    assert declared == ["append_audit", "audit", "count", "issue_token",
+                        "proposals", "put_proposal", "raise_flag", "select",
+                        "stored_flags", "threads", "write"], declared
     for name in declared:
         assert callable(getattr(SqliteStore, name, None)), "SqliteStore has no " + name
 

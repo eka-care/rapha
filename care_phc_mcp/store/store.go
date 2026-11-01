@@ -10,13 +10,19 @@
 //
 // THE PROTOCOL IS ONE METHOD WIDER THAN IT READS
 // ----------------------------------------------
-// kernel/contracts.py calls the Store protocol "ten methods" and declares
-// ten. The kernel calls eleven: kernel/directory.py calls
-// store.record_directory_id(...), which the protocol never declares, and
-// scripts/check_queues.py pins the list of off-protocol Store calls in the
-// kernel at exactly that one so a second fails the gate. That is contradiction
-// 29, and it is known rather than fixed: fixing it is a change to the protocol
-// and to the adapter test that pins its ten names.
+// kernel/contracts.py declares ELEVEN methods since 2026-11-01, when
+// issue_token joined it and closed the token race. The kernel calls twelve:
+// kernel/directory.py calls store.record_directory_id(...), which the
+// protocol never declares, and scripts/check_queues.py pins the list of
+// off-protocol Store calls in the kernel at exactly that one so a second
+// fails the gate. That is contradiction 29, and it is known rather than
+// fixed: fixing it is a change to the protocol and to the adapter test that
+// pins its names.
+//
+// issue_token is NOT one of those gaps and is the difference worth noting. It
+// was added to the protocol rather than bolted onto an adapter, because what
+// it promises is a property every adapter must hold and an optional method
+// cannot promise anything.
 //
 // So RecordDirectoryID is on this interface, named as what it is. An
 // interface that declared ten and served eleven would reproduce in Go the
@@ -268,6 +274,28 @@ type Store interface {
 	// api/main.py that calls this one rather than the kernel, which is why
 	// check_queues' count of the KERNEL's off-protocol calls stays at one.
 	OpenThread(token, actor string) (string, error)
+
+	// IssueToken is the ELEVENTH METHOD ON THE PROTOCOL ITSELF, added
+	// 2026-11-01 when the token race was closed. Unlike the two above it is
+	// not a gap: kernel/contracts.py declares it.
+	//
+	// The one method on this interface that must be ATOMIC against every
+	// other caller, including callers in other processes against the same
+	// file. Two arrivals racing must come back with two different numbers,
+	// and a set of them must have no hole: a waiting room is one room, and a
+	// number nobody was issued is a number nobody answers to.
+	//
+	// `floor` is the lowest number that may be handed out and it is the
+	// KERNEL's arithmetic, package tokens here and kernel/tokens.py there:
+	// one past the highest already issued, skipping tokens that are not on
+	// the sequence. The store does not second-guess it. What the store owns
+	// is only the atomicity, which is the half no pure package can provide.
+	//
+	// The contract is exactly: return a number not less than floor, never
+	// return the same number twice for one (workflow, scope, day), and do it
+	// in one indivisible step. An implementation that reads and then writes
+	// has not implemented this method.
+	IssueToken(workflow, scope string, floor int) (int, error)
 }
 
 // ---------------------------------------------------------------------------
@@ -291,6 +319,25 @@ var _ Store = (*SQLite)(nil)
 // that two writers cannot meet inside SQLite: modernc's driver is safe to use
 // concurrently, but WAL plus two writers still returns SQLITE_BUSY, and a
 // busy error on a clinical write is not a thing to discover in a clinic.
+// sequenceDDL is the facility's day sequence counter, and the one table here
+// whose key is not a single `id` column. It is created by hand rather than
+// through the Tables loop for exactly that reason: the whole point of it is a
+// UNIQUE key on (workflow, scope, day), because that uniqueness is what makes
+// issuing a number atomic. A table keyed by a generated row id would let two
+// writers both insert and both believe they were first.
+//
+// It is not a resource. No declaration can name it, no metric can count it,
+// and it holds no fact about anybody: four values and a high water mark.
+// Byte for byte the schema adapters/local/store.py creates, because the two
+// engines open the same file and a column either of them did not expect is a
+// clinic's database that one of them cannot read.
+const sequenceDDL = "CREATE TABLE IF NOT EXISTS day_sequence (" +
+	" workflow TEXT NOT NULL," +
+	" scope TEXT NOT NULL," +
+	" day TEXT NOT NULL," +
+	" last INTEGER NOT NULL," +
+	" PRIMARY KEY (workflow, scope, day))"
+
 func Open(path string) (*SQLite, error) {
 	dsn := path
 	if path == ":memory:" {
@@ -323,6 +370,9 @@ func Open(path string) (*SQLite, error) {
 		if _, err := db.Exec(stmt); err != nil {
 			return nil, fmt.Errorf("creating %s: %w", table, err)
 		}
+	}
+	if _, err := db.Exec(sequenceDDL); err != nil {
+		return nil, fmt.Errorf("creating day_sequence: %w", err)
 	}
 	// The constructor's own job in adapters/local/store.py, and here for the
 	// same reason: every queue view is `scope: today`, so a file seeded
@@ -768,14 +818,60 @@ func (s *SQLite) put(resource string, record map[string]any, thread string) (str
 
 // OpenThread starts an empty visit and returns its thread id. Off-protocol;
 // see the Store interface above.
+//
+// NO TOKEN IS INVENTED HERE ANY MORE. This used to fall back to the last three
+// characters of the generated row id whenever the caller passed none, so an
+// arrival that reached the store without a number got one that was on no
+// sequence, was issued to nobody, and was not a number at all. A visit with no
+// token now has none, visibly, rather than a plausible one nobody ever called
+// out. adapters/local/store.py removed the same fallback and says the same
+// thing; this engine had kept it.
+//
+// Issuing a number is IssueToken's, and choosing one is nobody's.
 func (s *SQLite) OpenThread(token, actor string) (string, error) {
 	thread := NewID("enc")
-	if token == "" {
-		token = thread[len(thread)-3:]
-	}
 	return s.put("encounter", map[string]any{
 		"id": thread, "status": "in_progress", "token": token, "created_by": actor,
 	}, thread)
+}
+
+// IssueToken hands out one number, and never hands the same one out twice.
+//
+// ONE SQL STATEMENT, and that is the whole of the fix. The upsert below is
+// indivisible: SQLite takes a write lock for the duration of a single
+// statement, so of two callers arriving in the same instant exactly one
+// inserts the row and the other is made to take the UPDATE branch and
+// increment what the first one wrote. Neither can read a counter, be
+// overtaken, and write back a number the other already has, because neither
+// reads it at all. There is no SELECT here on purpose.
+//
+// `floor` is the kernel's arithmetic (package tokens: one past the highest
+// number already issued, skipping tokens that are not on the sequence) and
+// this method does not second-guess it. MAX(last + 1, excluded.last) is why
+// it is passed at all: the counter alone would be wrong the first time a day
+// is issued against rows that already carry numbers, which is every day a
+// seed has been rolled forward into. The counter supplies the atomicity and
+// the floor supplies the starting point, and a number below the floor can
+// never come back.
+//
+// Line for line what adapters/local/store.py issue_token does, against the
+// same table and the same key, because the two engines open the same file.
+func (s *SQLite) IssueToken(workflow, scope string, floor int) (int, error) {
+	day := StartOf("day")
+	if len(day) >= 10 {
+		day = day[:10]
+	}
+	var last int
+	err := s.db.QueryRow(
+		"INSERT INTO day_sequence (workflow, scope, day, last) VALUES (?, ?, ?, ?)"+
+			" ON CONFLICT(workflow, scope, day)"+
+			" DO UPDATE SET last = MAX(last + 1, excluded.last)"+
+			" RETURNING last",
+		workflow, scope, day, floor).Scan(&last)
+	if err != nil {
+		return 0, err
+	}
+	return last, nil
 }
 
 // RaiseFlag is the Store protocol's raise_flag. Idempotent: raising a flag

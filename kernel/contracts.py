@@ -412,7 +412,7 @@ class ThreadRef:
 # --------------------------------------------------------------------------
 
 class Store(Protocol):
-    """Adapter interface. Deliberately small: ten methods, and a SQLite file
+    """Adapter interface. Deliberately small: eleven methods, and a SQLite file
     and a REST client over somebody else's record can both satisfy every one.
 
     Every read is scoped to a thread. How a resource joins to the thread's
@@ -422,6 +422,20 @@ class Store(Protocol):
 
     Nothing here commits a proposal. The kernel confirms by evaluating the
     guard again and then calling write(); the store only stores.
+
+    TEN METHODS UNTIL 2026-11-01, AND THE ELEVENTH IS A LOCK THIS SEAM DID NOT
+    HAVE. `issue_token` is the one method here that is not a read or a plain
+    write: it is an atomic reservation, and it is on the protocol because
+    kernel/tokens.py could not keep its promise without one. Reading the day's
+    numbers and then writing the next one is two steps, so two arrivals inside
+    one instant were handed the same number. That was written down in
+    kernel/tokens.py as the owner's to schedule rather than discovered from two
+    patients holding the same slip, and this is the scheduled change.
+
+    It is the protocol's business and not an adapter extra for the reason the
+    Spool comment below gives about queues: a property every adapter must hold
+    cannot be optional on the interface. An adapter that cannot issue a number
+    once has not implemented this protocol.
     """
 
     # reads that feed state derivation, views and metrics
@@ -441,6 +455,28 @@ class Store(Protocol):
 
     def raise_flag(self, thread: str, flag: str) -> None: ...
     # only for flags the workflow lists under `stored`; the kernel checks.
+
+    def issue_token(self, *, workflow: str, scope: str, floor: int) -> int: ...
+    # -> the number this arrival is given, and it is given to nobody else.
+    #
+    # The one method on this protocol that must be ATOMIC against every other
+    # caller, including callers in other processes against the same file. Two
+    # arrivals racing must come back with two different numbers, and a set of
+    # them must have no hole: a waiting room is one room and a number nobody
+    # was issued is a number nobody answers to.
+    #
+    # `floor` is the lowest number the adapter may hand out, and it is the
+    # KERNEL's arithmetic: one past the highest already issued, skipping any
+    # token that is not on the sequence. That rule stays in kernel/tokens.py
+    # so that two adapters cannot answer it differently. What the adapter owns
+    # is only the atomicity, which is the half the kernel cannot provide: it
+    # holds no lock and has no transaction, and inventing one here would put a
+    # transaction in the kernel.
+    #
+    # So the contract is exactly: return a number not less than `floor`, never
+    # return the same number twice for one (workflow, scope, day), and do it
+    # in one indivisible step. An adapter that reads and then writes has not
+    # implemented this.
 
     # proposals and audit
     def put_proposal(self, proposal: Proposal) -> None: ...

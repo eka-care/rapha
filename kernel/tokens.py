@@ -31,27 +31,43 @@ tail of a generated row id when nobody passed a token, and the seed shipped
 
 What it reads
 -------------
-`Store.threads`, which is on the protocol, and nothing else. There is
-deliberately no new Store method here: issuing a number is a question about
-the rows the store already serves, so it needs no eleventh method and the
-kernel gains no second off-protocol call. One process serves one facility
-(api/main.py), so "today's threads" is this facility's day.
+`Store.threads` for the arithmetic, and `Store.issue_token` for the number.
+One process serves one facility (api/main.py), so "today's threads" is this
+facility's day.
 
-Honest limit, and it is a real one
-----------------------------------
-Reading the day's numbers and then writing the next one is two steps, so two
-arrivals racing inside the same instant can be handed the same number. There
-is no lock here and there is no transaction, because the Store protocol has
-neither and inventing one for this would put a transaction in the kernel and a
-new method on every adapter.
+The split between those two is the whole design and it is worth stating. The
+RULE lives here: one past the highest number already issued, skipping any
+token that is not on the sequence. The ATOMICITY lives in the adapter, because
+it is the half the kernel cannot provide: the kernel holds no lock and has no
+transaction, and giving it one would put a transaction in the kernel. So the
+kernel computes the floor and the store reserves a number not below it, in one
+indivisible step. Two adapters cannot answer "what is the next number" two
+different ways, and neither can hand the same number out twice.
 
-At a primary health centre desk, where arrivals are a person walking up to a
-counter, this is a narrow window. It is not zero, and a shared poster that
-several patients scan at once is exactly where it would be reached. The fix is
-a sequence the store itself issues atomically, which is a change to the
-protocol and to every adapter behind it, and it is the owner's to schedule.
-Written down rather than left to be discovered from two patients holding the
-same slip.
+The race that used to be here, and what closed it
+-------------------------------------------------
+This module used to read the day's numbers and then let the caller write the
+next one, which is two steps, so two arrivals inside one instant were handed
+the same number. There was no lock and no transaction because the Store
+protocol had neither, and this file said so and said the fix was the owner's
+to schedule: a sequence the store itself issues atomically, which is a change
+to the protocol and to every adapter behind it.
+
+That is what was scheduled and what happened. `Store.issue_token` is the
+eleventh method on `kernel.contracts.Store`, the SQLite adapter satisfies it
+with a single upsert against a UNIQUE key rather than with a read followed by
+a write, and the Go store does the same against the same schema. The window
+is not narrowed, it is gone: there is no instant between reading and writing
+because nothing reads the counter.
+
+It is proved by making it happen rather than by this paragraph.
+`scripts/check_tokens_race.py` drives genuinely parallel arrivals, real
+processes against a real file, and asserts the numbers issued have no
+duplicate and no hole. Run against the unfixed code it fails, which is the
+only thing that makes it evidence.
+
+The widest case is the one that drove it: a staffed desk serialises arrivals
+through a human, and a shared QR poster does not serialise them at all.
 
 Pure: takes a Store, touches no network and no file. Python 3.9.
 """
@@ -96,9 +112,16 @@ def issue(store, *, workflow, scope="today"):
 
     A string because that is what the token column holds and what a screen
     draws; the sequence is arithmetic, the token is a label.
+
+    Two steps, and only the second one decides. `after()` reads the rows and
+    says the lowest number that would be honest; `issue_token` reserves one
+    not below it and is the only thing that can say which. A caller racing
+    this one may well compute the same floor, and that is not a defect any
+    more: the adapter's UNIQUE key means exactly one of them inserts it and
+    the rest are incremented past it.
     """
     seen = [ref.subject.get("token") for ref in store.threads(workflow=workflow, scope=scope)]
-    return str(after(seen))
+    return str(store.issue_token(workflow=workflow, scope=scope, floor=after(seen)))
 
 
 if __name__ == "__main__":

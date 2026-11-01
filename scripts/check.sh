@@ -43,6 +43,10 @@ python3 -m kernel.tokens
 # routes each numbering their own arrivals is the failure that leaves every
 # check above green and puts two people called four in one waiting room.
 python3 scripts/check_front_desk.py
+# And the number issued ONCE, proved by racing rather than by inspection: real
+# parallel processes against a real file, asserting no duplicate and no hole.
+# A sequential test passed against the broken code for as long as it shipped.
+python3 scripts/check_tokens_race.py
 
 echo "\n== the kernel and its contracts =="
 python3 -m catalogue.tests.test_guard
