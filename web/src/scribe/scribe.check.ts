@@ -287,24 +287,28 @@ ok(!/mic-live/.test(rec) && !/Microphone live/.test(rec),
   // viewport away from its own microphone.
   //
   // The objection was to a surface drawn OVER the thread. The owner has
-  // asked for a surface drawn BESIDE it -- "when someone starts scribe it
-  // also opens in another view within the session like canvas, with the
-  // live audiowave at the center and transcription" -- which does not take
-  // the thread away and does not hide the microphone. The reason the old
-  // rule existed is intact; the shape it forbade is not the shape we built.
+  // asked for the visit to carry tabs the way a channel does -- "when
+  // someone starts scribe it also opens in another view within the session
+  // like canvas", and then, on a screenshot of a channel's own tab row,
+  // "all of these should be tabs, records, scribe, etc". A tab is not a
+  // layer over the conversation; the conversation is the tab beside it.
+  // The reason the old rule existed is intact: nothing is stacked on
+  // anything, and the microphone still brings its own surface forward.
   //
   // What is still true, and is what this now holds:
   //   - the draft is the same panel every operation commits through
-  //   - it is inline inside that view, not a modal stacked on a modal
-  //   - the microphone opens the view, so nothing is a viewport away
+  //   - it is inline in that tab, not a modal stacked on a modal
+  //   - the microphone opens the tab, so nothing is a viewport away
   const enc = code(read("web/src/screens/Encounter.tsx"));
-  const dictation = enc.slice(enc.indexOf("<Side"), enc.indexOf("</Side>"));
+  const dictation = enc.slice(enc.indexOf('tab === "scribe"'), enc.indexOf('tab === "messages"'));
   ok(dictation.includes("<OperationPanel"), "the draft surface is the same panel every operation uses");
-  ok(/\binline\b/.test(dictation), "drawn inline in that view, not over it");
+  ok(/\binline\b/.test(dictation), "drawn inline in that tab, not over it");
   ok(dictation.includes("<ScribeBar"),
-    "and the recorder is in the same view as the draft it produces");
-  ok(/setSide\("scribe"\)/.test(enc),
-    "starting to dictate opens that view, so the recorder is never hidden");
+    "and the recorder is in the same tab as the draft it produces");
+  ok(/setTab\("scribe"\)/.test(enc),
+    "starting to dictate opens that tab, so the recorder is never hidden");
+  ok(/id: "messages"/.test(enc) && enc.indexOf('id: "messages"') < enc.indexOf('id: "scribe"'),
+    "and the conversation is the first tab, not something you navigate back to");
 }
 
 // 5. The mic does not open a form, and the per-field tick is gone from every

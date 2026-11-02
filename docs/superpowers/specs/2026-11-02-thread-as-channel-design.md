@@ -125,12 +125,17 @@ the bundle declares them. Rejected for now: the kernel has no document and no
 private conversation, so it would be declaring something it cannot serve. The
 declaration should follow the capability, not precede it.
 
-**C. A thread-local overlay with the width of the page. ← recommended**
-One component, `thread/Side.tsx`, that opens over the right-hand rail and takes
-its width — roughly 480px, and the full page under 900px. Four tabs across its
-head, each a plain renderer concern rather than a clinical one, which keeps
-`ui.check.ts` satisfied. Opened from the thread's own head and from the
-composer's `/`; closed with Escape; remembered per person like the rail is.
+**C. Tabs across the top of the visit, the way a channel has them. ← built**
+Owner, on a screenshot of a channel's own tab row: *"all of these should be
+tabs, records, scribe, etc."* So the conversation is not the screen; it is
+the FIRST TAB of the screen, and each tab takes the card's full width. One
+component, `thread/Tabs.tsx`, draws the row and nothing else — the tabs and
+the body under them both come from the screen above, which is how a surface
+stays clean of anything `ui.check.ts` forbids this renderer to name.
+
+An earlier draft of this note proposed a panel beside the thread instead.
+That was wrong for the same reason the old inline draft was: it rationed
+width. A tab does not.
 
 ## 7. The shape, as decided
 
@@ -151,7 +156,7 @@ composer's `/`; closed with Escape; remembered per person like the rail is.
 
 **The four views.** Each is a tab in `thread/Side.tsx`:
 
-- **Scribe — the canvas.** Owner's words, 2026-11-02: *"when someone starts
+- **What was heard — the canvas.** Owner's words, 2026-11-02: *"when someone starts
   scribe it also opens in another view within the session like canvas, with
   the live audiowave at the center and transcription."* So this is not a
   panel that appears after the recording; it is where the recording happens.
@@ -235,8 +240,10 @@ Each step leaves the gate green and the app usable.
    first because it touches `screens/ListScreen.tsx`, whose seven assertions in
    `ui.check.ts` must be repointed. Doing it before the thread work means the
    shell is settled when the views land.
-2. **`thread/Side.tsx` with two tabs: Previous visits and Scribe.** No new
-   dependency, no new route, no open question. Proves the surface.
+2. ~~**The tab row, with Messages, What was heard and Earlier visits.**~~
+   **Done, 2026-11-02.** The recorder and its drafts left the foot of the
+   thread; earlier visits gained a page that shows each visit's values. Next
+   on this tab: the waveform and the transcript area.
 3. **The records SDK wrapper and its scrub**, with a test that a filename
    never reaches a log.
 4. **Upload from the composer, and the Files view.** Needs §8.1 and §8.2.
