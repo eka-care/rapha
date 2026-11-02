@@ -394,6 +394,19 @@ def _lint_scribe(manifest, instruments):
                            "instrument's operations")
         if cfg.get("default") and cfg["default"] not in choose:
             bad.append(f"bundle.yaml scribe.{station}: default must be one of choose")
+        # The nudges: what this station may be told, said in the words a
+        # person would use. They are NOT a form and must not read as one --
+        # each is an example sentence, so the screen can show what the
+        # microphone accepts without implying it accepts only that.
+        for i, n in enumerate(cfg.get("nudges") or []):
+            where = f"bundle.yaml scribe.{station}.nudges[{i}]"
+            if not isinstance(n, dict):
+                bad.append(f"{where}: each nudge is a mapping with 'field' and 'say'")
+                continue
+            if not str(n.get("field") or "").strip():
+                bad.append(f"{where}: needs a 'field', the part of the record it fills")
+            if not str(n.get("say") or "").strip():
+                bad.append(f"{where}: needs a 'say', an example in a person's own words")
     return bad
 
 

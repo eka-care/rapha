@@ -21,6 +21,7 @@ import { agentLine, header, messages, queueViewFor, type Ctx, type Said } from "
 import type { Catalogue, Facility, Operation, Payload, ThreadView } from "../types";
 import { Composer } from "../thread/Composer";
 import { ScribeBar } from "../scribe/ScribeBar";
+import { ScribeStart } from "../scribe/Start";
 import { mergeDrafts, type Opened } from "../scribe/session";
 import { Stream } from "../thread/Thread";
 import { Carry, Team, Trend, usePast, visitOf } from "../thread/Past";
@@ -189,6 +190,19 @@ export function Encounter({
 
         {/* The station comes off the thread view, the same field the header
             badge draws; a thread past its last station has none. */}
+        {/* THE CENTREPIECE, and the reason it is here rather than behind the
+            microphone in the composer: speaking is how this product is used,
+            and a visit nobody has recorded yet should show one obvious way
+            to begin. The nudges beside it are the bundle's, never typed
+            here. */}
+        {!scribing && drafts.length === 0 && (
+          <ScribeStart
+            nudges={cat.scribe?.[thread.station ?? ""]?.nudges ?? []}
+            reason={consented ? undefined : "Capture consent is not recorded on this visit"}
+            onStart={() => setScribing(true)}
+          />
+        )}
+
         {scribing && (
           <ScribeBar thread={thread.id} station={thread.station ?? ""}
                      onDrafts={(s) => setDrafts((all) => mergeDrafts(all, s.drafts, s.session))}

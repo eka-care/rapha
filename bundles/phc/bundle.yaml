@@ -54,14 +54,57 @@ stations: [reception, nurse, doctor, lab, pharmacy, community]
 # must be in the scribe instrument's operations. `default: null` means the
 # person picks, which is the community worker's case: several surveys, none
 # of them obviously first.
+#
+# `nudges` are what the screen SHOWS somebody who has pressed record and does
+# not know what to say. They are examples, not a form and not a limit: the
+# microphone takes whatever is said, and a visit that needs a fourth reading
+# or a finding nobody listed is recorded the same way. The field names come
+# from Eka's own scribe taxonomy, so a note recorded here lands in the same
+# parts of the record a note recorded in Eka does.
+#
+# They are declared here, and not typed into the screen, for the reason
+# everything else is: a sentence a clinician reads beside a patient is part
+# of this facility's record of how it works. A centre that wants different
+# examples edits them from the control panel and the screen follows.
 scribe:
-  reception: {default: phc.op.patient-register, choose: [phc.op.patient-register]}
-  nurse:     {default: phc.op.vitals-record,    choose: [phc.op.vitals-record]}
-  doctor:    {default: phc.op.consult-document,
-              choose: [phc.op.consult-document, phc.op.ncd-review,
-                       phc.op.antenatal-visit, phc.op.followup,
-                       phc.op.rx-prescribe]}
-  community: {default: null,                    choose: [phc.op.household-visit]}
+  reception:
+    default: phc.op.patient-register
+    choose: [phc.op.patient-register]
+    nudges:
+      - {field: Name,    say: "Her name is Sunita Devi, she is thirty two."}
+      - {field: Mobile,  say: "Mobile nine eight four one two three four five six."}
+      - {field: Village, say: "She has come from Barkagaon."}
+      - {field: ABHA,    say: "She already has an ABHA number."}
+  nurse:
+    default: phc.op.vitals-record
+    choose: [phc.op.vitals-record]
+    nudges:
+      - {field: Vitals,   say: "BP one twenty over eighty, pulse eighty four."}
+      - {field: Vitals,   say: "Temperature ninety nine point four, weight fifty one kilos."}
+      - {field: Symptoms, say: "Fever since three days, and a cough at night."}
+      - {field: Triage,   say: "She is breathless, send her in first."}
+  doctor:
+    default: phc.op.consult-document
+    choose: [phc.op.consult-document, phc.op.ncd-review,
+             phc.op.antenatal-visit, phc.op.followup,
+             phc.op.rx-prescribe]
+    nudges:
+      - {field: Symptoms,        say: "Burning when she passes urine, four days now."}
+      - {field: Medical history, say: "Diabetic for six years, on metformin."}
+      - {field: Examination,     say: "Chest is clear, no tenderness in the abdomen."}
+      - {field: Diagnosis,       say: "This looks like a urinary tract infection."}
+      - {field: Medications,     say: "Nitrofurantoin hundred milligrams, twice a day, five days."}
+      - {field: Investigations,  say: "Send a urine routine and a blood sugar."}
+      - {field: Advice,          say: "Plenty of water, and come back if the fever climbs."}
+      - {field: Follow up,       say: "Review her in one week."}
+      - {field: Referral,        say: "Refer her to the district hospital for a scan."}
+  community:
+    default: null
+    choose: [phc.op.household-visit]
+    nudges:
+      - {field: Household, say: "Five people in the house, two under five."}
+      - {field: Members,   say: "The youngest has not had her measles dose."}
+      - {field: Findings,  say: "There is standing water behind the house."}
 
 # What this facility publishes to ABDM, and what it files under which of the
 # profile's own section slices. ABDM names the slices and fixes their codes

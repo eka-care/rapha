@@ -190,6 +190,14 @@ export type Catalogue = {
   workflows?: Record<string, Workflow>;
   instruments?: Record<string, { id: string; title: string; summary?: string; operations: string[]; kind: string; fields?: string[] }>;
   manifest?: { id: string; title: string; version: string; views: string[] };
+  /** What each station may record into, and the examples its screen shows
+   *  somebody who has just pressed record. bundle.yaml's own `scribe` key,
+   *  passed through whole; the nudges are sentences, never a form. */
+  scribe?: Record<string, {
+    default: string | null;
+    choose: string[];
+    nudges?: { field: string; say: string }[];
+  }>;
   /** role id to the capabilities it holds. vocab.BUNDLES, one list for the
    *  whole kernel, so a bundle's menu may name a role it has no use for. */
   bundles?: Record<string, string[]>;

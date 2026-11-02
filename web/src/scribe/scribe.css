@@ -66,3 +66,53 @@
 .scribe-phase { font-variant-numeric:tabular-nums; font-weight:600; }
 .scribe-bar > .cq:last-child { margin-left:auto; }
 .f-hint.heard { font-style: italic; }
+
+/* ── The way in: the microphone as the page, not as an icon ──────────────── */
+
+.sc-start {
+  display:grid; gap:20px; justify-items:center;
+  padding:28px 15px 20px; max-width:620px; margin:0 auto; width:100%;
+}
+
+.sc-go {
+  display:grid; justify-items:center; gap:7px; width:100%;
+  padding:22px 20px; cursor:pointer;
+  border:1px solid var(--color-agent-line); border-radius:var(--radius-xl);
+  background:var(--color-agent-tint); color:var(--color-text-primary);
+  transition:background var(--duration-fast) var(--ease-out),
+             border-color var(--duration-fast) var(--ease-out);
+}
+.sc-go:hover:not(:disabled) { background:var(--color-agent-tint-hover); border-color:var(--color-agent); }
+.sc-go:disabled { cursor:not-allowed; background:var(--color-bg-subtle); border-color:var(--color-border-subtle); }
+
+/* The one round thing on the screen, so the eye lands on it first. */
+.sc-go-ring {
+  display:grid; place-items:center; width:62px; height:62px; border-radius:50%;
+  background:var(--color-agent); color:var(--color-cta-ink); margin-bottom:3px;
+}
+.sc-go-ring .i { width:26px; height:26px; }
+.sc-go:disabled .sc-go-ring { background:var(--color-border-strong); }
+.sc-go-t { font-size:19px; font-weight:650; letter-spacing:-0.01em; }
+.sc-go-s { font-size:13px; color:var(--color-text-secondary); }
+
+.sc-nudges { width:100%; display:grid; gap:9px; }
+.sc-nudges-h {
+  margin:0; font-size:11px; font-weight:600; letter-spacing:0.07em;
+  text-transform:uppercase; color:var(--color-eyebrow);
+}
+.sc-list { list-style:none; margin:0; padding:0; display:grid; gap:1px;
+           background:var(--color-border-subtle);
+           border:1px solid var(--color-border-subtle); border-radius:var(--radius-md);
+           overflow:hidden; }
+.sc-n {
+  display:grid; grid-template-columns:132px 1fr; gap:14px; align-items:baseline;
+  padding:10px 13px; background:var(--color-bg-surface);
+}
+.sc-n-f { font-size:12px; font-weight:600; color:var(--color-text-secondary); }
+.sc-n-s { display:grid; gap:4px; min-width:0; }
+.sc-n-q { font-size:13.5px; color:var(--color-text-primary); }
+.sc-foot { margin:0; font-size:12px; color:var(--color-text-tertiary); }
+
+@media (max-width:640px) {
+  .sc-n { grid-template-columns:1fr; gap:3px; }
+}

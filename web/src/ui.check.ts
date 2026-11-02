@@ -923,4 +923,26 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   ok("no effect sets a liveness flag false without setting it true on the way in");
 }
 
+
+// THE NUDGES ARE THE BUNDLE'S WORDS, NOT THIS RENDERER'S. The sentences the
+// scribe screen shows somebody who has just pressed record are declared in
+// bundle.yaml under `scribe.<station>.nudges`, so a centre can change them.
+// One typed into a component would be a sentence no centre could edit and
+// the screen would then disagree with the facility it claims to describe --
+// which is the same rule that keeps stations, flags and columns out of here.
+{
+  const says: string[] = [];
+  for (const cfg of Object.values(catalogue.scribe ?? {}) as { nudges?: { say: string }[] }[]) {
+    for (const n of cfg.nudges ?? []) says.push(n.say);
+  }
+  assert.ok(says.length > 0, "the bundle declares no scribe nudges at all");
+  const typed: string[] = [];
+  for (const file of TSX) {
+    const src = readFileSync(file, "utf8");
+    for (const say of says) if (src.includes(say)) typed.push(`${relative(SRC, file)}: ${say}`);
+  }
+  assert.deepEqual(typed, [], "a nudge is typed into the renderer; it belongs in bundle.yaml");
+  ok(`${says.length} scribe nudges come from the bundle, none typed into a component`);
+}
+
 console.log(`\n${checks} checks passed`);

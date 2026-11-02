@@ -2708,7 +2708,21 @@
       "choose": [
         "phc.op.household-visit"
       ],
-      "default": null
+      "default": null,
+      "nudges": [
+        {
+          "field": "Household",
+          "say": "Five people in the house, two under five."
+        },
+        {
+          "field": "Members",
+          "say": "The youngest has not had her measles dose."
+        },
+        {
+          "field": "Findings",
+          "say": "There is standing water behind the house."
+        }
+      ]
     },
     "doctor": {
       "choose": [
@@ -2718,19 +2732,93 @@
         "phc.op.followup",
         "phc.op.rx-prescribe"
       ],
-      "default": "phc.op.consult-document"
+      "default": "phc.op.consult-document",
+      "nudges": [
+        {
+          "field": "Symptoms",
+          "say": "Burning when she passes urine, four days now."
+        },
+        {
+          "field": "Medical history",
+          "say": "Diabetic for six years, on metformin."
+        },
+        {
+          "field": "Examination",
+          "say": "Chest is clear, no tenderness in the abdomen."
+        },
+        {
+          "field": "Diagnosis",
+          "say": "This looks like a urinary tract infection."
+        },
+        {
+          "field": "Medications",
+          "say": "Nitrofurantoin hundred milligrams, twice a day, five days."
+        },
+        {
+          "field": "Investigations",
+          "say": "Send a urine routine and a blood sugar."
+        },
+        {
+          "field": "Advice",
+          "say": "Plenty of water, and come back if the fever climbs."
+        },
+        {
+          "field": "Follow up",
+          "say": "Review her in one week."
+        },
+        {
+          "field": "Referral",
+          "say": "Refer her to the district hospital for a scan."
+        }
+      ]
     },
     "nurse": {
       "choose": [
         "phc.op.vitals-record"
       ],
-      "default": "phc.op.vitals-record"
+      "default": "phc.op.vitals-record",
+      "nudges": [
+        {
+          "field": "Vitals",
+          "say": "BP one twenty over eighty, pulse eighty four."
+        },
+        {
+          "field": "Vitals",
+          "say": "Temperature ninety nine point four, weight fifty one kilos."
+        },
+        {
+          "field": "Symptoms",
+          "say": "Fever since three days, and a cough at night."
+        },
+        {
+          "field": "Triage",
+          "say": "She is breathless, send her in first."
+        }
+      ]
     },
     "reception": {
       "choose": [
         "phc.op.patient-register"
       ],
-      "default": "phc.op.patient-register"
+      "default": "phc.op.patient-register",
+      "nudges": [
+        {
+          "field": "Name",
+          "say": "Her name is Sunita Devi, she is thirty two."
+        },
+        {
+          "field": "Mobile",
+          "say": "Mobile nine eight four one two three four five six."
+        },
+        {
+          "field": "Village",
+          "say": "She has come from Barkagaon."
+        },
+        {
+          "field": "ABHA",
+          "say": "She already has an ABHA number."
+        }
+      ]
     }
   },
   "states": [
