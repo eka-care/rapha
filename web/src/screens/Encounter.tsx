@@ -39,10 +39,17 @@ import { initialsOf } from "../agent";
  *  them. */
 const QUICK = 1;
 
-/** Which tag an action's capture instrument earns. The words are the
- *  declaration's `instrument`, not a table of operations. */
+/** Which icon an action's capture instrument earns, and the reason this is a
+ *  table rather than a guess at the call site: scripts/check_instruments.py
+ *  holds it against the one instrument vocabulary, so an instrument added to
+ *  the kernel and not drawn here fails the gate instead of rendering nothing.
+ *
+ *  It used to be a pill reading SCRIBE in eight and a half point capitals.
+ *  That named our own vocabulary at a clinician, which is not information.
+ *  The icon says the same thing in the one way that is useful: a microphone
+ *  means speak, a page means type, a gauge means the machine reads it. */
 const TAG: Record<string, string> = {
-  scribe: "scribe", form: "form", device: "form", "constrained-voice": "form",
+  scribe: "mic", form: "doc", device: "vitals", "constrained-voice": "mic",
 };
 
 export function Encounter({
@@ -80,7 +87,11 @@ export function Encounter({
    *  typo, it is the anti-goal: nothing merges two ABHA numbers and the
    *  patient carries the mistake permanently. */
   const [carried, setCarried] = useState<{ thread: string; payload: Payload } | null>(null);
-  const [scribing, setScribing] = useState(false);
+  const [scribing, setScribing] = useState<string | null>(null);
+  /** The action somebody tapped, waiting on how they want to record it.
+   *  Tapping an action no longer opens a form: it opens the way in, and the
+   *  form is one of the two doors there. */
+  const [starting, setStarting] = useState<Operation | null>(null);
   const [drafts, setDrafts] = useState<Opened[]>([]);
   // The microphone is gated on the scribe instrument's own `requires:`, not a
   // flag named here: a bundle that spells its consent differently is gated by
@@ -104,6 +115,21 @@ export function Encounter({
   const { primary, overflow } = useMemo(() => weigh(thread.actions, thread.closes), [thread.actions, thread.closes]);
   const ranked = useMemo(() => (primary ? [primary, ...overflow] : overflow), [primary, overflow]);
   const offered = ranked.slice(0, QUICK);
+
+  /** Which actions this station may speak, from the bundle's own `scribe`
+   *  key. An action not on it opens its form directly, because offering a
+   *  microphone that fills nothing is worse than offering none. */
+  const speakable = new Set(cat.scribe?.[thread.station ?? ""]?.choose ?? []);
+  const nudges = cat.scribe?.[thread.station ?? ""]?.nudges ?? [];
+  /** THE ONE WAY A PANEL OPENS, so the rule above cannot be skipped by a
+   *  call site added later. It used to be three call sites, each repeating
+   *  the seed, and a fourth without it would have cost a patient a second
+   *  one time password in silence. */
+  const openPanel = (op: Operation) => setModal({ op, seed: carry(op) });
+  const take = (op: Operation) => {
+    if (speakable.has(op.id)) setStarting(op);
+    else openPanel(op);
+  };
 
   const spine = cat.workflows?.[thread.workflow]?.spine;
   const spineId = spine && typeof thread.subject?.id === "string" ? thread.subject.id : "";
@@ -163,16 +189,24 @@ export function Encounter({
                         <button
                           className={`prop${i === 0 ? " primary" : ""}`}
                           key={op.id}
-                          onClick={() => setModal({ op, seed: carry(op) })}
+                          onClick={() => take(op)}
                         >
-                          <Icon name={op.irreversibility === "irreversible" ? "lock" : "refer"} className="i sm" />
+                          {/* The icon says how this is recorded, so the tag
+                              that used to say it in small capitals is gone.
+                              A lock still earns words: an irreversible write
+                              is the one thing a glyph must not carry alone. */}
+                          <span className="p-i" aria-hidden="true">
+                            <Icon name={(op.irreversibility === "irreversible" ? "lock"
+                                      : TAG[op.instrument] ?? "doc") as never} className="i sm" />
+                          </span>
                           <span className="p-b">
                             <span className="p-l">{op.title}</span>
                             {op.summary && <span className="p-s">{op.summary}</span>}
                           </span>
-                          <span className={`p-tag ${op.irreversibility === "irreversible" ? "irr" : TAG[op.instrument] ?? ""}`}>
-                            {op.irreversibility === "irreversible" ? "confirm" : human(op.instrument)}
-                          </span>
+                          {op.irreversibility === "irreversible" && (
+                            <span className="p-tag irr">Needs confirming</span>
+                          )}
+                          <Icon name="refer" className="i sm p-go" />
                         </button>
                       ))}
                       {ranked.length > QUICK && (
@@ -190,23 +224,25 @@ export function Encounter({
 
         {/* The station comes off the thread view, the same field the header
             badge draws; a thread past its last station has none. */}
-        {/* THE CENTREPIECE, and the reason it is here rather than behind the
-            microphone in the composer: speaking is how this product is used,
-            and a visit nobody has recorded yet should show one obvious way
-            to begin. The nudges beside it are the bundle's, never typed
-            here. */}
-        {!scribing && drafts.length === 0 && (
+        {/* AFTER THE CHOICE, NEVER BEFORE IT. A person picks what they are
+            about to record on the thread; this is what that tap opens, and
+            from here speaking is the way in and the form is the way round.
+            The examples are the bundle's, never typed here. */}
+        {starting && !scribing && (
           <ScribeStart
-            nudges={cat.scribe?.[thread.station ?? ""]?.nudges ?? []}
+            title={starting.title}
+            nudges={nudges}
             reason={consented ? undefined : "Capture consent is not recorded on this visit"}
-            onStart={() => setScribing(true)}
+            onStart={() => { setScribing(starting.id); setStarting(null); }}
+            onType={() => { openPanel(starting); setStarting(null); }}
+            onCancel={() => setStarting(null)}
           />
         )}
 
         {scribing && (
-          <ScribeBar thread={thread.id} station={thread.station ?? ""}
+          <ScribeBar thread={thread.id} station={thread.station ?? ""} pick={scribing}
                      onDrafts={(s) => setDrafts((all) => mergeDrafts(all, s.drafts, s.session))}
-                     onClose={() => { setScribing(false); setDrafts([]); }} />
+                     onClose={() => { setScribing(null); setDrafts([]); }} />
         )}
         {drafts.map(({ draft: d, key }) => {
           const op = cat.operations[d.operation];
@@ -226,8 +262,11 @@ export function Encounter({
           roles={Object.keys(cat.bundles ?? {})}
           asking={asking}
           onSay={onSay}
-          onAction={(op) => setModal({ op, seed: carry(op) })}
-          onStartScribe={() => setScribing(true)}
+          onAction={(op) => take(op)}
+          /* The composer's microphone is the shortcut past the choice, for
+             somebody who already knows what they are doing: it opens on
+             whatever this station recorded last. */
+          onStartScribe={() => setScribing("")}
           micReason={consented ? undefined : "Capture consent is not recorded on this visit"}
           quick={
             <>

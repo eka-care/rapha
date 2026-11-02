@@ -100,10 +100,12 @@ assert vocab.INSTRUMENTS, "INSTRUMENTS is empty; no operation could declare one"
 ok("INSTRUMENTS is exactly INSTRUMENT_KINDS minus NOT_AN_OPERATION_DEFAULT")
 
 # ---------------------------------------------------------------------------
-# The renderer's side. An operation's instrument is drawn as a pill tag and
-# nothing else, so TAG is the list of defaults a screen can actually keep a
-# promise about. `palette` sat in the vocabulary precisely because nothing
-# tied the tuple to the renderer.
+# The renderer's side. An operation's instrument is drawn as an ICON on the
+# action -- it was a pill reading the instrument's name in capitals until
+# 2026-11-02, which told a clinician our vocabulary and nothing else -- so
+# TAG is the list of defaults a screen can actually keep a promise about.
+# `palette` sat in the vocabulary precisely because nothing tied the tuple to
+# the renderer.
 # ---------------------------------------------------------------------------
 
 enc = (ROOT / "web" / "src" / "screens" / "Encounter.tsx").read_text()
@@ -122,7 +124,7 @@ assert tag_keys == set(vocab.INSTRUMENTS), (
     % (sorted(tag_keys - set(vocab.INSTRUMENTS)),
        sorted(set(vocab.INSTRUMENTS) - tag_keys))
 )
-ok("every instrument an operation may default to has a pill tag, and no other")
+ok("every instrument an operation may default to has an icon, and no other")
 
 # ---------------------------------------------------------------------------
 # Nothing in either list is a ghost: every kind is named by a declared atom,

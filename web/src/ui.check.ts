@@ -645,8 +645,13 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   // either being trusted alone.
   const opens = [...enc.matchAll(/setModal\(\{\s*op\b/g)].length;
   const seeded = [...enc.matchAll(/setModal\(\{ op, seed: carry\(op\) \}\)/g)].length;
-  assert.ok(opens >= 2,
-    `this check found ${opens} ways to open a panel and there are at least two; ` +
+  // ONE CALL SITE SINCE 2026-11-02, the stronger version of the same rule:
+  // `openPanel` is now the only thing that opens one, so a screen added
+  // later cannot forget the seed without deleting the helper. The two counts
+  // are still compared, because a pattern that silently finds nothing passes
+  // every assertion under it.
+  assert.ok(opens >= 1,
+    `this check found ${opens} ways to open a panel and there is at least one; ` +
     "it is matching the wrong shape and would pass whatever the screen did");
   assert.equal(seeded, opens,
     `${opens - seeded} of ${opens} ways to open a panel do not carry what an ` +

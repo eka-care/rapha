@@ -35,9 +35,13 @@ const LANGUAGE_NAMES: Record<string, string> = {
 
 type Phase = "idle" | "recording" | "uploading" | "waiting" | "ready" | "failed" | "withdrawn";
 
-export function ScribeBar({ thread, station, onDrafts, onClose }: {
+export function ScribeBar({ thread, station, pick: asked, onDrafts, onClose }: {
   thread: string;
   station: string;
+  /** The operation the person chose on the thread before the microphone
+   *  opened. They picked the thing they were about to do; opening on a
+   *  different template would be the screen overruling them. */
+  pick?: string;
   /** Called with every ready session, including after a template switch. */
   onDrafts: (s: ScribeSession) => void;
   onClose: () => void;
@@ -97,7 +101,9 @@ export function ScribeBar({ thread, station, onDrafts, onClose }: {
       if (!alive.current) return;
       setMenu(t);
       const remembered = lastTemplate(currentRole(), station);
-      const pick = t.choose.find((c) => c.operation === remembered)?.operation ?? t.default ?? "";
+      const pick = t.choose.find((c) => c.operation === asked)?.operation
+                ?? t.choose.find((c) => c.operation === remembered)?.operation
+                ?? t.default ?? "";
       setTemplate(pick);
       chosen.current.template = pick;
       if (pick) void begin();   // recording starts on the click that opened the bar
