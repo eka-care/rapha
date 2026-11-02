@@ -73,11 +73,11 @@ export function brief(loaded: Loaded[]): Span[] {
   const busy = busiest(loaded);
   const queue = queues(loaded)[0];
   if (busy && busy.count > 1) {
-    out.push({ text: "in the facility, heaviest at " });
+    out.push({ text: "are here. The longest line is at " });
     out.push({ text: human(busy.station), go: queue ? `#/views/${queue.decl.id}` : undefined });
-    out.push({ text: `, where ${plural(busy.count, "is", "are")} waiting. ` });
+    out.push({ text: `, with ${busy.count} waiting. ` });
   } else {
-    out.push({ text: "in the facility. " });
+    out.push({ text: "are here. " });
   }
 
   const flagged = needingAttention(loaded);

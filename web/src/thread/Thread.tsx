@@ -15,7 +15,7 @@ import type { Client } from "../api";
 import { OperationPanel } from "../form/Panel";
 import { clock, type Ctx, type Msg, type Said } from "../messages";
 import type { Operation, Proposal, ThreadView } from "../types";
-import { human } from "../words";
+import { human, title } from "../words";
 import { Message, withMentions } from "./Message";
 
 export function Stream({ msgs, thread, client, ctx, instruments, editable, onEdit, onDone, children }: {
@@ -199,8 +199,8 @@ function Handover({ m }: { m: Extract<Msg, { kind: "handover" }> }) {
     <Fold tone="handed" who={m.from} title={m.title} at={clock(m.at)}
           summary={`→ @${human(m.to)} · ${m.note}`}
           badges={<>
-            <span className={`badge ${STATE[m.state] ?? "b-mute"}`}>{human(m.state)}</span>
-            {m.priority !== "normal" && <span className="badge b-warn">{human(m.priority)}</span>}
+            <span className={`badge ${STATE[m.state] ?? "b-mute"}`}>{title(m.state)}</span>
+            {m.priority !== "normal" && <span className="badge b-warn">{title(m.priority)}</span>}
           </>}>
       <div className="bubble">
         <div style={{ display: "flex", alignItems: "center", gap: 7, fontWeight: 600,
@@ -216,7 +216,7 @@ function Handover({ m }: { m: Extract<Msg, { kind: "handover" }> }) {
               <div key={r.id}>
                 <div className="m-meta">
                   {r.actor} · {clock(r.at)}
-                  {r.state && <span className="fl-e" style={{ padding: 0 }}>set to {human(r.state)}</span>}
+                  {r.state && <span className="fl-e" style={{ padding: 0 }}>set to {title(r.state)}</span>}
                 </div>
                 {withMentions(r.comment)}
               </div>

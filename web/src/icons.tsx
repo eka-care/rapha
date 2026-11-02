@@ -15,7 +15,7 @@ import type { Operation } from "./types";
 
 export type IconName =
   "sliders" | "mark" | "mark-lg" | "search" | "home" | "moon" | "sun" | "vitals" | "mic" | "box" | "clip" | "eye" | "plus" | "folder" | "chat" | "spark" | "check" | "alert" | "lock" | "send" | "user" | "users" | "list" | "cog" | "refer" | "chev" | "id" | "doc" |
-  "handle";
+  "handle" | "out" | "clock";
 
 export function Icon({ name, size, className }: {
   name: IconName; size?: "sm" | "lg"; className?: string;
@@ -85,4 +85,10 @@ const SHEET = `
   <!-- The card-reorder handle's glyph (spec: "two 12px horizontal rules 4px
        apart -- the plate's own seam repeated, not a stock six-dot grip"). -->
   <symbol id="i-handle" viewBox="0 0 24 24"><path d="M4 9h16M4 15h16"/></symbol>
+  <!-- The way out: a door left open and an arrow leaving through it. Drawn
+       rather than borrowed so its stroke matches the sheet. -->
+  <symbol id="i-out" viewBox="0 0 24 24"><path d="M15 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H15"/><path d="M10 8l-4 4 4 4M6 12h9"/></symbol>
+  <!-- A clock face. The hero says the time and nothing else, so the glyph
+       has to read at a glance for somebody who does not read the numerals. -->
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
 `;

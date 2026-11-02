@@ -23,7 +23,7 @@ import { Icon } from "../icons";
 import { header, queueViewFor } from "../messages";
 import { Failed, Loading } from "../parts";
 import type { Catalogue, RegisterRow, SubjectView, ThreadView } from "../types";
-import { human } from "../words";
+import { title } from "../words";
 
 export function Patients({ cat, onOpenThread, onOpenSubject }: {
   cat: Catalogue;
@@ -112,7 +112,7 @@ function Visits({ id, onOpenThread, onOpenSubject }: {
               ? e.did.map((d) => d.title).join(" · ")
               : <span className="u-mute">Nothing recorded</span>}
           </span>
-          {e.station && <span className="reg-at">{human(e.station)}</span>}
+          {e.station && <span className="reg-at">{title(e.station)}</span>}
         </button>
       ))}
       <button className="reg-all" onClick={() => onOpenSubject(id)}>

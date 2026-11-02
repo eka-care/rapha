@@ -73,18 +73,20 @@
 .chips { display: flex; gap: 7px; margin-top: 15px; flex-wrap: wrap; position: relative;
   z-index: 1; justify-content: center; }
 
-/* The session clock. It is the one number on the screen that moves on its
-   own, which is most of why the hero reads as live. */
-.arc { position: absolute; top: 24px; right: 26px; text-align: right; z-index: 1; }
-.arc-l { font-size: 9.5px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .09em; color: var(--color-text-tertiary); }
-.arc-t { font-size: 19px; font-weight: 800; letter-spacing: -.02em; margin-top: 3px;
-  font-variant-numeric: tabular-nums; }
-.arc-bar { width: 132px; height: 5px; border-radius: 999px;
-  background: var(--color-border-subtle); margin-top: 8px; overflow: hidden; }
-.arc-bar i { display: block; height: 100%; border-radius: 999px;
-  background: linear-gradient(90deg, var(--color-text-secondary), var(--color-text-primary)); }
-.arc-s { font-size: 10px; color: var(--color-text-tertiary); margin-top: 5px; }
+/* The clock. The time, large and set in tabular numerals so the digits do
+   not shuffle sideways on every tick, and the day under it. The colon is
+   its own span only so it can be held at a lighter weight: at this size a
+   full-strength colon reads as a third digit. */
+.clock { position: absolute; top: 22px; right: 26px; text-align: right; z-index: 1; }
+.clock-t {
+  display: block; font-size: 30px; font-weight: 700; line-height: 1;
+  letter-spacing: -.03em; font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+}
+.clock-c { color: var(--color-text-tertiary); font-weight: 400; margin: 0 1px; }
+.clock-d {
+  font-size: 11.5px; color: var(--color-text-tertiary); margin-top: 6px;
+}
 
 .brief { display: flex; gap: 12px; padding: 15px 16px; }
 .brief-av {
@@ -114,18 +116,33 @@
   height: 4px; border-radius: 999px; background: var(--color-border-subtle);
   margin-bottom: 11px; overflow: hidden; position: relative;
 }
+/* The bar is a share of a heavy queue, standing still.
+
+   GREEN TO AMBER, AND NOT TO RED. The owner asked for green to red. Red
+   on this product means one thing -- a person a clinician should get to
+   sooner -- and the check below this file enforces it, because a screen
+   where red means both "she is unwell" and "there is a short line" is a
+   screen where red means nothing. The heaviest station already says so in
+   words, with the alert mark, which is the one red the home screen is
+   allowed and the one that is actually about a patient.
+
+   The tone is composed from two plain tokens and opacity rather than one
+   mixed colour, because a mixed colour cannot be driven per element (see
+   the note in tokens.css). Clear green underneath, warning fading in with
+   the load, continuously -- stepping it into buckets would make a station
+   of six and a station of seven look identical on a card whose only job
+   is telling them apart. */
 .fl-rail i {
-  position: absolute; inset: 0; border-radius: 999px;
-  background: linear-gradient(90deg, transparent, var(--color-text-primary), transparent);
-  background-size: 60% 100%; background-repeat: no-repeat;
-  animation: flow 2.4s linear infinite;
+  position: absolute; inset: 0 auto 0 0; border-radius: 999px;
+  width: var(--fill); overflow: hidden;
+  background: var(--color-success);
 }
-@keyframes flow { from { background-position: -60% 0; } to { background-position: 160% 0; } }
+.fl-rail i::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  background: var(--color-warning);
+  opacity: var(--load);
+}
 .fl-col.jam .fl-rail { background: var(--color-warning-border); }
-.fl-col.jam .fl-rail i {
-  background: linear-gradient(90deg, transparent, var(--color-warning), transparent);
-  background-size: 60% 100%; background-repeat: no-repeat;
-}
 .fl-p {
   display: flex; align-items: center; gap: 7px; padding: 7px 8px;
   border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface);
@@ -189,7 +206,7 @@
 
 @media (max-width: 1000px) {
   .hgrid { grid-template-columns: 1fr; }
-  .arc { position: static; text-align: left; margin-top: 16px; }
+  .clock { position: static; text-align: left; margin-top: 16px; }
 }
 
 

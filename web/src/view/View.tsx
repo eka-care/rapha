@@ -177,7 +177,7 @@ function Queue({ rows, decl, derived, labelCols, provenance, onOpenThread }: {
                   className={`qr-pg${l.risk ? " risk" : ""}${l.der ? " der" : ""}`}
                   key={l.flag}
                 >
-                  {human(l.flag)}
+                  {title(l.flag)}
                 </span>
               ))}
             </span>
@@ -277,7 +277,7 @@ function SectionRows({ section }: { section: SectionResult }) {
   if (section.show === "flags") {
     return (
       <div className="qc-chips">
-        {(rows as string[]).map((f) => <span className="badge b-mute" key={f}>{human(f)}</span>)}
+        {(rows as string[]).map((f) => <span className="badge b-mute" key={f}>{title(f)}</span>)}
       </div>
     );
   }
@@ -321,7 +321,7 @@ export function Line({ line }: { line: StepStatus[] }) {
       {line.map((s, i) => (
         <div className={`st ${s.status === "done" ? "done" : s.status === "now" ? "now" : s.status === "skipped" ? "skip" : ""}`} key={s.station}>
           <span className="n">{s.status === "done" ? "✓" : i + 1}</span>
-          {human(s.label || s.station)}
+          {title(s.label || s.station)}
           {s.status === "skipped" && <span className="ml-auto fl-e">not this visit</span>}
         </div>
       ))}

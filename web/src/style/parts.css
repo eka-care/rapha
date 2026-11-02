@@ -379,23 +379,10 @@
 
 /* ── The control panel, which is a page ─────────────────────────────────── */
 
-.cp { display: grid; grid-template-columns: 232px 1fr; gap: 22px; align-items: start; }
-.cp-nav { display: grid; gap: 2px; position: sticky; top: 12px; }
-.cp-eyebrow { padding: 0 11px 10px; }
-.cp-tab {
-  display: flex; align-items: center; gap: 10px; text-align: left; width: 100%;
-  padding: 9px 11px; border-radius: var(--radius-md); cursor: pointer;
-  border: 1px solid transparent; background: transparent;
-  color: var(--color-text-secondary); font: inherit; font-size: 13.5px;
-}
-.cp-tab:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
-.cp-tab.on {
-  background: var(--color-bg-selected); color: var(--color-text-primary);
-  font-weight: 600; border-color: var(--color-border-subtle);
-}
-.cp-tab .i { flex-shrink: 0; color: var(--color-text-tertiary); }
-.cp-tab.on .i { color: var(--color-accent); }
-
+/* The sections moved to the shell's second panel, so this is one column
+   now. It was a 232px nav glued to the left of the page -- a third
+   navigation column on a screen that already had two. */
+.cp { display: block; }
 .cp-pane { min-width: 0; display: grid; gap: 18px; }
 .cp-head { display: grid; gap: 5px; }
 .cp-t { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.02em; }

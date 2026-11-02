@@ -19,7 +19,7 @@ import { ListScreen } from "../screens/ListScreen";
 import { Patient } from "../screens/Patient";
 import { Patients } from "../screens/Patients";
 import { seenTour, Tour } from "./Tour";
-import { cameBackFromLogin, gateApplies } from "../auth/client";
+import { cameBackFromLogin, gateApplies, rememberSignedOut, signedOutHere } from "../auth/client";
 import { SignIn } from "../auth/SignIn";
 import { signedIn } from "../auth/session";
 import { Control } from "../screens/Control";
@@ -27,7 +27,9 @@ import { Today } from "../screens/Today";
 import type { Facility, QueueRow, ViewDecl, ViewResult, Workflow } from "../types";
 import { IconSheet } from "../icons";
 import { Khoj } from "./Khoj";
-import { Sidebar } from "./Sidebar";
+import { Sidebar, panelFor } from "./Sidebar";
+import { Rail } from "./Rail";
+import { PARTS } from "../screens/Control";
 import { Topbar } from "./Topbar";
 
 type Route =
@@ -37,7 +39,7 @@ type Route =
   | { kind: "patient"; id: string }
   | { kind: "patients" }
   | { kind: "desk" }
-  | { kind: "settings" }
+  | { kind: "settings"; part: string }
   | { kind: "notfound"; id: string };
 
 function parse(hash: string): Route {
@@ -47,7 +49,7 @@ function parse(hash: string): Route {
   if (head === "patients" && id) return { kind: "patient", id };
   // The register itself, which is the top of the patients hierarchy.
   if (head === "patients") return { kind: "patients" };
-  if (head === "settings") return { kind: "settings" };
+  if (head === "settings") return { kind: "settings", part: id ?? "" };
   if (head === "desk") return { kind: "desk" };
   if (!head || head === "today") return { kind: "today" };
   // A second segment under an unrecognised first one is a malformed route,
@@ -132,13 +134,28 @@ export function App() {
    *  Eka cookie, so it still takes a caller's word -- web/src/auth/session.ts
    *  says so at length, and so does `caller()` in api/main.py. */
   const [session, setSession] = useState<boolean | null>(
-    () => (gateApplies(location.hostname) ? null : true));
+    () => (signedOutHere() ? false
+         : gateApplies(location.hostname) ? null : true));
+  // Asking is also how somebody comes BACK, so it is the one place the
+  // signed-out mark is cleared. Clearing it anywhere else would undo the
+  // button on the next reload, which is the bug this replaced.
   const askSession = useCallback(() => {
+    rememberSignedOut(false);
+    // WHERE THE GATE DOES NOT APPLY, THERE IS NOTHING TO ASK. On localhost
+    // the `.eka.care` cookie is never sent, so the probe can only ever say
+    // no -- and asking it here would mean a developer who pressed Sign out
+    // could never get back in. That is precisely the lockout `gateApplies`
+    // exists to prevent, so coming back is just forgetting the mark.
+    if (!gateApplies(location.hostname)) { setSession(true); return; }
     setSession(null);
     void signedIn().then(setSession);
   }, []);
+  const leave = useCallback(() => {
+    rememberSignedOut(true);
+    setSession(false);
+  }, []);
   useEffect(() => {
-    if (gateApplies(location.hostname)) askSession();
+    if (!signedOutHere() && gateApplies(location.hostname)) askSession();
   }, [askSession]);
   /** The tour runs once, on a person's first load, and only once the screen
    *  has something to point at. Nothing reopens it: a tour that comes back
@@ -170,7 +187,15 @@ export function App() {
     return () => removeEventListener("keydown", on);
   }, []);
 
-  const navViews = useMemo<ViewDecl[]>(() => facility.data?.views ?? [], [facility.data]);
+  const allViews = useMemo<ViewDecl[]>(() => facility.data?.views ?? [], [facility.data]);
+  // A summary view belongs to a thread, not to the nav -- the rule
+  // `summariesFor` in messages.ts is built on. This is where it was being
+  // broken: every declared view was loaded on arrival and offered in the
+  // palette, so the one that reads a single visit was asked for with no
+  // visit, and the kernel rightly answered 400 on every page load. The
+  // filter reads the declared kind, never an id this file may not know.
+  const navViews = useMemo<ViewDecl[]>(
+    () => allViews.filter((v) => v.kind !== "summary"), [allViews]);
 
   // Every declared view, loaded once, because the sidebar's counts, Today and
   // the command bar all read the same rows and loading them three times would
@@ -211,7 +236,7 @@ export function App() {
     if (!announced.current) { announced.current = true; return; }
     const n = loaded.filter((l) => l.decl.kind === "queue")
       .reduce((t, l) => t + ((l.result.rows ?? []) as unknown[]).length, 0);
-    say(n === 1 ? "1 in the workspace." : `${n} in the workspace.`);
+    say(n === 1 ? "1 patient is here." : `${n} patients are here.`);
   }, [loaded, loadingViews]);
 
   const liveThreads = useMemo(
@@ -336,8 +361,11 @@ export function App() {
     );
   }
 
+  const here = location.hash.replace(/^#\/?/, "");
+  const panel = panelFor(here);
+
   return (
-    <div className="app">
+    <div className="app" data-panel={panel ?? "none"}>
       <IconSheet />
       {/* SC 2.4.2: every screen was called "Workspace", so a person with the
           queue and a patient open in two tabs could not tell them apart. Both
@@ -356,32 +384,37 @@ export function App() {
       >
         Skip to the workspace
       </button>
-      <Sidebar
+      <Rail
+        route={here}
+        views={navViews}
         facility={facility.data}
-        route={location.hash.replace(/^#\/?/, "")}
-        line={line}
-        open={drawer}
+        theme={theme}
         onGo={go}
-        onCall={(token) => { setKhojOpen(false); go(`#/desk?q=${encodeURIComponent(token)}`); }}
-        onCloseDrawer={() => setDrawer(false)}
+        onTheme={flipTheme}
+        onSignOut={leave}
       />
+      {panel && (
+        <Sidebar
+          facility={facility.data}
+          route={here}
+          panel={panel}
+          sections={PARTS}
+          line={line}
+          open={drawer}
+          onGo={go}
+          onCall={(token) => { setKhojOpen(false); go(`#/desk?q=${encodeURIComponent(token)}`); }}
+          onCloseDrawer={() => setDrawer(false)}
+        />
+      )}
       {tour && <Tour onClose={() => setTour(false)} />}
       {drawer && <div className="drawer-scrim" onClick={() => setDrawer(false)} />}
       <div className="main">
         <Topbar
           title={title}
-          theme={theme}
-          views={navViews}
-          route={location.hash.replace(/^#\/?/, "")}
           deskLabel={createLabel(catalogue, facility.data?.bundle.workflow)}
           onSearch={() => setKhojOpen(true)}
-          onTheme={flipTheme}
           onMenu={() => setDrawer((d) => !d)}
-          facility={facility.data}
-          onGo={go}
           onDesk={() => go("#/desk")}
-          onSettings={() => go("#/settings")}
-          onSignOut={() => setSession(false)}
         />
         <main id="workspace" tabIndex={-1} className={route.kind === "thread" ? "view" : "view scroll"}>
           <div className="wrap">
@@ -450,6 +483,7 @@ export function App() {
                       without: facility.data?.without ?? {},
                     }}
                     theme={themePref} onTheme={setThemePref}
+                    part={route.part}
                   />
                 )}
                 {route.kind === "notfound" && (

@@ -15,10 +15,8 @@
  *  NOTHING HERE NAMES A STATION, A CAPABILITY OR AN OPERATION. The sections
  *  read them off the catalogue, the same rule every other screen follows.
  */
-import { useState } from "react";
 import type { Client } from "../api";
 import { Icon, type IconName } from "../icons";
-import { EXPANDS_TO, NAME } from "../brand";
 import type { Catalogue } from "../types";
 import type { Withheld } from "../grants";
 import { Roles } from "./Settings";
@@ -30,7 +28,11 @@ type Theme = "system" | "light" | "dark";
 
 type Part = { id: string; title: string; icon: IconName; blurb: string };
 
-const PARTS: Part[] = [
+/** The sections, and the order they are offered in. Exported because the
+ *  second panel of the shell draws them now: a page's sections are
+ *  navigation, and this product keeps navigation in one column rather than
+ *  giving every page its own private one. */
+export const PARTS: Part[] = [
   { id: "look", title: "Appearance", icon: "sun",
     blurb: "How this workspace looks on this device." },
   { id: "recording", title: "Recording", icon: "mic",
@@ -42,7 +44,7 @@ const PARTS: Part[] = [
 ];
 
 export function Control({
-  cat, client, roleIds, facility, theme, onTheme,
+  cat, client, roleIds, facility, theme, onTheme, part,
 }: {
   cat: Catalogue;
   client: Client;
@@ -50,25 +52,16 @@ export function Control({
   facility: Withheld;
   theme: Theme;
   onTheme: (t: Theme) => void;
+  /** Which section the address bar is on. It used to be state held inside
+   *  this component, which meant the section a person was reading could not
+   *  be linked to, did not survive a reload, and had to be found again
+   *  after every change they made. */
+  part: string;
 }) {
-  const [part, setPart] = useState(PARTS[0].id);
   const here = PARTS.find((p) => p.id === part) ?? PARTS[0];
 
   return (
     <div className="cp">
-      <nav className="cp-nav" aria-label="Control panel sections">
-        <div className="eyebrow cp-eyebrow">{NAME} · {EXPANDS_TO}</div>
-        {PARTS.map((p) => (
-          <button key={p.id} type="button"
-                  className={`cp-tab${p.id === part ? " on" : ""}`}
-                  aria-current={p.id === part ? "page" : undefined}
-                  onClick={() => setPart(p.id)}>
-            <Icon name={p.icon} className="i sm" />
-            {p.title}
-          </button>
-        ))}
-      </nav>
-
       <section className="cp-pane" aria-label={here.title}>
         <header className="cp-head">
           {/* h2, not h1: the top bar already carries this page's heading, and
@@ -77,10 +70,10 @@ export function Control({
           <p className="cp-s">{here.blurb}</p>
         </header>
 
-        {part === "look" && <Look theme={theme} onTheme={onTheme} />}
-        {part === "recording" && <Nudges cat={cat} client={client} />}
-        {part === "rail" && <RailPrefs />}
-        {part === "roles" && (
+        {here.id === "look" && <Look theme={theme} onTheme={onTheme} />}
+        {here.id === "recording" && <Nudges cat={cat} client={client} />}
+        {here.id === "rail" && <RailPrefs />}
+        {here.id === "roles" && (
           <Roles client={client} cat={cat} roleIds={roleIds} facility={facility} />
         )}
       </section>

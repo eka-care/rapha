@@ -28,7 +28,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EXPANDS_TO, NAME } from "../brand";
-import { canFrameLogin, loginUrl, returnTo } from "./client";
+import { canFrameLogin, gateApplies, loginUrl, returnTo } from "./client";
 import { Bloom } from "./Bloom";
 import { CLIENT_ID, ENV, LOGIN_URL, probe, type Answer } from "./session";
 
@@ -57,6 +57,13 @@ export function SignIn({ checking, onRetry }: {
   }, []);
 
   const ask = useCallback(() => {
+    // WHERE THE GATE DOES NOT APPLY, THE PROBE CAN ONLY SAY NO. The
+    // `.eka.care` cookie is never sent to localhost, so asking Eka whether
+    // this browser has a session is asking a question with one possible
+    // answer -- and gating the way back in on it meant a developer who
+    // signed out could not return. This screen is only reachable there by
+    // signing out, so the way back is simply saying so.
+    if (!gateApplies(location.hostname)) { onRetry(); return; }
     void probe().then((answer) => {
       if (!alive.current) return;
       setHeard(answer);

@@ -8,7 +8,7 @@
  *  and both menus fill with the laboratory's words.
  */
 import type { Operation } from "../types";
-import { human, title } from "../words";
+import { title } from "../words";
 
 export type Item = { key: string; label: string; sub?: string; group: string; op?: Operation };
 
@@ -22,7 +22,7 @@ export function slashItems(actions: Operation[], query: string): Item[] {
       key: o.id,
       label: o.title,
       sub: o.short && o.short !== o.title ? o.short : undefined,
-      group: o.station ? human(o.station) : "Actions",
+      group: o.station ? title(o.station) : "Actions",
       op: o,
     }));
 }
@@ -30,7 +30,7 @@ export function slashItems(actions: Operation[], query: string): Item[] {
 export function atItems(roles: string[], query: string): Item[] {
   return roles
     .filter((r) => r.toLowerCase().includes(query))
-    .map((r) => ({ key: r, label: human(r), group: "Roles" }));
+    .map((r) => ({ key: r, label: title(r), group: "Roles" }));
 }
 
 export function Menu({ items, pick, onChoose, id }: {

@@ -58,6 +58,41 @@ export function gateApplies(hostname: string): boolean {
            || hostname.endsWith(".localhost"));
 }
 
+/** Has somebody signed out ON THIS DEVICE?
+ *
+ *  SIGNING OUT HAD TO SURVIVE A REFRESH, and it did not. The way out set a
+ *  flag in memory, so the way-in screen appeared and the next reload threw
+ *  it away: on localhost the gate does not apply and the session starts
+ *  `true`, and on a real origin the cookie is still in the jar and the probe
+ *  says yes. Either way the person was back inside a centre they had just
+ *  left, which is the kind of thing that looks like a broken button and is
+ *  actually a missing fact.
+ *
+ *  So the fact is written down. It is deliberately a local one -- this
+ *  cannot end an Eka session, and Profile.tsx says so on the screen -- but
+ *  "this device has been handed back" is exactly the thing a shared computer
+ *  at a health centre needs to remember, and it is the thing a person means
+ *  when they press the button.
+ *
+ *  Storage can throw (a locked-down browser, private mode), and a session
+ *  that cannot be remembered must fail OPEN rather than lock somebody out of
+ *  their own screen, which is the same rule `gateApplies` is built on.
+ */
+const LEFT = "phc.signed.out";
+
+export function signedOutHere(): boolean {
+  try { return localStorage.getItem(LEFT) === "1"; } catch { return false; }
+}
+
+/** `true` on the way out, cleared the moment somebody asks to be let back
+ *  in. Nothing else writes it. */
+export function rememberSignedOut(left: boolean): void {
+  try {
+    if (left) localStorage.setItem(LEFT, "1");
+    else localStorage.removeItem(LEFT);
+  } catch { /* a browser that refuses storage still gets a working screen */ }
+}
+
 
 /** May this origin put the Eka login inside a frame?
  *

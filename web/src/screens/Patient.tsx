@@ -142,7 +142,7 @@ function Collation({ encounter, cat, open, onToggle, onOpenThread }: {
         <span className="visit__when">{when(encounter.opened_at)}</span>
         <span className="visit__did">{encounter.did.map((d) => d.title).join(" · ") || "Nothing recorded"}</span>
         {encounter.status !== "completed" && <span className="badge b-warn">Open</span>}
-        {encounter.station && <span className="badge b-mute">{human(encounter.station)}</span>}
+        {encounter.station && <span className="badge b-mute">{title(encounter.station)}</span>}
       </button>
 
       {open && (

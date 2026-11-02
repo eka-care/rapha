@@ -57,3 +57,61 @@ export const title = (id: string | null | undefined) => {
   if (first && ACRONYMS.has(first.toLowerCase())) return s;
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
+
+/** A VALUE off a row, spelled but not reshaped.
+ *
+ *  `human` is for an id and does two things to get there: it strips a
+ *  declaration's prefix and turns separators into spaces. On a value that
+ *  is ruinous -- an encounter called "enc-002" comes out as "enc 002" --
+ *  so this does only the half that is always safe, which is setting a word
+ *  that is an acronym in capitals. "anc" becomes ANC; a name, a village, a
+ *  phone number and an id all come back exactly as they went in.
+ */
+export const spell = (v: string | null | undefined) =>
+  (v ?? "").replace(/[^\s]+/g, (w) => (ACRONYMS.has(w.toLowerCase()) ? word(w) : w));
+
+/** A SENTENCE the kernel composed, set so it starts like one.
+ *
+ *  `title` is for an id: it strips a declaration's prefix and turns its
+ *  separators into spaces, which is right for "phc.op.record-vitals" and
+ *  wrong for a line of prose that happens to begin with a station's name.
+ *  This touches the first letter and nothing else, and leaves an acronym
+ *  alone because ABHA does not become Abha.
+ */
+export const sentence = (s: string | null | undefined) => {
+  const t = (s ?? "").trim();
+  const first = t.split(/[\s:]/)[0] ?? "";
+  if (!t || ACRONYMS.has(first.toLowerCase())) return t;
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+
+/** Which glyph stands for a role, by the same licence as the casing table
+ *  above: this decides how a declared word is DRAWN, never which words
+ *  appear. Delete a role from the bundle and nothing on any screen changes;
+ *  the entry simply stops being reached, exactly as "asha" does.
+ *
+ *  A role list set in one typeface and no picture is a list nobody scans.
+ *  The glyph is the part a person recognises before they have read anything,
+ *  which at a centre where English is a second language is most of the work
+ *  the label was supposed to do. Anything unlisted falls back to a person,
+ *  which is what every role is.
+ */
+const ROLE_GLYPH: Record<string, string> = {
+  // who sees the patient
+  mo: "clip", cho: "clip", doctor: "clip",
+  nurse: "vitals", anm: "vitals",
+  // who works the bench
+  lab: "box", "lab-incharge": "box", "lab incharge": "box",
+  pharmacist: "box", pharmacy: "box",
+  // who meets them at the door, and who goes to them
+  frontdesk: "id", reception: "id", registration: "id",
+  asha: "users", community: "users",
+  // who is only looking
+  demo: "eye", admin: "cog", observer: "eye",
+};
+
+/** The glyph for a role id, as an `IconName`. Typed as a string here because
+ *  this file is loaded by checks that run under plain node, where a .tsx
+ *  import cannot follow; the caller narrows it. */
+export const roleGlyph = (id: string | null | undefined): string =>
+  ROLE_GLYPH[(id ?? "").toLowerCase().replace(/[_.]/g, "-")] ?? "user";

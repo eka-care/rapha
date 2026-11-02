@@ -27,7 +27,7 @@ import { Stream } from "../thread/Thread";
 import { Carry, Team, Trend, usePast, visitOf } from "../thread/Past";
 import { Line } from "../view/View";
 import { RAIL, railFolded, railShown, setRailFolded, setRailShown, type RailId } from "./rail";
-import { human, title } from "../words";
+import { human, sentence, spell, title } from "../words";
 import { initialsOf } from "../agent";
 
 /** How many actions the agent's node offers.
@@ -192,7 +192,7 @@ export function Encounter({
                   <span className="id-val">{head.identity.value}</span>
                 </span>
               )}
-              {thread.station && <span className="badge b-ink">{human(thread.station)}</span>}
+              {thread.station && <span className="badge b-ink">{title(thread.station)}</span>}
               {head.badges.map((b) => (
                 <span className={`badge ${TONE[b.style] ?? "b-mute"}`} key={b.text}>{b.text}</span>
               ))}
@@ -350,7 +350,7 @@ export function Encounter({
                 </span>
               </div>
               <Line line={thread.line} />
-              {thread.nudge && <div className="nudge" style={{ margin: "0 12px 12px" }}>{thread.nudge}</div>}
+              {thread.nudge && <div className="nudge" style={{ margin: "0 12px 12px" }}>{sentence(thread.nudge)}</div>}
             </Panel>
           )}
 
@@ -455,7 +455,7 @@ function Details({ thread, cat, spine, already }: {
     const extra = Object.keys(subject).filter(
       (k) => !keys.includes(k) && !/(^|_)id$|_date$|_by$|^status$/.test(k) && subject[k]);
     return [...keys, ...extra]
-      .map((k) => ({ label: title(human(k)), value: String(subject[k]) }))
+      .map((k) => ({ label: title(human(k)), value: spell(String(subject[k])) }))
       .filter((r) => !already.has(r.value));
   }, [thread.subject, thread.workflow, cat, already]);
 

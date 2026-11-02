@@ -180,6 +180,22 @@
      It is in this file because it changes with the theme and this file is
      where the theme lives. */
   --eka-page: none;
+  /* ---- the patient-flow bar ------------------------------------------
+     Two numbers an element sets for itself: how far the bar runs, and how
+     loaded that station is on a 0-to-1 scale. They are declared here with
+     empty defaults so that a bar whose element sets neither reads as
+     nothing rather than dropping its whole declaration.
+
+     WHY NOT ONE MIXED COLOUR. The obvious version is a single token that
+     blends critical into success by the load. It does not work: a custom
+     property declared on :root has its var()s substituted against :root,
+     so every station inherits the same already-resolved 0% and the whole
+     line comes out green. The colour therefore has to be composed on the
+     element, which it is -- in home.css, out of these two plain tones and
+     opacity alone, so no colour is named outside this file. */
+  --fill: 0%;
+  --load: 0;
+
 }
 
 [data-theme="dark"] {

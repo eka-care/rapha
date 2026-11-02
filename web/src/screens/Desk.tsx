@@ -60,7 +60,7 @@ import { Failed, Loading } from "../parts";
 import { createLabel, firstOperation } from "../search";
 import type { Catalogue, QueueRow, ViewDecl } from "../types";
 import { fields } from "../view/View";
-import { human } from "../words";
+import { title } from "../words";
 import { walk } from "../validate";
 
 /** What the chip under a filled field says, per kind of row. Neither of these
@@ -365,7 +365,7 @@ function Day({ decl, rows, loading, first, onOpenThread }: {
             for every surface at once. */}
         <span className={`desk-wr-nm${f.named ? "" : " u-mute"}`}>{f.name}</span>
         {(row.flags ?? []).includes(ABHA_LINKED) && <Lotus className="desk-hit-lotus" />}
-        <span className="desk-wr-at">{human(row.station) || clock(row.opened_at)}</span>
+        <span className="desk-wr-at">{title(row.station) || clock(row.opened_at)}</span>
       </button>
     );
   };
@@ -394,7 +394,7 @@ function Day({ decl, rows, loading, first, onOpenThread }: {
         : <p className="desk-day-e">Nobody has been through this desk today yet.</p>}
 
       <p className="desk-day-n">
-        {day.all} in the workspace today, {day.moving.length} still on the line.
+        {day.all} came in today. {day.moving.length} are still waiting.
       </p>
     </section>
   );

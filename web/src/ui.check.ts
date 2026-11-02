@@ -742,7 +742,7 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   const says: [string, string, RegExp][] = [
     ["form/Panel.tsx", "a write landing", /say\(`Saved: \$\{op\.title\}\.`\)/],
     ["app/App.tsx", "the agent answering", /say\(answer\.said\)/],
-    ["app/App.tsx", "a list coming back changed", /say\(n === 1 \? "1 in the workspace\." :/],
+    ["app/App.tsx", "a list coming back changed", /say\(n === 1 \? "1 patient is here\." :/],
     ["screens/Desk.tsx", "a search answering", /say\(n === 1 \? "1 match\." :/],
   ];
   for (const [file, what, re] of says) {

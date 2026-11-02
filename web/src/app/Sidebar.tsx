@@ -13,8 +13,8 @@
  *  rows, in the same order, as the view behind them.
  */
 import { useState } from "react";
-import { NAME } from "../brand";
-import { Icon } from "../icons";
+
+import { Icon, type IconName } from "../icons";
 import type { Facility, QueueRow, ViewDecl } from "../types";
 import { fields } from "../view/View";
 import { human, title } from "../words";
@@ -62,11 +62,33 @@ function chips(line: { decl: ViewDecl; row: QueueRow }[]):
  *  glance. The rest is one tap away in the view the rows came from. */
 const LINE = 9;
 
+/** WHICH SECOND PANEL THIS ROUTE WANTS, or none at all.
+ *
+ *  Home is deliberately `null`. A panel that is always open is not a panel,
+ *  it is a margin, and the home screen is the one place whose whole job is
+ *  to be looked at rather than navigated. The line belongs beside the line
+ *  and beside a visit, because both are places you move between people
+ *  from; the settings sections belong beside the settings.
+ */
+export type Panel = "line" | "settings" | null;
+
+export function panelFor(route: string): Panel {
+  if (route.startsWith("views/") || route.startsWith("threads/")) return "line";
+  if (route.startsWith("settings")) return "settings";
+  return null;
+}
+
 export function Sidebar({
-  facility, route, line, open, onGo, onCall, onCloseDrawer,
+  facility, route, line, open, panel, sections, onGo, onCall, onCloseDrawer,
 }: {
   facility?: Facility;
   route: string;
+  /** What this panel is showing, decided by `panelFor` in the shell so that
+   *  the shell can also decide whether to give it any width. */
+  panel: Exclude<Panel, null>;
+  /** The settings sections, when that is what this panel is for. Their
+   *  words come from Control.tsx, which owns them. */
+  sections: { id: string; title: string; icon: IconName }[];
   /** Today's line, already loaded for the counts above: the same rows the
    *  queue view draws, with the declaration they came from so the name and
    *  the number are read the same way here as there. */
@@ -95,17 +117,46 @@ export function Sidebar({
   const shown = filter
     ? line.filter(({ decl, row }) => tags(line, row, decl).includes(filter))
     : line;
+
+  if (panel === "settings") {
+    // `#/settings` with no section shows the first one, so that is the row
+    // that has to look selected. Without this the page showed Appearance
+    // while the column showed nothing chosen.
+    const part = route.split("/")[1] || sections[0]?.id;
+    return (
+      <nav className="sb" data-open={open} aria-label="Settings sections">
+        <div className="sb-head">
+          <div className="sb-head-t">Settings</div>
+          <div className="sb-head-s">{facility?.bundle.title ?? "This centre"}</div>
+        </div>
+        <div className="sb-nav">
+          {sections.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`sb-sec-i${s.id === part ? " on" : ""}`}
+              aria-current={s.id === part ? "page" : undefined}
+              onClick={() => goTo(`#/settings/${s.id}`)}
+            >
+              <Icon name={s.icon} className="i sm" />
+              {s.title}
+            </button>
+          ))}
+        </div>
+      </nav>
+    );
+  }
+
   return (
-    <nav className="sb" data-open={open} aria-label="Main">
-      <div className="sb-top">
-        <span className="brand-mark"><Icon name="mark" /></span>
-        <div style={{ minWidth: 0 }}>
-          {/* The product, then the centre. It was the centre and a version
-              string: the version is a developer's fact, and the name of the
-              building is not what a person wants in the largest word on the
-              rail when they are standing in it. */}
-          <div className="brand-n">{NAME}</div>
-          <div className="brand-s">{facility?.bundle.title ?? "Workspace"}</div>
+    <nav className="sb" data-open={open} aria-label="The line">
+      {/* The brand moved to the icon rail, where it is the one mark at the
+          top of the one column that is always there. It was repeated here
+          over a list of patients, which is the second place a person looks
+          and the last place that needs telling them which product this is. */}
+      <div className="sb-head">
+        <div className="sb-head-t">{lineTitle || "Today"}</div>
+        <div className="sb-head-s">
+          {shown.length === 1 ? "1 patient" : `${shown.length} patients`}
         </div>
       </div>
 
@@ -169,7 +220,6 @@ export function Sidebar({
         </div>
       )}
 
-      <div className="sb-sec">{lineTitle} · today</div>
       <div className="sb-list">
         {shown.length === 0 ? (
           <div className="sb-empty">Nobody is waiting.</div>
@@ -184,7 +234,7 @@ export function Sidebar({
               {f.token && <span className="th-tok">{f.token}</span>}
               <span className="th-b">
                 <span className={`th-n${f.named ? "" : " u-mute"}`}>{f.name}</span>
-                {row.station && <span className="th-s">{human(row.station)}</span>}
+                {row.station && <span className="th-s">{title(row.station)}</span>}
               </span>
               {row.flags?.some((x) => row.badges?.[x] === "crit") && (
                 <span className="th-flag" aria-label="needs attention" />

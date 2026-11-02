@@ -15,7 +15,7 @@ import { displayFor, questionnaire } from "../declarations";
 import { valuesOf } from "../messages";
 import type { Catalogue, ThreadView } from "../types";
 import { wrote } from "../types";
-import { human } from "../words";
+import { human, title } from "../words";
 import {
   carriedForward, covers, heights, series, team, trendable,
   type Catchment, type Visit,
@@ -137,7 +137,7 @@ export function Team({ thread, cat, catchment }: {
   const members = team(
     thread.audit,
     (op) => cat.operations?.[op]?.title ?? human(op),
-    (actor) => human(actor.replace(/^user:/, "")),
+    (actor) => title(actor.replace(/^user:/, "")),
   );
   if (!members.length && !who) return null;
   return (

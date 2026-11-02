@@ -1,4 +1,4 @@
-/** §52: where you are, one way to search from anywhere, and the theme.
+/** §52: where you are, and the two things you can do from anywhere.
  *
  *  THE TITLE IS THE PAGE'S h1. There was no h1 on any screen but the home
  *  one, so the heading outline began at the h3 the role editor draws and said
@@ -11,30 +11,23 @@
  *  which building it is. The word is not lost: App puts it in the document
  *  title, where it tells a person with six tabs open which tab this is --
  *  which is the one place it was actually doing work.
+ *
+ *  THE PLACES ARE NOT HERE ANY MORE. Five nav words, a theme toggle, a cog
+ *  and an account chip used to share this row with the screen's own title,
+ *  so the bar answered "where am I" and "where could I go" in the same
+ *  breath and in the same type. Places live in the icon rail; what is left
+ *  here is the title and the two things that are not places -- starting
+ *  somebody off, and asking.
  */
 import { NAME } from "../brand";
-import { Profile } from "../auth/Profile";
-import type { Facility } from "../types";
 import { Icon } from "../icons";
 
-export function Topbar({ title, theme, views, route, deskLabel, facility, onSearch, onTheme,
-                        onMenu, onGo, onDesk, onSettings, onSignOut }: {
+export function Topbar({ title, deskLabel, onSearch, onMenu, onDesk }: {
   title: string;
-  theme: "light" | "dark";
-  /** The declared views. They were a permanent list down the rail, under the
-   *  people waiting; the artifact gives that column to the line alone and
-   *  carries everything else up here. */
-  views: { id: string; title: string }[];
-  route: string;
   deskLabel: string;
-  facility?: Facility;
   onSearch: () => void;
-  onTheme: () => void;
   onMenu: () => void;
-  onGo: (hash: string) => void;
   onDesk: () => void;
-  onSettings: () => void;
-  onSignOut: () => void;
 }) {
   return (
     <header className="topbar">
@@ -46,21 +39,6 @@ export function Topbar({ title, theme, views, route, deskLabel, facility, onSear
           {title}
         </h1>
       </div>
-      <nav className="tb-nav" aria-label="Views">
-        <button className={`tb-nv${route === "" || route === "today" ? " on" : ""}`}
-                onClick={() => onGo("#/")}>Home</button>
-        {/* The register. Not a declared view -- it is every patient this
-            centre holds rather than a slice of today -- so it is named here,
-            beside the views, in the one place the app's own destinations
-            live. */}
-        <button className={`tb-nv${route === "patients" ? " on" : ""}`}
-                onClick={() => onGo("#/patients")}>Patients</button>
-        {views.map((v) => (
-          <button key={v.id}
-                  className={`tb-nv${route === `views/${v.id}` ? " on" : ""}`}
-                  onClick={() => onGo(`#/views/${v.id}`)}>{v.title}</button>
-        ))}
-      </nav>
       <button className="pill ml-auto" onClick={onDesk}>
         <Icon name="plus" className="i sm" />
         {deskLabel}
@@ -70,17 +48,6 @@ export function Topbar({ title, theme, views, route, deskLabel, facility, onSear
         Ask {NAME}
         <span className="kbd">⌘K</span>
       </button>
-      <button
-        className="icon-btn"
-        onClick={onTheme}
-        aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-      >
-        <Icon name={theme === "dark" ? "sun" : "moon"} className="i sm" />
-      </button>
-      <button className="icon-btn" onClick={onSettings} aria-label="Control panel">
-        <Icon name="cog" className="i sm" />
-      </button>
-      <Profile facility={facility} onSignOut={onSignOut} />
     </header>
   );
 }

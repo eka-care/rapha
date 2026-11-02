@@ -13,9 +13,9 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { currentRole, setRole } from "../api";
-import { Icon } from "../icons";
+import { Icon, type IconName } from "../icons";
 import type { Facility } from "../types";
-import { human } from "../words";
+import { roleGlyph, title } from "../words";
 import { LOGIN_URL } from "./session";
 
 export function Profile({ facility, onSignOut }: {
@@ -52,26 +52,33 @@ export function Profile({ facility, onSignOut }: {
         aria-haspopup="menu"
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="prof-av"><Icon name="user" className="i sm" /></span>
-        <span className="prof-r">{human(role)}</span>
+        <span className="prof-av">
+          <Icon name={roleGlyph(role) as IconName} className="i sm" />
+        </span>
+        <span className="prof-r">{title(role)}</span>
       </button>
 
       {open && (
         <div className="prof-menu" role="menu">
           <div className="prof-h">
-            <div className="prof-n">{human(role)}</div>
-            <div className="prof-s">
-              {facility?.user.capabilities.length ?? 0} capabilities
-              {facility?.bundle.title ? ` · ${facility.bundle.title}` : ""}
+            <span className="prof-h-av">
+              <Icon name={roleGlyph(role) as IconName} className="i sm" />
+            </span>
+            <div className="prof-hb">
+              <div className="prof-n">{title(role)}</div>
+              <div className="prof-s">
+                {facility?.user.capabilities.length ?? 0} capabilities
+                {facility?.bundle.title ? ` · ${facility.bundle.title}` : ""}
+              </div>
             </div>
           </div>
 
           {roles.length > 1 && (
             <div className="prof-sec">
-              <div className="eyebrow">Station</div>
               {/* Until an administrator assigns it, this is where the role is
                   chosen, and it is the one the kernel is told on every
-                  request. */}
+                  request. Each row carries its own glyph: ten role names in
+                  one typeface is a list that has to be read word by word. */}
               {roles.map((r) => (
                 <button
                   key={r}
@@ -80,7 +87,8 @@ export function Profile({ facility, onSignOut }: {
                   aria-checked={r === role}
                   onClick={() => { setRole(r); location.reload(); }}
                 >
-                  {human(r)}
+                  <Icon name={roleGlyph(r) as IconName} className="i sm prof-role-i" />
+                  {title(r)}
                   {r === role && <Icon name="check" className="i sm ml-auto" />}
                 </button>
               ))}
@@ -89,6 +97,7 @@ export function Profile({ facility, onSignOut }: {
 
           <div className="prof-sec">
             <button className="prof-out" role="menuitem" onClick={onSignOut}>
+              <Icon name="out" className="i sm" />
               Sign out of {facility?.bundle.title ?? "this centre"}
             </button>
             <a className="prof-eka" href={LOGIN_URL} target="_blank" rel="noreferrer">

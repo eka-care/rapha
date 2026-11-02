@@ -8,6 +8,7 @@
  *  Every word and number comes from a declaration or a live row. agent.ts
  *  composes the prose; this file lays it out.
  */
+import { useEffect, useState, type CSSProperties } from "react";
 import { brief, facilityAsks, initialsOf, line, type Loaded } from "../agent";
 import { NAME } from "../brand";
 import { Icon } from "../icons";
@@ -18,6 +19,60 @@ import { human, title } from "../words";
 
 /** How many names a flow column shows before it says how many more. */
 const SHOWN = 4;
+
+/** What a full bar means.
+ *
+ *  Not "the busiest station", which is what it was: on a quiet morning the
+ *  busiest station might hold two people, and scaling to it painted two
+ *  people the same red as twenty. The bar would be at its loudest every
+ *  day, which is the same as having no colour at all.
+ *
+ *  So the scale has a floor. Below it the line is read against a steady
+ *  idea of a heavy queue and most of the card stays green; above it the
+ *  busiest station sets the scale and the comparison between stations is
+ *  what the colour shows. Five is a judgement about a primary health
+ *  centre, not a declared capacity -- no bundle declares one -- so it is
+ *  written here, once, where it can be argued with.
+ */
+const HEAVY = 5;
+
+/** How full one station's bar runs, and how loaded it is from 0 to 1. A
+ *  station with anybody in it keeps a visible floor on its width, so "one
+ *  person waiting" never draws as an empty bar. */
+const scaleOf = (busiest: number) => Math.max(busiest, HEAVY);
+
+const load = (n: number, busiest: number): number =>
+  n === 0 ? 0 : Math.min(1, n / scaleOf(busiest));
+
+const fill = (n: number, busiest: number): number =>
+  n === 0 ? 0 : Math.max(12, Math.round(load(n, busiest) * 100));
+
+/** The time, and the day it belongs to. Nothing else.
+ *
+ *  It ticks, because a clock that is drawn once and then left alone is a
+ *  clock that is wrong for most of the shift, and a wrong clock in the
+ *  corner of a workspace is worse than an empty corner. Once a minute is
+ *  enough for a wall clock and costs nothing.
+ */
+function Clock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  return (
+    <div className="clock">
+      <time className="clock-t" dateTime={`${hh}:${mm}`}>
+        {hh}<span className="clock-c">:</span>{mm}
+      </time>
+      <div className="clock-d">
+        {now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
+      </div>
+    </div>
+  );
+}
 
 export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, onAsk }: {
   loaded: Loaded[];
@@ -32,13 +87,10 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
   onAsk: (question: string) => void;
 }) {
   if (loading && !loaded.length) return <Loading what="the facility" shape="blocks" rows={4} />;
-  const now = new Date();
-  const h = now.getHours();
-  const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-
-  /** The centre's own name, from the bundle that is loaded. Never typed
-   *  here: a laboratory running this kernel reads its own title. */
-  const facility = cat.manifest?.title ?? "";
+  // The greeting and the centre's own name were a line above the heading --
+  // "Primary health centre · Monday 2 November · good afternoon". A person
+  // standing in the building knows all three, and the date is now part of
+  // the clock, where it is a fact rather than a label.
   const queues = loaded.filter((l) => l.decl.kind === "queue");
   const rows = queues.flatMap((l) => (l.result.rows ?? []) as QueueRow[]);
   const done = rows.filter((r) => !r.station).length;
@@ -57,46 +109,27 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
   const stations = (wf?.steps ?? []).map((s) => s.station);
   const badges = queues[0]?.decl.badges ?? {};
   const columns = line(loaded, stations, badges);
-
-  // The session clock. The prototype's OPD window; there is no declaration
-  // for a facility's hours, so this shows the time and the day's progress
-  // through it rather than inventing an opening hour.
-  const mins = h * 60 + now.getMinutes();
-  const span = { from: 9 * 60, to: 14 * 60 };
-  const pct = Math.max(0, Math.min(100, ((mins - span.from) / (span.to - span.from)) * 100));
-  const left = Math.round(((span.to - mins) / 60) * 10) / 10;
+  const busiest = columns.reduce((m, c) => Math.max(m, c.people.length), 0);
 
   return (
     <div className="home">
       <section className="hero">
         <svg className="hero-mark" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mark-lg" /></svg>
-        <div className="arc">
-          <div className="arc-l">Session</div>
-          <div className="arc-t">
-            {String(h).padStart(2, "0")}:{String(now.getMinutes()).padStart(2, "0")}
-          </div>
-          <div className="arc-bar"><i style={{ width: `${pct}%` }} /></div>
-          <div className="arc-s">
-            {pct <= 0 ? "not started" : pct >= 100 ? "session closed" : `${left} h left`}
-          </div>
-        </div>
-
-        {/* The artifact's hero: what the centre is, what day it is, and the
-            two numbers a person arriving at a shift wants. The greeting led
-            here and said nothing; it is the eyebrow's "good evening" now,
-            under the one line that matters. */}
-        <div className="hero-eye">
-          {facility} · {now.toLocaleDateString(undefined,
-            { weekday: "long", day: "numeric", month: "long" })} · {greeting.toLowerCase()}
-        </div>
+        {/* WHAT WAS HERE: "Session", a time, a progress bar and "2.4 h
+            left" -- a countdown through a 9-to-2 window this product never
+            declared anywhere. It invented a fact, and when the invented
+            window ran out the corner of the home screen said "session
+            closed" over a centre with eight people still in it. A clock
+            cannot be wrong about what it is for. */}
+        <Clock />
 
         <h2 className="hero-h">
-          {rows.length} in the workspace.<br />
+          {rows.length === 1 ? "1 patient is here." : `${rows.length} patients are here.`}<br />
           <span>
             {tasks.length === 0
-              ? `${done} complete.`
+              ? (done === 1 ? "1 is finished." : `${done} are finished.`)
               : `${tasks.reduce((n, t) => n + t.count, 0)} ${
-                  tasks.reduce((n, t) => n + t.count, 0) === 1 ? "thing needs" : "things need"} you.`}
+                  tasks.reduce((n, t) => n + t.count, 0) === 1 ? "needs" : "need"} you.`}
           </span>
         </h2>
 
@@ -131,7 +164,9 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
         <div className="brief">
           <span className="brief-av"><Icon name="spark" className="i sm" /></span>
           <div>
-            <div className="m-meta">Shift brief · {now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</div>
+            {/* The time was here too, a second clock three inches under the
+                first one, and both said the same thing. */}
+            <div className="m-meta">Shift brief</div>
             <p className="brief-t">
               {brief(loaded).map((s, i) =>
                 s.go
@@ -151,10 +186,25 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
             {columns.map((c) => (
               <div className={`fl-col${c.jam ? " jam" : ""}`} key={c.station}>
                 <div className="fl-h">
-                  <span className="fl-n">{human(c.station)}</span>
+                  <span className="fl-n">{title(c.station)}</span>
                   <span className="fl-c">{c.people.length}</span>
                 </div>
-                <div className="fl-rail">{c.people.length > 0 && <i />}</div>
+                {/* A STATIC BAR, NOT A SWEEP. This used to be a gradient
+                    running left to right on a 2.4s loop, in every station,
+                    for as long as the screen was open: five things moving
+                    under the one card a person reads to find out where the
+                    line is stuck. Motion means something changed, and
+                    nothing was changing.
+                    It now fills in proportion to the busiest station and
+                    takes its colour from the same ratio, so the shape of
+                    the queue is readable from across the room and sitting
+                    still. `--fill` drives both. */}
+                <div className="fl-rail" aria-hidden="true">
+                  <i style={{
+                    "--fill": `${fill(c.people.length, busiest)}%`,
+                    "--load": load(c.people.length, busiest),
+                  } as CSSProperties} />
+                </div>
                 {c.people.length === 0
                   ? <div className="fl-e">Clear</div>
                   : c.people.slice(0, SHOWN).map((p) => (
@@ -186,7 +236,7 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
                 {c.jam && (
                   <div className="fl-jam">
                     <Icon name="alert" className="i sm" />
-                    heaviest here
+                    Longest wait
                   </div>
                 )}
               </div>
@@ -226,7 +276,7 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
             <div>
               <div className="pu-r">
                 <span>Seen today</span>
-                <span>{rows.length} in the workspace</span>
+                <span>{rows.length === 1 ? "1 patient" : `${rows.length} patients`}</span>
               </div>
               <div className="pu-v">{done}<small>complete</small></div>
               <div className="split">
