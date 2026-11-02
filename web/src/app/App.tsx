@@ -38,19 +38,28 @@ type Route =
   | { kind: "thread"; id: string }
   | { kind: "patient"; id: string }
   | { kind: "patients" }
-  | { kind: "desk" }
+  | { kind: "desk"; q: string }
   | { kind: "settings"; part: string }
   | { kind: "notfound"; id: string };
 
 function parse(hash: string): Route {
-  const [head, id] = hash.replace(/^#\/?/, "").split("/");
+  // THE QUERY IS NOT PART OF THE PATH, and forgetting that is what broke the
+  // one control in the line column: calling token 1 goes to `#/desk?q=1`, the
+  // whole of which was read as a first segment, matched nothing, and fell
+  // through to the last line of this function as a view id -- so the kernel
+  // was asked for `/views/desk?q=1/` and rightly said it had no such view.
+  const bare = hash.replace(/^#\/?/, "");
+  const cut = bare.indexOf("?");
+  const path = cut === -1 ? bare : bare.slice(0, cut);
+  const args = new URLSearchParams(cut === -1 ? "" : bare.slice(cut + 1));
+  const [head, id] = path.split("/");
   if (head === "threads" && id) return { kind: "thread", id };
   if (head === "views" && id) return { kind: "view", id };
   if (head === "patients" && id) return { kind: "patient", id };
   // The register itself, which is the top of the patients hierarchy.
   if (head === "patients") return { kind: "patients" };
   if (head === "settings") return { kind: "settings", part: id ?? "" };
-  if (head === "desk") return { kind: "desk" };
+  if (head === "desk") return { kind: "desk", q: args.get("q") ?? "" };
   if (!head || head === "today") return { kind: "today" };
   // A second segment under an unrecognised first one is a malformed route,
   // not a bare view id. Guessing is how an empty thread id once reached the
@@ -471,6 +480,7 @@ export function App() {
                     client={api}
                     queue={deskRows}
                     loadingQueue={loadingViews}
+                    q={route.q}
                     onOpenThread={(t) => { reload(); go(`#/threads/${t}`); }}
                   />
                 )}

@@ -74,7 +74,7 @@ const FROM_DIRECTORY = "From the patient directory";
  *  enough that the list is there before they stop typing. */
 const SETTLE = 180;
 
-export function Desk({ cat, decl, workflow, client, queue, loadingQueue, onOpenThread }: {
+export function Desk({ cat, decl, workflow, client, queue, loadingQueue, q, onOpenThread }: {
   cat: Catalogue;
   /** The queue view, which is what declares how a person is described here.
    *  Absent draws whatever a record carries, minus the plumbing. */
@@ -89,9 +89,15 @@ export function Desk({ cat, decl, workflow, client, queue, loadingQueue, onOpenT
    *  facility -- nobody waiting, nobody seen -- which is a confident lie and
    *  looks exactly like a kernel that is down. */
   loadingQueue?: boolean;
+  /** What the line column's call box was given, carried here in the address
+   *  so that calling a token is a place you can arrive at, go back from and
+   *  reload. It seeds the search and nothing else: the clerk sees the person
+   *  that token belongs to and still chooses them, because a token is a
+   *  claim about who is at the counter, not proof of it. */
+  q?: string;
   onOpenThread: (thread: string) => void;
 }) {
-  const [typed, setTyped] = useState("");
+  const [typed, setTyped] = useState(q ?? "");
   const [found, setFound] = useState<Resolution | null>(null);
   const [pick, setPick] = useState(0);
   const [opening, setOpening] = useState<DeskRow | null>(null);
@@ -108,6 +114,13 @@ export function Desk({ cat, decl, workflow, client, queue, loadingQueue, onOpenT
   const box = useRef<HTMLInputElement>(null);
 
   useEffect(() => { box.current?.focus(); }, []);
+
+  // CALLING A SECOND TOKEN WHILE ALREADY HERE. The address changes, this
+  // screen does not remount, and the seed above runs once -- so without this
+  // the second call would silently do nothing, which is the same failure as
+  // the first one and harder to see. An empty q is somebody who navigated to
+  // the desk plainly and must not have their typing cleared.
+  useEffect(() => { if (q) setTyped(q); }, [q]);
 
   // The search. Out of order answers are dropped rather than rendered: a
   // slower response to "kam" must not overwrite the answer to "kamala".

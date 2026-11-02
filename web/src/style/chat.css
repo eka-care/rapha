@@ -257,3 +257,66 @@
    card rather than on its header, because the header is a summary somebody
    scans and this is a thing they do after reading the values. */
 .kept-do { display: flex; justify-content: flex-end; padding-top: 10px; }
+
+/* ---- the view beside the thread ----------------------------------------
+   It takes the rail's column and half as much again, because the thing it
+   was built for is a clinical note somebody has to read and sign, and 300px
+   is the width that made that impossible in the first place. The grid is
+   written the same way as the two above it: `minmax(0, 1fr)` on the left so
+   one long word in the conversation cannot push this column off the screen.
+*/
+.chatgrid.aside { grid-template-columns: minmax(0, 1fr) 460px; }
+
+.side {
+  display: flex; flex-direction: column; height: 100%; min-height: 0;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.side-h {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  padding: 7px 7px 0 9px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.side-tabs { display: flex; gap: 2px; flex: 1; min-width: 0; }
+/* A tab is underlined by the thing it selects, not boxed: a row of filled
+   pills reads as a row of buttons, and these are places, not actions. */
+.side-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 10px 9px; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 11.5px; font-weight: 500;
+  color: var(--color-text-tertiary);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  white-space: nowrap;
+}
+.side-tab:hover { color: var(--color-text-primary); }
+.side-tab.on {
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-accent);
+}
+.side-x {
+  flex-shrink: 0; display: grid; place-items: center;
+  width: 28px; height: 28px; margin-bottom: 4px;
+  border: 0; border-radius: var(--radius-sm); background: none; cursor: pointer;
+  color: var(--color-text-tertiary);
+}
+.side-x:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+/* The one cross in a set that has no cross. */
+.side-x .i { transform: rotate(45deg); }
+
+.side-b {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 13px; display: flex; flex-direction: column; gap: 13px;
+}
+
+.pastv { display: flex; flex-direction: column; gap: 13px; }
+.pastv-v { padding: 9px 12px 11px; display: flex; flex-direction: column; gap: 2px; }
+
+@media (max-width: 1100px) {
+  /* One column, and the view takes the page. A 460px panel beside a
+     conversation on a tablet leaves neither of them usable. */
+  .chatgrid.aside { grid-template-columns: 1fr; }
+  .chatgrid.aside .chatcard { display: none; }
+  .side { height: 100%; }
+}

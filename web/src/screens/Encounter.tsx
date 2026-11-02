@@ -9,7 +9,7 @@
  *  (§21), ink-filled for the one that closes this station's step. Every word
  *  on them is the operation's own declaration.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { threadAsks } from "../agent";
 import type { Client } from "../api";
 import { OperationPanel } from "../form/Panel";
@@ -24,7 +24,8 @@ import { ScribeBar } from "../scribe/ScribeBar";
 import { ScribeStart } from "../scribe/Start";
 import { mergeDrafts, type Opened } from "../scribe/session";
 import { Stream } from "../thread/Thread";
-import { Carry, Team, Trend, usePast, visitOf } from "../thread/Past";
+import { Carry, PastVisits, Team, Trend, usePast, visitOf } from "../thread/Past";
+import { Side, type SideId, type Tab } from "../thread/Side";
 import { Line } from "../view/View";
 import { RAIL, railFolded, railShown, setRailFolded, setRailShown, type RailId } from "./rail";
 import { human, sentence, spell, title } from "../words";
@@ -49,6 +50,15 @@ const QUICK = 1;
  *  That named our own vocabulary at a clinician, which is not information.
  *  The icon says the same thing in the one way that is useful: a microphone
  *  means speak, a page means type, a gauge means the machine reads it. */
+/** The views that open beside the thread, named the way screens/rail.ts
+ *  names its panels: by what they SHOW, not by the component or by our own
+ *  word for the machinery. A clinician does not have a feature called
+ *  "scribe"; they have a recording, and what they want is what it heard. */
+const SIDES: Tab[] = [
+  { id: "past", title: "Earlier visits", icon: "clock" },
+  { id: "scribe", title: "What was heard", icon: "mic" },
+];
+
 const TAG: Record<string, string> = {
   scribe: "mic", form: "doc", device: "vitals", "constrained-voice": "mic",
 };
@@ -100,6 +110,11 @@ export function Encounter({
   };
   const fold = (now: boolean) => { setFolded(now); setRailFolded(now); };
 
+  /** Which view is open beside the thread, if any. Not remembered: unlike
+   *  the rail, this is a thing you open to read and then close, and a view
+   *  still sitting there from the last patient is a view in the way. */
+  const [side, setSide] = useState<SideId | null>(null);
+
   const [editing, setEditing] = useState<{ op: Operation; start: Payload } | null>(null);
   const [carried, setCarried] = useState<{ thread: string; payload: Payload } | null>(null);
   const [scribing, setScribing] = useState<string | null>(null);
@@ -108,6 +123,20 @@ export function Encounter({
    *  form is one of the two doors there. */
   const [starting, setStarting] = useState<Operation | null>(null);
   const [drafts, setDrafts] = useState<Opened[]>([]);
+
+  // THE RECORDING OPENS ITS OWN VIEW. Pressing the microphone and having
+  // nothing appear would be the same silence the old inline bar at least
+  // avoided, so starting to dictate brings the view that holds it. It is
+  // not closed again when the recording stops: the draft is still there to
+  // be read, and taking the page away from somebody mid-sentence is worse
+  // than leaving it open one beat too long.
+  useEffect(() => {
+    // `""` IS A REAL VALUE HERE, not an absence: the composer's microphone
+    // passes it to mean "open on whatever this station recorded last". A
+    // truthiness test read that as off, so the one shortcut a doctor who
+    // knows what they are doing uses silently did nothing.
+    if (scribing !== null || drafts.length > 0) setSide("scribe");
+  }, [scribing, drafts.length]);
   // The microphone is gated on the scribe instrument's own `requires:`, not a
   // flag named here: a bundle that spells its consent differently is gated by
   // its own spelling. The kernel refuses without it besides.
@@ -178,7 +207,7 @@ export function Encounter({
   const todayVisit = useMemo(() => visitOf(thread, cat), [thread, cat]);
 
   return (
-    <div className={`chatgrid${folded ? " folded" : ""}`}>
+    <div className={`chatgrid${side ? " aside" : folded ? " folded" : ""}`}>
       <div className="card chatcard">
         <header className="pt-head">
           <span className="avatar">{initialsOf(head.name)}</span>
@@ -196,10 +225,21 @@ export function Encounter({
               {head.badges.map((b) => (
                 <span className={`badge ${TONE[b.style] ?? "b-mute"}`} key={b.text}>{b.text}</span>
               ))}
+              {/* TWO DIFFERENT THINGS, AND THEY USED TO SHARE A WORD. One
+                  opens what happened before WITHOUT leaving this visit; the
+                  other leaves for the patient's whole record. "All visits"
+                  described both, so the chip was renamed to the place it
+                  actually goes. */}
+              {past.length > 0 && (
+                <button className="chip" onClick={() => setSide("past")}>
+                  <Icon name="clock" className="i sm" />
+                  Earlier visits
+                </button>
+              )}
               {spineId && (
                 <button className="chip" onClick={() => onOpenSubject(spineId)}>
                   <Icon name="folder" className="i sm" />
-                  All visits
+                  Patient record
                 </button>
               )}
             </div>
@@ -281,22 +321,13 @@ export function Encounter({
           />
         )}
 
-        {scribing && (
-          <ScribeBar thread={thread.id} station={thread.station ?? ""} pick={scribing}
-                     onDrafts={(s) => setDrafts((all) => mergeDrafts(all, s.drafts, s.session))}
-                     onClose={() => { setScribing(null); setDrafts([]); }} />
-        )}
-        {drafts.map(({ draft: d, key }) => {
-          const op = cat.operations[d.operation];
-          return op ? (
-            <div key={key} style={{ padding: "0 15px 12px", maxHeight: "42vh", overflowY: "auto", flexShrink: 0 }}>
-              <OperationPanel op={op} thread={thread.id} client={client} draft={d}
-                instruments={cat.instruments} flags={thread.flags} inline
-                onDone={() => { setDrafts((all) => all.filter((x) => x.draft.operation !== d.operation)); onChanged(); }}
-                onCancel={() => setDrafts((all) => all.filter((x) => x.draft.operation !== d.operation))} />
-            </div>
-          ) : null;
-        })}
+        {/* WHAT USED TO BE HERE: the recording bar and every draft it
+            produced, stacked at the foot of the thread inside a 42vh
+            scroller. A clinical note is the one thing on this screen a
+            doctor has to READ BEFORE SIGNING, and it was the thing with the
+            least room -- a form in a letterbox, under the conversation it
+            came from. Both moved into the view beside the thread, which has
+            the width, and the thread went back to being a thread. */}
 
         <Composer
           about={head.name}
@@ -320,7 +351,35 @@ export function Encounter({
         />
       </div>
 
-      {folded ? (
+      {side ? (
+        <Side open={side} tabs={SIDES} onPick={setSide} onClose={() => setSide(null)}>
+          {side === "past" && <PastVisits visits={past} />}
+          {side === "scribe" && (
+            <>
+              {scribing !== null && (
+                <ScribeBar thread={thread.id} station={thread.station ?? ""} pick={scribing}
+                           onDrafts={(s) => setDrafts((all) => mergeDrafts(all, s.drafts, s.session))}
+                           onClose={() => { setScribing(null); setDrafts([]); }} />
+              )}
+              {drafts.map(({ draft: d, key }) => {
+                const op = cat.operations[d.operation];
+                return op ? (
+                  <OperationPanel key={key} op={op} thread={thread.id} client={client} draft={d}
+                    instruments={cat.instruments} flags={thread.flags} inline
+                    onDone={() => { setDrafts((all) => all.filter((x) => x.draft.operation !== d.operation)); onChanged(); }}
+                    onCancel={() => setDrafts((all) => all.filter((x) => x.draft.operation !== d.operation))} />
+                ) : null;
+              })}
+              {scribing === null && drafts.length === 0 && (
+                <div className="state-empty">
+                  Nothing has been dictated on this visit yet.<br />
+                  Start the microphone and what is heard appears here.
+                </div>
+              )}
+            </>
+          )}
+        </Side>
+      ) : folded ? (
         <button type="button" className="rail-open" onClick={() => fold(false)}
                 aria-label="Show the panels beside this visit">
           <Icon name="chev" className="i sm" />

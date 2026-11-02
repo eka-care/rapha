@@ -279,15 +279,32 @@ ok(!/mic-live/.test(rec) && !/Microphone live/.test(rec),
   ok(!/scribe|mic|dictat/i.test(rail), "scribe has no navigation item");
   ok(!/instrument|operations\b/.test(rail), "no operation reaches the rail at all");
 
-  // Started from the composer, the draft opens inline in the thread. A modal
-  // over the screen is the "persistent panel" §2.6 rules out, and it is also
-  // what put the recorder a full viewport away from its own microphone.
+  // WHERE THE DRAFT OPENS, AND WHY THIS CHANGED ON 2026-11-02.
+  //
+  // It used to be pinned inline in the thread, between the stream and the
+  // composer, and this check said why: a modal over the screen is the
+  // "persistent panel" §2.6 rules out, and it put the recorder a full
+  // viewport away from its own microphone.
+  //
+  // The objection was to a surface drawn OVER the thread. The owner has
+  // asked for a surface drawn BESIDE it -- "when someone starts scribe it
+  // also opens in another view within the session like canvas, with the
+  // live audiowave at the center and transcription" -- which does not take
+  // the thread away and does not hide the microphone. The reason the old
+  // rule existed is intact; the shape it forbade is not the shape we built.
+  //
+  // What is still true, and is what this now holds:
+  //   - the draft is the same panel every operation commits through
+  //   - it is inline inside that view, not a modal stacked on a modal
+  //   - the microphone opens the view, so nothing is a viewport away
   const enc = code(read("web/src/screens/Encounter.tsx"));
-  const dictation = enc.slice(enc.indexOf("{scribing && ("), enc.indexOf("<Composer"));
+  const dictation = enc.slice(enc.indexOf("<Side"), enc.indexOf("</Side>"));
   ok(dictation.includes("<OperationPanel"), "the draft surface is the same panel every operation uses");
-  ok(/\binline\b/.test(dictation), "drawn inline in the thread, not over it");
-  ok(enc.indexOf("{scribing && (") > enc.indexOf("<Stream"),
-    "and it sits between the thread and the composer that started it");
+  ok(/\binline\b/.test(dictation), "drawn inline in that view, not over it");
+  ok(dictation.includes("<ScribeBar"),
+    "and the recorder is in the same view as the draft it produces");
+  ok(/setSide\("scribe"\)/.test(enc),
+    "starting to dictate opens that view, so the recorder is never hidden");
 }
 
 // 5. The mic does not open a form, and the per-field tick is gone from every

@@ -151,9 +151,31 @@ composer's `/`; closed with Escape; remembered per person like the rail is.
 
 **The four views.** Each is a tab in `thread/Side.tsx`:
 
-- **Scribe** — what the microphone heard, the draft it produced, and the field
-  it mapped to. Today this is a bar over the composer with no room to check a
-  number; it is the one view a doctor will actually read before signing.
+- **Scribe — the canvas.** Owner's words, 2026-11-02: *"when someone starts
+  scribe it also opens in another view within the session like canvas, with
+  the live audiowave at the center and transcription."* So this is not a
+  panel that appears after the recording; it is where the recording happens.
+  Pressing the microphone opens it. Three things, in this order down the page:
+
+  1. **The waveform, centred and live.** It is the one thing on the screen
+     that proves the microphone is working, which a bar saying "Listening"
+     does not — a dead microphone says "Listening" too. Drawn from the audio
+     we are already capturing, through the Web Audio API, with no new
+     dependency and nothing extra sent anywhere.
+  2. **The transcription, as it arrives.** This is the part we cannot build
+     on the API we are on: today nothing comes back until the whole
+     consultation has been uploaded, transcribed and structured. Eka's
+     current API sends the raw transcript the moment recording ends, and its
+     streaming mode sends it while the person is still talking. **This view
+     is the reason to move**, and it is the same move §11 describes.
+  3. **The draft, and the field each value mapped to**, which the doctor
+     reads and signs. Today it is a form in a 42vh letterbox under the
+     conversation; here it has the width of the view.
+
+  Until the API moves, the waveform and the draft are real and the
+  transcript area says plainly that the words arrive when the recording
+  finishes. A panel that pretends to stream and does not is worse than one
+  that says what it is waiting for.
 - **Files** — this patient's records from the SDK, this visit's first, the rest
   under it. Read a report without leaving the visit.
 - **Ask about this patient** — the private doctor-to-agent conversation. Not in
@@ -186,6 +208,24 @@ These change what gets built, so they are the owner's.
    PHC adds a document, and it is also the fastest way to put an unconsented
    photograph into a national health record. I would ship file-pick first and
    camera only once there is an answer about consent.
+
+## 8a. The scribe delay, and why the canvas needs it fixed
+
+Measured, not assumed: 25 to 52 seconds of Eka processing for 92 seconds of
+audio, and the upload of the whole file happens only after recording stops,
+through our server, twice over the wire.
+
+Three separate costs, and the canvas is blocked on the third:
+
+1. **Nothing is sent until the doctor stops talking.** `MediaRecorder` is
+   started with no timeslice, so the first byte leaves after the last word.
+2. **It travels twice** — browser to our API, our API to Eka.
+3. **We show nothing until the structured note is finished**, and we find out
+   by asking every three seconds.
+
+Eka's current API fixes all three: chunked upload during recording, the raw
+transcript the moment recording ends, a streaming mode, and a notification
+instead of polling. The cost of moving is real and is named in §11.
 
 ## 9. Order of work
 

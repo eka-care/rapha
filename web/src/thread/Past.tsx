@@ -122,6 +122,55 @@ export function Trend({ now, visits }: { now: Visit; visits: Visit[] }) {
   );
 }
 
+/** BESIDE the thread: every earlier visit, with what each one recorded.
+ *
+ *  The rail's trend answers "is this number going the wrong way" and nothing
+ *  else, because one 300px column fits one sparkline. The question a doctor
+ *  actually opens history for is "what happened last time", and that is a
+ *  list of values per visit -- which has never been on this screen at all.
+ *  It is here rather than in the rail because it needs the width, and it
+ *  does not repeat the trend for the same reason the details card does not
+ *  repeat the header: one fact, one place.
+ *
+ *  Newest first. Today is not in it: today is the thread this sits beside.
+ */
+export function PastVisits({ visits }: { visits: Visit[] }) {
+  if (!visits.length) {
+    return (
+      <div className="state-empty">
+        No earlier visit is recorded for this patient.
+      </div>
+    );
+  }
+  return (
+    <div className="pastv">
+      {[...visits].reverse().map((v) => (
+        <section className="card" key={v.thread}>
+          <div className="card-h">
+            <div className="card-t">{v.when}</div>
+            <span className="badge b-mute ml-auto">
+              {v.values.length === 1 ? "1 value" : `${v.values.length} values`}
+            </span>
+          </div>
+          <div className="pastv-v">
+            {v.values.length === 0 ? (
+              // A visit that opened and recorded nothing is a real thing that
+              // happens, and saying so is better than an empty frame that
+              // reads as a page still loading.
+              <p className="rail-none">Nothing was recorded at this visit.</p>
+            ) : v.values.map((val) => (
+              <div className={`kv${val.crit ? " crit" : ""}`} key={val.link_id}>
+                <span>{val.label}</span>
+                <b>{val.value}</b>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 /** In the rail: who covers this patient, and who has been near this visit.
  *
  *  The two halves are different kinds of fact and are drawn as such. The
