@@ -4,8 +4,8 @@
  */
 import assert from "node:assert/strict";
 import {
-  apiBase, cameBackFromLogin, canFrameLogin, clientIdFor, gateApplies, loginBase,
-  loginUrl, returnTo, worthRefreshing,
+  apiBase, cameBackFromLogin, canFrameLogin, clientIdFor, gateApplies, hubBase,
+  loginBase, loginUrl, returnTo, whoIsThereUrl, worthRefreshing,
 } from "./client.ts";
 
 let checks = 0;
@@ -93,5 +93,18 @@ ok(!cameBackFromLogin("", true),
    "and framed alone is not it either, because this app may one day be "
    + "embedded somewhere on purpose");
 ok(!cameBackFromLogin("?mode=signup", true), "no other mode counts");
+
+
+// THE HUB, which is the question now and refresh-token is not.
+ok(hubBase("PROD") === "https://hub.eka.care", "production's hub");
+ok(hubBase(undefined) === "https://hub.dev.eka.care", "and dev's, by default");
+ok(hubBase("DEV") === "https://hub.dev.eka.care", "anything that is not PROD is dev");
+
+ok(whoIsThereUrl(undefined, "5").startsWith("https://hub.dev.eka.care/account/5/"),
+   "the read that proves a session goes to the hub account asked for");
+ok(whoIsThereUrl("PROD", "9").includes("/account/9/"),
+   "and carries the account it was given, not a baked in one");
+ok(!whoIsThereUrl(undefined, "5").includes("refresh-token"),
+   "and it is NOT the refresh route, which answered 400 to everybody and proved nothing");
 
 console.log(`ok   session rules: ${checks} checks`);

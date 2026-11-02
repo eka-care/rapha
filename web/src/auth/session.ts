@@ -21,7 +21,7 @@
  *  of it over https, and the browser has to have signed in to the Eka portal
  *  already. There is no debug mode and no hardcoded token here either.
  */
-import { apiBase, clientIdFor, loginBase } from "./client";
+import { apiBase, clientIdFor, loginBase, whoIsThereUrl, worthRefreshing } from "./client";
 
 export const ENV = import.meta.env.VITE_APP_ENV as string | undefined;
 export const API_BASE = apiBase(ENV);
@@ -32,6 +32,10 @@ export const CLIENT_ID = clientIdFor(
 );
 
 const REFRESH_URL = `${API_BASE}/connect-auth/v1/account/refresh-token`;
+
+/** nectar's own hub account, overridable the way it is there. */
+const HUB_ACCOUNT = (import.meta.env.VITE_HUB_ACCOUNT_ID as string) ?? "5";
+const HUB_URL = whoIsThereUrl(ENV, HUB_ACCOUNT);
 
 /** The native bridges, tried before the cookie.
  *
@@ -87,48 +91,81 @@ export interface Answer {
   said: number | "no answer" | "the app";
 }
 
-/** A new token, or not, and what Eka said. The app first, then the cookie. */
-export async function probe(): Promise<Answer> {
-  if (await throughTheApp()) return { ok: true, said: "the app" };
+/** Renew the token. A RETRY, not a question.
+ *
+ *  This is what refresh-token is for everywhere in nectar, and the only
+ *  thing it is for. Asking it whether somebody is signed in is what kept a
+ *  signed in person on the sign in screen.
+ */
+async function renew(): Promise<boolean> {
   try {
-    // AN EMPTY OBJECT, AND IT HAS TO BE THERE. With a real session Eka
+    // An empty object, and it has to be there. With a real session Eka
     // answered 400 and said so in as many words:
     //     {"error":{"code":"INVALID_REQUEST","message":"EOF"}}
     // "EOF" is a JSON decoder reaching the end of a body that was never
-    // sent. The route reads one before it looks at anything else, so a POST
-    // with no body is refused before the cookie is ever considered -- which
-    // is why this looked like a session problem and was not one.
-    //
-    // nectar sends no body (apps/abdm-parent's refreshToken,
-    // apps/abdm-records' fetchWrapper) and this file was ported from them.
-    // Those calls only run as a retry after a 401, so nobody there would
-    // have noticed. The cookie is still the whole credential: `{}` carries
-    // nothing, it just gives the decoder something to find.
+    // sent. nectar sends none, and nectar only ever calls this as a retry,
+    // so nobody there would have seen it.
     const res = await fetch(REFRESH_URL, {
       method: "POST",
       credentials: "include",
       headers: { "content-type": "application/json" },
       body: "{}",
     });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Is there a session? Asked by using one, which is nectar's own answer.
+ *
+ *  The hub read is the question; a refusal worth one retry gets one, and the
+ *  renewal above is that retry. Exactly `fetchConfig` in
+ *  apps/abdm-parent/src/main.ts, and for the same reason: a session is
+ *  proved by a call that needed it succeeding.
+ *
+ *  The body is never read. With no cookie the hub answers 302 to Eka's own
+ *  login and that redirect carries no CORS header, so the browser refuses to
+ *  follow it and the fetch throws -- which is why "no answer" here means
+ *  turned away at the gate rather than Eka being down.
+ */
+async function askTheHub(): Promise<Answer> {
+  try {
+    const res = await fetch(HUB_URL, {
+      credentials: "include",
+      headers: { "client-id": CLIENT_ID },
+    });
     return { ok: res.ok, said: res.status };
   } catch {
-    // Cross origin, so a refused refresh and an unreachable Eka arrive the
-    // same way. Neither is a session, and neither carries a status.
     return { ok: false, said: "no answer" };
   }
 }
 
-/** A new token, or false. */
+/** A session, or not, and what Eka said. The app first, then the cookie. */
+export async function probe(): Promise<Answer> {
+  if (await throughTheApp()) return { ok: true, said: "the app" };
+
+  const first = await askTheHub();
+  if (first.ok) return first;
+
+  // A cross origin refusal and a cross origin block arrive the same way, so
+  // "no answer" is nectar's FETCH_ERROR under another name.
+  const why = typeof first.said === "number" ? first.said : ("FETCH_ERROR" as const);
+  if (worthRefreshing(why) && await renew()) return askTheHub();
+  return first;
+}
+
+/** A session, or false. */
 export async function refresh(): Promise<boolean> {
   return (await probe()).ok;
 }
 
 /** Is somebody signed in?
  *
- *  Asked by refreshing, because there is no cheaper question: a refresh that
- *  succeeds proves the cookie is good, and one that fails is the same answer
- *  a 401 would give. nectar never asks separately either -- it calls the API
- *  it wants and refreshes when that is refused.
+ *  Asked by reading something that needs a session, because that is the only
+ *  honest way to ask: a read that succeeds proves the cookie is good. This
+ *  used to ask the refresh route instead, which proved nothing and answered
+ *  400 to everybody.
  */
 export const signedIn = refresh;
 
@@ -142,7 +179,8 @@ export const signedIn = refresh;
  * capability is missing -- replaying a refused write is the one thing a
  * retry must never do.
  *
- * So the rule lives in client.ts as `worthRefreshing`, checked, ready for
- * the first browser call to Eka that needs it, and nothing here pretends to
- * use it. An engine with no caller is an engine somebody calls by accident.
+ * So the rule lives in client.ts as `worthRefreshing`, and `probe` above is
+ * now its one caller: the hub read is a call to Eka's API, so a refusal
+ * there IS worth a renewal and a second try. Nothing wraps the kernel's own
+ * calls, and nothing should.
  */

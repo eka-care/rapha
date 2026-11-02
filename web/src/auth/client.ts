@@ -129,3 +129,39 @@ export function loginUrl(env: string | undefined, clientId: string, back: string
   const next = encodeURIComponent(back);
   return `${loginBase(env)}/auth/login?audience=${encodeURIComponent(clientId)}&next=${next}`;
 }
+
+/** Where Eka's hub is: the API that answers "is anybody signed in".
+ *
+ *  NOT THE REFRESH ROUTE, and that was the mistake. This app asked
+ *  `connect-auth/v1/account/refresh-token` whether a session existed, because
+ *  that is the only session call nectar has. But nectar never ASKS it
+ *  anything: in apps/abdm-parent/src/main.ts, apps/abdm, apps/nhcx and
+ *  apps/abdm-records alike, refresh-token runs only as a retry after a real
+ *  call came back 401, 403 or threw. Nobody there has ever seen its answer on
+ *  a first call, so nobody there would notice if it never gave a good one.
+ *
+ *  What nectar DOES ask is `fetchConfig`: an ordinary read of the hub, with
+ *  the cookie and the client id, and a retry if it is refused. The session is
+ *  proved by using it. So that is what this app asks too, and refresh-token
+ *  goes back to being the retry it is everywhere else.
+ */
+export function hubBase(env: string | undefined): string {
+  return env === "PROD" ? "https://hub.eka.care" : "https://hub.dev.eka.care";
+}
+
+/** The read whose refusal is the whole answer.
+ *
+ *  MEASURED: with no cookie, every hub path answers 302 to
+ *  `aortago.dev.eka.care/auth/login`, and that redirect carries no CORS
+ *  header, so the browser cannot follow it and the fetch throws. With a
+ *  cookie the gate passes the request through. So the only thing read off
+ *  this call is whether it arrived at all -- the body is never used, and the
+ *  path only has to be one the gate stands in front of.
+ *
+ *  The account is nectar's own (`VITE_HUB_ACCOUNT_ID`, default 5) because
+ *  that is the one request shape of theirs known to work. It is overridable
+ *  for the same reason it is overridable there.
+ */
+export function whoIsThereUrl(env: string | undefined, account: string): string {
+  return `${hubBase(env)}/account/${account}/configuration/?config_keys=clinics%2Cdoctors`;
+}
