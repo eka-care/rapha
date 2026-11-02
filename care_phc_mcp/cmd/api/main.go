@@ -573,6 +573,7 @@ var served = []struct {
 	{"/patients/pending", ""},
 	{"/patients/publish", "a publish needs a directory to publish TO, and Go has no vendor behind that seam"},
 	{"/abha/config", "G1 does not reach ABDM"},
+	{"/scribe/nudges/{station}", "G8 serves the outbox, and the scribe with it"},
 	{"/scribe/templates", "G8 serves the outbox, and the scribe with it"},
 	{"/scribe/sessions", "G8 serves the outbox, and the scribe with it"},
 	{"/scribe/sessions/{session_id}", "G8 serves the outbox, and the scribe with it"},

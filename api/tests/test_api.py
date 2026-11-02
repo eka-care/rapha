@@ -704,7 +704,13 @@ def test_templates_are_the_stations_and_the_callers():
     assert [c["title"] for c in body["choose"]][1:4] == \
         ["Review a long term condition", "Antenatal visit", "Follow up visit"], \
         "a template's title is the declaration's, not a renderer's"
-    assert "hi" in body["languages"] and "ta" in body["languages"]
+    # NO LANGUAGE LIST. Nothing picks one: every recording goes up as every
+    # language this facility supports and the service decides what it heard.
+    # A consultation at a primary health centre is not in one language, and
+    # asking somebody to predict their own before they speak cost them the
+    # transcript when they guessed wrong.
+    assert "languages" not in body, body
+    assert set(scribe.LANGUAGES["auto"]) >= {"hi", "ta"}, scribe.LANGUAGES["auto"]
     nurse_as_pharmacist = client.get("/api/scribe/templates?station=nurse&role=pharmacist").json()
     assert nurse_as_pharmacist["choose"] == [], "no capability, no template"
 

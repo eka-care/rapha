@@ -46,8 +46,22 @@ ok(!strip.some((c) => c.link_id === "history"),
 ok(carriedForward(today, null).length === 0 && carriedForward(null, before).length === 0,
    "a first visit has nothing to carry, and says so by drawing nothing");
 
+// Nine questions, all of them DIFFERENT between the two visits, because
+// `carriedForward` only carries what changed and the same visit twice now
+// carries nothing. That is the rule below this one.
 const wide = sep("t4", "x", Array.from({ length: 9 }, (_, i) => kv(`q${i}`, `Q${i}`, String(i + 1))));
-ok(carriedForward(wide, wide).length === STRIP, "the strip stops at four, so it stays a glance");
+const wider = sep("t5", "y", Array.from({ length: 9 }, (_, i) => kv(`q${i}`, `Q${i}`, String(i + 20))));
+ok(carriedForward(wider, wide).length === STRIP, "the strip stops at four, so it stays a glance");
+
+// AN ARROW FROM A VALUE TO ITSELF SAYS NOTHING. A returning patient's
+// header read "sam -> sam, 28 -> 28, male -> male" above the record: four
+// rows of furniture over the one row that moved.
+ok(carriedForward(wide, wide).length === 0,
+   "a value that did not change is not a change, and does not earn an arrow");
+ok(!carriedForward(sep("a", "n", [kv("name", "Name", "Sam"), kv("bp", "BP", "138")]),
+                   sep("b", "b", [kv("name", "Name", "Sam"), kv("bp", "BP", "132")]))
+     .some((c) => c.link_id === "name"),
+   "a name is the same on every visit, so it never belongs in a change strip");
 
 // The one clinical judgement on screen is the kernel's, not this file's.
 const flagged = carriedForward(

@@ -42,7 +42,7 @@
 import { useEffect, useState } from "react";
 import type { Client } from "../api";
 import { inert, inertReason, type Withheld } from "../grants";
-import { EXPANDS_TO, NAME } from "../brand";
+import { Icon } from "../icons";
 import type { Catalogue } from "../types";
 import { title } from "../words";
 
@@ -104,7 +104,7 @@ function groupsFor(cat: Catalogue): Group[] {
 }
 
 export function Roles({
-  cat, roleIds, facility, client, onClose,
+  cat, roleIds, facility, client,
 }: {
   cat: Catalogue;
   /** /facility's role list: the nine presets plus the demo union. Demo is not
@@ -116,7 +116,6 @@ export function Roles({
    *  a switch the guard refuses. */
   facility: Withheld;
   client: Client;
-  onClose: () => void;
 }) {
   const editable = roleIds.filter((r) => r !== "demo");
   const [role, setRole] = useState(editable[0] ?? "");
@@ -166,46 +165,31 @@ export function Roles({
     }
   };
 
+  // A SECTION OF A PAGE SINCE 2026-11-02, not a dialog. The name, the
+  // explanation and the close button went with the modal chrome: the page
+  // carries the first two in its own header and there is nothing to close.
   return (
-    <div className="mod mod-roles">
-      <div className="mod-bar" />
-      {/* The one place the tour starts again. Nothing else reopens it: a
-          tour that comes back on its own is an interruption. */}
-      <button
-        className="tour-again"
-        onClick={() => { try { localStorage.removeItem("phc.tour.seen"); } catch { /* private window */ }
-                         location.hash = "#/"; location.reload(); }}
-      >
-        Take the tour again
-      </button>
-      <div className="mod-h">
-        {/* The one place the name is spelled out. Beside the mark on every
-            screen it would be a gloss nobody needs twice. */}
-        <div className="eyebrow">{NAME} · {EXPANDS_TO}</div>
-        <div className="mod-t">Roles</div>
-        <p className="mod-sub">
-          What a person in each role may do at this centre. Saving applies at
-          once to everyone in that role; the shipped list stays untouched, so
-          Reset always works.
-        </p>
-        <label className="f-field roles-pick">
-          <span className="f-lab">Role</span>
-          <select
-            className="f-in"
-            value={role}
-            disabled={!editable.length}
-            onChange={(e) => setRole(e.target.value)}
-          >
+    <div className="cp-body">
+      <div className="cp-row">
+        <label className="cp-pick">
+          <span className="cp-pick-l">Role</span>
+          <select value={role} disabled={!editable.length}
+                  onChange={(e) => setRole(e.target.value)}>
             {editable.length
               ? editable.map((r) => (
                   <option key={r} value={r}>{roleName(r, cat)}</option>
                 ))
               : <option>No roles to edit</option>}
           </select>
+          <Icon name="chev" className="i sm" />
         </label>
+        <p className="cp-note cp-row-end">
+          Saving applies at once to everyone in that role. The shipped list
+          stays untouched, so Reset always works.
+        </p>
       </div>
 
-      <div className="mod-b">
+      <div className="cp-groups">
         {groups.map((g) => {
           // A capability this centre withholds is dead whether or not an
           // operation names it: the kernel has already taken it off the
@@ -266,18 +250,16 @@ export function Roles({
         {err && <div className="f-bad block">{err}</div>}
       </div>
 
-      <div className="mod-f">
-        <button
-          className="cq quiet"
-          disabled={busy || !role}
-          onClick={() => setCaps(new Set(presets[role] ?? []))}
-        >
+      <div className="cp-acts">
+        <button type="button" className="cp-quiet" disabled={busy || !role}
+                onClick={() => setCaps(new Set(presets[role] ?? []))}>
           Reset to preset
         </button>
-        <div className="roles-f-end">
-          <button className="cq" onClick={onClose} disabled={busy}>Close</button>
-          <button className="cq rose" onClick={save} disabled={busy || !role}>Save</button>
-        </div>
+        <span className="cp-acts-end">
+          <button type="button" className="cp-go" onClick={save} disabled={busy || !role}>
+            Save
+          </button>
+        </span>
       </div>
     </div>
   );

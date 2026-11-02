@@ -26,6 +26,7 @@ import { mergeDrafts, type Opened } from "../scribe/session";
 import { Stream } from "../thread/Thread";
 import { Carry, Team, Trend, usePast, visitOf } from "../thread/Past";
 import { Line } from "../view/View";
+import { RAIL, railFolded, railShown, setRailFolded, setRailShown, type RailId } from "./rail";
 import { human, title } from "../words";
 import { initialsOf } from "../agent";
 
@@ -86,6 +87,19 @@ export function Encounter({
    *  One person's national health number on another person's record is not a
    *  typo, it is the anti-goal: nothing merges two ABHA numbers and the
    *  patient carries the mistake permanently. */
+  /** THE RAIL IS THE PERSON'S, not the screen's. What it shows and whether
+   *  it is there at all is a setting on this device, because a doctor who
+   *  wants one panel is not deciding anything about the centre. The control
+   *  panel sets the same two values; see screens/rail.ts. */
+  const [shown, setShown] = useState<RailId[]>(() => railShown());
+  const [folded, setFolded] = useState(() => railFolded());
+  const drop = (id: RailId) => {
+    const next = shown.filter((x) => x !== id);
+    setShown(next);
+    setRailShown(next);
+  };
+  const fold = (now: boolean) => { setFolded(now); setRailFolded(now); };
+
   const [editing, setEditing] = useState<{ op: Operation; start: Payload } | null>(null);
   const [carried, setCarried] = useState<{ thread: string; payload: Payload } | null>(null);
   const [scribing, setScribing] = useState<string | null>(null);
@@ -109,6 +123,9 @@ export function Encounter({
     carriedInto(carried, thread.id, walk(questionnaire(op.input)?.questions ?? [])) as Payload | undefined;
 
   const head = useMemo(() => header(thread, queueViewFor(cat, thread.workflow), displayFor), [thread, cat]);
+  /** What the header line already says, so the rail does not say it again. */
+  const onHeader = useMemo(
+    () => new Set<string>([head.name, ...head.meta].filter(Boolean)), [head]);
   const msgs = useMemo(() => messages(thread, ctx, said), [thread, ctx, said]);
   const line = useMemo(() => agentLine(thread, ctx), [thread, ctx]);
 
@@ -161,7 +178,7 @@ export function Encounter({
   const todayVisit = useMemo(() => visitOf(thread, cat), [thread, cat]);
 
   return (
-    <div className="chatgrid">
+    <div className={`chatgrid${folded ? " folded" : ""}`}>
       <div className="card chatcard">
         <header className="pt-head">
           <span className="avatar">{initialsOf(head.name)}</span>
@@ -303,31 +320,65 @@ export function Encounter({
         />
       </div>
 
-      <aside className="panel" aria-label="Context">
-        <div className="card">
-          <div className="card-h">
-            <div className="card-t">Patient state</div>
-            <span className="badge b-mute ml-auto">
-              {thread.station ? human(thread.station) : "Complete"}
-            </span>
+      {folded ? (
+        <button type="button" className="rail-open" onClick={() => fold(false)}
+                aria-label="Show the panels beside this visit">
+          <Icon name="chev" className="i sm" />
+        </button>
+      ) : (
+        <aside className="panel" aria-label="Beside this visit">
+          <div className="rail-top">
+            <button type="button" className="rail-fold" onClick={() => fold(true)}>
+              <Icon name="chev" className="i sm" />
+              Hide
+            </button>
           </div>
-          <Line line={thread.line} />
-          {thread.nudge && <div className="nudge" style={{ margin: "0 12px 12px" }}>{thread.nudge}</div>}
-        </div>
 
-        <Details thread={thread} cat={cat} spine={spine ?? null} />
+          {/* WHAT USED TO BE HERE: the 16 raw capability codes this caller
+              holds, and the audit trail. Both are true and neither is a
+              clinician's. A nurse reading our capability ids beside a
+              patient's name is reading our schema, and the trail is every
+              row we wrote, which is a developer's view of their afternoon.
+              They belong behind the control panel, and this rail is for
+              what the thread cannot say. */}
+          {shown.includes("state") && (
+            <Panel id="state" onDrop={drop}>
+              <div className="card-h">
+                <div className="card-t">Where they are</div>
+                <span className="badge b-mute ml-auto">
+                  {thread.station ? title(human(thread.station)) : "Finished"}
+                </span>
+              </div>
+              <Line line={thread.line} />
+              {thread.nudge && <div className="nudge" style={{ margin: "0 12px 12px" }}>{thread.nudge}</div>}
+            </Panel>
+          )}
 
-        <Trend now={todayVisit} visits={past} />
+          {shown.includes("details") && (
+            <Panel id="details" onDrop={drop} bare>
+              <Details thread={thread} cat={cat} spine={spine ?? null} already={onHeader} />
+            </Panel>
+          )}
 
-        <Team thread={thread} cat={cat} catchment={catchment} />
+          {shown.includes("trend") && (
+            <Panel id="trend" onDrop={drop} bare>
+              <Trend now={todayVisit} visits={past} />
+            </Panel>
+          )}
 
-        {/* WHAT USED TO BE HERE: the 16 raw capability codes this caller holds,
-            and the audit trail. Both are true and neither is a clinician's.
-            A nurse reading our capability ids beside a patient's name is
-            reading our schema, and the trail is every row we wrote, which is
-            a developer's view of their afternoon. They belong behind the
-            control panel, and this rail is for what the thread cannot say. */}
-      </aside>
+          {shown.includes("team") && (
+            <Panel id="team" onDrop={drop} bare>
+              <Team thread={thread} cat={cat} catchment={catchment} />
+            </Panel>
+          )}
+
+          {shown.length === 0 && (
+            <p className="rail-none">
+              Nothing here. Add panels back in the control panel.
+            </p>
+          )}
+        </aside>
+      )}
 
       {editing && (
         <>
@@ -360,20 +411,53 @@ export function Encounter({
   );
 }
 
+/** The frame around one rail panel, carrying the one control a person needs
+ *  on it: take this away. `bare` is for a panel that draws its own card and
+ *  may draw nothing at all -- the remove button must not be the only thing
+ *  left when there is no trend yet. */
+function Panel({ id, onDrop, bare, children }: {
+  id: RailId; onDrop: (id: RailId) => void; bare?: boolean;
+  children: React.ReactNode;
+}) {
+  const name = RAIL.find((r) => r.id === id)?.title ?? id;
+  return (
+    <div className={`rail-slot${bare ? " bare" : " card"}`}>
+      {children}
+      <button type="button" className="rail-drop" aria-label={`Remove ${name}`}
+              onClick={() => onDrop(id)}>
+        <Icon name="plus" className="i sm" />
+      </button>
+    </div>
+  );
+}
+
 const TONE: Record<string, string> = { crit: "b-crit", warn: "b-warn", ok: "b-ok", mute: "b-mute" };
 
 /** §25: what is known about the subject. Headed with the word the workflow
  *  declares as its spine, never with the title of the operation that typed
  *  the values in -- that is provenance, and provenance lives on the thread. */
-function Details({ thread, cat, spine }: { thread: ThreadView; cat: Catalogue; spine: string | null }) {
+function Details({ thread, cat, spine, already }: {
+  thread: ThreadView; cat: Catalogue; spine: string | null;
+  /** The values the header above has ALREADY printed, so this card does not
+   *  print them a second time nine inches below. A patient's name, age and
+   *  village were on the header, in this card, and in the change strip
+   *  between them, which is three places for one fact on one screen.
+   *
+   *  Matched on the VALUE and not the field name, because the header
+   *  composes its line out of whatever the declaration gave it and this
+   *  card must not have to guess which fields those were. */
+  already: Set<string>;
+}) {
   const rows = useMemo(() => {
     const queue = queueViewFor(cat, thread.workflow);
     const subject = thread.subject ?? {};
     const keys = (queue?.columns ?? []).filter((k) => subject[k]);
     const extra = Object.keys(subject).filter(
       (k) => !keys.includes(k) && !/(^|_)id$|_date$|_by$|^status$/.test(k) && subject[k]);
-    return [...keys, ...extra].map((k) => ({ label: title(human(k)), value: String(subject[k]) }));
-  }, [thread.subject, thread.workflow, cat]);
+    return [...keys, ...extra]
+      .map((k) => ({ label: title(human(k)), value: String(subject[k]) }))
+      .filter((r) => !already.has(r.value));
+  }, [thread.subject, thread.workflow, cat, already]);
 
   // WHAT USED TO BE HERE: every committed record's values, drawn again. The
   // thread beside this rail already carries each of them, with who recorded

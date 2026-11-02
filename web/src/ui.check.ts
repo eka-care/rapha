@@ -169,7 +169,14 @@ const IMPLEMENTED = [
     // The declarations glob and the types mirror are allowed to name shapes;
     // neither renders. abha/ is the one accepted exception in this renderer:
     // ABHA is a national identifier, not a facility's concept.
-    if (/\/(types|declarations)\.ts$/.test(file) || /\/abha\//.test(file)) continue;
+    //
+    // words.ts is the third, and it is a SPELLING table rather than a
+    // vocabulary. Its list decides that "asha" is set ASHA and "ncd" is set
+    // NCD -- how the letters are drawn, never which words appear. Delete a
+    // role from the bundle and nothing on any screen changes; the entry just
+    // stops being reached. The rule this check protects is that the renderer
+    // must not DECIDE what is shown, and a casing table decides nothing.
+    if (/\/(types|declarations|words)\.ts$/.test(file) || /\/abha\//.test(file)) continue;
     const body = code(readFileSync(file, "utf8"));
     for (const { word, kind } of vocab) {
       // Only a quoted literal counts. A variable that happens to be spelled

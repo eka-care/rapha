@@ -41,11 +41,10 @@ async function ask(path: string, init: RequestInit): Promise<ScribeSession> {
 export type Templates = {
   default: string | null;
   choose: { operation: string; title: string }[];
-  languages: string[];
 };
 
-/** What this station may be recorded into, and the language choices, ahead of
- *  the microphone being pressed at all. */
+/** What this station may be recorded into, ahead of the microphone being
+ *  pressed at all. No language comes back: nothing picks one. */
 export async function templates(station: string): Promise<Templates> {
   const res = await fetch(`${API_BASE}${ROUTE.replace("/sessions", "/templates")}?station=${encodeURIComponent(station)}`,
                           { headers: { "X-PHC-Role": currentRole() } });
@@ -55,9 +54,14 @@ export async function templates(station: string): Promise<Templates> {
 
 /** Hand one recording to the kernel. The blob is the body: no multipart, no
  *  base64, and no field around it that could carry a patient's name. */
-export const startSession = (thread: string, audio: Blob, operations: string[], language: string) =>
+/** NO LANGUAGE ARGUMENT. Every recording goes up as every language this
+ *  facility supports and the service decides what it heard. A consultation
+ *  in a primary health centre is not in one language, and asking somebody
+ *  to predict their own before they speak cost them the transcript when
+ *  they guessed wrong. api/scribe.LANGUAGES says the same at length. */
+export const startSession = (thread: string, audio: Blob, operations: string[]) =>
   ask(`${ROUTE}?thread=${encodeURIComponent(thread)}&operations=${encodeURIComponent(operations.join(","))}` +
-      `&language=${encodeURIComponent(language)}`,
+      ``,
       { method: "POST", body: audio, headers: { "Content-Type": audio.type || "audio/webm" } });
 
 export const pollSession = (id: string) =>

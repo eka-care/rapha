@@ -221,7 +221,7 @@
   border-color: var(--color-accent);
   outline: 2px solid var(--color-accent); outline-offset: 1px;
 }
-.sb-call-go:focus-visible, .sb-pill:focus-visible, .tb-nv:focus-visible {
+.sb-call-go:focus-visible, .sb-filter-go:focus-visible, .tb-nv:focus-visible {
   outline: 2px solid var(--color-accent); outline-offset: 2px;
 }
 .sb-call-in::placeholder { color: var(--color-text-tertiary); }
@@ -233,16 +233,56 @@
 }
 .sb-call-go:hover { background: var(--color-agent-tint-hover); }
 
-.sb-pills { display: flex; gap: 5px; flex-wrap: wrap; padding: 0 12px 10px; }
-.sb-pill {
+/* ONE CONTROL, NOT TEN CHIPS. Every programme and every flag in the line
+   was a chip here, so a day with four programmes and three flags put eight
+   buttons above the people waiting: a filter bar taller than the thing it
+   filtered. */
+.sb-filter { position: relative; padding: 0 12px 10px; display: flex; gap: 6px; }
+.sb-filter-go {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: var(--radius-md); cursor: pointer;
   border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface);
-  color: var(--color-text-secondary); border-radius: var(--radius-pill);
-  padding: 3px 10px; font: inherit; font-size: 11.5px; cursor: pointer;
+  color: var(--color-text-secondary); font: inherit; font-size: 12px;
 }
-.sb-pill:hover { border-color: var(--color-border-strong); }
-.sb-pill.on {
+.sb-filter-go:hover { border-color: var(--color-border-strong); color: var(--color-text-primary); }
+.sb-filter-go.on {
   background: var(--color-agent-tint); border-color: var(--color-agent-line);
   color: var(--color-agent); font-weight: 550;
+}
+.sb-filter-go .i { flex-shrink: 0; }
+.sb-filter-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-filter-n {
+  margin-left: auto; flex-shrink: 0; font-variant-numeric: tabular-nums;
+  color: var(--color-text-tertiary);
+}
+.sb-filter-go.on .sb-filter-n { color: inherit; }
+.sb-filter-x {
+  flex-shrink: 0; display: grid; place-items: center; width: 29px;
+  border-radius: var(--radius-md); cursor: pointer;
+  border: 1px solid var(--color-border-subtle); background: transparent;
+  color: var(--color-text-tertiary);
+}
+.sb-filter-x:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+.sb-filter-x .i { transform: rotate(45deg); }
+
+.sb-filter-menu {
+  list-style: none; margin: 0; padding: 5px; z-index: 30;
+  position: absolute; top: calc(100% - 4px); left: 12px; right: 12px;
+  display: grid; gap: 1px; max-height: 300px; overflow-y: auto;
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md);
+  background: var(--color-bg-surface); box-shadow: var(--shadow-md);
+}
+.sb-filter-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 6px 9px; border-radius: var(--radius-sm); cursor: pointer;
+  border: none; background: transparent; color: var(--color-text-secondary);
+  font: inherit; font-size: 12.5px;
+}
+.sb-filter-item:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+.sb-filter-item.on { color: var(--color-agent); font-weight: 600; }
+.sb-filter-c {
+  margin-left: auto; font-variant-numeric: tabular-nums;
+  color: var(--color-text-tertiary);
 }
 
 /* The views moved up here from the rail. */

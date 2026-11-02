@@ -206,7 +206,10 @@ assert.ok(
 assert.deepEqual(head.meta, ["34", "female", "Sonpur"]);
 assert.ok(head.badges.some((b) => b.text === "2"), "the token is a badge, not part of the meta");
 assert.ok(
-  head.badges.some((b) => b.text === "abha pending" && b.style === "warn"),
+  // "ABHA", not "abha": words.ts sets the acronyms this health system is
+  // full of in capitals, because a screen that says "Abha pending" is a
+  // screen that has not read what it is printing.
+  head.badges.some((b) => b.text === "ABHA pending" && b.style === "warn"),
   "a flag is styled by the queue view's badge map, not by a regex over its name",
 );
 assert.ok(

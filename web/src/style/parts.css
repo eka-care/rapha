@@ -376,3 +376,140 @@
 /* The small mark above the wordmark went: with the flower drawn behind it,
    two daffodils were on screen at once, one of them a thumbnail of the
    other. */
+
+/* ── The control panel, which is a page ─────────────────────────────────── */
+
+.cp { display: grid; grid-template-columns: 232px 1fr; gap: 22px; align-items: start; }
+.cp-nav { display: grid; gap: 2px; position: sticky; top: 12px; }
+.cp-eyebrow { padding: 0 11px 10px; }
+.cp-tab {
+  display: flex; align-items: center; gap: 10px; text-align: left; width: 100%;
+  padding: 9px 11px; border-radius: var(--radius-md); cursor: pointer;
+  border: 1px solid transparent; background: transparent;
+  color: var(--color-text-secondary); font: inherit; font-size: 13.5px;
+}
+.cp-tab:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+.cp-tab.on {
+  background: var(--color-bg-selected); color: var(--color-text-primary);
+  font-weight: 600; border-color: var(--color-border-subtle);
+}
+.cp-tab .i { flex-shrink: 0; color: var(--color-text-tertiary); }
+.cp-tab.on .i { color: var(--color-accent); }
+
+.cp-pane { min-width: 0; display: grid; gap: 18px; }
+.cp-head { display: grid; gap: 5px; }
+.cp-t { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.02em; }
+.cp-s { margin: 0; font-size: 13.5px; color: var(--color-text-secondary); max-width: 62ch; }
+
+.cp-body { display: grid; gap: 14px; min-width: 0; }
+.cp-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.cp-row-end { margin-left: auto; max-width: 46ch; text-align: right; }
+
+.cp-pick { position: relative; display: inline-flex; align-items: center; gap: 9px; }
+.cp-pick-l { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); }
+.cp-pick select {
+  appearance: none; -webkit-appearance: none;
+  padding: 7px 30px 7px 12px; border-radius: var(--radius-md); cursor: pointer;
+  border: 1px solid var(--color-border-control); background: var(--color-bg-surface);
+  color: var(--color-text-primary); font: inherit; font-size: 13.5px; min-width: 180px;
+}
+.cp-pick select:hover { background: var(--color-bg-hover); }
+.cp-pick .i { position: absolute; right: 10px; pointer-events: none; color: var(--color-text-tertiary); }
+
+.cp-choices { display: grid; gap: 8px; }
+.cp-choice {
+  display: flex; align-items: flex-start; gap: 13px; width: 100%; text-align: left;
+  padding: 13px 14px; border-radius: var(--radius-lg); cursor: pointer;
+  border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+}
+.cp-choice:hover { border-color: var(--color-border-strong); background: var(--color-bg-hover); }
+.cp-choice.on { border-color: var(--color-accent-line); background: var(--color-accent-soft); }
+.cp-choice-i {
+  flex-shrink: 0; display: grid; place-items: center; width: 32px; height: 32px;
+  border-radius: var(--radius-md); background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+}
+.cp-choice.on .cp-choice-i { background: var(--color-accent); color: var(--color-cta-ink); }
+.cp-choice-b { display: grid; gap: 3px; min-width: 0; }
+.cp-choice-t { font-size: 14px; font-weight: 600; }
+.cp-choice-s { font-size: 12.5px; color: var(--color-text-secondary); line-height: 1.4; }
+.cp-choice-on { margin-left: auto; flex-shrink: 0; color: var(--color-accent); }
+
+.cp-nudges { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.cp-nudge { display: grid; grid-template-columns: 170px 1fr auto; gap: 8px; align-items: center; }
+.cp-in {
+  padding: 8px 11px; border-radius: var(--radius-md); min-width: 0;
+  border: 1px solid var(--color-border-control); background: var(--color-bg-surface);
+  color: var(--color-text-primary); font: inherit; font-size: 13.5px;
+}
+.cp-in:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -1px; }
+.cp-in.say { font-style: italic; }
+.cp-drop, .rail-drop {
+  flex-shrink: 0; display: grid; place-items: center; width: 30px; height: 30px;
+  border-radius: var(--radius-md); cursor: pointer;
+  border: 1px solid transparent; background: transparent; color: var(--color-text-tertiary);
+}
+.cp-drop:hover, .rail-drop:hover {
+  background: var(--color-critical-soft); color: var(--color-critical);
+  border-color: var(--color-critical-border);
+}
+.cp-drop .i, .rail-drop .i { transform: rotate(45deg); }
+
+.cp-acts { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.cp-acts-end { display: flex; align-items: center; gap: 9px; margin-left: auto; }
+.cp-quiet, .cp-go {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 15px; border-radius: var(--radius-pill); cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 550;
+}
+.cp-quiet {
+  border: 1px solid var(--color-border-control); background: transparent;
+  color: var(--color-text-secondary);
+}
+.cp-quiet:hover:not(:disabled) { background: var(--color-bg-hover); color: var(--color-text-primary); }
+.cp-go {
+  border: 1px solid var(--color-accent); background: var(--color-accent);
+  color: var(--color-cta-ink);
+}
+.cp-go:hover:not(:disabled) { background: var(--color-accent-hover); }
+.cp-quiet:disabled, .cp-go:disabled { opacity: .45; cursor: not-allowed; }
+
+.cp-note { margin: 0; font-size: 12.5px; color: var(--color-text-tertiary); }
+.cp-empty { margin: 0; font-size: 13.5px; color: var(--color-text-secondary); }
+.cp-bad { margin: 0; font-size: 13px; color: var(--color-critical); }
+.cp-ok { margin: 0; font-size: 13px; color: var(--color-success); }
+.cp-groups { display: grid; gap: 18px; }
+
+@media (max-width: 860px) {
+  .cp { grid-template-columns: 1fr; }
+  .cp-nav { position: static; grid-auto-flow: column; overflow-x: auto; }
+  .cp-eyebrow { display: none; }
+  .cp-nudge { grid-template-columns: 1fr auto; }
+  .cp-nudge .field { grid-column: 1 / -1; }
+  .cp-row-end { margin-left: 0; text-align: left; }
+}
+
+/* ── The rail beside a visit: folds away, and each panel can go ─────────── */
+
+.rail-top { display: flex; justify-content: flex-end; }
+.rail-fold, .rail-open {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: var(--radius-pill); cursor: pointer;
+  border: 1px solid var(--color-border-subtle); background: transparent;
+  color: var(--color-text-tertiary); font: inherit; font-size: 12px;
+}
+.rail-fold:hover, .rail-open:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+.rail-fold .i { transform: rotate(-90deg); }
+.rail-open { align-self: start; padding: 7px; }
+.rail-open .i { transform: rotate(90deg); }
+
+/* The remove control appears on the panel it would remove, and only when
+   the pointer is on it: four always-visible crosses down a rail read as four
+   things waiting to be dealt with. It is always reachable by keyboard. */
+.rail-slot { position: relative; }
+.rail-slot .rail-drop { position: absolute; top: 7px; right: 7px; opacity: 0; }
+.rail-slot:hover .rail-drop,
+.rail-slot .rail-drop:focus-visible { opacity: 1; }
+.rail-slot.bare:empty { display: none; }
+.rail-none { margin: 0; font-size: 12.5px; color: var(--color-text-tertiary); }

@@ -22,7 +22,7 @@ import { seenTour, Tour } from "./Tour";
 import { cameBackFromLogin, gateApplies } from "../auth/client";
 import { SignIn } from "../auth/SignIn";
 import { signedIn } from "../auth/session";
-import { Roles } from "../screens/Settings";
+import { Control } from "../screens/Control";
 import { Today } from "../screens/Today";
 import type { Facility, QueueRow, ViewDecl, ViewResult, Workflow } from "../types";
 import { IconSheet } from "../icons";
@@ -109,7 +109,10 @@ function useTheme() {
     return () => mq.removeEventListener("change", on);
   }, [theme]);
 
-  return [dark ? "dark" : "light", () => setTheme(dark ? "light" : "dark")] as const;
+  // The control panel sets the three-way preference; the topbar button only
+  // flips what is on screen. Both are here so there is one source of it.
+  return [dark ? "dark" : "light", () => setTheme(dark ? "light" : "dark"),
+          theme, setTheme] as const;
 }
 
 export function App() {
@@ -120,7 +123,7 @@ export function App() {
     return () => removeEventListener("hashchange", on);
   }, []);
 
-  const [theme, flipTheme] = useTheme();
+  const [theme, flipTheme, themePref, setThemePref] = useTheme();
 
   /** The Eka session, nectar's way: there is no login form here, only the
    *  question of whether one was done on Eka. `null` is "still asking".
@@ -439,14 +442,14 @@ export function App() {
                   />
                 )}
                 {route.kind === "settings" && (
-                  <Roles
+                  <Control
                     client={api} cat={catalogue}
                     roleIds={facility.data?.roles ?? []}
                     facility={{
                       withheld: facility.data?.withheld ?? {},
                       without: facility.data?.without ?? {},
                     }}
-                    onClose={() => go("#/")}
+                    theme={themePref} onTheme={setThemePref}
                   />
                 )}
                 {route.kind === "notfound" && (
@@ -497,7 +500,7 @@ export function App() {
 
 function titleFor(route: Route, views: ViewDecl[]): string {
   if (route.kind === "today") return "Today";
-  if (route.kind === "settings") return "Settings";
+  if (route.kind === "settings") return "Control panel";
   if (route.kind === "view") return views.find((v) => v.id === route.id)?.title ?? "List";
   if (route.kind === "thread") return "Encounter";
   if (route.kind === "patients") return "Patients";

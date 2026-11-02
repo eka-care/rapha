@@ -3,6 +3,7 @@
  *  filter, sort and search are held per view for the session.
  */
 import { useMemo, useState } from "react";
+import { Icon } from "../icons";
 import { say } from "../announce";
 import { displayFor } from "../declarations";
 import {
@@ -24,6 +25,7 @@ export function ListScreen({ result, decl, workflow, onOpenThread }: {
   onOpenThread?: (thread: string) => void;
 }) {
   const key = result.view;
+  const [riskOpen, setRiskOpen] = useState(false);
   const [state, setState] = useState(() => memory[key] ?? { q: "", sort: "recent" as SortKey, filter: null as Filter });
   const set = (next: Partial<typeof state>) => {
     const merged = { ...state, ...next };
@@ -106,17 +108,36 @@ export function ListScreen({ result, decl, workflow, onOpenThread }: {
     return { ...result, rows: sortRows(out, state.sort, decl) };
   }, [result, rows, state, decl, isQueue]);
 
+  // EVERY FLAG, not only the alarming ones. A flag is a thing that is true
+  // of a few people and that somebody goes looking for; a station and a
+  // programme are how the whole day is divided. The first kind belongs
+  // behind one control and the second stays in front, and which a tab is
+  // comes off its own filter rather than its colour.
+  const isFlag = (t: { filter: unknown }) =>
+    !!t.filter && typeof t.filter === "object" && "flag" in (t.filter as object);
+  const risky = tabs.filter((t) => !t.sep && isFlag(t));
+  const onRisk = risky.find((t) => JSON.stringify(state.filter) === JSON.stringify(t.filter));
+
   return (
     <div style={{ paddingBottom: 20 }}>
       {isQueue && rows.length > 0 && (
         <>
+          {/* WHERE THEY ARE, AS CHIPS. WHAT IS WRONG, BEHIND ONE CONTROL.
+              Fifteen chips in two rows was a filter bar taller than the
+              thing it filtered, and it gave a station and a flag the same
+              weight -- but where somebody is standing and what is wrong
+              with them are not the same question. Stations and programmes stay
+              visible because that is how a day is divided; the flags are
+              an exception somebody goes looking for, so they are one
+              button away. Which tab is which is the declaration's
+              (`risk`), not this file's. */}
           <div className="qtabs" role="group" aria-label="Filter this list">
-            {tabs.map((t, i) => (t.sep ? (
+            {tabs.filter((t) => !isFlag(t)).map((t, i) => (t.sep ? (
               <span className="qtab-sep" key={`sep-${i}`} aria-hidden="true" />
             ) : (
               <button
                 key={JSON.stringify(t.filter) + t.label}
-                className={`qtab${JSON.stringify(state.filter) === JSON.stringify(t.filter) ? " on" : ""}${t.risk ? " risk" : ""}${t.prog ? " prog" : ""}`}
+                className={`qtab${JSON.stringify(state.filter) === JSON.stringify(t.filter) ? " on" : ""}${t.prog ? " prog" : ""}`}
                 aria-pressed={JSON.stringify(state.filter) === JSON.stringify(t.filter)}
                 /* SC 4.1.3: pressing a chip rewrites the list below it and
                    moves nobody's focus. The chip already carries its count,
@@ -129,7 +150,41 @@ export function ListScreen({ result, decl, workflow, onOpenThread }: {
               </button>
             )))}
           </div>
+          {/* The flags control sits in the search row and not with the
+              station chips, because that row scrolls sideways and clips
+              what hangs out of it -- which is where this menu opened into
+              nothing the first time. */}
           <div className="tabs">
+          {risky.length > 0 && (
+            <span className="qtab-wrap">
+              <button type="button"
+                      className={`qtab flags${onRisk ? " on" : ""}`}
+                      aria-expanded={riskOpen} aria-haspopup="true"
+                      onClick={() => setRiskOpen((v) => !v)}>
+                <Icon name="sliders" className="i sm" />
+                {onRisk ? onRisk.label : "Needs attention"}
+                <span className="n">{onRisk ? onRisk.n : risky.reduce((a, t) => a + t.n, 0)}</span>
+              </button>
+              {riskOpen && (
+                <ul className="qtab-menu">
+                  {risky.map((t) => (
+                    <li key={JSON.stringify(t.filter) + t.label}>
+                      <button type="button"
+                              className={`qtab-item${onRisk === t ? " on" : ""}`}
+                              onClick={() => {
+                                set({ filter: t.filter });
+                                setRiskOpen(false);
+                                say(t.n === 1 ? "1 shown." : `${t.n} shown.`);
+                              }}>
+                        <span>{t.label}</span>
+                        <span className="qtab-c">{t.n}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </span>
+          )}
             <input
               className="input" type="search" value={state.q}
               placeholder="Search this list" aria-label="Search this list"

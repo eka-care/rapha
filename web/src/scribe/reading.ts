@@ -65,7 +65,7 @@ export type Reading = {
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function recordReading(thread: string, operation: string, language = "en-IN"): Reading {
+export function recordReading(thread: string, operation: string): Reading {
   let settle!: (h: Heard) => void;
   const heard = new Promise<Heard>((r) => (settle = r));
   let done = false;
@@ -85,7 +85,7 @@ export function recordReading(thread: string, operation: string, language = "en-
   const send = async (blob: Blob) => {
     let id = "";
     try {
-      let s = await startSession(thread, blob, [operation], language);
+      let s = await startSession(thread, blob, [operation]);
       id = s.session;
       for (let i = 0; i < TRIES && s.status === "running" && keep; i++) {
         await wait(POLL_MS);

@@ -85,6 +85,17 @@ ROLES[DEMO_ROLE] = sorted(vocab.CAPABILITIES)
 # facility shares this process.
 OVERRIDES: dict[str, list[str]] = {}
 
+# The examples the scribe screen shows, when a centre has changed them from
+# what bundle.yaml ships. Same shape and same honesty as OVERRIDES above:
+# in-process, one facility per kernel, lost on restart, and to be persisted
+# beside phc.sqlite3 when a second facility shares this process. It is
+# written down rather than hidden because a centre that edits its own
+# prompts and finds them gone on Monday will not edit them again.
+#
+# {station: [{"field": ..., "say": ...}]}. A station absent here uses the
+# bundle's own, which is the only reason a fresh kernel shows anything.
+NUDGES: dict[str, list[dict]] = {}
+
 
 # Which system of record. There is one: `local`, the SQLite file this
 # repository ships with. The CARE adapter was deleted because patients now live
@@ -258,6 +269,37 @@ def set_role(role: str, body: dict, request: Request):
     return {"role": role, "capabilities": caps}
 
 
+@router.put("/scribe/nudges/{station}")
+def set_nudges(station: str, body: dict, request: Request):
+    """A centre's own examples for one station's recording screen.
+
+    Guarded on `facility.admin` like the role editor, and for the same
+    reason: this is a change to how the centre works, not to one visit.
+
+    It stores SENTENCES and nothing else. Nothing here can name an
+    operation, a capability or a flag, so the worst a bad edit can do is
+    put unhelpful words on a screen -- which is why it needs no lint
+    beyond the two fields being there.
+    """
+    user = caller(request)
+    if "facility.admin" not in user["capabilities"]:
+        raise HTTPException(403, "missing capability facility.admin")
+    if station not in BUNDLE.scribe:
+        raise HTTPException(404, "no such station %r" % station)
+    given = body.get("nudges")
+    if not isinstance(given, list):
+        raise HTTPException(400, "nudges must be a list")
+    cleaned = []
+    for n in given:
+        field = str((n or {}).get("field") or "").strip()
+        say = str((n or {}).get("say") or "").strip()
+        if not field or not say:
+            raise HTTPException(400, "each example needs a field and a sentence")
+        cleaned.append({"field": field[:40], "say": say[:200]})
+    NUDGES[station] = cleaned
+    return {"station": station, "nudges": cleaned}
+
+
 @router.get("/whoami")
 def whoami(request: Request):
     """What the MCP server reads to build its tool list. Shape is frozen."""
@@ -269,9 +311,18 @@ def whoami(request: Request):
 def catalogue():
     """The compiled catalogue: the operations, and the four declaration types
     that join them."""
-    return dict(declarations.compile_json(BUNDLE),
-                capabilities=sorted(vocab.CAPABILITIES), bundles=vocab.BUNDLES,
-                states=sorted(vocab.STATES), operations=BUNDLE.operations)
+    compiled = dict(declarations.compile_json(BUNDLE),
+                    capabilities=sorted(vocab.CAPABILITIES), bundles=vocab.BUNDLES,
+                    states=sorted(vocab.STATES), operations=BUNDLE.operations)
+    # A centre's own examples replace the bundle's, station by station, so
+    # editing the doctor's prompts leaves the nurse's as they shipped.
+    if NUDGES:
+        scribe_cfg = {k: dict(v) for k, v in (compiled.get("scribe") or {}).items()}
+        for station, nudges in NUDGES.items():
+            if station in scribe_cfg:
+                scribe_cfg[station]["nudges"] = nudges
+        compiled["scribe"] = scribe_cfg
+    return compiled
 
 
 @router.get("/threads/{thread_id}")
@@ -915,9 +966,8 @@ def scribe_pick(user, names):
 @router.get("/scribe/templates")
 def scribe_templates(request: Request, station: str = ""):
     """What a recording may fill at this station, for this caller: the
-    station's own default and switcher from `BUNDLE.scribe`, narrowed to what
-    this person's capabilities allow, plus the languages a recording may be
-    made in."""
+    station's own default and switcher from `BUNDLE.scribe`, narrowed to
+    what this person's capabilities allow."""
     user = caller(request)
     allowed, _ = scribe_allowed(user)
     cfg = BUNDLE.scribe.get(station) or {}
@@ -925,7 +975,10 @@ def scribe_templates(request: Request, station: str = ""):
     default = cfg.get("default") if cfg.get("default") in choose else None
     return {"default": default,
             "choose": [{"operation": o, "title": BUNDLE.operations[o]["title"]} for o in choose],
-            "languages": list(scribe.LANGUAGES)}
+            # No language list. Nothing picks one: every recording goes up
+            # as `auto`, which is every language this facility supports, and
+            # the service decides what it heard. See api/scribe.LANGUAGES.
+            }
 
 
 def collect_if_consent_stands(session):
@@ -966,7 +1019,7 @@ def scribe_or_404(session_id, request):
 
 @router.post("/scribe/sessions")
 async def scribe_start(request: Request, thread: str = None, format: str = None,
-                       operations: str = "", language: str = "en-IN"):
+                       operations: str = "", language: str = "auto"):
     """The browser posts one recording here, as the raw body.
 
     Four refusals before a byte leaves this machine, in this order: consent,

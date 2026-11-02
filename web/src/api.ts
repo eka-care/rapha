@@ -166,6 +166,11 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ capabilities }),
     }),
+  /** A centre's own examples for one station's recording screen. Sentences
+   *  only: nothing here can name an operation, a capability or a flag. */
+  setNudges: (station: string, nudges: { field: string; say: string }[]) =>
+    req<{ station: string; nudges: { field: string; say: string }[] }>(
+      `/scribe/nudges/${station}/`, { method: "PUT", body: JSON.stringify({ nudges }) }),
 };
 
 /** What a screen needs to talk to a kernel. */

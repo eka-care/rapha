@@ -74,7 +74,10 @@
   color:var(--color-text-secondary);
 }
 .sc-x:hover { background:var(--color-bg-hover); color:var(--color-text-primary); }
-.sc-x .i { transform:rotate(180deg); }
+/* The glyph points DOWN at rest (icons.tsx i-chev), so a quarter turn
+   anticlockwise is the back arrow this button needs. It was a half turn,
+   which pointed it at the ceiling. */
+.sc-x .i { transform:rotate(90deg); }
 
 /* THE CONTROL IS A VOICE, not a picture of a microphone. */
 .sc-go {
@@ -194,9 +197,11 @@
 }
 .sc-pick select:hover:not(:disabled) { background:var(--color-bg-hover); }
 .sc-pick select:disabled { opacity:.55; cursor:not-allowed; }
+/* No rotation: the glyph already points down, which is what a select's
+   chevron says. The quarter turn that used to be here pointed it left. */
 .sc-pick .i {
   position:absolute; right:8px; pointer-events:none;
-  transform:rotate(90deg); color:var(--color-text-tertiary);
+  color:var(--color-text-tertiary);
 }
 
 .sc-rec-do { display:flex; align-items:center; gap:7px; margin-left:auto; }

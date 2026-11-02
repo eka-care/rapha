@@ -234,3 +234,30 @@
   background: var(--color-ghost); color: var(--color-text-secondary);
   display: grid; place-items: center; font-weight: 700; font-size: 12.5px; flex-shrink: 0;
 }
+
+/* The flag filters, behind one control. Fifteen chips in two rows gave a
+   station and an exception the same weight; "at the lab" and "vitals
+   flagged" are not the same kind of question. */
+.qtab-wrap { position: relative; display: inline-flex; }
+.qtab.flags { display: inline-flex; align-items: center; gap: 7px; }
+.qtab.flags .i { flex-shrink: 0; }
+.qtab-menu {
+  list-style: none; margin: 0; padding: 5px; z-index: 30; min-width: 220px;
+  position: absolute; top: calc(100% + 5px); left: 0;
+  display: grid; gap: 1px;
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md);
+  background: var(--color-bg-surface); box-shadow: var(--shadow-md);
+}
+.qtab-item {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 7px 10px; border-radius: var(--radius-sm); cursor: pointer;
+  border: none; background: transparent; color: var(--color-text-secondary);
+  font: inherit; font-size: 12.5px;
+}
+.qtab-item:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+/* NOT clinical red. That ink is the declared risk tone and a selected
+   menu row is not a risk; ui.check.ts refuses it anywhere else. The row's
+   own badge in the list below still carries the tone the declaration
+   gave it. */
+.qtab-item.on { color: var(--color-agent); font-weight: 600; }
+.qtab-c { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--color-text-tertiary); }

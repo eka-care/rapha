@@ -77,7 +77,7 @@ function Person({ row, cat, open, onToggle, onOpenThread, onOpenSubject }: {
   return (
     <div className={`reg-p${open ? " on" : ""}`}>
       <button className="reg-row" aria-expanded={open} onClick={onToggle}>
-        <span className="chev" aria-hidden="true">›</span>
+        <span className="chev" aria-hidden="true"><Icon name="chev" className="i sm" /></span>
         <span className="reg-av">{initialsOf(head.name)}</span>
         <span className="reg-b">
           <span className="reg-nm">{head.name}</span>

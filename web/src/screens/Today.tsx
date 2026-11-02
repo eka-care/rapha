@@ -100,13 +100,14 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
           </span>
         </h2>
 
-        {/* The one sentence this product exists to be able to say, and the
-            gate is what makes it true: no route writes without a person, and
-            no model fills a field. */}
-        <p className="hero-lede">
-          Every record here was committed by a person who was there.
-          Nothing on this screen was written by the system.
-        </p>
+        {/* WHAT WAS HERE: "Every record here was committed by a person who
+            was there. Nothing on this screen was written by the system."
+            True, and the whole point of the guard -- and it was two
+            sentences of reassurance over a list of people waiting, aimed at
+            a doubt nobody standing at a health centre has. The property is
+            enforced in catalogue/guard.py and proved in the kernel's own
+            checks, which is where it belongs; a screen does not earn trust
+            by claiming it. */}
 
         {/* A button that OPENS the command bar, so what looked like a field
             was a read-only input nested inside it: a second stop for the

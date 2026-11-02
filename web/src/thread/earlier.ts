@@ -48,6 +48,13 @@ export function carriedForward(now: Visit | null, before: Visit | null): Carried
   for (const v of now.values) {
     const was = then.get(v.link_id);
     if (!was || was.value === "" || v.value === "") continue;
+    // ONLY WHAT CHANGED. This strip is an arrow between two visits, and an
+    // arrow from a value to itself says nothing: a returning patient's
+    // header read "sam -> sam, 28 -> 28, male -> male" above the record,
+    // which is four rows of furniture over the one row that moved. A name
+    // and a sex do not change between Tuesday and Friday; a blood pressure
+    // does, and that is the only thing worth an arrow.
+    if (was.value === v.value) continue;
     out.push({ link_id: v.link_id, label: v.label, then: trim(was.value, v.value),
                now: v.value, crit: v.crit });
   }

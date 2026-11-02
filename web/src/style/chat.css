@@ -13,6 +13,9 @@
    artifact this screen is built from writes it this way for this reason. */
 .chatgrid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px;
   height: 100%; align-items: start; }
+/* Folded, the rail is one small control, and the visit takes the room back.
+   A column held open behind a hidden panel is the panel still being there. */
+.chatgrid.folded { grid-template-columns: minmax(0, 1fr) auto; }
 .chatcard { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 
 .pt-head {
@@ -46,11 +49,16 @@
   font: inherit; color: inherit; background: none; border: 0; cursor: pointer;
   padding: 2px 0; border-radius: var(--radius-sm);
 }
+/* A REAL GLYPH SINCE 2026-11-02, not the character. It was a typed ">"
+   at eleven pixels, which set at a different weight from every other mark
+   on the screen and could not inherit the icon colour. i-chev points DOWN
+   as drawn, so closed is a quarter turn back and open is the glyph itself. */
 .ev-h .chev {
-  color: var(--color-text-tertiary); font-size: 11px; line-height: 1;
-  transition: transform var(--duration-slow) var(--ease-out); display: inline-block;
+  color: var(--color-text-tertiary); line-height: 0; display: inline-flex;
+  transform: rotate(-90deg);
+  transition: transform var(--duration-slow) var(--ease-out);
 }
-.ev-h[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.ev-h[aria-expanded="true"] .chev { transform: rotate(0deg); }
 .ev-st {
   font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .08em;
   text-transform: uppercase; color: var(--color-eyebrow); white-space: nowrap;

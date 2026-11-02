@@ -121,10 +121,23 @@ def shaped_template(op_id, fields):
     _templates[op_id] = new_id
     return new_id
 
-# What a person picks in the bar, to what Eka is told was spoken. Hinglish is
-# two languages at once, which is how it is sent.
-LANGUAGES = {"en-IN": ["en-IN"], "hinglish": ["en-IN", "hi"], "hi": ["hi"],
-             "ta": ["ta"], "te": ["te"]}
+# What Eka is told was spoken. Hinglish is two languages at once, which is
+# how it is sent.
+#
+# NOBODY PICKS ONE ANY MORE. There was a dropdown on the recording bar and
+# it was a question with no good answer: a consultation in a primary health
+# centre is not in one language. A doctor asks in Hindi, the patient answers
+# in Bhojpuri-inflected Hindi, the drug name is English and the examination
+# is narrated in English with Hindi asides. Making somebody choose before
+# they speak is making them predict their own consultation, and getting it
+# wrong costs them the transcript.
+#
+# So every language this facility supports goes up on every recording and
+# the service decides what it heard, which is what it is for. `auto` is that
+# list, and it is the only value the kernel sends.
+_SPOKEN = {"en-IN": ["en-IN"], "hinglish": ["en-IN", "hi"], "hi": ["hi"],
+           "ta": ["ta"], "te": ["te"]}
+LANGUAGES = dict(_SPOKEN, auto=sorted({c for codes in _SPOKEN.values() for c in codes}))
 
 TRANSCRIPT_SECONDS = 24 * 3600
 

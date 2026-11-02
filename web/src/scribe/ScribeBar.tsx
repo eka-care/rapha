@@ -30,9 +30,6 @@ import { lastTemplate, pickMime, reasonFor, rememberTemplate, sentence, type Scr
 import "./scribe.css";
 
 const POLL_MS = 3000;
-const LANGUAGE_NAMES: Record<string, string> = {
-  "en-IN": "English", hinglish: "Hinglish", hi: "हिन्दी", ta: "தமிழ்", te: "తెలుగు",
-};
 
 type Phase = "idle" | "recording" | "uploading" | "waiting" | "ready" | "failed" | "withdrawn";
 
@@ -49,17 +46,16 @@ export function ScribeBar({ thread, station, pick: asked, onDrafts, onClose }: {
 }) {
   const [menu, setMenu] = useState<Templates | null>(null);
   const [template, setTemplate] = useState<string>("");
-  const [language, setLanguage] = useState("en-IN");
   const [phase, setPhase] = useState<Phase>("idle");
   const [session, setSession] = useState<ScribeSession | null>(null);
   const [note, setNote] = useState("");
   const [seconds, setSeconds] = useState(0);
 
   /** The picker as it is NOW. The upload runs from the recorder's onstop, set
-   *  up when recording began, and a language changed mid-consultation would be
-   *  lost reading state through that closure. */
-  const chosen = useRef({ template, language });
-  chosen.current = { template, language };
+   *  up when recording began, and a template switched mid-consultation
+   *  would be lost reading state through that closure. */
+  const chosen = useRef({ template });
+  chosen.current = { template };
 
   /** One outcome per recording. Two polls can be in flight at once, and both
    *  can come back ready: seen in a browser, where the second one reported a
@@ -230,8 +226,8 @@ export function ScribeBar({ thread, station, pick: asked, onDrafts, onClose }: {
 
   const upload = async (blob: Blob) => {
     try {
-      const { template: op, language: lang } = chosen.current;
-      const s = await startSession(thread, blob, [op], lang);
+      const { template: op } = chosen.current;
+      const s = await startSession(thread, blob, [op]);
       // Discarded or closed while the upload was in the air: the kernel has
       // it now, so tell it to keep nothing rather than poll for a draft.
       if (!keep.current || !alive.current) return void dropSession(s.session).catch(() => {});
@@ -310,14 +306,6 @@ export function ScribeBar({ thread, station, pick: asked, onDrafts, onClose }: {
         <Icon name="chev" className="i sm" />
       </label>
 
-      <label className="sc-pick">
-        <span className="u-sr">Language</span>
-        <select value={language} onChange={(e) => setLanguage(e.target.value)}
-                disabled={phase !== "idle" && !live && !over}>
-          {(menu?.languages ?? ["en-IN"]).map((l) => <option key={l} value={l}>{LANGUAGE_NAMES[l] ?? l}</option>)}
-        </select>
-        <Icon name="chev" className="i sm" />
-      </label>
 
       <span className="sc-rec-do">
         {live && <button className="sc-stop" onClick={stop}>Stop</button>}

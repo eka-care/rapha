@@ -9,6 +9,7 @@
  *  §10 lists eight object types. Task and Comment are not here: the kernel has
  *  no row behind either, and drawing one would be a picture of a product.
  */
+import { Icon } from "../icons";
 import { useState } from "react";
 import type { Client } from "../api";
 import { OperationPanel } from "../form/Panel";
@@ -130,7 +131,7 @@ function Fold({ tone, who, title, summary, at, badges, children }: {
       <div className={`m-av node ${tone}`} aria-hidden="true" />
       <div className="m-b">
         <button className="ev-h" aria-expanded={shown} onClick={() => setShown((v) => !v)}>
-          <span className="chev" aria-hidden="true">›</span>
+          <span className="chev" aria-hidden="true"><Icon name="chev" className="i sm" /></span>
           <span className="ev-st">{who}</span>
           <span className="ev-t">{title}</span>
           {badges}
