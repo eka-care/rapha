@@ -148,7 +148,14 @@ def ref_or_404(thread: str) -> ThreadRef:
                "status": rows[0].get("status"), "arrival": rows[0].get("arrival")}
     patient = store.select("patient", thread=thread, where={}, fields=[], limit=1)
     if patient:
-        subject.update(patient[0])
+        # WITHOUT `operation`, for the reason adapters/local/store.threads
+        # gives at the other place a subject is built: it is which form
+        # opened the row, so a correction can find it, and it is not a fact
+        # about the person. It reached the context rail as a line reading
+        # "Operation: phc.op.patient-register" beside somebody's village,
+        # which is our schema printed at a clinician. api/tests/test_api.py
+        # holds both paths to it.
+        subject.update({k: v for k, v in patient[0].items() if k != "operation"})
     return ThreadRef(id=thread, workflow=WORKFLOW.id, subject=subject,
                      opened_at=rows[0].get("created_date") or "")
 

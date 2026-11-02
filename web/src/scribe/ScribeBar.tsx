@@ -23,6 +23,7 @@
  *  audio rather than merely stopping it.
  */
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "../icons";
 import { currentRole, type ApiError } from "../api";
 import { dropSession, pollSession, refill, startSession, templates, type Templates } from "./client";
 import { lastTemplate, pickMime, reasonFor, rememberTemplate, sentence, type ScribeSession } from "./session";
@@ -278,29 +279,63 @@ export function ScribeBar({ thread, station, pick: asked, onDrafts, onClose }: {
     : "";
   const hint = sentence(phase === "waiting" ? "running" : phase, note);
 
+  const live = phase === "recording";
+  const busy = phase === "uploading" || phase === "waiting";
+
   return (
-    <div className="scribe-bar" role="status" aria-live="polite">
-      <span className={`scribe-dot ${phase === "recording" ? "on" : ""}`} aria-hidden />
-      {said && <span className="scribe-phase">{said}</span>}
-      <select aria-label="Template" value={template} onChange={(e) => void choose(e.target.value)}
-              disabled={!menu || phase === "uploading" || phase === "waiting"}>
-        {!template && <option value="">Choose a template</option>}
-        {menu?.choose.map((c) => <option key={c.operation} value={c.operation}>{c.title}</option>)}
-      </select>
-      <select aria-label="Language" value={language} onChange={(e) => setLanguage(e.target.value)}
-              disabled={phase !== "idle" && phase !== "recording" && !over}>
-        {(menu?.languages ?? ["en-IN"]).map((l) => <option key={l} value={l}>{LANGUAGE_NAMES[l] ?? l}</option>)}
-      </select>
-      {phase === "recording" && <button className="cq" onClick={stop}>Stop</button>}
-      {over && template && <button className="cq" onClick={() => void begin()}>Record again</button>}
-      {(phase === "recording" || phase === "uploading" || phase === "waiting" || phase === "ready") && (
-        <button className="cq" onClick={() => void withdraw()}>Discard</button>
-      )}
+    <div className={`sc-rec${live ? " on" : ""}`} role="status" aria-live="polite">
+      <span className="sc-rec-state">
+        {live ? (
+          <span className="sc-pulse" aria-hidden="true" />
+        ) : busy ? (
+          <span className="sc-spin" aria-hidden="true" />
+        ) : (
+          <span className="sc-rec-dot" aria-hidden="true" />
+        )}
+        {said && <span className="sc-rec-said">{said}</span>}
+      </span>
+
+      {/* Both pickers are the browser's `select` wearing this product's
+          clothes. They were bare: a white system dropdown and a default
+          grey button sat in the middle of a dark clinical screen, which is
+          what an unstyled control looks like and is the first thing
+          anybody notices. */}
+      <label className="sc-pick">
+        <span className="u-sr">Template</span>
+        <select value={template} onChange={(e) => void choose(e.target.value)}
+                disabled={!menu || busy}>
+          {!template && <option value="">Choose a template</option>}
+          {menu?.choose.map((c) => <option key={c.operation} value={c.operation}>{c.title}</option>)}
+        </select>
+        <Icon name="chev" className="i sm" />
+      </label>
+
+      <label className="sc-pick">
+        <span className="u-sr">Language</span>
+        <select value={language} onChange={(e) => setLanguage(e.target.value)}
+                disabled={phase !== "idle" && !live && !over}>
+          {(menu?.languages ?? ["en-IN"]).map((l) => <option key={l} value={l}>{LANGUAGE_NAMES[l] ?? l}</option>)}
+        </select>
+        <Icon name="chev" className="i sm" />
+      </label>
+
+      <span className="sc-rec-do">
+        {live && <button className="sc-stop" onClick={stop}>Stop</button>}
+        {over && template && <button className="sc-quiet" onClick={() => void begin()}>Record again</button>}
+        {(live || busy || phase === "ready") && (
+          <button className="sc-quiet" onClick={() => void withdraw()}>Discard</button>
+        )}
+        <button className="sc-quiet icon" onClick={close} aria-label="Close">
+          <Icon name="plus" className="i sm" />
+        </button>
+      </span>
+
       {phase === "ready" && session && session.drafts.length === 0 && (
-        <details><summary>Nothing to fill. Transcript</summary><p>{session.transcript}</p></details>
+        <details className="sc-rec-note">
+          <summary>Nothing to fill. Transcript</summary><p>{session.transcript}</p>
+        </details>
       )}
-      {hint && <span className="f-hint">{hint}</span>}
-      <button className="cq" onClick={close} aria-label="Close scribe">×</button>
+      {hint && <span className="sc-rec-note">{hint}</span>}
     </div>
   );
 }

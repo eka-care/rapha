@@ -841,6 +841,27 @@ def test_the_register_is_refused_without_the_capability_to_find_a_patient():
         del main.ROLES[role]
 
 
+def test_no_subject_carries_the_kernels_own_bookkeeping():
+    """`operation` is on every clinical row so that a correction can find the
+    rows its own form wrote. It is OUR schema, not a fact about a patient,
+    and it must not reach a screen.
+
+    Both paths are held, because there are two and they are in different
+    files: `ref_or_404` here builds one thread's subject, and the adapter's
+    `threads()` builds a queue's. The first version of this dropped it in
+    one of them, and the context rail went on printing a line reading
+    "Operation: phc.op.patient-register" beside somebody's village.
+    """
+    one = client.get("/api/threads/enc-003").json()["subject"]
+    assert one["name"], one
+    assert "operation" not in one, one
+
+    rows = client.get("/api/views/phc.view.station-queue").json()["rows"]
+    assert rows, "the queue is empty, so this check proves nothing"
+    for row in rows:
+        assert "operation" not in (row.get("subject") or {}), row
+
+
 if __name__ == "__main__":
     ran = 0
     for name, fn in sorted(globals().items()):

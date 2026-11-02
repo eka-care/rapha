@@ -6,18 +6,23 @@
  *  making. Only then does this appear, and from here speaking is the way in
  *  and the form is the way round.
  *
- *  SPEAKING IS THE PRODUCT. The forms are not: they are where what was heard
- *  lands, and a person checks it before it is kept. So the microphone is the
- *  big control and typing is a line of text beneath it, which is the reverse
- *  of how this screen used to read.
+ *  IT IS A VOICE, NOT A DEVICE. The control is the shape a voice makes, not a
+ *  picture of the thing you speak into: a microphone glyph is the hardware,
+ *  and the hardware is not what anybody is thinking about. The wave is at
+ *  rest until the pointer is on it, and it is still on `prefers-reduced-
+ *  motion`, because a thing that moves forever on a clinical screen is an
+ *  interruption.
  *
- *  THE NUDGES ARE EXAMPLES AND NOT A FORM, which is why they are worded as
- *  somebody speaking rather than as field labels. A consultation with a
- *  fourth reading, a finding nobody listed, or three medicines instead of one
- *  is recorded exactly the same way; nothing here narrows what the microphone
- *  accepts. They are on screen because a person who has just pressed record
- *  and does not know what to say will say nothing, and a blank screen is what
- *  sends a clinic back to paper.
+ *  THE EXAMPLES ARE NUDGES AND STAY NUDGE SIZED. They were a two column
+ *  table, then cards, and both were too much furniture for a hint: a card
+ *  reads as a thing you must fill in, which is the one thing these must not
+ *  be. Each is now one line somebody said, in quotation marks, with the part
+ *  of the record it fills in front of it.
+ *
+ *  There is no sentence underneath explaining that the list is not binding.
+ *  It was there and it was filler: nothing about a row of loose quoted
+ *  phrases suggests a form, so saying "not a list to stick to" only told
+ *  somebody to worry about something they were not worrying about.
  *
  *  They are DECLARED, in bundle.yaml under `scribe.<station>.nudges`, and
  *  this file types none of them. A centre whose doctors speak differently
@@ -27,6 +32,14 @@
 import { Icon } from "../icons";
 
 export type Nudge = { field: string; say: string };
+
+/** The wave's own shape. Fixed, not random: a control that is a different
+ *  object on every render is a control nobody learns the look of. Read as
+ *  relative heights, loudest in the middle, the way a sentence is. */
+const WAVE = [
+  12, 20, 34, 26, 48, 62, 40, 72, 88, 64, 96, 78, 100, 84,
+  100, 72, 92, 60, 80, 46, 66, 38, 52, 28, 36, 22, 16, 10,
+];
 
 export function ScribeStart({ title, nudges, reason, onStart, onType, onCancel }: {
   /** The operation's own title. The person just tapped it, and the screen
@@ -60,8 +73,11 @@ export function ScribeStart({ title, nudges, reason, onStart, onType, onCancel }
 
       <button type="button" className="sc-go" onClick={onStart} disabled={!!reason}
               title={reason} aria-label={reason || "Start speaking"}>
-        <span className="sc-go-ring" aria-hidden="true">
-          <Icon name="mic" className="i" />
+        <span className="sc-wave" aria-hidden="true">
+          {WAVE.map((h, i) => (
+            <span className="sc-bar" key={i}
+                  style={{ height: `${h}%`, animationDelay: `${i * 55}ms` }} />
+          ))}
         </span>
         <span className="sc-go-t">Start speaking</span>
         <span className="sc-go-s">{reason || "Say it in your own words. Check it after."}</span>
@@ -69,18 +85,15 @@ export function ScribeStart({ title, nudges, reason, onStart, onType, onCancel }
 
       {groups.length > 0 && (
         <div className="sc-nudges">
-          <p className="sc-nudges-h">Things you can say</p>
-          <ul className="sc-list">
-            {groups.map((g) => (
-              <li className="sc-n" key={g.field}>
-                <span className="sc-n-f">{g.field}</span>
-                <span className="sc-n-s">
-                  {g.says.map((s) => <span className="sc-n-q" key={s}>{s}</span>)}
-                </span>
+          <p className="sc-nudges-h">Things people say here</p>
+          <ul className="sc-says">
+            {groups.map((g) => g.says.map((say) => (
+              <li className="sc-say" key={say}>
+                <span className="sc-say-f">{g.field}</span>
+                <span className="sc-say-q">{say}</span>
               </li>
-            ))}
+            )))}
           </ul>
-          <p className="sc-foot">Not a list to stick to. Say whatever the visit needs.</p>
         </div>
       )}
 

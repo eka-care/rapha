@@ -145,6 +145,15 @@ func (k *kernel) refOr404(w http.ResponseWriter, thread string) (store.ThreadRef
 	}
 	if len(patient) > 0 {
 		for key, value := range patient[0] {
+			// WITHOUT `operation`, for the reason store.Threads gives at
+			// the other place a subject is built: it is which form opened
+			// the row, so a correction can find it, and it is not a fact
+			// about the person. It reached the context rail as a line
+			// reading "Operation: phc.op.patient-register" beside
+			// somebody's village, which is our schema shown to a clinician.
+			if key == "operation" {
+				continue
+			}
 			subject[key] = value
 		}
 	}

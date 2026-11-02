@@ -235,7 +235,14 @@ ok(/if \(!keep\.current \|\| !parts\.length\) return;/.test(rec),
    "a withdrawn recording is never uploaded");
 ok(/chunks\.current = \[\]/.test(rec), "and what was captured is dropped");
 ok(rec.indexOf("dropSession") > 0, "the kernel is told to keep nothing either");
-ok(/phase === "recording"[^\n]*\n?[^\n]*withdraw/.test(rec),
+// `live` is the bar's own name for phase === "recording", so both halves
+// are held: that the name means what it says, and that Discard is drawn
+// whenever it is true. Spelled against the name rather than against the
+// comparison, because the comparison moved into a const on 2026-11-02 and
+// the rule did not.
+ok(/const live = phase === "recording";/.test(rec),
+   "the bar no longer names the recording phase, so the rule below cannot see it");
+ok(/\{\(live \|\|[^)]*\) && \(\s*\n?[^\n]*withdraw/.test(rec),
    "the discard control is on the bar while recording");
 ok(/position:fixed/.test(read("web/src/scribe/scribe.css")),
    "the live indicator cannot be scrolled off the screen");
