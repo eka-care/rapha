@@ -113,6 +113,32 @@ export function Sidebar({
    *  call, and the box is absent rather than asking for one by a name the
    *  renderer made up. */
   const tokenWord = (line[0]?.decl.columns ?? []).find((c) => /token/i.test(c)) ?? "";
+  /** CALLING A NUMBER IS CALLING A PERSON, not searching for digits.
+   *
+   *  This column already holds the line and every row's number, so the
+   *  number resolves here: the thread whose token matches opens, which is
+   *  the patient walking up to the counter. It went to the front desk with
+   *  the digits in the search box instead, which is a different act -- that
+   *  is what you do when you do not know who someone is, and a token is the
+   *  one thing that says exactly who they are.
+   *
+   *  Loose on the comparison, because the board outside says 7 and the row
+   *  may carry "007" or "A-7", and a clerk retyping a number to make it
+   *  match is a clerk doing the computer's job.
+   */
+  const loose = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/^0+(?=\d)/, "");
+  const callOut = () => {
+    const want = loose(call.trim());
+    if (!want) return;
+    const hit = line.find(({ decl, row }) => loose(fields(decl, row).token) === want);
+    setCall("");
+    // NOT IN THE LINE IS NOT AN ERROR. A number nobody here holds is most
+    // often somebody who has not been registered yet, so it falls through
+    // to the desk with what was typed, which is where that is put right.
+    if (hit) goTo(`#/threads/${hit.row.thread}`);
+    else onCall(call.trim());
+  };
+
   const pills = chips(line);
   const shown = filter
     ? line.filter(({ decl, row }) => tags(line, row, decl).includes(filter))
@@ -167,7 +193,7 @@ export function Sidebar({
           keeps them, and this column is the line: call a number, narrow by
           programme, and the people. */}
       {tokenWord && (
-      <form className="sb-call" onSubmit={(e) => { e.preventDefault(); onCall(call.trim()); }}>
+      <form className="sb-call" onSubmit={(e) => { e.preventDefault(); callOut(); }}>
         <input
           className="sb-call-in"
           value={call}
