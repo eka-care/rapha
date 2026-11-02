@@ -14,6 +14,7 @@ import { api } from "../api";
 import { displayFor, questionnaire } from "../declarations";
 import { valuesOf } from "../messages";
 import type { Catalogue, ThreadView } from "../types";
+import { wrote } from "../types";
 import { human } from "../words";
 import {
   carriedForward, covers, heights, series, team, trendable,
@@ -53,12 +54,17 @@ export function usePast(thread: ThreadView, cat: Catalogue, spineId: string) {
 /** One visit's committed values, by the operation's own questionnaire. */
 export function visitOf(view: ThreadView, cat: Catalogue, when = ""): Visit {
   const ctx = { operations: cat.operations ?? {}, schema: questionnaire, badges: {}, display: displayFor };
-  const values = [];
+  // THE LAST VALUE WINS, which is what a correction means. The trail keeps
+  // every version of an answer and this strip shows what the visit SAYS, so
+  // a pulse keyed as 85 and corrected to 58 is 58 here. Pushing them all in
+  // order and showing the first was how the header went on reading 92 after
+  // somebody had already fixed it to 76.
+  const latest = new Map<string, ReturnType<typeof valuesOf>[number]>();
   for (const row of view.audit) {
-    if (!/^(committed|confirmed|allowed)/.test(row.outcome)) continue;
-    values.push(...valuesOf(ctx, row.operation, row.payload));
+    if (!wrote(row.outcome)) continue;
+    for (const v of valuesOf(ctx, row.operation, row.payload)) latest.set(v.link_id, v);
   }
-  return { thread: view.id, when: when ? day(when) : "Today", values };
+  return { thread: view.id, when: when ? day(when) : "Today", values: [...latest.values()] };
 }
 
 const day = (iso: string) =>

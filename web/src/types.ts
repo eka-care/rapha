@@ -341,3 +341,19 @@ export type RegisterRow = {
 };
 
 export type Register = { patients: RegisterRow[]; total: number };
+
+/** Audit outcomes that mean A CLINICAL FACT WAS WRITTEN.
+ *
+ *  catalogue/vocab.py WROTE, and ui.check.ts holds the two together. It was
+ *  three copies of a regular expression in this tree and two tuples in the
+ *  kernel, and when "amended" was added on 2026-11-02 four of them silently
+ *  went on showing the value from before the correction. A screen that
+ *  disagrees with the record about a patient's pulse is the worst drift
+ *  there is.
+ *
+ *  `proposed` is a request and not a write; a denial is the opposite of one.
+ */
+export const WROTE = ["committed", "confirmed", "allowed", "amended"] as const;
+
+/** Did this audit line write something? */
+export const wrote = (outcome: string) => WROTE.some((w) => outcome.startsWith(w));

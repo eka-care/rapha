@@ -49,7 +49,7 @@ threads:
     token: "1"
     status: in_progress
     minutes_ago: 45
-    patient: {name: Kamala Devi, age: 34, sex: female, phone: "9800000002",
+    patient: {operation: phc.op.patient-register, name: Kamala Devi, age: 34, sex: female, phone: "9800000002",
               village: Sonpur, category: anc}
     audit:
       - operation: phc.op.patient-register
@@ -65,26 +65,28 @@ threads:
     token: "5"
     status: in_progress
     arrival: poster
-    patient: {name: Ramesh Kumar, age: 61, sex: male, phone: "9800000003",
+    patient: {operation: phc.op.patient-register, name: Ramesh Kumar, age: 61, sex: male, phone: "9800000003",
               village: Bhagwanpur, category: ncd,
               abha_number: "12-3456-7890-1234"}
     rows:
-      - {resource: observation, status: final, category: vital-signs,
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
          code: "8480-6", code_system: "http://loinc.org", code_display: "Systolic blood pressure",
          value: 186, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, status: final, category: vital-signs,
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
          code: "8462-4", code_system: "http://loinc.org", code_display: "Diastolic blood pressure",
          value: 112, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, status: final, category: vital-signs,
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
          code: "8867-4", code_system: "http://loinc.org", code_display: "Heart rate",
          value: 92, unit: "/min", unit_system: "http://unitsofmeasure.org"}
       # What the handover and its reply wrote. handover.raised is derived from
       # the first of these, which is what puts Reply on the doctor's screen.
       - resource: questionnaire_response
+        operation: phc.op.handover
         questionnaire: phc.schema.handover-v1
         created_by: "user:nurse"
         payload: {to: mo, note: "BP 190/125 on two readings, headache since morning. Please see before the queue.", priority: urgent}
       - resource: questionnaire_response
+        operation: phc.op.handover-reply
         questionnaire: phc.schema.handover-reply-v1
         created_by: "user:mo"
         payload: {comment: "Coming now. Keep her in the side room.", state: acknowledged}
@@ -122,21 +124,21 @@ threads:
     token: "4"
     status: in_progress
     arrival: poster
-    patient: {name: Iqbal Ahmed, age: 52, sex: male, phone: "9800000004",
+    patient: {operation: phc.op.patient-register, name: Iqbal Ahmed, age: 52, sex: male, phone: "9800000004",
               village: Sonpur, category: general,
               abha_number: "12-3456-7890-5678"}
     rows:
-      - {resource: observation, status: final, category: vital-signs,
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
          code: "8480-6", code_system: "http://loinc.org", code_display: "Systolic blood pressure",
          value: 118, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, status: final, category: vital-signs,
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
          code: "8462-4", code_system: "http://loinc.org", code_display: "Diastolic blood pressure",
          value: 76, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, status: final, category: vital-signs,
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
          code: "8867-4", code_system: "http://loinc.org", code_display: "Heart rate",
          value: 92, unit: "/min", unit_system: "http://unitsofmeasure.org"}
-      - {resource: notes, text: "Fever three days, no red flags on examination."}
-      - {resource: service_request, code: CBC, status: active}
+      - {resource: notes, operation: phc.op.consult-document, text: "Fever three days, no red flags on examination."}
+      - {resource: service_request, operation: phc.op.lab-order, code: CBC, status: active}
     # Said no to the recording. The consultation was typed, the queue badges
     # the visit declined, and nothing asks again.
     flags: [capture.declined]
@@ -174,25 +176,25 @@ threads:
   - id: enc-005
     token: "3"
     status: in_progress
-    patient: {name: Sunita Bai, age: 27, sex: female, phone: "9800000005",
+    patient: {operation: phc.op.patient-register, name: Sunita Bai, age: 27, sex: female, phone: "9800000005",
               village: Rampur, category: general}
     rows:
-      - {resource: observation, status: final, category: vital-signs,
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
          code: "8480-6", code_system: "http://loinc.org", code_display: "Systolic blood pressure",
          value: 118, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, status: final, category: vital-signs,
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
          code: "8462-4", code_system: "http://loinc.org", code_display: "Diastolic blood pressure",
          value: 76, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, status: final, category: vital-signs,
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
          code: "8867-4", code_system: "http://loinc.org", code_display: "Heart rate",
          value: 92, unit: "/min", unit_system: "http://unitsofmeasure.org"}
-      - {resource: notes, text: "Fever three days, no red flags on examination."}
+      - {resource: notes, operation: phc.op.consult-document, text: "Fever three days, no red flags on examination."}
       # A prescription line is five columns now, not a sentence, and the
       # codes are the value sets' own. Oral rehydration salts are advised in
       # the plan narrative and not prescribed here, because this build cannot
       # code them: the medicine value set is six primary level essential
       # medicines and it says in the file that it is not a formulary.
-      - {resource: medication_request,
+      - {resource: medication_request, operation: phc.op.rx-prescribe,
          medication: "777067000", medication_system: "http://snomed.info/sct",
          medication_display: "Acetaminophen only product",
          dose: 500, dose_unit: "mg", dose_unit_system: "http://unitsofmeasure.org",
@@ -241,26 +243,26 @@ threads:
   - id: enc-006
     token: "2"
     status: completed
-    patient: {name: Meera Patel, age: 45, sex: female, phone: "9800000006",
+    patient: {operation: phc.op.patient-register, name: Meera Patel, age: 45, sex: female, phone: "9800000006",
               village: Rampur, category: ncd,
               abha_number: "12-3456-7890-9012"}
     rows:
-      - {resource: observation, status: final, category: vital-signs,
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
          code: "8480-6", code_system: "http://loinc.org", code_display: "Systolic blood pressure",
          value: 118, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, status: final, category: vital-signs,
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
          code: "8462-4", code_system: "http://loinc.org", code_display: "Diastolic blood pressure",
          value: 76, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, status: final, category: vital-signs,
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
          code: "8867-4", code_system: "http://loinc.org", code_display: "Heart rate",
          value: 92, unit: "/min", unit_system: "http://unitsofmeasure.org"}
-      - {resource: notes, text: "Fever three days, no red flags on examination."}
+      - {resource: notes, operation: phc.op.consult-document, text: "Fever three days, no red flags on examination."}
       # A prescription line is five columns now, not a sentence, and the
       # codes are the value sets' own. Oral rehydration salts are advised in
       # the plan narrative and not prescribed here, because this build cannot
       # code them: the medicine value set is six primary level essential
       # medicines and it says in the file that it is not a formulary.
-      - {resource: medication_request,
+      - {resource: medication_request, operation: phc.op.rx-prescribe,
          medication: "777067000", medication_system: "http://snomed.info/sct",
          medication_display: "Acetaminophen only product",
          dose: 500, dose_unit: "mg", dose_unit_system: "http://unitsofmeasure.org",
@@ -271,9 +273,9 @@ threads:
          duration: 3, duration_unit: "d",
          duration_unit_system: "http://unitsofmeasure.org",
          intent: order, status: active}
-      - {resource: medication_dispense, medication: Paracetamol 500mg,
+      - {resource: medication_dispense, operation: phc.op.pharmacy-dispense, medication: Paracetamol 500mg,
          quantity: "1", status: completed}
-      - {resource: medication_dispense, medication: ORS sachet,
+      - {resource: medication_dispense, operation: phc.op.pharmacy-dispense, medication: ORS sachet,
          quantity: "1", status: completed}
     audit:
       - operation: phc.op.patient-register
@@ -332,13 +334,13 @@ threads:
     same_patient_as: enc-003
     minutes_ago: 129600          # ninety days, so the timeline has a gap in it
     rows:
-      - {resource: observation, status: final, category: vital-signs,
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
          code: "8480-6", code_system: "http://loinc.org", code_display: "Systolic blood pressure",
          value: 148, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: observation, status: final, category: vital-signs,
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
          code: "8462-4", code_system: "http://loinc.org", code_display: "Diastolic blood pressure",
          value: 94, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
-      - {resource: notes, text: "Raised pressure on two readings. Advised salt reduction, review in three months."}
+      - {resource: notes, operation: phc.op.consult-document, text: "Raised pressure on two readings. Advised salt reduction, review in three months."}
     flags: [vitals.flagged]
     audit:
       - operation: phc.op.vitals-record

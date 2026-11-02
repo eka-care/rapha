@@ -67,7 +67,7 @@ TABLES = {
     # disagree about whether somebody gets published twice.
     "patient": ("id", "name", "age", "sex", "phone", "village", "category",
                 "abha_number", "directory_id", "directory_synced",
-                "created_by", "created_date"),
+                "operation", "created_by", "created_date"),
     # `arrival` is how the person got into the queue: at the desk, or by
     # themselves at the printed poster. It sits on the encounter and not on
     # the patient because it is a fact about THIS visit: the same person
@@ -76,7 +76,7 @@ TABLES = {
     # Written once, when the thread is opened, which is the moment it is
     # true; nothing else may set it.
     "encounter": ("id", "patient", "status", "token", "arrival",
-                  "created_by", "created_date"),
+                  "operation", "created_by", "created_date"),
     # A coding is three columns, not one: the code, the system it is from, and
     # the display the value set gave it. Flat, because a district count is
     # `WHERE code = '8480-6'` and a trend is an ORDER BY, and both want a
@@ -97,7 +97,7 @@ TABLES = {
     # laboratory value read as a settled one to every consumer of the record.
     "observation": ("id", "encounter", "category", "code", "code_system",
                     "code_display", "value", "unit", "unit_system", "status",
-                    "created_by", "created_date"),
+                    "operation", "created_by", "created_date"),
     # A diagnosis is a coded condition, a clinical status, a verification
     # status and an onset, each of the three codes carrying the system it came
     # from. Flat for the reason observation is flat: a district count of a
@@ -105,8 +105,8 @@ TABLES = {
     "condition": ("id", "encounter", "code", "code_system", "code_display",
                   "clinical_status", "clinical_status_system",
                   "verification_status", "verification_status_system",
-                  "onset", "created_by", "created_date"),
-    "notes": ("id", "encounter", "text", "created_by", "created_date"),
+                  "onset", "operation", "created_by", "created_date"),
+    "notes": ("id", "encounter", "text", "operation", "created_by", "created_date"),
     # A prescription line is five answers, not a sentence. `dosage_instruction`
     # is gone: it held the dose and the frequency as prose, so neither could be
     # counted and neither reached ABDM as a Dosage.
@@ -122,24 +122,24 @@ TABLES = {
                            # kernel/fhir.py where the projection would be
                            # deciding what a prescription is.
                            "intent",
-                           "status", "created_by", "created_date"),
+                           "status", "operation", "created_by", "created_date"),
     "medication_dispense": ("id", "encounter", "medication", "quantity", "status",
-                            "created_by", "created_date"),
+                            "operation", "created_by", "created_date"),
     "service_request": ("id", "encounter", "code", "status",
-                        "created_by", "created_date"),
+                        "operation", "created_by", "created_date"),
     # `code_system` for the same reason observation has one: a code with no
     # system is unresolvable in FHIR R4 and unexportable to ABDM. No
     # code_display here, because a report is read through its observations and
     # duplicating the display on both rows is two places for one fact.
     "diagnostic_report": ("id", "encounter", "code", "code_system", "conclusion",
-                          "status", "created_by", "created_date"),
-    "specimen": ("id", "encounter", "code", "status", "created_by", "created_date"),
+                          "status", "operation", "created_by", "created_date"),
+    "specimen": ("id", "encounter", "code", "status", "operation", "created_by", "created_date"),
     "inventory_item": ("id", "encounter", "code", "quantity", "status",
-                       "created_by", "created_date"),
+                       "operation", "created_by", "created_date"),
     "questionnaire_response": ("id", "encounter", "questionnaire", "payload",
-                               "created_by", "created_date"),
+                               "operation", "created_by", "created_date"),
     "token_booking": ("id", "encounter", "patient", "status",
-                      "created_by", "created_date"),
+                      "operation", "created_by", "created_date"),
     # the kernel's own records
     "thread_flag": ("id", "thread", "flag", "created_by", "created_date"),
     "proposal": ("id", "thread", "operation", "payload", "proposed_by", "surface",
@@ -148,6 +148,22 @@ TABLES = {
     "audit": ("id", "thread", "operation", "actor", "surface", "payload",
               "outcome", "at", "proposal"),
 }
+
+# `operation` on every per-encounter row: WHICH declared operation wrote it.
+#
+# Added 2026-11-02 so that a record can be corrected. A visit's rows can only
+# be rewritten if the kernel can find the ones a given operation produced,
+# and without this column it could not: a consultation and a nurse's vitals
+# both write `observation` on the same thread, so "the observations on this
+# thread" would have had the doctor's correction overwrite the nurse's
+# readings. That is not a cosmetic bug, so the join is a column rather than
+# an assumption.
+#
+# It is the adapter's own bookkeeping in the sense that no declaration reads
+# it, and the kernel's in the sense that the kernel fills it. Null on every
+# row written before today, which is truthful: nobody recorded it then, and
+# kernel/proposals.amend refuses a record it cannot locate rather than
+# guessing.
 
 # The facility's day sequence counter, and the one table in this file whose
 # key is not a single `id` column. It is created by hand below rather than
@@ -388,7 +404,14 @@ class SqliteStore:
                 patient = self.db.execute(
                     "SELECT * FROM patient WHERE id = ?", [row["patient"]]).fetchone()
                 if patient:
-                    subject.update(dict(patient))
+                    # WITHOUT `operation`. It is this adapter's own
+                    # bookkeeping -- which form opened the row, so a
+                    # correction can find it -- and not a fact about the
+                    # person. It reached the context rail as a line reading
+                    # "Operation: phc.op.patient-register" beside somebody's
+                    # village, which is our schema printed at a clinician.
+                    subject.update({k: v for k, v in dict(patient).items()
+                                    if k != "operation"})
             out.append(ThreadRef(id=row["id"], workflow=workflow, subject=subject,
                                  opened_at=row["created_date"] or ""))
         return out
@@ -487,7 +510,14 @@ class SqliteStore:
             # thread's declared age (see seed()'s own `minutes_ago`) vanish
             # the instant its patient row was written, and would do the same
             # to a real visit's wait-rule clock the moment ABHA linking ran.
-            sets = [k for k in record if k not in ("id", "created_by", "created_date")]
+            # `operation` joins the write-once pair for the same reason they
+            # are there: it is WHICH FORM OPENED this row, and linking an
+            # ABHA re-writes the patient row registration created. Letting
+            # it move would mean a clerk correcting a misspelt name found
+            # nothing to correct, because the row would by then say it
+            # belonged to the linking operation.
+            sets = [k for k in record
+                    if k not in ("id", "created_by", "created_date", "operation")]
             self.db.execute(
                 "UPDATE %s SET %s WHERE id = ?"
                 % (_table(resource), ", ".join("%s = ?" % k for k in sets)),
@@ -812,7 +842,14 @@ def seed(store, threads=None):
         elif t.get("patient"):
             # write(), not _put(): attaching the person to the thread is the
             # adapter's own join and it is already written down once.
-            patient_of[thread] = store.write("patient", stamped(t["patient"]), thread=thread)
+            # The patient row carries `operation:` like every other seeded
+            # row: WHICH FORM OPENED IT, so a clerk can correct a misspelt
+            # name on a demo thread. It is the SEED's word and never this
+            # file's -- an operation id typed here would be one bundle's
+            # vocabulary written into an adapter every bundle uses, which
+            # bundles/lab/check.py rightly refuses.
+            patient_of[thread] = store.write("patient", stamped(t["patient"]),
+                                             thread=thread)
         for record in t.get("rows") or []:
             record = dict(record)
             store._put(record.pop("resource"), stamped(record), thread=thread)

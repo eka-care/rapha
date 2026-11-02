@@ -16,6 +16,7 @@ import { Icon } from "../icons";
 import { header, queueViewFor, valuesOf } from "../messages";
 import { Failed, Loading } from "../parts";
 import type { Catalogue, SubjectView, ThreadView } from "../types";
+import { wrote } from "../types";
 import { human, title } from "../words";
 
 type Tab = "overview" | "encounters" | "timeline";
@@ -197,7 +198,7 @@ function Timeline({ view, onOpenThread }: { view: SubjectView; onOpenThread: (t:
 function committed(thread: ThreadView, cat: Catalogue) {
   const ctx = { operations: cat.operations ?? {}, schema: questionnaire, badges: {}, display: displayFor };
   return (thread.audit ?? [])
-    .filter((a) => /^(committed|confirmed|allowed)/.test(a.outcome))
+    .filter((a) => wrote(a.outcome))
     .map((a) => ({
       id: a.id,
       title: ctx.operations[a.operation]?.title ?? human(a.operation),

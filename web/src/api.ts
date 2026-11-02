@@ -138,6 +138,11 @@ export const api = {
    *  person ticked an empty box on this screen. */
   commit: (op: string, body: { thread: string; payload: unknown; confirmed: boolean }) =>
     post<unknown>(`/operations/${op}/commit/`, body),
+  /** A correction to something already recorded on a visit that is still
+   *  open. Not a second commit: the kernel REPLACES the rows this operation
+   *  wrote rather than adding a contradictory set. */
+  amend: (op: string, body: { thread: string; payload: unknown; confirmed: boolean }) =>
+    post<unknown>(`/operations/${op}/amend/`, body),
   confirm: (proposal: string, body: { payload: unknown; confirmed: boolean }) =>
     post<unknown>(`/proposals/${proposal}/confirm/`, body),
   reject: (proposal: string, body: { reason?: string }) =>

@@ -656,6 +656,26 @@ def commit(op_id: str, request: Request, body: dict = Body(default={})):
     return {"committed": op_id, "thread": panel(thread, user)}
 
 
+@router.post("/operations/{op_id}/amend")
+def amend(op_id: str, request: Request, body: dict = Body(default={})):
+    """A person corrected something already recorded. Body: thread, payload.
+
+    Not a second commit, and the difference matters: this REPLACES the rows
+    the same operation wrote on this visit instead of adding a second,
+    contradictory set. It refuses once the visit is over, because a record
+    that has already been published is corrected by publishing again, not by
+    editing underneath. kernel/proposals.amend holds both rules.
+    """
+    user, _ = caller(request), operation_or_404(op_id)
+    thread = thread_of(body)
+    decision = proposals.amend(
+        store, BUNDLE, op_id, thread=thread, payload=body.get("payload") or {},
+        caps=set(user["capabilities"]), scopes=set(user["scopes"]), actor=user["id"],
+        confirmed=bool(body.get("confirmed")))
+    allowed_or_422(decision)
+    return {"amended": op_id, "thread": panel(thread, user)}
+
+
 @router.post("/proposals/{proposal_id}/confirm")
 def confirm(proposal_id: str, request: Request, body: dict = Body(default={})):
     """Accept a proposal. Rendered surface only, and once only.

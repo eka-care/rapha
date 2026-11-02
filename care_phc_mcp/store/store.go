@@ -71,22 +71,22 @@ import (
 // column added on one side and not the other fails the gate rather than
 // drifting until a mapped clinical value lands nowhere.
 var Tables = map[string][]string{
-	"patient":                {"id", "name", "age", "sex", "phone", "village", "category", "abha_number", "directory_id", "directory_synced", "created_by", "created_date"},
+	"patient": {"id", "name", "age", "sex", "phone", "village", "category", "abha_number", "directory_id", "directory_synced", "operation", "created_by", "created_date"},
 	// `arrival` is how the person reached the queue: at the desk, or by
 	// themselves at the printed poster. A fact about THIS visit, so it sits
 	// on the encounter beside the number that was issued in the same moment.
-	"encounter":              {"id", "patient", "status", "token", "arrival", "created_by", "created_date"},
-	"observation":            {"id", "encounter", "category", "code", "code_system", "code_display", "value", "unit", "unit_system", "status", "created_by", "created_date"},
-	"condition":              {"id", "encounter", "code", "code_system", "code_display", "clinical_status", "clinical_status_system", "verification_status", "verification_status_system", "onset", "created_by", "created_date"},
-	"notes":                  {"id", "encounter", "text", "created_by", "created_date"},
-	"medication_request":     {"id", "encounter", "medication", "medication_system", "medication_display", "dose", "dose_unit", "dose_unit_system", "route", "route_system", "route_display", "frequency", "frequency_system", "frequency_display", "duration", "duration_unit", "duration_unit_system", "intent", "status", "created_by", "created_date"},
-	"medication_dispense":    {"id", "encounter", "medication", "quantity", "status", "created_by", "created_date"},
-	"service_request":        {"id", "encounter", "code", "status", "created_by", "created_date"},
-	"diagnostic_report":      {"id", "encounter", "code", "code_system", "conclusion", "status", "created_by", "created_date"},
-	"specimen":               {"id", "encounter", "code", "status", "created_by", "created_date"},
-	"inventory_item":         {"id", "encounter", "code", "quantity", "status", "created_by", "created_date"},
-	"questionnaire_response": {"id", "encounter", "questionnaire", "payload", "created_by", "created_date"},
-	"token_booking":          {"id", "encounter", "patient", "status", "created_by", "created_date"},
+	"encounter":              {"id", "patient", "status", "token", "arrival", "operation", "created_by", "created_date"},
+	"observation":            {"id", "encounter", "category", "code", "code_system", "code_display", "value", "unit", "unit_system", "status", "operation", "created_by", "created_date"},
+	"condition":              {"id", "encounter", "code", "code_system", "code_display", "clinical_status", "clinical_status_system", "verification_status", "verification_status_system", "onset", "operation", "created_by", "created_date"},
+	"notes":                  {"id", "encounter", "text", "operation", "created_by", "created_date"},
+	"medication_request":     {"id", "encounter", "medication", "medication_system", "medication_display", "dose", "dose_unit", "dose_unit_system", "route", "route_system", "route_display", "frequency", "frequency_system", "frequency_display", "duration", "duration_unit", "duration_unit_system", "intent", "status", "operation", "created_by", "created_date"},
+	"medication_dispense":    {"id", "encounter", "medication", "quantity", "status", "operation", "created_by", "created_date"},
+	"service_request":        {"id", "encounter", "code", "status", "operation", "created_by", "created_date"},
+	"diagnostic_report":      {"id", "encounter", "code", "code_system", "conclusion", "status", "operation", "created_by", "created_date"},
+	"specimen":               {"id", "encounter", "code", "status", "operation", "created_by", "created_date"},
+	"inventory_item":         {"id", "encounter", "code", "quantity", "status", "operation", "created_by", "created_date"},
+	"questionnaire_response": {"id", "encounter", "questionnaire", "payload", "operation", "created_by", "created_date"},
+	"token_booking":          {"id", "encounter", "patient", "status", "operation", "created_by", "created_date"},
 	"thread_flag":            {"id", "thread", "flag", "created_by", "created_date"},
 	"proposal":               {"id", "thread", "operation", "payload", "proposed_by", "surface", "status", "created_at", "flags_raised", "decided_by", "decided_at", "final_payload"},
 	"audit":                  {"id", "thread", "operation", "actor", "surface", "payload", "outcome", "at", "proposal"},
@@ -641,6 +641,15 @@ func (s *SQLite) Threads(workflow, scope string) ([]ThreadRef, error) {
 			// single row or nothing, so a second would be ignored either way.
 			if len(found) == 1 {
 				for k, v := range found[0] {
+					// WITHOUT `operation`. It is this adapter's own
+					// bookkeeping -- which form opened the row, so a
+					// correction can find it -- and not a fact about the
+					// person. It reached the context rail as a line reading
+					// "Operation: phc.op.patient-register" beside somebody's
+					// village, which is our schema printed at a clinician.
+					if k == "operation" {
+						continue
+					}
 					subject[k] = v
 				}
 			}
@@ -788,7 +797,13 @@ func (s *SQLite) put(resource string, record map[string]any, thread string) (str
 		var sets []string
 		var params []any
 		for _, key := range Tables[name] { // declaration order, so one row is one statement
-			if key == "id" || key == "created_by" || key == "created_date" {
+			// `operation` joins the write-once pair for the same reason
+			// they are there: it is WHICH FORM OPENED this row, and
+			// linking an ABHA re-writes the patient row registration
+			// created. Letting it move would mean a clerk correcting a
+			// misspelt name found nothing to correct.
+			if key == "id" || key == "created_by" || key == "created_date" ||
+				key == "operation" {
 				continue
 			}
 			if value, set := row[key]; set {

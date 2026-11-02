@@ -22,6 +22,8 @@ ordinary selects. The Store protocol stays at its nine methods.
 """
 from __future__ import annotations
 
+from catalogue import vocab
+
 from kernel import state
 
 
@@ -79,7 +81,7 @@ def _did(store, thread, bundle):
     out, seen = [], set()
     for record in store.audit(thread):
         outcome = getattr(record, "outcome", "") or ""
-        if not outcome.startswith(("committed", "confirmed", "allowed")):
+        if not outcome.startswith(vocab.WROTE):
             continue
         op_id = getattr(record, "operation", "")
         if op_id in seen:

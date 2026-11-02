@@ -86,6 +86,7 @@ export function Encounter({
    *  One person's national health number on another person's record is not a
    *  typo, it is the anti-goal: nothing merges two ABHA numbers and the
    *  patient carries the mistake permanently. */
+  const [editing, setEditing] = useState<{ op: Operation; start: Payload } | null>(null);
   const [carried, setCarried] = useState<{ thread: string; payload: Payload } | null>(null);
   const [scribing, setScribing] = useState<string | null>(null);
   /** The action somebody tapped, waiting on how they want to record it.
@@ -131,6 +132,25 @@ export function Encounter({
     else openPanel(op);
   };
 
+  /** WHAT CAN STILL BE CORRECTED, and the three conditions are the kernel's
+   *  own, said again here so the screen does not offer a control that would
+   *  be refused: the visit is still open, the operation is not irreversible,
+   *  and this is the LAST thing that operation recorded. Older lines on the
+   *  thread are the history of the correction and are not themselves
+   *  editable. kernel/proposals.amend enforces all three; this only decides
+   *  where a button is drawn.
+   */
+  const editable = useMemo(() => {
+    if (!thread.station) return new Set<string>();
+    const latest = new Map<string, string>();
+    for (const m of msgs) {
+      if (m.kind !== "posted") continue;
+      if (cat.operations[m.operation]?.irreversibility === "irreversible") continue;
+      latest.set(m.operation, m.id);
+    }
+    return new Set(latest.values());
+  }, [msgs, thread.station, cat.operations]);
+
   const spine = cat.workflows?.[thread.workflow]?.spine;
   const spineId = spine && typeof thread.subject?.id === "string" ? thread.subject.id : "";
   /** This patient's earlier visits, for the strip under the name and the
@@ -174,6 +194,11 @@ export function Encounter({
         <Stream
           msgs={msgs} thread={thread} client={client} ctx={ctx}
           instruments={cat.instruments} onDone={onChanged}
+          editable={editable}
+          onEdit={(m) => {
+            const op = cat.operations[m.operation];
+            if (op) setEditing({ op, start: m.payload as Payload });
+          }}
         >
           {/* §21: the agent's own message, and the actions it is offering. */}
           {(line.sentences.length > 0 || offered.length > 0) && (
@@ -303,6 +328,18 @@ export function Encounter({
             a developer's view of their afternoon. They belong behind the
             control panel, and this rail is for what the thread cannot say. */}
       </aside>
+
+      {editing && (
+        <>
+          <div className="scrim" onClick={() => setEditing(null)} />
+          <OperationPanel
+            op={editing.op} thread={thread.id} client={client} amending
+            instruments={cat.instruments} flags={thread.flags} start={editing.start}
+            onDone={() => { setEditing(null); onChanged(); }}
+            onCancel={() => setEditing(null)}
+          />
+        </>
+      )}
 
       {modal && (
         <>

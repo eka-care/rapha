@@ -12,6 +12,7 @@
 // rendered surface:
 //
 //	POST /operations/{op}/commit    a person tapped commit
+//	POST /operations/{op}/amend     a person corrected what was kept
 //	POST /proposals/{id}/confirm    a person accepted a machine's proposal
 //
 // Propose writes a proposal and an audit line and no clinical row. Confirm
@@ -386,6 +387,45 @@ func (k *kernel) commit(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"committed": op.ID, "thread": view})
 }
 
+// amend is api/main.py's amend: a person corrected something already
+// recorded. Not a second commit -- it REPLACES the rows the same operation
+// wrote on this visit instead of adding a contradictory set, and it refuses
+// once the visit is over.
+func (k *kernel) amend(w http.ResponseWriter, r *http.Request) {
+	person, ok := k.who(w, r)
+	if !ok {
+		return
+	}
+	op, declared := k.operationOr404(w, r.PathValue("op_id"))
+	if !declared {
+		return
+	}
+	in, parsed := body(r)
+	if !parsed {
+		k.badBody(w)
+		return
+	}
+	thread, ok := k.threadOf(w, in)
+	if !ok {
+		return
+	}
+	caps, scopes := capsOf(person)
+	decision, err := k.write.Amend(k.store, op, thread, payloadOf(in), caps,
+		scopes, person.ID, truthy(in["confirmed"]), "")
+	if err != nil {
+		detail(w, http.StatusInternalServerError, "%v", err)
+		return
+	}
+	if !allowedOr422(w, decision) {
+		return
+	}
+	view, ok := k.panel(w, thread, person)
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"amended": op.ID, "thread": view})
+}
+
 // proposalOr404 is api/main.py's proposal_or_404.
 func (k *kernel) proposalOr404(w http.ResponseWriter, id string) (store.Proposal, bool) {
 	found, exists, err := k.store.Proposal(id)
@@ -510,6 +550,7 @@ func (k *kernel) mountGuard(mux *http.ServeMux, prefix string) {
 	mux.HandleFunc(prefix+"/threads/{thread_id}", only(http.MethodGet, k.getThread))
 	mux.HandleFunc(prefix+"/operations/{op_id}/propose", only(http.MethodPost, k.propose))
 	mux.HandleFunc(prefix+"/operations/{op_id}/commit", only(http.MethodPost, k.commit))
+	mux.HandleFunc(prefix+"/operations/{op_id}/amend", only(http.MethodPost, k.amend))
 	mux.HandleFunc(prefix+"/proposals/{proposal_id}", only(http.MethodGet, k.getProposal))
 	mux.HandleFunc(prefix+"/proposals/{proposal_id}/confirm", only(http.MethodPost, k.confirm))
 	mux.HandleFunc(prefix+"/proposals/{proposal_id}/reject", only(http.MethodPost, k.reject))

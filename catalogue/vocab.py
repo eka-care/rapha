@@ -86,6 +86,16 @@ IRREVERSIBILITY = ("reversible", "correctable", "irreversible")
 # because this is the lower layer (kernel imports catalogue, never the other
 # way round) and because "which instrument kinds there are" is what this
 # module is for.
+# Audit outcomes that mean A CLINICAL FACT WAS WRITTEN. One tuple, because
+# this list was four copies in two languages and a fifth in the browser, and
+# the day a fifth outcome was added -- "amended", on 2026-11-02 -- four of
+# them silently went on showing the value before the correction. A screen
+# that disagrees with the record about a patient's pulse is the worst kind
+# of drift there is, so the list is named once and checked.
+#
+# `proposed` is a request and not a write. A denial is the opposite of one.
+WROTE = ("committed", "confirmed", "allowed", "amended")
+
 INSTRUMENT_KINDS = ("form", "device", "constrained-voice", "scribe", "spoken-prompt")
 
 # INSTRUMENTS is the narrower question: what an OPERATION's `instrument:` may

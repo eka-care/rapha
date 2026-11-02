@@ -35,6 +35,7 @@ package proposals
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	carephc "github.com/eka-care/care_phc_mcp"
@@ -52,6 +53,10 @@ import (
 type Store interface {
 	kstate.Reader
 	Write(resource string, record map[string]any, thread string) (string, error)
+	// Select is here for one caller: WrittenBy, which has to find the rows a
+	// given operation wrote before a correction can replace them.
+	Select(resource string, thread *string, q store.Query, fields []string,
+		limit int) ([]map[string]string, error)
 	RaiseFlag(thread, flag, actor string) error
 	PutProposal(p store.Proposal) error
 	AppendAudit(r store.AuditRecord) error
@@ -193,6 +198,13 @@ func str(v any) string {
 func (b *Bundle) decide(s Store, op carephc.Operation, thread string,
 	payload map[string]any, caps map[string]bool, surface, actor string,
 	confirmed bool, scopes map[string]bool) (guard.Decision, error) {
+	return b.decideWith(s, op, thread, payload, caps, surface, actor, confirmed,
+		scopes, false)
+}
+
+func (b *Bundle) decideWith(s Store, op carephc.Operation, thread string,
+	payload map[string]any, caps map[string]bool, surface, actor string,
+	confirmed bool, scopes map[string]bool, correcting bool) (guard.Decision, error) {
 	if !kstate.DrawnBy(b.Workflow, op.ID) {
 		// Before the guard, because this is not a judgement about this
 		// thread's state: the operation is not part of this line at all.
@@ -210,6 +222,26 @@ func (b *Bundle) decide(s Store, op carephc.Operation, thread string,
 	flags, err := kstate.Flags(s, thread, b.Workflow)
 	if err != nil {
 		return guard.Decision{}, err
+	}
+	if correcting {
+		// A CORRECTION IS EVALUATED AS IF ITS OWN RECORD WERE NOT THERE.
+		// `phc.op.vitals-record` declares `not vitals.recorded`, so a nurse
+		// fixing a pulse she keyed as 85 and meant as 58 would be told the
+		// vitals are already recorded, which is both true and useless. A
+		// precondition of that shape says when a step may first be TAKEN;
+		// a correction is not taking it again. Only this operation's own
+		// negative terms are lifted; everything else about the guard runs
+		// exactly as it does on a commit.
+		lifted := map[string]bool{}
+		for flag, known := range flags {
+			lifted[flag] = known
+		}
+		for _, term := range op.Preconditions {
+			if strings.HasPrefix(term, "not ") {
+				delete(lifted, strings.TrimSpace(term[4:]))
+			}
+		}
+		flags = lifted
 	}
 	performers, err := kstate.Performers(s, thread)
 	if err != nil {
@@ -245,7 +277,7 @@ func (b *Bundle) decide(s Store, op carephc.Operation, thread string,
 // declaration writes carries its author. Rows used to land with created_by
 // null, which made "who did this" a question only the audit could answer.
 func (b *Bundle) write(s Store, op carephc.Operation, thread string,
-	payload map[string]any, actor string) ([]string, error) {
+	payload map[string]any, actor string, reuse map[string][]string) ([]string, error) {
 	var records []mapping.Record
 	if _, err := b.Catalogue.Mapping(op.ID, &records); err != nil {
 		return nil, err
@@ -254,9 +286,29 @@ func (b *Bundle) write(s Store, op carephc.Operation, thread string,
 	if err != nil {
 		return nil, err
 	}
+	// WHICH OPERATION WROTE THIS ROW, stamped here because it is the
+	// kernel's fact and not the mapping's: a declaration says what a blood
+	// pressure is, not which form it arrived on. Without it a correction
+	// could not find its own rows -- a consultation and a nurse's vitals
+	// both write `observation` on one thread. `reuse` is the ids of the
+	// rows a correction is replacing, per resource and in order; nil on a
+	// first commit, which is an insert.
+	spare := map[string][]string{}
+	for res, had := range reuse {
+		spare[res] = append([]string(nil), had...)
+	}
 	var ids []string
 	for _, row := range built {
-		id, err := s.Write(row.Resource, row.Columns, thread)
+		columns := map[string]any{}
+		for k, v := range row.Columns {
+			columns[k] = v
+		}
+		columns["operation"] = op.ID
+		if left := spare[row.Resource]; len(left) > 0 {
+			columns["id"] = left[0]
+			spare[row.Resource] = left[1:]
+		}
+		id, err := s.Write(row.Resource, columns, thread)
 		if err != nil {
 			return nil, err
 		}
@@ -343,7 +395,120 @@ func (b *Bundle) Commit(s Store, op carephc.Operation, thread string,
 		return decision, err
 	}
 	if decision.Allowed {
-		if _, err := b.write(s, op, thread, payload, actor); err != nil {
+		if _, err := b.write(s, op, thread, payload, actor, nil); err != nil {
+			return decision, err
+		}
+	}
+	return decision, nil
+}
+
+// WrittenBy is the rows this operation already wrote on this visit, keyed by
+// resource and ordered by when each row was opened, so a correction replaces
+// the first medicine with the first medicine. `operation` is the column
+// write() stamps; a row written before that column existed has none and
+// comes back in no list, which is why Amend refuses rather than guessing
+// which row a clinician meant.
+func (b *Bundle) WrittenBy(s Store, op carephc.Operation, thread string) (map[string][]string, error) {
+	var records []mapping.Record
+	if _, err := b.Catalogue.Mapping(op.ID, &records); err != nil {
+		return nil, err
+	}
+	found := map[string][]string{}
+	for _, record := range records {
+		if _, seen := found[record.Resource]; seen {
+			continue
+		}
+		rows, err := s.Select(record.Resource, &thread,
+			store.Query{"operation": {Equals: op.ID}}, []string{"id", "created_date"}, 200)
+		if err != nil {
+			return nil, err
+		}
+		sort.SliceStable(rows, func(i, j int) bool {
+			if rows[i]["created_date"] != rows[j]["created_date"] {
+				return rows[i]["created_date"] < rows[j]["created_date"]
+			}
+			return rows[i]["id"] < rows[j]["id"]
+		})
+		ids := []string{}
+		for _, row := range rows {
+			ids = append(ids, row["id"])
+		}
+		found[record.Resource] = ids
+	}
+	for res, ids := range found {
+		if len(ids) == 0 {
+			delete(found, res)
+		}
+	}
+	return found, nil
+}
+
+// Amend corrects what was already recorded, while the visit is still open.
+//
+// THE CASE THIS EXISTS FOR. A nurse keys a pulse of 85 and means 58. The
+// only answers before it were a second contradictory reading or leaving the
+// wrong one standing, and a clinician who cannot fix an obvious slip keeps a
+// paper copy.
+//
+// ONLY WHILE THE VISIT IS OPEN. A workflow out of stations is a visit that
+// is over, its document may already have gone to ABDM, and a record changed
+// after publication is a different problem with a different answer: a new
+// bundle that relatesTo the old one. So this refuses in those words.
+//
+// THE GUARD RUNS AGAIN, less this operation's own negative preconditions.
+// Same capability, same scope, same separation of duties, same validator,
+// same audit line. Nothing here is a shortcut past the guard.
+func (b *Bundle) Amend(s Store, op carephc.Operation, thread string,
+	payload map[string]any, caps, scopes map[string]bool, actor string,
+	confirmed bool, at string) (guard.Decision, error) {
+	if at == "" {
+		at = Now()
+	}
+	refuse := func(reason, outcome string) (guard.Decision, error) {
+		decision := guard.Decision{Allowed: false, Reason: reason, Audit: map[string]any{
+			"operation": op.ID, "actor": actor, "surface": guard.Rendered,
+			"payload": copyPayload(payload), "outcome": outcome,
+		}}
+		if _, err := AuditRow(s, decision.Audit, thread, at, ""); err != nil {
+			return decision, err
+		}
+		return decision, nil
+	}
+
+	flags, err := kstate.Flags(s, thread, b.Workflow)
+	if err != nil {
+		return guard.Decision{}, err
+	}
+	if kstate.Station(b.Workflow, flags) == "" {
+		return refuse("this visit is over, so its records can no longer be "+
+			"edited here", "denied: the visit is over")
+	}
+	if op.Irreversibility == "irreversible" {
+		return refuse("this cannot be edited: it was an irreversible action "+
+			"and it has already left this facility", "denied: irreversible")
+	}
+	reuse, err := b.WrittenBy(s, op, thread)
+	if err != nil {
+		return guard.Decision{}, err
+	}
+	if len(reuse) == 0 {
+		return refuse("nothing recorded by this operation was found on this "+
+			"visit, so there is nothing to edit", "denied: nothing to edit")
+	}
+
+	decision, err := b.decideWith(s, op, thread, payload, caps, guard.Rendered,
+		actor, confirmed, scopes, true)
+	if err != nil {
+		return guard.Decision{}, err
+	}
+	if decision.Allowed {
+		decision.Audit["outcome"] = "amended"
+	}
+	if _, err := AuditRow(s, decision.Audit, thread, at, ""); err != nil {
+		return decision, err
+	}
+	if decision.Allowed {
+		if _, err := b.write(s, op, thread, payload, actor, reuse); err != nil {
 			return decision, err
 		}
 	}
@@ -412,7 +577,7 @@ func (b *Bundle) Confirm(s Store, proposal store.Proposal, caps, scopes map[stri
 	if _, err := AuditRow(s, decision.Audit, proposal.Thread, at, proposal.ID); err != nil {
 		return decision, proposal, err
 	}
-	if _, err := b.write(s, op, proposal.Thread, use, actor); err != nil {
+	if _, err := b.write(s, op, proposal.Thread, use, actor, nil); err != nil {
 		return decision, proposal, err
 	}
 	decided := proposal

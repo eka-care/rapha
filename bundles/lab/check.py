@@ -249,10 +249,20 @@ def check_ranges_are_per_analyte():
     d = commit(store, "lab.op.result-enter", dict(RESULT, potassium=6.8), TECHNOLOGIST, actor=A_TECH)
     assert d, d.reason
     assert "lab.critical" in store.stored, "6.8 is plausible and critical"
-    rows = {r["code"]: r for r in store.rows["observation"]}
+    # Without `id`: the row now carries one, because the fake store assigns
+    # ids the way the adapter does so that a correction can replace a row
+    # rather than append a second. What that id IS is not this check's
+    # business; every clinical field on the row still is.
+    rows = {r["code"]: {k: v for k, v in r.items() if k != "id"}
+            for r in store.rows["observation"]}
     assert rows["potassium"] == {"created_by": A_TECH, "category": "laboratory",
                                  "code": "potassium", "value": 6.8,
                                  "unit": "mmol/L", "_thread": T,
+                                 # WHICH FORM WROTE THIS ROW, stamped by
+                                 # kernel/proposals._write since 2026-11-02
+                                 # so that a correction can find its own
+                                 # rows and nobody else's.
+                                 "operation": "lab.op.result-enter",
                                  # R4's Observation.status. `preliminary`
                                  # because nobody has verified it yet, which
                                  # is what the report row below also says and

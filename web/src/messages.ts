@@ -39,6 +39,12 @@ export type Msg =
   | {
       kind: "posted"; id: string; at: string; title: string; actor: string;
       operation: string; tags: Tag[]; values: Kv[]; transcript?: string | null;
+      /** The answers exactly as they were committed, so a correction opens
+       *  the same form already holding them instead of an empty one. */
+      payload: Record<string, unknown>;
+      /** This line IS a correction to something recorded earlier on this
+       *  visit, rather than the first time it was recorded. */
+      edited: boolean;
     }
   | {
       kind: "denied"; id: string; at: string; title: string; actor: string; reason: string;
@@ -205,6 +211,8 @@ export function messages(thread: ThreadView, ctx: Ctx, said: Said[] = []): Msg[]
         kind: "posted", id: a.id, at: a.at, title: titleOf(ctx, a.operation),
         actor: actorOf(a.actor), operation: a.operation, tags: tagsFor(ctx, a, raised),
         values: a.outcome === "rejected" ? [] : valuesOf(ctx, a.operation, a.payload),
+        payload: (a.payload ?? {}) as Record<string, unknown>,
+        edited: a.outcome === "amended",
         transcript: (thread.proposals ?? []).find((p) => p.id === a.proposal)?.transcript ?? null,
       });
     }

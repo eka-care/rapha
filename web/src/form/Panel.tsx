@@ -44,8 +44,13 @@ const IRREVERSIBLE = "irreversible";
 const FROM_ABHA = "From ABHA";
 
 export function OperationPanel({
-  op, thread, client, proposal, draft, instruments, inline, mobile, seed, start, found, onDone, onCancel,
+  op, thread, client, proposal, draft, instruments, inline, mobile, seed, start, found,
+  amending, onDone, onCancel,
 }: {
+  /** This is a CORRECTION to what this operation already recorded on this
+   *  visit, not a new record. The form is the same form; what changes is
+   *  that the kernel replaces the rows instead of adding a second set. */
+  amending?: boolean;
   op: Operation;
   thread: string;
   /** A mobile number the clerk has already typed, from the search that missed.
@@ -295,6 +300,7 @@ export function OperationPanel({
     setError(null);
     try {
       if (proposal) await client.confirm(proposal.id, { payload, confirmed });
+      else if (amending) await client.amend(op.id, { thread, payload, confirmed });
       else await client.commit(op.id, { thread, payload, confirmed });
       // SC 4.1.3: the panel closes and a row appears somewhere else on the
       // screen. Seeing that is how a sighted clerk knows the write landed;

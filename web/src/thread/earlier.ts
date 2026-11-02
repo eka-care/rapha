@@ -13,6 +13,7 @@
  *  screen -- that a value is out of range -- is the kernel's `crit`, which
  *  the questionnaire's own range decided.
  */
+import { wrote } from "../types.ts";
 import type { Kv } from "../messages";
 
 /** One visit, reduced to the values it committed. */
@@ -136,7 +137,7 @@ export function team(
 ): Member[] {
   const seen = new Map<string, Member>();
   for (const row of audit) {
-    if (!row.actor || !/^(committed|confirmed|allowed)/.test(row.outcome)) continue;
+    if (!row.actor || !wrote(row.outcome)) continue;
     const actor = row.actor.replace(/^user:/, "");
     if (!seen.has(actor))
       seen.set(actor, { actor, role: roleOf(row.actor), did: titleOf(row.operation) });

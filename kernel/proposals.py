@@ -28,6 +28,7 @@ from kernel import mapping, terminology
 from kernel.state import drawn_by
 from kernel.state import flags as thread_flags
 from kernel.state import performers
+from kernel.state import station
 
 
 def now() -> str:
@@ -92,7 +93,7 @@ audit_row = _audit
 
 
 def _decide(store, bundle, op, *, thread, payload, caps, surface, actor,
-            confirmed=False, scopes=None, workflow=None):
+            confirmed=False, scopes=None, workflow=None, correcting=False):
     # Which plugins this facility runs is the bundle's own answer and never a
     # caller's argument: a surface that could pass one could widen it. It
     # changes no decision, only the sentence; see catalogue/guard.evaluate.
@@ -106,14 +107,33 @@ def _decide(store, bundle, op, *, thread, payload, caps, surface, actor,
                               audit={"operation": op["id"], "actor": actor,
                                      "surface": surface, "payload": dict(payload),
                                      "outcome": "denied: not in this workflow"})
+    known = thread_flags(store, thread, workflow)
+    if correcting:
+        # A CORRECTION IS EVALUATED AS IF ITS OWN RECORD WERE NOT THERE, and
+        # nothing less would work: `phc.op.vitals-record` declares
+        # `not vitals.recorded`, so a nurse fixing a pulse she keyed as 85
+        # and meant as 58 would be told the vitals are already recorded --
+        # which is both true and useless. A precondition of that shape says
+        # when a step may first be TAKEN; a correction is not taking it
+        # again.
+        #
+        # Only the negative terms are lifted, and only this operation's own.
+        # A positive precondition still has to hold: a correction to a
+        # consultation on an unregistered patient is as impossible as the
+        # consultation was. Nothing else about the guard changes -- the
+        # capability, the scope, the separation of duties, the validator and
+        # the irreversibility rule all run exactly as they do on a commit.
+        known = frozenset(known) - {
+            term[4:].strip() for term in (op.get("preconditions") or [])
+            if isinstance(term, str) and term.startswith("not ")}
     return guard.evaluate(
-        op, caps=caps, state=thread_flags(store, thread, workflow), payload=payload,
+        op, caps=caps, state=known, payload=payload,
         surface=surface, confirmed=confirmed, scopes=scopes, actor=actor,
         validate=validator(op), performers=performers(store, thread),
         withheld=withheld)
 
 
-def _write(store, bundle, op, *, thread, payload, workflow, actor=None):
+def _write(store, bundle, op, *, thread, payload, workflow, actor=None, reuse=None):
     """Guard steps 6 and 7: the CARE write, then the state emit.
 
     Which answer becomes which column is declared on the operation atom and
@@ -130,8 +150,25 @@ def _write(store, bundle, op, *, thread, payload, workflow, actor=None):
     declaration writes carries its author. Rows used to land with created_by
     null, which made "who did this" a question only the audit could answer.
     """
-    ids = [store.write(res, row, thread=thread)
-           for res, row in mapping.records(op, payload, actor=actor)]
+    rows = mapping.records(op, payload, actor=actor)
+    # WHICH OPERATION WROTE THIS ROW, stamped here because it is the kernel's
+    # fact and not the mapping's: a declaration says what a blood pressure
+    # is, not which form it arrived on. Without it a correction could not
+    # find its own rows -- a consultation and a nurse's vitals both write
+    # `observation` on one thread -- so kernel.proposals.amend reads it.
+    # `reuse` is {resource: [ids]}, the rows a correction is replacing, taken
+    # in order per resource. Keyed by resource and not by position, because
+    # one payload fans out into several kinds at once and a flat list would
+    # hand an observation's id to a condition row. Empty on a first commit,
+    # which is an insert.
+    spare = {res: list(ids) for res, ids in (reuse or {}).items()}
+    ids = []
+    for res, row in rows:
+        row = dict(row, operation=op["id"])
+        left = spare.get(res)
+        if left:
+            row["id"] = left.pop(0)
+        ids.append(store.write(res, row, thread=thread))
     for flag in raised(op, payload, workflow):
         store.raise_flag(thread, flag)
     return ids
@@ -174,6 +211,95 @@ def commit(store, bundle, op_id, *, thread, payload, caps, actor,
     if decision:
         _write(store, bundle, op, thread=thread, payload=payload, workflow=workflow,
                actor=actor)
+    return decision
+
+
+def written_by(store, op, *, thread):
+    """The rows this operation already wrote on this visit, {resource: [ids]}.
+
+    Ordered by when each row was opened, so a correction replaces the first
+    medicine with the first medicine. `operation` is the column the adapter
+    stamps in `_write`; a row written before that column existed has none,
+    and comes back in no list, which is why `amend` refuses rather than
+    guessing which row a clinician meant.
+    """
+    found = {}
+    for record in op.get("mapping") or []:
+        res = record["resource"]
+        if res in found:
+            continue
+        rows = store.select(res, thread=thread, where={"operation": op["id"]},
+                            fields=["id", "created_date"], limit=200)
+        found[res] = [r["id"] for r in
+                      sorted(rows, key=lambda r: (r.get("created_date") or "", r.get("id") or ""))]
+    return {res: ids for res, ids in found.items() if ids}
+
+
+def amend(store, bundle, op_id, *, thread, payload, caps, actor,
+          confirmed=False, scopes=None, at=None):
+    """Correct what was already recorded, while the visit is still open.
+
+    THE CASE THIS EXISTS FOR. A nurse keys a pulse of 85 and means 58. Until
+    today the only answers were to record a second, contradictory reading or
+    to leave the wrong one standing, and a clinician who cannot fix an
+    obvious slip stops trusting the screen and keeps a paper copy -- which
+    is the one outcome this product cannot survive.
+
+    ONLY WHILE THE VISIT IS OPEN, and that is the whole of the rule. A
+    workflow that has run out of stations is a visit that is over, its
+    document may already have gone to ABDM, and a record changed after it
+    was published is a different problem with a different answer: FHIR
+    answers it with a new bundle that relatesTo the old one, which is
+    written down in kernel/fhir.py and is not this. So this refuses, in
+    those words, rather than quietly rewriting history.
+
+    THE GUARD RUNS AGAIN, unchanged. A correction is a write: the same
+    capability, the same preconditions, the same validation and the same
+    audit line as the commit it replaces. Nothing here is a shortcut past
+    the guard, and the trail keeps both payloads, so what was first recorded
+    is still on the record.
+
+    Returns the same Decision shape `commit` does.
+    """
+    at = at or now()
+    op, workflow = bundle.operations[op_id], bundle.workflow()
+
+    if station(workflow, thread_flags(store, thread, workflow)) is None:
+        decision = guard.Decision(False, "this visit is over, so its records can no "
+                                         "longer be edited here", {
+            "operation": op_id, "actor": actor, "surface": guard.RENDERED,
+            "payload": dict(payload), "outcome": "denied: the visit is over"})
+        _audit(store, decision.audit, thread=thread, at=at)
+        return decision
+
+    reuse = written_by(store, op, thread=thread)
+    if not reuse:
+        decision = guard.Decision(False, "nothing recorded by this operation was "
+                                         "found on this visit, so there is nothing "
+                                         "to edit", {
+            "operation": op_id, "actor": actor, "surface": guard.RENDERED,
+            "payload": dict(payload), "outcome": "denied: nothing to edit"})
+        _audit(store, decision.audit, thread=thread, at=at)
+        return decision
+
+    if op["irreversibility"] == "irreversible":
+        decision = guard.Decision(False, "this cannot be edited: it was an "
+                                         "irreversible action and it has already "
+                                         "left this facility", {
+            "operation": op_id, "actor": actor, "surface": guard.RENDERED,
+            "payload": dict(payload), "outcome": "denied: irreversible"})
+        _audit(store, decision.audit, thread=thread, at=at)
+        return decision
+
+    decision = _decide(store, bundle, op, thread=thread, payload=payload, caps=caps,
+                       surface=guard.RENDERED, actor=actor, confirmed=confirmed,
+                       scopes=scopes, workflow=workflow, correcting=True)
+    if decision:
+        decision.audit["outcome"] = "amended"
+    _audit(store, decision.audit, thread=thread, at=at)
+    if decision:
+        _write(store, bundle, op, thread=thread, payload=payload, workflow=workflow,
+               actor=actor, reuse=reuse)
     return decision
 
 

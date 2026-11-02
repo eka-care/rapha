@@ -33,6 +33,7 @@
  *  card was actually found -- not here.
  */
 import assert from "node:assert/strict";
+import { WROTE } from "./types.ts";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -948,6 +949,31 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   }
   assert.deepEqual(typed, [], "a nudge is typed into the renderer; it belongs in bundle.yaml");
   ok(`${says.length} scribe nudges come from the bundle, none typed into a component`);
+}
+
+// ONE LIST OF THE OUTCOMES THAT MEAN SOMETHING WAS WRITTEN, held against
+// the kernel's. It was three regular expressions here and two tuples there,
+// and the day "amended" was added four of them went on showing the value
+// from before the correction. A screen that disagrees with the record about
+// a patient's pulse is the worst drift there is, so it is one list now and
+// this is what keeps it one.
+{
+  const vocab = readFileSync(join(ROOT, "catalogue", "vocab.py"), "utf8");
+  const declared = /^WROTE = \(([^)]*)\)/m.exec(vocab);
+  assert.ok(declared, "catalogue/vocab.py no longer declares WROTE");
+  const kernel = [...declared![1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual([...WROTE], kernel,
+    "web/src/types.ts WROTE and catalogue/vocab.py WROTE disagree about what " +
+    "counts as written");
+
+  const stale: string[] = [];
+  for (const file of TSX) {
+    const src = readFileSync(file, "utf8");
+    if (/committed\|confirmed\|allowed/.test(src)) stale.push(relative(SRC, file));
+  }
+  assert.deepEqual(stale, [],
+    "an outcome list is spelled out again instead of calling wrote()");
+  ok(`${kernel.length} written outcomes, one list, shared with the kernel`);
 }
 
 console.log(`\n${checks} checks passed`);

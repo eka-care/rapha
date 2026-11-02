@@ -20,12 +20,13 @@ threads:
   - id: lab-002
     token: 25-0416
     status: in_progress
-    patient: {name: Anjali Rao, age: 34, sex: female, phone: "9440000021",
+    patient: {operation: lab.op.referral-accession, name: Anjali Rao, age: 34, sex: female, phone: "9440000021",
               created_by: "user:phlebotomist"}
     rows:
-      - {resource: service_request, code: cbc, status: active,
+      - {resource: service_request, operation: lab.op.referral-accession, code: cbc, status: active,
          created_by: "user:phlebotomist"}
       - resource: questionnaire_response
+        operation: lab.op.referral-accession
         questionnaire: lab.schema.accession-v1
         created_by: "user:phlebotomist"
         payload: {name: Anjali Rao, age: 34, sex: female, phone: "9440000021",
@@ -44,18 +45,19 @@ threads:
   - id: lab-003
     token: 25-0415
     status: in_progress
-    patient: {name: Faizal Sheikh, age: 47, sex: male, phone: "9440000022",
+    patient: {operation: lab.op.referral-accession, name: Faizal Sheikh, age: 47, sex: male, phone: "9440000022",
               created_by: "user:phlebotomist"}
     rows:
-      - {resource: service_request, code: bmp, status: active,
+      - {resource: service_request, operation: lab.op.referral-accession, code: bmp, status: active,
          created_by: "user:phlebotomist"}
       - resource: questionnaire_response
+        operation: lab.op.referral-accession
         questionnaire: lab.schema.accession-v1
         created_by: "user:phlebotomist"
         payload: {name: Faizal Sheikh, age: 47, sex: male, phone: "9440000022",
                   referrer_name: Dr Ipsita Barua, referrer_contact: "9440000091",
                   panel: bmp}
-      - {resource: specimen, code: venous-blood, status: available,
+      - {resource: specimen, operation: lab.op.specimen-collect, code: venous-blood, status: available,
          created_by: "user:phlebotomist"}
     audit:
       - operation: lab.op.referral-accession
@@ -77,28 +79,29 @@ threads:
   - id: lab-004
     token: 25-0414
     status: in_progress
-    patient: {name: Devi Prasad, age: 66, sex: male, phone: "9440000023",
+    patient: {operation: lab.op.referral-accession, name: Devi Prasad, age: 66, sex: male, phone: "9440000023",
               created_by: "user:phlebotomist"}
     rows:
-      - {resource: service_request, code: bmp, status: active,
+      - {resource: service_request, operation: lab.op.referral-accession, code: bmp, status: active,
          created_by: "user:phlebotomist"}
       - resource: questionnaire_response
+        operation: lab.op.referral-accession
         questionnaire: lab.schema.accession-v1
         created_by: "user:phlebotomist"
         payload: {name: Devi Prasad, age: 66, sex: male, phone: "9440000023",
                   referrer_name: Dr Shobha Menon, referrer_contact: "9440000092",
                   panel: bmp}
-      - {resource: specimen, code: venous-blood, status: available,
+      - {resource: specimen, operation: lab.op.specimen-collect, code: venous-blood, status: available,
          created_by: "user:phlebotomist"}
-      - {resource: observation, status: preliminary, category: laboratory, code: glucose, value: 412,
+      - {resource: observation, operation: lab.op.result-enter, status: preliminary, category: laboratory, code: glucose, value: 412,
          unit: mg/dL, created_by: "user:technologist"}
-      - {resource: observation, status: preliminary, category: laboratory, code: creatinine, value: 2.4,
+      - {resource: observation, operation: lab.op.result-enter, status: preliminary, category: laboratory, code: creatinine, value: 2.4,
          unit: mg/dL, created_by: "user:technologist"}
-      - {resource: observation, status: preliminary, category: laboratory, code: sodium, value: 131,
+      - {resource: observation, operation: lab.op.result-enter, status: preliminary, category: laboratory, code: sodium, value: 131,
          unit: mmol/L, created_by: "user:technologist"}
-      - {resource: observation, status: preliminary, category: laboratory, code: potassium, value: 6.8,
+      - {resource: observation, operation: lab.op.result-enter, status: preliminary, category: laboratory, code: potassium, value: 6.8,
          unit: mmol/L, created_by: "user:technologist"}
-      - {resource: diagnostic_report, code: bmp, status: preliminary,
+      - {resource: diagnostic_report, operation: lab.op.result-enter, code: bmp, status: preliminary,
          created_by: "user:technologist"}
     flags: [lab.critical]
     audit:
@@ -120,30 +123,31 @@ threads:
   - id: lab-005
     token: 25-0413
     status: in_progress
-    patient: {name: Rukmini Shetty, age: 41, sex: female, phone: "9440000024",
+    patient: {operation: lab.op.referral-accession, name: Rukmini Shetty, age: 41, sex: female, phone: "9440000024",
               created_by: "user:phlebotomist"}
     rows:
-      - {resource: service_request, code: cbc, status: active,
+      - {resource: service_request, operation: lab.op.referral-accession, code: cbc, status: active,
          created_by: "user:phlebotomist"}
       - resource: questionnaire_response
+        operation: lab.op.referral-accession
         questionnaire: lab.schema.accession-v1
         created_by: "user:phlebotomist"
         payload: {name: Rukmini Shetty, age: 41, sex: female, phone: "9440000024",
                   referrer_name: Dr Nandini Rao, referrer_contact: "9440000090",
                   panel: cbc}
-      - {resource: specimen, code: venous-blood, status: available,
+      - {resource: specimen, operation: lab.op.specimen-collect, code: venous-blood, status: available,
          created_by: "user:phlebotomist"}
-      - {resource: observation, status: preliminary, category: laboratory, code: haemoglobin, value: 9.1,
+      - {resource: observation, operation: lab.op.result-enter, status: preliminary, category: laboratory, code: haemoglobin, value: 9.1,
          unit: g/dL, created_by: "user:technologist"}
-      - {resource: observation, status: preliminary, category: laboratory, code: wbc, value: 7.2,
+      - {resource: observation, operation: lab.op.result-enter, status: preliminary, category: laboratory, code: wbc, value: 7.2,
          unit: 10*3/uL, created_by: "user:technologist"}
-      - {resource: observation, status: preliminary, category: laboratory, code: platelets, value: 188,
+      - {resource: observation, operation: lab.op.result-enter, status: preliminary, category: laboratory, code: platelets, value: 188,
          unit: 10*3/uL, created_by: "user:technologist"}
-      - {resource: diagnostic_report, code: cbc, status: preliminary,
+      - {resource: diagnostic_report, operation: lab.op.result-enter, code: cbc, status: preliminary,
          created_by: "user:technologist"}
-      - {resource: diagnostic_report, code: verification, status: rejected,
+      - {resource: diagnostic_report, operation: lab.op.result-verify, code: verification, status: rejected,
          created_by: "user:pathologist"}
-      - {resource: notes, text: "Specimen haemolysed. Recollect before reporting.",
+      - {resource: notes, operation: lab.op.result-verify, text: "Specimen haemolysed. Recollect before reporting.",
          created_by: "user:pathologist"}
     audit:
       - operation: lab.op.referral-accession
@@ -165,30 +169,31 @@ threads:
   - id: lab-006
     token: 25-0412
     status: in_progress
-    patient: {name: Sunanda Iyer, age: 29, sex: female, phone: "9440000025",
+    patient: {operation: lab.op.referral-accession, name: Sunanda Iyer, age: 29, sex: female, phone: "9440000025",
               created_by: "user:phlebotomist"}
     rows:
-      - {resource: service_request, code: cbc, status: active,
+      - {resource: service_request, operation: lab.op.referral-accession, code: cbc, status: active,
          created_by: "user:phlebotomist"}
       - resource: questionnaire_response
+        operation: lab.op.referral-accession
         questionnaire: lab.schema.accession-v1
         created_by: "user:phlebotomist"
         payload: {name: Sunanda Iyer, age: 29, sex: female, phone: "9440000025",
                   referrer_name: Dr Ipsita Barua, referrer_contact: "9440000091",
                   panel: cbc}
-      - {resource: specimen, code: venous-blood, status: available,
+      - {resource: specimen, operation: lab.op.specimen-collect, code: venous-blood, status: available,
          created_by: "user:phlebotomist"}
-      - {resource: observation, status: preliminary, category: laboratory, code: haemoglobin, value: 11.2,
+      - {resource: observation, operation: lab.op.result-enter, status: preliminary, category: laboratory, code: haemoglobin, value: 11.2,
          unit: g/dL, created_by: "user:technologist"}
-      - {resource: observation, status: preliminary, category: laboratory, code: wbc, value: 6.4,
+      - {resource: observation, operation: lab.op.result-enter, status: preliminary, category: laboratory, code: wbc, value: 6.4,
          unit: 10*3/uL, created_by: "user:technologist"}
-      - {resource: observation, status: preliminary, category: laboratory, code: platelets, value: 233,
+      - {resource: observation, operation: lab.op.result-enter, status: preliminary, category: laboratory, code: platelets, value: 233,
          unit: 10*3/uL, created_by: "user:technologist"}
-      - {resource: diagnostic_report, code: cbc, status: preliminary,
+      - {resource: diagnostic_report, operation: lab.op.result-enter, code: cbc, status: preliminary,
          created_by: "user:technologist"}
-      - {resource: diagnostic_report, code: verification, status: verified,
+      - {resource: diagnostic_report, operation: lab.op.result-verify, code: verification, status: verified,
          created_by: "user:pathologist"}
-      - {resource: notes, text: "Mild anaemia. Values consistent with the specimen.",
+      - {resource: notes, operation: lab.op.result-verify, text: "Mild anaemia. Values consistent with the specimen.",
          created_by: "user:pathologist"}
     audit:
       - operation: lab.op.referral-accession
@@ -210,34 +215,36 @@ threads:
   - id: lab-007
     token: 25-0411
     status: completed
-    patient: {name: Mohan Bhat, age: 58, sex: male, phone: "9440000026",
+    patient: {operation: lab.op.referral-accession, name: Mohan Bhat, age: 58, sex: male, phone: "9440000026",
               created_by: "user:phlebotomist"}
     rows:
-      - {resource: service_request, code: bmp, status: active,
+      - {resource: service_request, operation: lab.op.referral-accession, code: bmp, status: active,
          created_by: "user:phlebotomist"}
       - resource: questionnaire_response
+        operation: lab.op.referral-accession
         questionnaire: lab.schema.accession-v1
         created_by: "user:phlebotomist"
         payload: {name: Mohan Bhat, age: 58, sex: male, phone: "9440000026",
                   referrer_name: Dr Shobha Menon, referrer_contact: "9440000092",
                   panel: bmp}
-      - {resource: specimen, code: venous-blood, status: available,
+      - {resource: specimen, operation: lab.op.specimen-collect, code: venous-blood, status: available,
          created_by: "user:phlebotomist"}
-      - {resource: observation, status: preliminary, category: laboratory, code: glucose, value: 104,
+      - {resource: observation, operation: lab.op.result-enter, status: preliminary, category: laboratory, code: glucose, value: 104,
          unit: mg/dL, created_by: "user:technologist"}
-      - {resource: observation, status: preliminary, category: laboratory, code: creatinine, value: 1.0,
+      - {resource: observation, operation: lab.op.result-enter, status: preliminary, category: laboratory, code: creatinine, value: 1.0,
          unit: mg/dL, created_by: "user:technologist"}
-      - {resource: observation, status: preliminary, category: laboratory, code: sodium, value: 140,
+      - {resource: observation, operation: lab.op.result-enter, status: preliminary, category: laboratory, code: sodium, value: 140,
          unit: mmol/L, created_by: "user:technologist"}
-      - {resource: observation, status: preliminary, category: laboratory, code: potassium, value: 4.3,
+      - {resource: observation, operation: lab.op.result-enter, status: preliminary, category: laboratory, code: potassium, value: 4.3,
          unit: mmol/L, created_by: "user:technologist"}
-      - {resource: diagnostic_report, code: bmp, status: preliminary,
+      - {resource: diagnostic_report, operation: lab.op.result-enter, code: bmp, status: preliminary,
          created_by: "user:technologist"}
-      - {resource: diagnostic_report, code: verification, status: verified,
+      - {resource: diagnostic_report, operation: lab.op.result-verify, code: verification, status: verified,
          created_by: "user:pathologist"}
-      - {resource: notes, text: "Within the reference intervals held on the panel.",
+      - {resource: notes, operation: lab.op.result-verify, text: "Within the reference intervals held on the panel.",
          created_by: "user:pathologist"}
       - resource: questionnaire_response
+        operation: lab.op.report-release
         questionnaire: lab.schema.release-v1
         created_by: "user:pathologist"
         payload: {channel: portal, attest: true,

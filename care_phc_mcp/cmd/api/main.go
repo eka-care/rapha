@@ -516,6 +516,7 @@ var served = []struct {
 	{"/catalogue", ""},
 	{"/operations", ""},
 	{"/operations/{op_id}/commit", ""},
+	{"/operations/{op_id}/amend", ""},
 	{"/operations/{op_id}/propose", ""},
 	{"/proposals/{proposal_id}", ""},
 	{"/proposals/{proposal_id}/confirm", ""},

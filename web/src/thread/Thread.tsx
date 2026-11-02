@@ -17,12 +17,17 @@ import type { Operation, Proposal, ThreadView } from "../types";
 import { human } from "../words";
 import { Message, withMentions } from "./Message";
 
-export function Stream({ msgs, thread, client, ctx, instruments, onDone, children }: {
+export function Stream({ msgs, thread, client, ctx, instruments, editable, onEdit, onDone, children }: {
   msgs: Msg[];
   thread: ThreadView;
   client: Client;
   ctx: Ctx;
   instruments?: Record<string, unknown>;
+  /** The ids of the records this person may still correct. Decided by the
+   *  screen above, from the visit's state and the operation's own
+   *  reversibility, never here: this file draws what it is given. */
+  editable?: Set<string>;
+  onEdit?: (m: Extract<Msg, { kind: "posted" }>) => void;
   onDone: () => void;
   children?: React.ReactNode;
 }) {
@@ -46,6 +51,7 @@ export function Stream({ msgs, thread, client, ctx, instruments, onDone, childre
       )}
       {msgs.map((m) => (
         <Entry key={m.id} m={m} thread={thread} client={client} ctx={ctx}
+               editable={editable} onEdit={onEdit}
                instruments={instruments} onDone={onDone} />
       ))}
       {children}
@@ -53,9 +59,12 @@ export function Stream({ msgs, thread, client, ctx, instruments, onDone, childre
   );
 }
 
-function Entry({ m, thread, client, ctx, instruments, onDone }: {
+function Entry({ m, thread, client, ctx, instruments, editable, onEdit, onDone }: {
   m: Msg; thread: ThreadView; client: Client; ctx: Ctx;
-  instruments?: Record<string, unknown>; onDone: () => void;
+  instruments?: Record<string, unknown>;
+  editable?: Set<string>;
+  onEdit?: (m: Extract<Msg, { kind: "posted" }>) => void;
+  onDone: () => void;
 }) {
   if (m.kind === "said") {
     return <Message who={m.who} actor={m.actor} at={clock(m.at)} text={m.text} />;
@@ -63,7 +72,9 @@ function Entry({ m, thread, client, ctx, instruments, onDone }: {
 
   if (m.kind === "handover") return <Handover m={m} />;
 
-  if (m.kind === "posted") return <Posted m={m} />;
+  if (m.kind === "posted") {
+    return <Posted m={m} onEdit={editable?.has(m.id) && onEdit ? () => onEdit(m) : undefined} />;
+  }
 
   if (m.kind === "denied") {
     return (
@@ -140,13 +151,22 @@ function Fold({ tone, who, title, summary, at, badges, children }: {
  *  already finished, and the only thing that should be open on this screen is
  *  what is happening now.
  */
-function Posted({ m }: { m: Extract<Msg, { kind: "posted" }> }) {
+function Posted({ m, onEdit }: {
+  m: Extract<Msg, { kind: "posted" }>;
+  /** Absent when this record can no longer be changed -- the visit is over,
+   *  or something later replaced it -- and the row then shows no control,
+   *  because an Edit button that refuses is worse than none. */
+  onEdit?: () => void;
+}) {
   return (
     <Fold tone="kept" who={m.actor} title={m.title} at={clock(m.at)}
           summary={m.values.slice(0, 3).map((v) => `${v.label} ${brief(v.value)}`).join(" · ")}
-          badges={m.tags.map((t) => (
-            <span className={`badge ${TAG[t.style] ?? "b-mute"}`} key={t.text}>{t.text}</span>
-          ))}>
+          badges={<>
+            {m.edited && <span className="badge b-mute">Edited</span>}
+            {m.tags.map((t) => (
+              <span className={`badge ${TAG[t.style] ?? "b-mute"}`} key={t.text}>{t.text}</span>
+            ))}
+          </>}>
       <div className="bubble">
         {m.values.length > 0 && (
           <div className="kvbox">
@@ -159,6 +179,11 @@ function Posted({ m }: { m: Extract<Msg, { kind: "posted" }> }) {
           </div>
         )}
         {m.transcript && <div className="quote">{m.transcript}</div>}
+        {onEdit && (
+          <div className="kept-do">
+            <button type="button" className="cq" onClick={onEdit}>Edit this</button>
+          </div>
+        )}
       </div>
     </Fold>
   );

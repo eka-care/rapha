@@ -244,3 +244,8 @@
   .chatgrid { grid-template-columns: 1fr; }
   .panel { display: none; }
 }
+
+/* The one control on a record that has already been kept. It sits inside the
+   card rather than on its header, because the header is a summary somebody
+   scans and this is a thing they do after reading the values. */
+.kept-do { display: flex; justify-content: flex-end; padding-top: 10px; }

@@ -89,8 +89,21 @@ class Fake:
         return frozenset(self.stored)
 
     def write(self, resource, record, *, thread):
-        self.add(resource, thread=thread, **record)
-        return f"{resource}-{len(self.rows[resource])}"
+        # An id that already exists UPDATES, which is what the SQLite adapter
+        # does and what a correction depends on. This fake appended
+        # unconditionally until 2026-11-02, so an amend looked like a second
+        # row here and like an edit in production: the fake was hiding the
+        # one behaviour under test.
+        rid = record.get("id")
+        if rid:
+            for row in self.rows.get(resource, []):
+                if row.get("id") == rid:
+                    row.update(record)
+                    return rid
+        rid = rid or f"{resource}-{len(self.rows.get(resource, [])) + 1}"
+        self.add(resource, thread=thread, id=rid, **{k: v for k, v in record.items()
+                                                     if k != "id"})
+        return rid
 
     def raise_flag(self, thread, flag):
         self.stored.add(flag)
@@ -946,6 +959,65 @@ def test_scribe_station_config_is_linted():
     manifest_bad = {"scribe": {"nurse": {"default": "phc.op.nope", "choose": []}}}
     problems = declarations._lint_scribe(manifest_bad, bundle.instruments_raw)
     assert any("phc.op.nope" in p for p in problems), problems
+
+
+def test_a_correction_replaces_its_own_rows_and_leaves_another_station_alone():
+    """The one way this feature could hurt somebody.
+
+    A consultation and a nurse's vitals both write `observation` on the same
+    visit. If a correction found its rows by resource and thread, a doctor
+    fixing their note would overwrite the nurse's readings and nobody would
+    see it happen. The `operation` column is what makes that impossible, and
+    this is the check that it stays impossible.
+    """
+    s = registered()
+    args = dict(thread=T, caps={"vitals.record"}, actor="nurse")
+    assert proposals.commit(s, BUNDLE, "phc.op.vitals-record",
+                            payload=dict(VITALS, pulse=85), **args)
+    before = len(s.rows["observation"])
+    # Somebody else's observation on the same visit, from a different form.
+    s.add("observation", id="obs-stranger", code="other", value="1",
+          created_date="2026-01-01T00:00:00+00:00",
+          operation="phc.op.consult-document")
+
+    # The join itself, asserted directly: the rows a correction may replace
+    # are this operation's and nobody else's. Positional luck could hide a
+    # broken filter in the end-to-end assertions below.
+    mine = proposals.written_by(s, OPS["phc.op.vitals-record"], thread=T)
+    assert "obs-stranger" not in mine.get("observation", []), \
+        "a correction can reach rows another station wrote"
+
+    d = proposals.amend(s, BUNDLE, "phc.op.vitals-record",
+                        payload=dict(VITALS, pulse=58), **args)
+    assert d, d.reason
+    assert len(s.rows["observation"]) == before + 1, "a correction added rows"
+    seen = lambda v: [r for r in s.rows["observation"] if str(r.get("value")) == v]
+    assert [r for r in seen("58")
+            if r.get("operation") == "phc.op.vitals-record"], \
+        "the corrected pulse is not on the record"
+    assert not seen("85"), "the wrong reading is still standing"
+    stranger = [r for r in s.rows["observation"] if r.get("code") == "other"]
+    assert stranger and str(stranger[0]["value"]) == "1", \
+        "a doctor's correction rewrote the nurse's reading"
+    assert s.audit(T)[-1].outcome == "amended", "a correction left no trail"
+
+
+def test_a_correction_is_refused_once_the_visit_is_over():
+    s = registered()
+    args = dict(thread=T, caps={"vitals.record"}, actor="nurse")
+    assert proposals.commit(s, BUNDLE, "phc.op.vitals-record", payload=VITALS, **args)
+    # Walk the thread to the end of its line the way a real one gets there:
+    # the consultation is written, and the last two steps do not apply --
+    # nobody ordered a test or prescribed anything, so the lab and the
+    # pharmacy are skipped rather than pending. The declaration decides
+    # that; this test only supplies the rows.
+    s.add("notes", text="seen and sent home")
+    assert state.station(WF, state.flags(s, T, WF)) is None, "the visit is still open"
+    d = proposals.amend(s, BUNDLE, "phc.op.vitals-record",
+                        payload=dict(VITALS, pulse=58), **args)
+    assert not d and "over" in d.reason, d.reason
+    assert not [r for r in s.rows["observation"] if str(r.get("value")) == "58"], \
+        "a closed visit was edited"
 
 
 if __name__ == "__main__":

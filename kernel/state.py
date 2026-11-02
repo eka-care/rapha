@@ -2,6 +2,7 @@
 
 This is care_phc/thread.py with the rules taken out of the module and put in
 the workflow declaration. derive() becomes states(): the same flags, computed
+from catalogue import vocab
 from the same records, but by walking Workflow.states over Store.count rather
 than by reading a hard coded Snapshot. station() and actions() keep their
 behaviour exactly; only where the line comes from has changed.
@@ -66,7 +67,10 @@ def flags(store, thread, workflow):
 # Outcomes on an audit line that mean "this actor performed this operation on
 # this thread". A proposal is a request and not a performance; a denial is the
 # opposite of one.
-PERFORMED = ("allowed", "confirmed")
+# A correction is a performance: if a nurse records a reading and a doctor
+# corrects it, the doctor acted on this thread, and a separation of duties
+# rule that could not see that would let one person be both pairs of eyes.
+PERFORMED = tuple(o for o in vocab.WROTE if o != "committed")
 
 
 def performers(store, thread):
