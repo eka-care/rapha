@@ -370,20 +370,25 @@ def check_the_consent_is_spoken_not_read():
 
     # `spoken` is the facility's off switch: true speaks the line, false
     # renders the same `says` sentence on screen instead (fallback: text).
-    # c.Instrument defaults `spoken` to True, which means the compiled value
-    # alone cannot tell "declared true" from "not declared, defaulted true":
-    # this reads the atom's own frontmatter to prove the key is actually
-    # there, not just that the default happens to agree with it, and then
-    # separately proves the value survives compilation into catalogue.json
-    # rather than being dropped or reset on the way. Losing either check lets
-    # someone delete the off switch again while every other assertion here
-    # still passes on the default.
+    # IT IS OFF, 2026-11-03, the owner's call: a synthesised voice at a
+    # reception counter talks over a queue, reads in the browser's accent
+    # rather than the patient's language, and fails silently in half a dozen
+    # ways. The clerk says the line.
+    #
+    # c.Instrument defaults `spoken` to True, so the compiled value alone
+    # cannot tell "declared" from "defaulted": this reads the atom's own
+    # frontmatter to prove the key is actually there, and then separately
+    # proves the value survives compilation into catalogue.json rather than
+    # being dropped or reset to the default on the way. Losing either check
+    # lets someone delete the switch while every other assertion here still
+    # passes -- and with the value now false, a dropped key would turn the
+    # voice back ON silently, which is the louder failure of the two.
     fm, _ = parse(pathlib.Path("bundles/phc/phc.inst.consent-speak.md"))
     assert "spoken" in fm, "the atom does not declare `spoken`: the off switch is gone"
-    assert fm["spoken"] is True, fm["spoken"]
-    assert inst.spoken is True, inst.spoken
+    assert fm["spoken"] is False, fm["spoken"]
+    assert inst.spoken is False, inst.spoken
     compiled = json.load(open("catalogue/catalogue.json"))
-    assert compiled["instruments"]["phc.inst.consent-speak"]["spoken"] is True, \
+    assert compiled["instruments"]["phc.inst.consent-speak"]["spoken"] is False, \
         "the off switch did not survive compilation into catalogue.json"
 
     schema = json.load(open("questionnaires/phc.schema.register-v1.json"))
@@ -391,8 +396,8 @@ def check_the_consent_is_spoken_not_read():
     assert consent["text"] == "Record this visit?", consent["text"]
     assert "description" not in consent, "the 53 word read-out moved to the spoken line"
     ok("the registration form asks 'Record this visit?' with no read-out "
-       "paragraph, the agent's own line carries all four things a recording "
-       "consent needs, and its off switch declares and compiles")
+       "paragraph, the consent line carries all four things a recording "
+       "consent needs, and the voice that used to read it aloud is off")
 
 
 if __name__ == "__main__":

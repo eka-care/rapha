@@ -2,14 +2,14 @@
 id: phc.inst.consent-speak
 type: instrument
 kind: spoken-prompt
-title: Ask for consent aloud
-summary: The agent asks; the clerk taps what the patient answered.
+title: Ask for consent
+summary: The clerk says the line; the clerk taps what the patient answered.
 operations: [phc.op.patient-register]
 fields: [capture_consent, capture_declined]
 says: >-
   May we record this visit to write your notes?
   You can say no, or stop it any time.
-spoken: true
+spoken: false
 commit: tap
 readback: required
 fallback: text
@@ -34,14 +34,26 @@ recording it authorises happens later at the doctor. That costs the doctor no
 consultation time, and by the time the scribe is available the answer is
 already a thread flag.
 
-## The off switch
+## The off switch, and why it is off
 
-`spoken: true` is this atom's default; a facility setting overrides it. When
-it resolves false the same sentence renders on screen, via `fallback: text`,
-for a person to read instead, and nothing else changes: the clerk still taps
-what the patient answered. The linter refuses a `spoken-prompt` with an empty
-`says` whether `spoken` is true or false, because the off switch must always
-have something to fall back to.
+`spoken: false`, 2026-11-03, the owner's call. The browser no longer reads
+the line aloud; the same sentence renders on screen, via `fallback: text`,
+for the clerk to say in their own voice. Nothing else changes -- the clerk
+still taps what the patient answered, and the four things the sentence
+carries are unchanged, because the consent is the sentence and not the
+speaker.
+
+A synthesised voice at a reception counter is the wrong instrument for this.
+It talks over a queue, it reads in the browser's accent rather than the
+patient's language, and it fails silently in more ways than anyone notices:
+a muted device, no audio hardware, no Web Speech API, an autoplay policy
+refusing an utterance with no gesture behind it. A clerk reading seventeen
+words aloud does none of that.
+
+The switch itself stays declared, so turning the voice back on is one word
+in this file. The linter refuses a `spoken-prompt` with an empty `says`
+whether `spoken` is true or false, because the off switch must always have
+something to fall back to.
 
 ## What this cannot do
 

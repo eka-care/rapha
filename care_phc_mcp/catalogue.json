@@ -217,9 +217,9 @@
       "readback": "required",
       "requires": null,
       "says": "May we record this visit to write your notes? You can say no, or stop it any time.",
-      "spoken": true,
-      "summary": "The agent asks; the clerk taps what the patient answered.",
-      "title": "Ask for consent aloud",
+      "spoken": false,
+      "summary": "The clerk says the line; the clerk taps what the patient answered.",
+      "title": "Ask for consent",
       "type": "instrument",
       "types": []
     },
