@@ -80,6 +80,72 @@ It also replaces a dependency: the deck names **Twilio** for reminders.
 This layer already does provider-agnostic telephony, so reminders should go
 through it rather than adding a fourth provider.
 
+### 5.1 One clinic number that any ASHA dials: yes, with one change
+
+Asked 2026-11-03: can every clinic's workspace have a number an ASHA calls,
+have the conversation, and have it land in that clinic's account as a
+patient with structured records?
+
+**The lookup today goes the other way.** `webhook_router.py` calls
+`get_telephony_config_by_phone(event.caller_number)` — it resolves the
+workspace from **the number that called**, so every ASHA's personal handset
+has to be registered, and an unregistered caller is refused outright with
+"Please setup your workspace at console.eka.care". One shared clinic number
+is not what it does.
+
+**But the dialled number is already there.** `event.called_number` is
+parsed and carried into the stream session's `additional_data`. It is
+simply not what the lookup uses. So the change is: resolve the workspace
+from `called_number`, and keep `caller_number` to identify the worker.
+Both are already in the event, and that combination is better than either
+alone — one number for a whole centre, and still a record of who recorded
+the visit, which a health record needs.
+
+The schema needs one edit with it: `telephony_config` has
+`UNIQUE KEY uq_telephony_config_phone_number`, which forbids many workers
+sharing a clinic number. The uniqueness belongs on the clinic number in a
+separate table, or on the pair.
+
+**Hanging up is already the end of the session.** Telephony sessions are
+created with `commit_on_close: bool = True`, so the structuring pass starts
+when the call drops. Nothing needs a stop button.
+
+### 5.2 The patient is the hard half, and it is ours
+
+A telephony session is created today with a workspace and a user and
+**no patient**. The protocol's session model does carry `patient_details`
+with `oid` promoted for indexing, but the telephony path fills none of it,
+because when the call connects nobody knows who the patient is.
+
+Taking the name and mobile out of the conversation works. The danger is the
+step after it: **matching a spoken name and a spoken number to a patient.**
+A wrong match writes one pregnant woman's record into another woman's file.
+In a village with repeated names and shared handsets that is not a rare
+event, and it is the one failure this product cannot have.
+
+So the call should not silently create or join a patient. It should land as
+a visit with a **suggested** match that somebody at the centre confirms or
+corrects before it joins the record. Rapha's front desk is already that
+screen, and this keeps "no forms" true for the ASHA — she only talks — while
+putting the one dangerous judgement in front of a person.
+
+Note also who creates the patient. Eka's scribe produces a structured
+document; it does not own a patient register. Our kernel does, with the
+ABHA link and the FHIR record. So the patient is created by the kernel off
+the webhook, not by Eka.
+
+### 5.3 Consent has nowhere to live on a phone call
+
+An ambient recording of a conversation with a patient needs that patient's
+consent, and a phone call has no screen to show it on. The ASHA has to say
+it and the patient has to answer, and that answer should be inside the
+recording.
+
+Rapha already gates the microphone on a declared consent flag, so there is
+a place to put the result. What does not exist is a way to satisfy that
+flag by voice. It is a decision, not a detail: without it the phoned-in
+visit cannot legally be the demo.
+
 ## 6. A precedent for the reminder decision
 
 Eka's own house rule, written into the webhook registry: *"payloads are
