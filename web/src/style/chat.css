@@ -22,10 +22,13 @@
   padding: 13px 15px; display: flex; align-items: flex-start; gap: 11px;
   border-bottom: 1px solid var(--color-border-subtle); flex-shrink: 0;
 }
-/* A person's name is the display type on this screen. */
+/* A person's name is the display type on this screen, and since the visit
+   draws no top bar it is also the page's h1 -- hence the reset: the browser's
+   own h1 metrics would make the card's header taller than the bar it
+   replaced, which is the opposite of the point. */
 .pt-name {
   font-family: var(--font-serif); font-size: 19px; font-weight: 420;
-  letter-spacing: .012em; line-height: 1.15;
+  letter-spacing: .012em; line-height: 1.15; margin: 0;
 }
 .pt-meta { font-size: 10.5px; color: var(--color-text-tertiary); margin-top: 2px; }
 .pt-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
@@ -247,6 +250,11 @@
   color: var(--color-agent);
 }
 .mic:hover:not(:disabled) { background: var(--color-agent-tint-hover); }
+/* The bar's last control, rehoused. Pill rather than circle, because unlike
+   the microphone it carries a shortcut worth reading. */
+.askbtn { height: 36px; padding: 0 10px; gap: 6px; border-radius: var(--radius-pill); }
+.askbtn .kbd { pointer-events: none; }
+@media (max-width: 640px) { .askbtn .kbd { display: none; } }
 .mic.rec { animation: micpulse 1.1s infinite; }
 @keyframes micpulse {
   0%, 100% { box-shadow: var(--ring-rec-a); }

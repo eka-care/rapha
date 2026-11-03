@@ -25,7 +25,7 @@ import { signedIn } from "../auth/session";
 import { Control } from "../screens/Control";
 import { Today } from "../screens/Today";
 import type { Facility, QueueRow, ViewDecl, ViewResult, Workflow } from "../types";
-import { IconSheet } from "../icons";
+import { Icon, IconSheet } from "../icons";
 import { Khoj } from "./Khoj";
 import { Sidebar, panelFor } from "./Sidebar";
 import { Rail } from "./Rail";
@@ -423,14 +423,32 @@ export function App() {
       {tour && <Tour onClose={() => setTour(false)} />}
       {drawer && <div className="drawer-scrim" onClick={() => setDrawer(false)} />}
       <div className="main">
-        <Topbar
-          title={title}
-          deskLabel={createLabel(catalogue, facility.data?.bundle.workflow)}
-          onSearch={() => setKhojOpen(true)}
-          onAssist={route.kind === "thread" ? undefined : () => { setAssistSeen(true); setAssistOpen(true); }}
-          onMenu={() => setDrawer((d) => !d)}
-          onDesk={() => go("#/desk")}
-        />
+        {/* NO BAR INSIDE A VISIT. It carried one word, "Encounter", above a
+            card already headed with the patient's name: two headings, one of
+            which said nothing. Its three controls each went somewhere else
+            or nowhere -- the question box into the composer, where a person
+            is already typing; the assistant was already a tab of the visit;
+            and registering a new patient has no business on the screen of a
+            patient who is sitting there. The heading moved with the bar: the
+            patient's name is the visit's h1 (screens/Encounter.tsx). */}
+        {route.kind !== "thread" && (
+          <Topbar
+            title={title}
+            deskLabel={createLabel(catalogue, facility.data?.bundle.workflow)}
+            onSearch={() => setKhojOpen(true)}
+            onAssist={() => { setAssistSeen(true); setAssistOpen(true); }}
+            onMenu={() => setDrawer((d) => !d)}
+            onDesk={() => go("#/desk")}
+          />
+        )}
+        {/* The bar was also the only way back to the line on a narrow
+            screen, where the line is a drawer. The way back outlives it. */}
+        {route.kind === "thread" && (
+          <button className="icon-btn thread-menu" onClick={() => setDrawer((d) => !d)}
+                  aria-label="Open navigation">
+            <Icon name="list" className="i sm" />
+          </button>
+        )}
         <main id="workspace" tabIndex={-1} className={route.kind === "thread" ? "view" : "view scroll"}>
           <div className="wrap">
           <Boundary>
@@ -441,6 +459,7 @@ export function App() {
                 onSay={(t) => onSay(route.id, t)}
                 onChanged={reload}
                 onOpenSubject={(sid) => go(`#/patients/${sid}`)}
+                onAsk={() => setKhojOpen(true)}
                 onRemember={remember}
                 catchment={facility.data?.catchment}
               />
@@ -574,12 +593,13 @@ function ViewScreen({ id, decl, workflow, nonce }: {
   );
 }
 
-function ThreadScreen({ id, cat, ctx, said, asking, nonce, catchment, onSay, onChanged, onRemember, onOpenSubject }: {
+function ThreadScreen({ id, cat, ctx, said, asking, nonce, catchment, onSay, onChanged, onRemember, onOpenSubject, onAsk }: {
   id: string; cat: ReturnType<typeof Object>; ctx: Ctx; said: Said[];
   asking: boolean; nonce: number;
   catchment?: Facility["catchment"];
   onSay: (t: string) => void; onChanged: () => void; onRemember: (r: Recent) => void;
   onOpenSubject: (subjectId: string) => void;
+  onAsk: () => void;
 }) {
   const { data, error, loading, reload } = useAsync(() => api.thread(id), [id, nonce]);
   // header() already answers "what is this thread called", using the queue
@@ -603,6 +623,7 @@ function ThreadScreen({ id, cat, ctx, said, asking, nonce, catchment, onSay, onC
       onSay={onSay}
       onChanged={() => { reload(); onChanged(); }}
       onOpenSubject={onOpenSubject}
+      onAsk={onAsk}
     />
   );
 }

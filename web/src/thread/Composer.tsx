@@ -10,6 +10,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "../icons";
+import { NAME } from "../brand";
 import type { Operation } from "../types";
 import type { Verb } from "./commands";
 import { Menu, atItems, slashItems, type Item } from "./Menu";
@@ -29,7 +30,7 @@ export type Recording = { seconds: number; onStop: () => void } | null;
 
 export function Composer({
   about, actions, roles, verbs, asking, recording, quick,
-  onSay, onAction, onStartScribe, micReason,
+  onSay, onAction, onStartScribe, onAsk, micReason,
 }: {
   about: string;
   actions: Operation[];
@@ -43,6 +44,11 @@ export function Composer({
   onSay: (text: string) => void;
   onAction: (op: Operation, mention?: string) => void;
   onStartScribe?: () => void;
+  /** Open the global question box. A visit has no top bar of its own --
+   *  the screen's heading is the patient, not the word "Encounter" -- so
+   *  the one control that bar still carried lives here, beside the box a
+   *  person is already typing in. */
+  onAsk?: () => void;
   /** §34's quick actions, rendered inside the composer row the way the
    *  prototype does: the things you can do sit beside the box you say things
    *  in, not in a toolbar at the top of the screen. */
@@ -165,6 +171,18 @@ export function Composer({
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
             }}
           />
+      {onAsk && (
+        <button
+          type="button"
+          className="btn btn-g askbtn"
+          onClick={onAsk}
+          title={`Ask ${NAME}`}
+          aria-label={`Ask ${NAME}`}
+        >
+          <Icon name="search" className="i sm" />
+          <span className="kbd">⌘K</span>
+        </button>
+      )}
       {onStartScribe && (
         <button
           type="button"

@@ -285,6 +285,16 @@
 }
 @media (max-width: 900px) { .drawer-scrim { display: block; } }
 
+/* A visit draws no top bar, so on a narrow screen -- where the line is a
+   drawer rather than a column -- this is the way back to it. It floats over
+   the visit's own card instead of taking a row from it. */
+.thread-menu { display: none; }
+@media (max-width: 900px) {
+  /* In the flow, not floating: floated it landed on the patient's own
+     initials, which are the first thing in the card below. */
+  .thread-menu { display: grid; flex-shrink: 0; margin: 10px 0 -4px 12px; }
+}
+
 
 /* The line in the rail. A row is a number, a name, the station they are at,
    and a dot when something on them is out of range -- the artifact's own

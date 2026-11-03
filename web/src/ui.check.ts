@@ -727,15 +727,31 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   const h1s = TSX.filter((f) => f.endsWith(".tsx"))
     .filter((f) => /<h1\b/.test(code(readFileSync(f, "utf8"))))
     .map(rel);
-  // TWO FILES, NEVER ONE PAGE. The sign-in screen is what App renders
+  // THREE FILES, NEVER ONE PAGE. The sign-in screen is what App renders
   // INSTEAD of the shell when there is no Eka session -- it returns before
-  // the rail, the top bar and the workspace exist -- so the two headings
-  // cannot meet. A screen with no h1 at all is the thing this rule is for,
-  // and the sign-in screen having one is it obeying the rule, not breaking
-  // it. Asserted as the exact pair so a THIRD cannot arrive quietly.
-  assert.deepEqual(h1s, ["app/Topbar.tsx", "auth/SignIn.tsx"],
+  // the rail, the top bar and the workspace exist -- so it cannot meet
+  // either of the others. The visit screen names the patient, and the top
+  // bar names the screen; a visit draws no top bar, so those two cannot
+  // meet either. Both exclusions are asserted below rather than trusted.
+  // The list is exact so a FOURTH cannot arrive quietly.
+  assert.deepEqual(h1s, ["app/Topbar.tsx", "auth/SignIn.tsx", "screens/Encounter.tsx"],
     "the page has more than one top-level heading, or none: " + h1s.join(", "));
   const appSrc = code(readFileSync(join(SRC, "app", "App.tsx"), "utf8"));
+  // The visit's heading and the shell's cannot both be on screen: the bar is
+  // rendered only off a visit, and the patient's name only on one. Without
+  // this, deleting the condition gives every visit two h1s and nothing says
+  // so -- which is the whole reason the pair above is listed exactly.
+  assert.match(appSrc, /route\.kind !== "thread" && \(\s*<Topbar/,
+    "the top bar is drawn inside a visit, where the patient's name is "
+    + "already the page's h1: that is two top-level headings on one page");
+  assert.ok(!/<Topbar[\s\S]{0,600}?onAssist=\{route\.kind === "thread"/.test(appSrc),
+    "the bar still tests for a visit inside itself, which means it is still "
+    + "drawn there");
+  // And the one control that bar carried into a visit has somewhere to be.
+  assert.match(code(readFileSync(join(SRC, "thread", "Composer.tsx"), "utf8")),
+    /onAsk && \(/,
+    "the composer no longer opens the question box, so removing the bar took "
+    + "the only way to ask with it");
   assert.match(appSrc, /if \(session !== true\) \{[\s\S]{0,400}?<SignIn/,
     "the sign-in screen must REPLACE the shell, not sit inside it: two h1s "
     + "on one page is what this allows and it is only safe because it returns");
