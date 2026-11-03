@@ -51,8 +51,19 @@ export function setRailShown(ids: RailId[]) {
 
 const FOLD = "phc.rail.folded";
 
+/** FOLDED UNTIL SOMEBODY OPENS IT. It used to default open, so a visit
+ *  arrived as a conversation plus four cards of context nobody had asked
+ *  for, and the thread -- the thing the screen is for -- got what was left.
+ *  The rail is reference: a person reaches for it, and the one tap to do
+ *  that is cheaper than the width it costs everyone who does not.
+ *
+ *  Only the default moves. A person who opens it has that remembered, and
+ *  a person who closed it before still finds it closed. */
 export const railFolded = () => {
-  try { return localStorage.getItem(FOLD) === "1"; } catch { return false; }
+  try {
+    const v = localStorage.getItem(FOLD);
+    return v === null ? true : v === "1";
+  } catch { return true; }
 };
 export const setRailFolded = (folded: boolean) => {
   try { localStorage.setItem(FOLD, folded ? "1" : "0"); } catch { /* private window */ }

@@ -50,11 +50,14 @@ export function Stream({ msgs, thread, client, ctx, instruments, editable, onEdi
           Type a message, @mention someone, use / for an action, or dictate.
         </div>
       )}
-      {msgs.map((m) => (
-        <Entry key={m.id} m={m} thread={thread} client={client} ctx={ctx}
-               editable={editable} onEdit={onEdit}
-               instruments={instruments} onDone={onDone} />
-      ))}
+      {runs(msgs).map((r) =>
+        r.length === 1 ? (
+          <Entry key={r[0].id} m={r[0]} thread={thread} client={client} ctx={ctx}
+                 editable={editable} onEdit={onEdit}
+                 instruments={instruments} onDone={onDone} />
+        ) : (
+          <Refusals key={r[0].id} run={r} />
+        ))}
       {children}
     </div>
   );
@@ -194,6 +197,55 @@ const TAG: Record<string, string> = { crit: "b-crit", warn: "b-warn", ok: "b-ok"
 
 /** §12.2, §12.3. The border stays neutral: §57 draws it in the agent colour,
  *  which §50 reserves for AI, and a nurse's note is not model output. */
+/** A RUN OF REFUSALS IS ONE EVENT, not several.
+ *
+ *  An agent that proposes three operations and has all three refused in the
+ *  same second is an agent doing its job -- it guessed, the kernel said no,
+ *  nothing was written. Drawn as three rows with three red dots it reads as
+ *  three things going wrong, and on a busy visit it is most of the page.
+ *
+ *  Only a run of CONSECUTIVE refusals folds, and only when there is more
+ *  than one. A single refusal is still a line of its own, because a lone
+ *  "no" after something a person did is news.
+ */
+function runs(msgs: Msg[]): Msg[][] {
+  const out: Msg[][] = [];
+  for (const m of msgs) {
+    const last = out[out.length - 1];
+    if (m.kind === "denied" && last && last[0].kind === "denied") last.push(m);
+    else out.push([m]);
+  }
+  return out;
+}
+
+function Refusals({ run }: { run: Msg[] }) {
+  const [shown, setShown] = useState(false);
+  const rows = run as Extract<Msg, { kind: "denied" }>[];
+  return (
+    <div className={`ev${shown ? " on" : ""}`}>
+      <div className="m-av node refused" aria-hidden="true" />
+      <div className="m-b">
+        <button className="ev-h" aria-expanded={shown} onClick={() => setShown((v) => !v)}>
+          <span className="chev" aria-hidden="true"><Icon name="chev" className="i sm" /></span>
+          <span className="ev-t">{rows.length} refused</span>
+          <span className="ev-sum">Nothing was written.</span>
+          <span className="ev-time">{clock(rows[rows.length - 1].at)}</span>
+        </button>
+        {shown && (
+          <div className="bubble">
+            {rows.map((r) => (
+              <div className="ref-1" key={r.id}>
+                <b>{r.title}</b>
+                <span>{r.reason}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Handover({ m }: { m: Extract<Msg, { kind: "handover" }> }) {
   return (
     <Fold tone="handed" who={m.from} title={m.title} at={clock(m.at)}

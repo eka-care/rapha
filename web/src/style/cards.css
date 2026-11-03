@@ -140,27 +140,32 @@
 
 
 /* ---- what earlier visits say about this one (web/src/thread/Past.tsx) ----
-   The carry forward strip is the artifact's: the few values this visit
-   recorded, beside what they were last time, in one row under the name. It is
-   the comparison a clinician makes in their head on every follow up, and it
-   saves opening the last visit to make it. */
+   The few values this visit recorded, beside what they were last time. It
+   is the comparison a clinician makes in their head on every follow up,
+   and it saves opening the last visit to make it.
+
+   IT WAS A TABLE UNTIL 2026-11-04: a bordered card of equal cells, each
+   with a label above a 15px value, sitting inside the card that holds the
+   whole visit. A card inside a card, and the loudest thing on the screen
+   was a comparison, not the patient. It is a line now -- no box, no cell
+   borders, no column rules -- which is what a sentence of context should
+   look like above a conversation. */
 .carry {
-  display: flex; flex-wrap: wrap; margin-top: var(--space-3);
-  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-lg);
-  overflow: hidden; background: var(--color-bg-surface);
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: 4px 18px; margin-top: var(--space-2);
+  padding: 7px 15px 9px;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
-.cf {
-  flex: 1 1 128px; min-width: 0; padding: 9px 12px;
-  border-right: 1px solid var(--color-border-subtle);
-}
-.cf:last-child { border-right: 0; }
-.cf-r { display: flex; align-items: baseline; gap: 6px; margin-top: 3px; }
+.cf { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+.cf .eyebrow { font-size: 9px; }
+.cf-r { display: flex; align-items: baseline; gap: 5px; }
 .cf .then {
-  font-size: 12px; color: var(--color-text-tertiary); font-variant-numeric: tabular-nums;
+  font-size: 11.5px; color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums; text-decoration: line-through;
 }
-.cf .arr { font-size: 11px; color: var(--color-text-tertiary); }
+.cf .arr { font-size: 10px; color: var(--color-text-tertiary); }
 .cf .now {
-  font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums;
+  font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums;
   color: var(--color-text-primary);
 }
 .cf.crit .now { color: var(--color-critical); }

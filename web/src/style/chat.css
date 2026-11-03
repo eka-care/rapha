@@ -96,17 +96,27 @@
   background: var(--color-bg-canvas); border: 1.5px solid var(--color-border-strong);
 }
 .m-av.node.kept::before { background: var(--color-text-secondary); border-color: var(--color-text-secondary); }
-.m-av.node.refused::before { background: var(--color-critical); border-color: var(--color-critical); }
+/* A REFUSAL IS NOT A PATIENT PROBLEM. This dot was the critical ink, so a
+   doctor scanning the left edge of a visit saw the same red for "the agent
+   guessed at an operation that is not in this workflow" as for "this person
+   needs attention sooner". Three of those in one minute, which is a normal
+   thing for an agent to do, painted the visit as an emergency. The record
+   still says Refused in words, on a badge, where it belongs. */
+.m-av.node.refused::before { background: var(--color-border-strong); border-color: var(--color-border-strong); }
 .m-av.node.handed::before { background: var(--color-warning); border-color: var(--color-warning); }
 .m-b { min-width: 0; }
 .m-meta {
   font-size: 9.5px; color: var(--color-text-tertiary); font-weight: 600;
   margin-bottom: 5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
 }
+/* A MEASURE, because a line of prose the width of a 1440px screen is not
+   read, it is skimmed and lost. Everything else on the thread is short
+   enough not to care; the agent's own sentences are not. */
 .bubble {
   background: var(--color-bg-hover); border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg); padding: 11px 13px;
   font-size: 12.5px; line-height: 1.55; color: var(--color-text-secondary);
+  max-width: 74ch;
 }
 .msg.right .bubble {
   background: var(--color-accent-soft); border-color: var(--color-accent-line);
@@ -323,3 +333,9 @@
 }
 .scribe-go { padding: 11px 20px; font-size: 13.5px; gap: 9px; }
 .scribe-why { font-size: 12px; color: var(--color-text-tertiary); max-width: 34ch; }
+
+/* One refusal inside a folded run. */
+.ref-1 { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; }
+.ref-1 + .ref-1 { border-top: 1px solid var(--color-border-subtle); padding-top: 7px; margin-top: 4px; }
+.ref-1 b { color: var(--color-text-primary); font-weight: 600; white-space: nowrap; }
+.ref-1 span { min-width: 0; }
