@@ -74,6 +74,50 @@ flap that diff on any row sitting exactly on a boundary, and a check that
 fails one run in fifty is a check people learn to rerun. The request carries
 the instant; the kernel evaluates against it; the gate stays deterministic.
 
+## 1a. What building it changed, 2026-11-04
+
+Steps 1 to 7 of section 12 are built and committed. Three things in this
+note turned out to be wrong or unnecessary once they met the code, and an
+uncorrected design note is worse than none.
+
+**There is no `task` row, and there is no `task_attempt` row.** Section 2
+below argues the two objects well and then proposes STORING them, which
+would mean generating a set of rows when a pregnancy opens and cancelling
+them when it ends. Cancelling is the part that kills it: somebody has to
+remember, in every path that could end a pregnancy, including the ones
+added later. A contact is DERIVED instead -- computed from the schedule,
+the episode's own date and the audit, every time anybody asks. An episode
+that has ended produces nothing, at every instant, with no cancellation
+step anywhere to forget. The failure this whole note is arranged around
+becomes impossible rather than unlikely.
+
+It also dissolved section 6. An estimated delivery date corrected at
+fourteen weeks moves the whole arc with nothing to reconcile and no orphan
+rows, because nothing was ever written down.
+
+**A referral is an episode, not a second object.** Section 2's argument
+that a referral, a contact and a follow-up are one thing was right, and the
+thing they are is already here: an episode has a start, an owner, an end
+and an outcome, and it outlives the visit that raised it. So a referral is
+an `episode_of_care` of type `referral` with a one contact schedule hung
+off it, drawn by the same component with no renderer change.
+
+**The chasing log is not built**, so the "attempts" half of section 2 is
+still owed. It belongs with the chasing itself, which is decision 11.4.
+
+**What section 9 said this would cost was about right**, except that
+`task`, `task_attempt` and the generation step all fell away, and one
+field appeared that is not in this note: a schedule declares `anchor_from`,
+because a pregnancy is measured from a date somebody recorded and a
+referral from the moment it was raised.
+
+Two things the lint found that nobody had decided, both now written up in
+the atoms and both the owner's: an ANM cannot record an antenatal visit
+(it needs `encounter.document`, which she does not hold), and a community
+health officer cannot close a referral (it needs `handover`, which she
+does not hold either). The people who do this work in India cannot record
+it in this product today.
+
 ## 2. One object, not four
 
 The build plan asks whether a referral, a reminder, a follow-up and a task
