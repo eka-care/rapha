@@ -210,8 +210,11 @@ func (b *Bundle) decideWith(s Store, op carephc.Operation, thread string,
 		// thread's state: the operation is not part of this line at all.
 		return guard.Decision{
 			Allowed: false,
+			// In the workflow's own words and the operation's own title:
+			// the ids are on the audit line below, where an auditor can
+			// find them. Parity with kernel/proposals.py.
 			Reason: fmt.Sprintf("%s is not a step of %s: no station in this "+
-				"workflow draws it", op.ID, b.Workflow.ID),
+				"line draws it", op.Title, b.Workflow.Title),
 			Audit: map[string]any{
 				"operation": op.ID, "actor": actor, "surface": surface,
 				"payload": copyPayload(payload),
@@ -538,8 +541,7 @@ func (b *Bundle) Confirm(s Store, proposal store.Proposal, caps, scopes map[stri
 		// still the wrong answer.
 		decision := guard.Decision{
 			Allowed: false,
-			Reason: fmt.Sprintf("%s is not an operation this facility declares",
-				proposal.Operation),
+			Reason: "that is not an action this facility offers",
 			Audit: map[string]any{
 				"operation": proposal.Operation, "actor": actor,
 				"surface": guard.Rendered, "payload": use,

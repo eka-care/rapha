@@ -122,6 +122,21 @@
   background: var(--color-accent-soft); border-color: var(--color-accent-line);
   color: var(--color-text-primary);
 }
+/* Lines within one turn sit close, and only the first keeps the full corner
+   on the side the avatar is, so a stack reads as one person speaking. */
+.m-b > .bubble + .bubble { margin-top: 4px; }
+.m-b > .bubble:not(:first-of-type) { border-top-left-radius: var(--radius-sm); }
+.msg.right .m-b > .bubble:not(:first-of-type) {
+  border-top-left-radius: var(--radius-lg); border-top-right-radius: var(--radius-sm);
+}
+
+/* The head of a long visit, behind one control. It is a quiet row, not a
+   button somebody is meant to want: the thing being read is below it. */
+.earlier {
+  align-self: center; margin: 2px auto 4px;
+  color: var(--color-text-tertiary);
+}
+
 .bubble b { color: var(--color-text-primary); font-weight: 600; }
 .bubble .t {
   font-size: 12.5px; font-weight: 700; color: var(--color-text-primary);

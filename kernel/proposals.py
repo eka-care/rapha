@@ -102,8 +102,10 @@ def _decide(store, bundle, op, *, thread, payload, caps, surface, actor,
     if not drawn_by(workflow, op["id"]):
         # Before the guard, because this is not a judgement about this thread's
         # state: the operation is not part of this line at all.
+        # In the workflow's own words and the operation's own title: the ids
+        # are on the audit line below, where an auditor can find them.
         return guard.Decision(False, "%s is not a step of %s: no station in this "
-                                     "workflow draws it" % (op["id"], workflow.id),
+                                     "line draws it" % (op["title"], workflow.title),
                               audit={"operation": op["id"], "actor": actor,
                                      "surface": surface, "payload": dict(payload),
                                      "outcome": "denied: not in this workflow"})
@@ -317,8 +319,8 @@ def confirm(store, bundle, proposal, *, caps, actor, payload=None,
         # like any other denial rather than raising KeyError on the tap, which
         # is what this did. Nothing was ever written either way; a 500 on a
         # confirm button is still the wrong answer.
-        decision = guard.Decision(False, "%s is not an operation this facility "
-                                         "declares" % proposal.operation,
+        decision = guard.Decision(False, "that is not an action this facility "
+                                         "offers",
                                   {"operation": proposal.operation, "actor": actor,
                                    "surface": guard.RENDERED, "payload": payload,
                                    "outcome": "denied: not in this bundle"})

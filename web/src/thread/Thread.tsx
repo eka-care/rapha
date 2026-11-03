@@ -16,7 +16,8 @@ import { OperationPanel } from "../form/Panel";
 import { clock, type Ctx, type Msg, type Said } from "../messages";
 import type { Operation, Proposal, ThreadView } from "../types";
 import { human, title } from "../words";
-import { Message, withMentions } from "./Message";
+import { Message, Turn, withMentions } from "./Message";
+import { blocks, split, type Block } from "./fold";
 
 export function Stream({ msgs, thread, client, ctx, instruments, editable, onEdit, onDone, children }: {
   msgs: Msg[];
@@ -50,14 +51,9 @@ export function Stream({ msgs, thread, client, ctx, instruments, editable, onEdi
           Type a message, @mention someone, use / for an action, or dictate.
         </div>
       )}
-      {runs(msgs).map((r) =>
-        r.length === 1 ? (
-          <Entry key={r[0].id} m={r[0]} thread={thread} client={client} ctx={ctx}
-                 editable={editable} onEdit={onEdit}
-                 instruments={instruments} onDone={onDone} />
-        ) : (
-          <Refusals key={r[0].id} run={r} />
-        ))}
+      <Body msgs={msgs} thread={thread} client={client} ctx={ctx}
+            editable={editable} onEdit={onEdit}
+            instruments={instruments} onDone={onDone} />
       {children}
     </div>
   );
@@ -197,38 +193,59 @@ const TAG: Record<string, string> = { crit: "b-crit", warn: "b-warn", ok: "b-ok"
 
 /** §12.2, §12.3. The border stays neutral: §57 draws it in the agent colour,
  *  which §50 reserves for AI, and a nurse's note is not model output. */
-/** A RUN OF REFUSALS IS ONE EVENT, not several.
- *
- *  An agent that proposes three operations and has all three refused in the
- *  same second is an agent doing its job -- it guessed, the kernel said no,
- *  nothing was written. Drawn as three rows with three red dots it reads as
- *  three things going wrong, and on a busy visit it is most of the page.
- *
- *  Only a run of CONSECUTIVE refusals folds, and only when there is more
- *  than one. A single refusal is still a line of its own, because a lone
- *  "no" after something a person did is news.
+/** The visit, as blocks: what folds is decided in fold.ts, and this draws
+ *  the answer. The older part sits behind one control, because the thing
+ *  being read on a long visit is the bottom of the list.
  */
-function runs(msgs: Msg[]): Msg[][] {
-  const out: Msg[][] = [];
-  for (const m of msgs) {
-    const last = out[out.length - 1];
-    if (m.kind === "denied" && last && last[0].kind === "denied") last.push(m);
-    else out.push([m]);
-  }
-  return out;
+function Body({ msgs, thread, client, ctx, instruments, editable, onEdit, onDone }: {
+  msgs: Msg[]; thread: ThreadView; client: Client; ctx: Ctx;
+  instruments?: Record<string, unknown>;
+  editable?: Set<string>;
+  onEdit?: (m: Extract<Msg, { kind: "posted" }>) => void;
+  onDone: () => void;
+}) {
+  const [all, setAll] = useState(false);
+  const { earlier, recent } = split(blocks(msgs));
+  const draw = (b: Block) => {
+    if (b.kind === "refusals") return <Refusals key={b.id} rows={b.rows} machine={b.machine} />;
+    if (b.kind === "turn") {
+      const first = b.msgs[0];
+      return <Turn key={b.id} who={first.who} actor={first.actor} at={clock(first.at)}
+                   texts={b.msgs.map((m) => m.text)} />;
+    }
+    return <Entry key={b.id} m={b.msg} thread={thread} client={client} ctx={ctx}
+                  editable={editable} onEdit={onEdit}
+                  instruments={instruments} onDone={onDone} />;
+  };
+  return (
+    <>
+      {earlier.length > 0 && !all && (
+        <button type="button" className="cq earlier" onClick={() => setAll(true)}>
+          Show {earlier.length} earlier
+        </button>
+      )}
+      {(all ? earlier : []).map(draw)}
+      {recent.map(draw)}
+    </>
+  );
 }
 
-function Refusals({ run }: { run: Msg[] }) {
+/** A refusal is not a patient problem, and a machine's refusal is not even a
+ *  person's. The agent's fold says how many and nothing else; a person's
+ *  names what was refused, because somebody is waiting on it.
+ */
+function Refusals({ rows, machine }: { rows: Extract<Msg, { kind: "denied" }>[]; machine: boolean }) {
   const [shown, setShown] = useState(false);
-  const rows = run as Extract<Msg, { kind: "denied" }>[];
+  const one = rows.length === 1;
   return (
     <div className={`ev${shown ? " on" : ""}`}>
       <div className="m-av node refused" aria-hidden="true" />
       <div className="m-b">
         <button className="ev-h" aria-expanded={shown} onClick={() => setShown((v) => !v)}>
           <span className="chev" aria-hidden="true"><Icon name="chev" className="i sm" /></span>
-          <span className="ev-t">{rows.length} refused</span>
-          <span className="ev-sum">Nothing was written.</span>
+          {!machine && <span className="ev-st">{rows[0].actor}</span>}
+          <span className="ev-t">{one ? rows[0].title : `${rows.length} refused`}</span>
+          <span className="ev-sum">{one ? rows[0].reason : "Nothing was written."}</span>
           <span className="ev-time">{clock(rows[rows.length - 1].at)}</span>
         </button>
         {shown && (
@@ -239,6 +256,7 @@ function Refusals({ run }: { run: Msg[] }) {
                 <span>{r.reason}</span>
               </div>
             ))}
+            <div className="fl-e" style={{ padding: "6px 0 0" }}>Nothing was written.</div>
           </div>
         )}
       </div>

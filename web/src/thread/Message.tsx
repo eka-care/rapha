@@ -15,6 +15,17 @@ export function withMentions(text: string) {
 export function Message({ who, actor, at, text }: {
   who: "user" | "agent"; actor: string; at: string; text: string;
 }) {
+  return <Turn who={who} actor={actor} at={at} texts={[text]} />;
+}
+
+/** ONE PERSON TALKING IS ONE BLOCK. Three lines typed in a row drew three
+ *  avatars, three names and three clocks, which is three times the furniture
+ *  for one thing somebody said. The header belongs to the turn; which line
+ *  it was is not information anybody needs. Who speaks and when is decided
+ *  in fold.ts, not here. */
+export function Turn({ who, actor, at, texts }: {
+  who: "user" | "agent"; actor: string; at: string; texts: string[];
+}) {
   const mine = who === "user";
   return (
     <div className={`msg${mine ? " right" : ""}`}>
@@ -23,7 +34,9 @@ export function Message({ who, actor, at, text }: {
       </div>
       <div className="m-b">
         <div className="m-meta">{actor} · {at}</div>
-        <div className="bubble">{withMentions(text)}</div>
+        {texts.map((text, i) => (
+          <div className="bubble" key={i}>{withMentions(text)}</div>
+        ))}
       </div>
     </div>
   );

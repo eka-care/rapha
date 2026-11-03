@@ -288,7 +288,7 @@ def test_confirming_a_proposal_this_bundle_does_not_declare_is_a_refusal():
     s.put_proposal(stranded)
     d, back = proposals.confirm(s, BUNDLE, stranded, caps={"result.verify"},
                                 actor="user:demo", confirmed=True)
-    assert not d and "not an operation this facility declares" in d.reason
+    assert not d and "not an action this facility offers" in d.reason
     assert back.status == "pending", "a refusal must not decide the proposal"
     assert s.log[-1].outcome == "denied: not in this bundle"
 
