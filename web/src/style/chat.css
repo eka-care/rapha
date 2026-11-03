@@ -362,3 +362,24 @@
 .ref-1 + .ref-1 { border-top: 1px solid var(--color-border-subtle); padding-top: 7px; margin-top: 4px; }
 .ref-1 b { color: var(--color-text-primary); font-weight: 600; white-space: nowrap; }
 .ref-1 span { min-width: 0; }
+
+/* ------------------------------------------------- paper from elsewhere
+   The Background tab. A card per document, and inside it the short answers
+   as the key/value rows every other tab uses, with anything long set as
+   running text instead. A discharge summary squeezed into a right aligned
+   value is a discharge summary nobody reads, which is the whole point of
+   keeping it. */
+.bgtab { display: flex; flex-direction: column; gap: 13px; }
+.bg-v { padding: 9px 12px 11px; display: flex; flex-direction: column; gap: 6px; }
+.bg-long { display: flex; flex-direction: column; gap: 3px; }
+.bg-lab {
+  font-size: 9px; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+/* pre-wrap: the line breaks in somebody else's letter are part of what it
+   says. A result sheet reflowed into a paragraph is a different document. */
+.bg-body {
+  margin: 0; font-size: 12px; line-height: 1.55; white-space: pre-wrap;
+  color: var(--color-text-secondary);
+}
+.bg-add { align-self: flex-start; }

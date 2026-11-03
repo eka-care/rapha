@@ -21,13 +21,19 @@
 import { Icon, type IconName } from "../icons";
 
 /** Which tabs a visit can have. Each is a KIND OF THING THE VISIT KEEPS, not
- *  a feature of ours. Files and the private conversation with the agent are
- *  the next two and are not here yet: both wait on a decision recorded in
- *  the design note, and a tab that opens on an apology is worse than a tab
- *  that is not there. "ask" is the medical assistant, which is general
- *  medicine and not this visit's own agent: it is given nothing about the
- *  patient. */
-export type TabId = "messages" | "scribe" | "past" | "ask";
+ *  a feature of ours. The private conversation with the agent is the next
+ *  one and is not here yet: it waits on a decision recorded in the design
+ *  note, and a tab that opens on an apology is worse than a tab that is not
+ *  there. "ask" is the medical assistant, which is general medicine and not
+ *  this visit's own agent: it is given nothing about the patient.
+ *
+ *  "context" is paper from somewhere else -- a discharge summary, an outside
+ *  result -- and it is a tab rather than a line in the conversation because
+ *  somebody reads it BEFORE the visit starts, and because a two page letter
+ *  in a chat bubble is not a readable letter. What belongs in it is not
+ *  decided here: the screen picks it out by the `presents:` word the atom
+ *  declares, so a bundle with no such operation simply has an empty tab. */
+export type TabId = "messages" | "scribe" | "context" | "past" | "ask";
 
 export type Tab = { id: TabId; title: string; icon: IconName; count?: number };
 

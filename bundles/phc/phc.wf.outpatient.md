@@ -11,7 +11,12 @@ steps:
     operations: [phc.op.patient-register, phc.op.abha-link]
   - station: nurse
     done_when: vitals.recorded
-    operations: [phc.op.vitals-record]
+    # Vitals first: it is what this station is for, and the order inside a
+    # step is this bundle saying which of the things here is the point.
+    # Background from elsewhere is seated behind it on purpose -- copying
+    # in somebody else's letter must never be the headline advice at a
+    # bench whose job is to take a reading.
+    operations: [phc.op.vitals-record, phc.op.context-add]
   - station: doctor
     done_when: consult.documented
     operations: [phc.op.consult-document, phc.op.ncd-review,

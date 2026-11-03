@@ -23,6 +23,7 @@ operations:
   - phc.op.household-visit
   - phc.op.handover
   - phc.op.handover-reply
+  - phc.op.context-add
   # Generated from the `templates` declaration below.
   - phc.op.ncd-review
   - phc.op.antenatal-visit
@@ -294,6 +295,7 @@ capabilities:
   visit.household:      {title: Record a household visit}
   appointment.book:     {title: Book an appointment}
   handover:             {title: Hand over to a colleague}
+  context.record:       {title: Add background from elsewhere}
   facility.admin:       {title: Administer this centre}
   reporting.view:       {title: Read this centre's numbers}
 
@@ -314,15 +316,15 @@ roles:
   frontdesk:
     title: Front desk
     capabilities: [patient.find, patient.register, abha.link, appointment.book,
-                   handover]
+                   context.record, handover]
   nurse:
     title: Staff nurse
     capabilities: [patient.find, patient.register, abha.link, appointment.book,
-                   vitals.record, assessment.record, handover]
+                   vitals.record, assessment.record, context.record, handover]
   mo:
     title: Medical officer
     capabilities: [patient.find, encounter.document, rx.prescribe, lab.order,
-                   assessment.record, reporting.view, handover]
+                   assessment.record, reporting.view, context.record, handover]
   lab:
     title: Laboratory technician
     capabilities: [patient.find, lab.result.enter, handover]

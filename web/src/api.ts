@@ -185,7 +185,14 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]) {
 
   useEffect(() => {
     let live = true;
-    setState({ loading: true });
+    // KEEP WHAT IS ON SCREEN while the next read is in flight. This used to
+    // drop `data`, so every reload after a commit replaced the screen with a
+    // skeleton and back again -- and a screen that unmounts loses its own
+    // state, which is why saving anything from a tab of the visit threw the
+    // person back to the first tab. A caller that still wants the skeleton
+    // tests `loading` alone, which is unchanged; one that wants the old view
+    // to stay tests `loading && !data`.
+    setState((s) => ({ ...s, loading: true }));
     run().then(
       (data) => live && setState({ data, loading: false }),
       (e) =>

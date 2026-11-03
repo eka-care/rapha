@@ -249,7 +249,11 @@ def test_an_utterance_proposes_and_the_card_carries_what_the_thread_must_draw():
     assert card["verdict"] == {"allowed": True, "reason": "proposed", "next": ""}
     # 8 since 2026-11-01, not 7: recording is presumed, so the action that
     # stops it stands on every visit nobody refused and is offered here too.
-    assert card["order"] == "the kernel lists it 1 of 8 at nurse", \
+    # 9 since 2026-11-04: background from elsewhere is seated at this bench,
+    # BEHIND the reading -- which is what "1 of" still being the vitals is
+    # checking. The count moves when the bundle adds an action; the position
+    # moves only if the line changes its mind about what this bench is for.
+    assert card["order"] == "the kernel lists it 1 of 9 at nurse", \
         "ordering is read from kernel actions(), never decided by the agent"
     assert card["offered_here"] is True
 

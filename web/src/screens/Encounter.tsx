@@ -27,6 +27,7 @@ import { mergeDrafts, type Opened } from "../scribe/session";
 import { Stream } from "../thread/Thread";
 import { Carry, PastVisits, Team, Trend, usePast, visitOf } from "../thread/Past";
 import { AssistantPanel } from "../assistant/Lazy";
+import { Background } from "../thread/Background";
 import { Tabs, type Tab, type TabId } from "../thread/Tabs";
 import { Line } from "../view/View";
 import { RAIL, railFolded, railShown, setRailFolded, setRailShown, type RailId } from "./rail";
@@ -56,9 +57,12 @@ const QUICK = 1;
  *  what they SHOW, not by the component or by our own word for the
  *  machinery. A clinician does not have a feature called "scribe"; they
  *  have a recording, and what they want is what it heard. */
-const tabsFor = (past: number): Tab[] => [
+const tabsFor = (past: number, papers: number): Tab[] => [
   { id: "messages", title: "Messages", icon: "chat" },
   { id: "scribe", title: "Scribe", icon: "mic" },
+  /* Next to the recording, because both are ways something gets INTO this
+     visit, and before the history, because this is what you read first. */
+  { id: "context", title: "Background", icon: "clip", count: papers },
   { id: "past", title: "Earlier visits", icon: "clock", count: past },
   { id: "ask", title: "Ask", icon: "spark" },
 ];
@@ -141,6 +145,11 @@ export function Encounter({
    *  to do is, and arriving at a new patient inside last patient's draft
    *  would be the worst possible first screen. */
   const [tab, setTab] = useState<TabId>("messages");
+  /** Which way of copying paper in is open, if any. Local to the tab:
+   *  unlike every other form on this screen it does NOT belong at the
+   *  foot of the conversation, because the thing it produces is read
+   *  here and nowhere else. */
+  const [adding, setAdding] = useState<Operation | null>(null);
 
   /** A FORM OPENED BELOW THE FOLD IS A BUTTON THAT DID NOTHING. On a visit
    *  with any history the foot of the thread is off screen, and the whole
@@ -216,6 +225,24 @@ export function Encounter({
   // §33: the declared rule in loops.ts decides the order, not this screen.
   const { primary, overflow } = useMemo(() => weigh(thread.actions, thread.closes), [thread.actions, thread.closes]);
   const ranked = useMemo(() => (primary ? [primary, ...overflow] : overflow), [primary, overflow]);
+
+  /** PAPER FROM SOMEWHERE ELSE. Neither half names an operation: what goes
+   *  in this tab is whatever the bundle declared as `presents: artifact`,
+   *  which is a word from catalogue/vocab.THREAD_OBJECTS -- a closed list
+   *  this renderer implements -- and not a word typed here. A bundle that
+   *  declares none gets an empty tab and no button, which is correct: it
+   *  has nothing of this kind to keep.
+   *
+   *  `records` is what has been copied in already; `canAdd` is the way to
+   *  copy another, and it is empty for somebody whose role does not hold
+   *  the capability, because thread.actions has already been filtered by
+   *  the guard. */
+  const papers = useMemo(
+    () => msgs.filter((m) => m.kind === "posted"
+                         && cat.operations[m.operation]?.presents === "artifact"),
+    [msgs, cat]);
+  const canAdd = useMemo(
+    () => ranked.filter((op) => op.presents === "artifact"), [ranked]);
   const offered = ranked.slice(0, QUICK);
 
   /** Which actions this station may speak, from the bundle's own `scribe`
@@ -275,7 +302,7 @@ export function Encounter({
    *  point is that `/` is now the way to all of it without hunting for a
    *  pixel. */
   const verbs = useMemo(() => commands({
-    tabs: tabsFor(past.length),
+    tabs: tabsFor(past.length, papers.length),
     open: tab,
     goTab: (id) => setTab(id as TabId),
     // Absent, not disabled: the same rule the actions half keeps.
@@ -283,7 +310,7 @@ export function Encounter({
     railFolded: folded,
     toggleRail: () => fold(!folded),
     openRecord: spineId ? () => onOpenSubject(spineId) : undefined,
-  }), [past.length, tab, consented, folded, spineId, onOpenSubject]);
+  }), [past.length, papers.length, tab, consented, folded, spineId, onOpenSubject]);
 
   return (
     <div className={`chatgrid${folded ? " folded" : ""}`}>
@@ -308,21 +335,25 @@ export function Encounter({
               {head.badges.map((b) => (
                 <span className={`badge ${TONE[b.style] ?? "b-mute"}`} key={b.text}>{b.text}</span>
               ))}
-              {/* WHAT HAPPENED BEFORE IS A TAB NOW, not a chip, so the one
-                  chip left here is the one that LEAVES this visit for the
-                  patient's whole record. It used to say "All visits", which
-                  described both and distinguished neither. */}
-              {spineId && (
-                <button className="chip" onClick={() => onOpenSubject(spineId)}>
-                  <Icon name="folder" className="i sm" />
-                  Patient record
-                </button>
-              )}
+              {/* NO CHIP FOR THE PATIENT'S RECORD. It sat here beside the
+                  badges, which made leaving this visit look like one more
+                  fact about the patient. It is a place you go, and places
+                  are the rail's and the `/` menu's -- both of which still
+                  offer it, on the owner's call, 2026-11-04. */}
             </div>
           </div>
         </header>
 
-        <Tabs open={tab} tabs={tabsFor(past.length)} onPick={setTab} />
+        <Tabs open={tab} tabs={tabsFor(past.length, papers.length)} onPick={setTab} />
+
+        {tab === "context" && (
+          <div className="vbody">
+            <Background
+              papers={papers} add={canAdd} adding={adding} onAdd={setAdding}
+              thread={thread.id} client={client} cat={cat} flags={thread.flags}
+              onDone={() => { setAdding(null); onChanged(); }} />
+          </div>
+        )}
 
         {tab === "past" && <div className="vbody"><PastVisits visits={past} /></div>}
 

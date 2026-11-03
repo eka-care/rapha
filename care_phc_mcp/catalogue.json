@@ -34,6 +34,7 @@
       "patient.register",
       "abha.link",
       "appointment.book",
+      "context.record",
       "handover"
     ],
     "lab": [
@@ -54,6 +55,7 @@
       "lab.order",
       "assessment.record",
       "reporting.view",
+      "context.record",
       "handover"
     ],
     "nurse": [
@@ -63,6 +65,7 @@
       "appointment.book",
       "vitals.record",
       "assessment.record",
+      "context.record",
       "handover"
     ],
     "pathologist": [
@@ -95,6 +98,7 @@
     "abha.link",
     "appointment.book",
     "assessment.record",
+    "context.record",
     "encounter.document",
     "facility.admin",
     "handover",
@@ -334,6 +338,7 @@
       "phc.op.household-visit",
       "phc.op.handover",
       "phc.op.handover-reply",
+      "phc.op.context-add",
       "phc.op.ncd-review",
       "phc.op.antenatal-visit",
       "phc.op.followup"
@@ -509,6 +514,26 @@
           }
         },
         "resource": "condition"
+      }
+    ],
+    "phc.op.context-add": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "payload": {
+            "json": "payload"
+          },
+          "questionnaire": {
+            "const": "phc.schema.context-v1"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "questionnaire_response"
       }
     ],
     "phc.op.followup": [
@@ -1837,6 +1862,58 @@
         "condition"
       ]
     },
+    "phc.op.context-add": {
+      "capability": "context.record",
+      "description": "A patient arrives holding paper. A discharge summary from the district\nhospital, a scan report from a private laboratory, an old prescription from a\ncamp. None of it is ours and none of it is in our records, so today it is read\nonce at the desk and then it goes home in the same bag it came in.\n\nThis copies it in before the consultation starts, so the person writing the\nnote has already read it.",
+      "emits": [],
+      "fields": [
+        {
+          "link_id": "source",
+          "options": null,
+          "required": true,
+          "text": "Who wrote it",
+          "type": "string"
+        },
+        {
+          "link_id": "dated",
+          "options": null,
+          "required": false,
+          "text": "Date on it",
+          "type": "string"
+        },
+        {
+          "link_id": "body",
+          "options": null,
+          "required": true,
+          "text": "What it says",
+          "type": "text"
+        }
+      ],
+      "id": "phc.op.context-add",
+      "input": "phc.schema.context-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "registered"
+      ],
+      "presents": "artifact",
+      "scope_qualifier": null,
+      "short": "Background",
+      "station": "nurse",
+      "summary": "A letter, a result or a discharge note another facility wrote, copied in as given.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Add background from elsewhere",
+      "tool": "propose_context_add",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "questionnaire_response"
+      ]
+    },
     "phc.op.followup": {
       "capability": "encounter.document",
       "description": "A return visit about something already recorded. It asks what has\nhappened since, your assessment, the conditions this visit is about and\nthe plan. It does not ask for an examination, on the view that a return\nvisit is usually about what changed rather than about a fresh set of\nfindings.\n\nNEEDS SIGN-OFF. Leaving the examination off this form is a product\nchoice made without a clinician, and a follow up that does need an\nexamination has nowhere to put it on this template. The general\nconsultation asks all five questions and is the answer until a named\nclinical officer confirms this narrowing or replaces it.",
@@ -3087,6 +3164,7 @@
       "abha.link",
       "appointment.book",
       "assessment.record",
+      "context.record",
       "encounter.document",
       "facility.admin",
       "handover",
@@ -3105,6 +3183,7 @@
       "abha.link": "Create or link an ABHA",
       "appointment.book": "Book an appointment",
       "assessment.record": "Record an assessment",
+      "context.record": "Add background from elsewhere",
       "encounter.document": "Document a consultation",
       "facility.admin": "Administer this centre",
       "handover": "Hand over to a colleague",
@@ -3165,6 +3244,7 @@
         "patient.register",
         "abha.link",
         "appointment.book",
+        "context.record",
         "handover"
       ],
       "lab": [
@@ -3185,6 +3265,7 @@
         "lab.order",
         "assessment.record",
         "reporting.view",
+        "context.record",
         "handover"
       ],
       "nurse": [
@@ -3194,6 +3275,7 @@
         "appointment.book",
         "vitals.record",
         "assessment.record",
+        "context.record",
         "handover"
       ],
       "pharmacist": [
@@ -3383,7 +3465,8 @@
           "applies_when": null,
           "done_when": "vitals.recorded",
           "operations": [
-            "phc.op.vitals-record"
+            "phc.op.vitals-record",
+            "phc.op.context-add"
           ],
           "station": "nurse"
         },

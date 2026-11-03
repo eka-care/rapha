@@ -1,0 +1,35 @@
+{
+  "version": "1.0",
+  "slug": "phc.schema.context-v1",
+  "title": "Background from elsewhere",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.context-add"
+    }
+  },
+  "questions": [
+    {
+      "link_id": "source",
+      "text": "Who wrote it",
+      "type": "string",
+      "required": true,
+      "description": "The hospital, laboratory or doctor this came from. Say it the way the paper says it."
+    },
+    {
+      "link_id": "dated",
+      "text": "Date on it",
+      "type": "string",
+      "required": false,
+      "description": "The date the paper carries, if it carries one. Leave it empty rather than guessing."
+    },
+    {
+      "link_id": "body",
+      "text": "What it says",
+      "type": "text",
+      "required": true,
+      "description": "As given. Do not summarise it and do not correct it: this is a copy of somebody else's document, not our finding."
+    }
+  ]
+}

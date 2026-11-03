@@ -609,7 +609,10 @@ function ThreadScreen({ id, cat, ctx, said, asking, nonce, catchment, onSay, onC
   const name = data ? header(data, queueViewFor(cat as never, data.workflow), displayFor).name : id;
   useEffect(() => { if (data) onRemember({ id, name }); }, [data, id, name, onRemember]);
 
-  if (loading) return <Loading what="this encounter" shape="messages" rows={3} />;
+  // Only the FIRST read draws a skeleton. A reload after a commit keeps
+  // the visit mounted, so the tab the person was reading is still the tab
+  // they are on when the new data lands.
+  if (loading && !data) return <Loading what="this encounter" shape="messages" rows={3} />;
   if (error) return <Failed error={error} what="open this encounter" onRetry={reload} />;
   return (
     <Encounter

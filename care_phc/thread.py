@@ -128,11 +128,24 @@ def actions(catalogue, flags, caps, station_filter=None):
     from catalogue.guard import visible
 
     order = {name: i for i, (name, *_) in enumerate(LINE)}
+    # Inside one station, the order the STEP lists its operations in. That
+    # list is the bundle saying which of the things at this bench is the
+    # point, and the fallback this replaces was the operation id, which is
+    # alphabetical and means nothing: the first atom added at the nurse whose
+    # id sorts before "phc.op.vitals-record" became the headline advice at a
+    # bench whose job is to take a reading. kernel/state.actions already
+    # ordered this way; this copy had not been brought along.
+    seat = {}
+    for wf in (catalogue.get("workflows") or {}).values():
+        for step in wf.get("steps") or ():
+            for i, op_id in enumerate(step.get("operations") or ()):
+                seat.setdefault(op_id, i)
     here = station(flags)
     picked = [
         op for op in catalogue["operations"].values()
         if visible(op, caps, flags)
         and (station_filter is None or op["station"] == station_filter)
     ]
-    picked.sort(key=lambda op: (op["station"] != here, order.get(op["station"], 99), op["id"]))
+    picked.sort(key=lambda op: (op["station"] != here, order.get(op["station"], 99),
+                                seat.get(op["id"], 99), op["id"]))
     return picked

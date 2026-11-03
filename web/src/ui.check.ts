@@ -355,6 +355,36 @@ const IMPLEMENTED = [
     "the menu is not silently truncated; it scrolls and filters instead");
   ok("menus: / and @ are sourced from declarations, never written down");
 
+  // ------------------------------------- paper this centre did not write
+  //
+  // The Background tab holds whatever the bundle declared as
+  // `presents: artifact`. That word is in catalogue/vocab.THREAD_OBJECTS, a
+  // closed list this renderer implements, so naming it is the renderer
+  // naming its own vocabulary -- not a bundle's. Everything else about the
+  // tab, including which operation fills it and what its questions are
+  // called, has to come from the declarations, and these are the lines that
+  // make it so rather than leave it to habit.
+  const bg = code(readFileSync(join(SRC, "thread", "Background.tsx"), "utf8"));
+  const enc = code(readFileSync(join(SRC, "screens", "Encounter.tsx"), "utf8"));
+  assert.match(enc, /presents === "artifact"/,
+    "the Background tab's contents are picked some way other than by the "
+    + "word the atom declares");
+  assert.match(enc, /ranked\.filter\(\(op\) => op\.presents === "artifact"\)/,
+    "the way to copy paper in is not read off thread.actions, so it is "
+    + "offered to somebody the guard would refuse");
+  for (const forbidden of [/station/i, /capability/i, /\bflag[^s]/i, /phc\./,
+                           /link_id === /, /["'`]body["'`]/, /["'`]source["'`]/]) {
+    assert.ok(!forbidden.test(bg.replace(/^import .*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "")),
+      `the Background tab names something declared: ${forbidden}`);
+  }
+  // Long answers are told apart by LENGTH, never by what the bundle called
+  // the question: this renderer cannot know a field is a letter, and a
+  // facility that renames it must not lose the formatting.
+  assert.match(bg, /v\.value\.length > LONG/,
+    "a pasted document is recognised by a field name rather than its size");
+  ok("background: the tab is filled by the declared `presents` word, and "
+     + "names no field, operation or capability of any bundle");
+
   const encounter = code(readFileSync(join(SRC, "screens", "Encounter.tsx"), "utf8"));
   assert.match(encounter, /weigh\(thread\.actions, thread\.closes\)/,
     "§33's ordering is the declared rule in loops.ts, not a sort in the screen");
