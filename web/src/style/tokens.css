@@ -68,8 +68,10 @@
   --shadow-overlay: 0 24px 70px rgba(20,20,19,.20);
 
   /* ---- grounds ----
-     THE WARM CREAM IS THE HERA DECK'S OWN, sampled off the rendered PDF
-     rather than guessed at: #FAF6F0 everywhere behind the content.
+     THE WARM GROUND IS THE HERA DECK'S, carried a little further. The
+     deck's own cream sampled at #FAF6F0, which is a yellow warmth at 36
+     degrees of hue. This is the same idea turned toward red and lifted
+     most of the way to white: #FDF8F6, hue 17, lightness 98.
 
      The rest of this ramp moved with it, and had to. The greys here were
      neutral stone, which is a fine ground on its own and reads distinctly
@@ -80,15 +82,15 @@
      White stays white. Cards are the one thing that does not warm, because
      the deck does exactly this: white cards standing clear of a cream
      page, which is where its crispness comes from. */
-  --color-bg-canvas: #FAF6F0;
+  --color-bg-canvas: #FDF8F6;
   --color-dot: rgba(20,20,19,.2);
   /* The chrome the content passes under. Translucent, so the canvas and the
      list scrolling beneath it are both still there. */
-  --color-bg-nav: rgba(250,246,240,.72);
+  --color-bg-nav: rgba(253,248,246,.72);
   --color-bg-surface: #FFFFFF;
-  --color-bg-subtle: #F3EEE6;
-  --color-bg-rail: #F6F1EA;
-  --color-bg-hover: #F1ECE4;
+  --color-bg-subtle: #F6EFEC;
+  --color-bg-rail: #F9F2F0;
+  --color-bg-hover: #F4EDEA;
   --color-bg-selected: #EFECFD;
   /* The tint under something inert: an avatar's square, a progress rail, the
      ground of a hovered row. Alpha, not a grey, because it has to sit over
@@ -100,9 +102,9 @@
   --color-glass: rgba(255,255,255,.62);
   --color-glass-edge: rgba(255,255,255,.75);
 
-  --color-border-subtle: #E8E1D6;
-  --color-border-strong: #D6CDBF;
-  --color-border-control: #8B8479;
+  --color-border-subtle: #EBE1DC;
+  --color-border-strong: #D8CBC6;
+  --color-border-control: #8F837E;
 
   --color-text-primary: #141413;
   --color-text-secondary: #5C5C58;
