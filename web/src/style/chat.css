@@ -147,11 +147,22 @@
  *  the only tag left is on the lock, because an irreversible action is the
  *  one thing a glyph must never carry alone.
  */
-.props { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+/* NIMBLE, NOT A SLAB. Until 2026-11-04 each of these was a full-width
+   card: a 34px icon tile, a 14px title, a 12px summary line and a chevron,
+   boxed and bordered. One of them is most of the agent's message and
+   several are most of the visit, which makes the one thing a clinician is
+   there to do look like a row of furniture.
+
+   It is a button the size of its own words now. The summary and the
+   chevron are gone: the summary is the first thing the form says when it
+   opens, so printing it here was reading the next screen out loud, and a
+   chevron on a button that is plainly a button is decoration. */
+.props { margin-top: 11px; display: flex; flex-wrap: wrap; gap: 7px; }
 .prop {
-  display: flex; align-items: center; gap: 13px; width: 100%; text-align: left;
+  display: inline-flex; align-items: center; gap: 7px; width: auto;
+  text-align: left; max-width: 100%;
   border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface);
-  border-radius: var(--radius-lg); padding: 13px 14px; cursor: pointer;
+  border-radius: var(--radius-pill); padding: 7px 13px 7px 10px; cursor: pointer;
   color: var(--color-text-primary);
   transition: border-color var(--duration-fast) var(--ease-out),
               background var(--duration-fast) var(--ease-out);
@@ -159,26 +170,31 @@
 .prop:hover:not(:disabled) { border-color: var(--color-border-strong); background: var(--color-bg-hover); }
 .prop:disabled { opacity: .45; cursor: not-allowed; }
 
-/* The step that closes this station. Tinted and outlined rather than filled:
-   it has to be first among several, not the loudest thing on the page. */
-.prop.primary { border-color: var(--color-agent-line); background: var(--color-agent-tint); }
-.prop.primary:hover { border-color: var(--color-agent); background: var(--color-agent-tint-hover); }
-.prop.primary .p-i { background: var(--color-agent); color: var(--color-cta-ink); }
-
-.p-i {
-  flex-shrink: 0; display: grid; place-items: center; width: 34px; height: 34px;
-  border-radius: var(--radius-md);
-  background: var(--color-bg-subtle); color: var(--color-text-secondary);
+/* The step that closes this station: filled, because at this size a tint
+   does not read, and there is only ever one of them. */
+/* The same ink every other primary control on the product uses. The
+   agent's violet is a TINT token (--color-agent-hover is lighter, not
+   darker) so filling with it leaves no hover state to go to. */
+.prop.primary {
+  border-color: var(--color-cta); background: var(--color-cta);
+  color: var(--color-cta-ink);
 }
-.p-b { min-width: 0; flex: 1; display: grid; gap: 2px; }
-.p-l { font-size: 14px; font-weight: 600; line-height: 1.3; letter-spacing: -0.005em; }
-.p-s { font-size: 12px; color: var(--color-text-secondary); line-height: 1.35; }
-.p-go { flex-shrink: 0; color: var(--color-text-tertiary); }
-.prop:hover .p-go { color: var(--color-text-secondary); }
+.prop.primary:hover:not(:disabled) {
+  border-color: var(--color-cta-hover); background: var(--color-cta-hover);
+}
+.prop.primary .p-i { color: var(--color-cta-ink); }
 
-/* The one tag left, and it says what happens rather than what we call it. */
+/* An inline glyph, not a tile. */
+.p-i { flex-shrink: 0; display: inline-flex; color: var(--color-text-tertiary); }
+.p-b { min-width: 0; display: flex; align-items: baseline; gap: 7px; }
+.p-l {
+  font-size: 12.5px; font-weight: 600; line-height: 1.35;
+  letter-spacing: -0.005em; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+
 .p-tag {
-  flex-shrink: 0; font-size: 11px; font-weight: 600; padding: 3px 9px;
+  flex-shrink: 0; font-size: 10px; font-weight: 600; padding: 2px 7px;
   border-radius: var(--radius-pill); white-space: nowrap;
   background: var(--color-critical-soft); color: var(--color-critical);
   border: 1px solid var(--color-critical-border);
@@ -297,3 +313,13 @@
 
 .pastv { display: flex; flex-direction: column; gap: 13px; }
 .pastv-v { padding: 9px 12px 11px; display: flex; flex-direction: column; gap: 2px; }
+
+/* The Scribe tab with nothing recorded yet: one button, in the middle.
+   What was here was two sentences explaining where the microphone lives,
+   which is a screen apologising for itself. */
+.scribe-off {
+  flex: 1; min-height: 240px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 11px; text-align: center;
+}
+.scribe-go { padding: 11px 20px; font-size: 13.5px; gap: 9px; }
+.scribe-why { font-size: 12px; color: var(--color-text-tertiary); max-width: 34ch; }

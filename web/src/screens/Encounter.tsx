@@ -56,9 +56,14 @@ const QUICK = 1;
  *  have a recording, and what they want is what it heard. */
 const tabsFor = (past: number): Tab[] => [
   { id: "messages", title: "Messages", icon: "chat" },
-  { id: "scribe", title: "What was heard", icon: "mic" },
+  { id: "scribe", title: "Scribe", icon: "mic" },
   { id: "past", title: "Earlier visits", icon: "clock", count: past },
 ];
+
+/** Why the microphone is unavailable, in one place. It was written out
+ *  twice -- once on the composer and once nowhere, which is how the tab
+ *  came to have a disabled button with no explanation beside it. */
+const MIC_WHY = "Capture consent is not recorded on this visit";
 
 const TAG: Record<string, string> = {
   scribe: "mic", form: "doc", device: "vitals", "constrained-voice": "mic",
@@ -139,6 +144,7 @@ export function Encounter({
     // knows what they are doing uses silently did nothing.
     if (scribing !== null || drafts.length > 0) setTab("scribe");
   }, [scribing, drafts.length]);
+
   // The microphone is gated on the scribe instrument's own `requires:`, not a
   // flag named here: a bundle that spells its consent differently is gated by
   // its own spelling. The kernel refuses without it besides.
@@ -146,6 +152,24 @@ export function Encounter({
     .map((i) => i as { kind?: string; requires?: string })
     .find((i) => i.kind === "scribe")?.requires;
   const consented = !consentFlag || (thread.flags ?? []).includes(consentFlag);
+  // THE SHORTCUT. Not a bare letter: this screen is mostly a text box, and
+  // a bare key would start recording every time somebody typed it into the
+  // composer. Not Cmd+K either -- App.tsx already opens the command
+  // palette on that, and two things on one chord is a chord that does the
+  // wrong one. The guard is the modifier rather than a check on where the
+  // focus is, because a focus check is wrong the moment another input is
+  // added to this screen.
+  useEffect(() => {
+    const hit = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      if (e.key.toLowerCase() !== "j") return;
+      e.preventDefault();
+      if (!consented || scribing !== null) return;
+      setScribing("");
+    };
+    window.addEventListener("keydown", hit);
+    return () => window.removeEventListener("keydown", hit);
+  }, [consented, scribing]);
 
   /** The rule itself is loops.carriedInto, where a check can run it: the
    *  guard that keeps one patient's identifier off another patient's form is
@@ -261,10 +285,26 @@ export function Encounter({
                   onCancel={() => setDrafts((all) => all.filter((x) => x.draft.operation !== d.operation))} />
               ) : null;
             })}
+            {/* ONE BUTTON, IN THE MIDDLE, AND NOTHING ELSE. What was here
+                was two sentences explaining where the microphone lives,
+                which is a screen apologising for itself. The tab a person
+                opened to record in should let them record. */}
             {scribing === null && drafts.length === 0 && (
-              <div className="state-empty">
-                Nothing has been dictated on this visit yet.<br />
-                Start the microphone on the messages tab and what is heard appears here.
+              <div className="scribe-off">
+                <button
+                  type="button"
+                  className="btn btn-b scribe-go"
+                  onClick={() => setScribing("")}
+                  disabled={!consented}
+                  title={consented ? undefined : MIC_WHY}
+                >
+                  <Icon name="mic" className="i" />
+                  Start session
+                </button>
+                {/* A disabled control that does not say why is a dead end.
+                    The reason is the kernel's, read off the instrument's
+                    own `requires:`, never a word typed here. */}
+                {!consented && <p className="scribe-why">{MIC_WHY}</p>}
               </div>
             )}
           </div>
@@ -297,6 +337,7 @@ export function Encounter({
                           className={`prop${i === 0 ? " primary" : ""}`}
                           key={op.id}
                           onClick={() => take(op)}
+                          title={op.summary || op.title}
                         >
                           {/* The icon says how this is recorded, so the tag
                               that used to say it in small capitals is gone.
@@ -308,12 +349,10 @@ export function Encounter({
                           </span>
                           <span className="p-b">
                             <span className="p-l">{op.title}</span>
-                            {op.summary && <span className="p-s">{op.summary}</span>}
                           </span>
                           {op.irreversibility === "irreversible" && (
                             <span className="p-tag irr">Needs confirming</span>
                           )}
-                          <Icon name="refer" className="i sm p-go" />
                         </button>
                       ))}
                       {ranked.length > QUICK && (
@@ -365,7 +404,7 @@ export function Encounter({
              somebody who already knows what they are doing: it opens on
              whatever this station recorded last. */
           onStartScribe={() => setScribing("")}
-          micReason={consented ? undefined : "Capture consent is not recorded on this visit"}
+          micReason={consented ? undefined : MIC_WHY}
           quick={
             <>
               {threadAsks({ hasHistory: !!spineId, flags: thread.flags }).slice(0, 2).map((q) => (
