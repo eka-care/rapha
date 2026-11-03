@@ -27,6 +27,8 @@ operations:
   # docs/superpowers/specs/2026-11-04-maternal-and-child-health-design.md
   - phc.op.pregnancy-open
   - phc.op.pregnancy-close
+  - phc.op.referral-raise
+  - phc.op.referral-close
   - phc.op.context-add
   # Generated from the `templates` declaration below.
   - phc.op.ncd-review
@@ -48,6 +50,7 @@ instruments:
 # a clinical protocol and carries its own sign off; see the atom.
 schedules:
   - phc.sched.antenatal
+  - phc.sched.referral
 metrics:
   - phc.metric.visits
   - phc.metric.abha-coverage
@@ -270,6 +273,11 @@ states:
   # `pregnancy.open` is an opening with no ending yet.
   - pregnancy.open
   - pregnancy.ended
+  # A referral this centre has not heard the end of. Derived from the same
+  # pair of episode rows a pregnancy is, because a referral IS an episode:
+  # it starts, it is owed, and it ends with an outcome.
+  - referral.open
+  - referral.ended
 
 # What a person may do here. An atom naming anything else fails the per bundle
 # closure check in kernel/declarations.py.

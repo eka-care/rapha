@@ -325,6 +325,10 @@ type Schedule struct {
 	Episode  string         `json:"episode"`
 	Anchor   map[string]int `json:"anchor"`
 	Contacts []Contact      `json:"contacts"`
+	// Where the date the offsets apply to comes from: "recorded" (the
+	// default) is a date somebody wrote down, "opened" is the moment the
+	// episode itself was opened. A referral is the second kind.
+	AnchorFrom string `json:"anchor_from"`
 }
 
 type Metric struct {

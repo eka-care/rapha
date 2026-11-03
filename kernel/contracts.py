@@ -378,6 +378,12 @@ class Schedule:
     # facility can read it and a clinician can sign it off.
     anchor: dict
     contacts: tuple
+    # Where the date the offsets apply to comes from. `recorded` (the
+    # default) is the date somebody wrote down, which is right for an event
+    # that happened before the record of it. `opened` is the moment the
+    # episode itself was opened, which is right for one where the record IS
+    # the event, such as a referral being raised.
+    anchor_from: str = "recorded"
     type: str = "schedule"
 
 

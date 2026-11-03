@@ -164,8 +164,13 @@ def test_a_capability_the_role_lacks_hides_the_action_and_refuses_the_write():
     # roles hold that capability and actions() never filters on the caller's
     # station, so a note is writable from any desk. rx-prescribe is the absence
     # under test.
+    # referral-raise joins them for the same reason and on the same
+    # capability: a pharmacist who sees something that needs a hospital may
+    # say so, and referring is no more the property of one desk than a note
+    # is. If that is wrong it is wrong in bundle.yaml, which is where the
+    # capability is granted, and not here.
     assert [op["id"] for op in thread["actions"]] == [
-        "phc.op.pharmacy-dispense", "phc.op.handover"]
+        "phc.op.pharmacy-dispense", "phc.op.handover", "phc.op.referral-raise"]
     denied = client.post("/api/operations/phc.op.rx-prescribe/commit?role=pharmacist",
                          json={"thread": "enc-005", "payload": {"medications": []}})
     assert denied.status_code == 422
@@ -263,8 +268,9 @@ def test_an_utterance_proposes_and_the_card_carries_what_the_thread_must_draw():
     # the reading for the same reason. Closing one is not counted, and that
     # is the preconditions working rather than an omission: this visit has
     # no open pregnancy, so there is nothing to close and the action is
-    # absent rather than drawn and refused.
-    assert card["order"] == "the kernel lists it 1 of 10 at nurse", \
+    # absent rather than drawn and refused. 11 once referring arrived, for
+    # the same reason a handover is offered at every desk.
+    assert card["order"] == "the kernel lists it 1 of 11 at nurse", \
         "ordering is read from kernel actions(), never decided by the agent"
     assert card["offered_here"] is True
 

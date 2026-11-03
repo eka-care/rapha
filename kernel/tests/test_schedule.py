@@ -201,4 +201,42 @@ assert schedule.why(BUNDLE, empty, WF, ended) == "this is over"
 assert schedule.why(BUNDLE, empty, WF, episode()) == ""
 ok("a screen can say which nothing it is looking at")
 
+# -- a referral is an episode too, measured from when it was raised -------
+#
+# The whole of the referral feature is this: no second mechanism, no second
+# kind of row, and no second idea of what "owed" means.
+
+REFERRAL = BUNDLE.schedules["phc.sched.referral"]
+confirm = REFERRAL.contacts[0]
+
+raised = date(2026, 10, 1)
+open_referral = {"id": "ep-r", "type": "referral", "status": "active",
+                 "opened_at": raised.isoformat() + "T09:00:00+00:00",
+                 "ended_at": "", "outcome": "", "anchor_date": "",
+                 "anchor_basis": "raised", "encounters": []}
+
+assert schedule.start_of(REFERRAL, open_referral) == raised
+ok("a referral is measured from the moment it was raised, not from a date anybody typed")
+
+rows = schedule.contacts(BUNDLE, empty, WF, open_referral,
+                         at=noon(raised + timedelta(days=confirm.due)))
+assert len(rows) == 1 and rows[0]["state"] == schedule.DUE, rows
+ok("so raising one owes somebody an answer about it, without a second mechanism")
+
+# The day after the window shuts it belongs to the escalation, and the day
+# it is closed it belongs to nobody.
+late = schedule.contacts(BUNDLE, empty, WF, open_referral,
+                         at=noon(raised + timedelta(days=confirm.closes + 1)))
+assert late[0]["state"] == schedule.MISSED and late[0]["owner"] == confirm.escalates_to
+ok("a referral nobody chased changes hands, exactly as a missed contact does")
+
+closed = dict(open_referral, status="ended", outcome="attended")
+assert schedule.contacts(BUNDLE, empty, WF, closed) == []
+ok("and closing the referral stops the chase, because the chase was derived from it")
+
+# An undated PREGNANCY still says so: `anchor_from` is per schedule and a
+# referral's answer must not have changed the other one's.
+assert "dated" in schedule.why(BUNDLE, empty, WF, episode(anchor_date=""))
+ok("the pregnancy schedule still wants a date, so anchor_from is per schedule")
+
 print("\nok   the schedule: %d checks" % checks)

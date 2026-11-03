@@ -519,6 +519,9 @@ def _lint_schedule(fm, manifest, ops, fail):
     voc = vocab.from_manifest(manifest)
     roles = set((manifest.get("roles") or {}))
 
+    if fm.get("anchor_from") not in (None, "recorded", "opened"):
+        fail("anchor_from: 'recorded' (a date somebody wrote down) or "
+             "'opened' (the moment the episode was opened)")
     anchor = fm.get("anchor")
     if not isinstance(anchor, dict) or not anchor:
         return fail("anchor: a schedule is measured from something")
@@ -872,6 +875,7 @@ def load(bundle_id="phc", catalogue=None, facility=None):
             schedules[did] = c.Schedule(
                 id=fm["id"], title=fm["title"], summary=fm["summary"],
                 episode=fm["episode"], anchor=dict(fm["anchor"]),
+                anchor_from=fm.get("anchor_from") or "recorded",
                 contacts=tuple(c.Contact(**{k: v for k, v in contact.items()
                                             if k in c.Contact.__annotations__})
                                for contact in fm["contacts"]))

@@ -1,0 +1,38 @@
+{
+    "version": "1.0",
+    "slug": "phc-referral-raise-v1",
+    "title": "Refer this patient onward",
+    "status": "active",
+    "subject_type": "encounter",
+    "styling_metadata": {
+        "phc": {
+            "operation": "phc.op.referral-raise"
+        }
+    },
+    "questions": [
+        {
+            "link_id": "refer_to",
+            "text": "Where are you sending her?",
+            "type": "string",
+            "required": true,
+            "styling_metadata": {
+                "phc": {
+                    "short": "To",
+                    "help": "The facility by name. There is no registry of them here yet, so this is typed."
+                }
+            }
+        },
+        {
+            "link_id": "reason",
+            "text": "Why",
+            "type": "text",
+            "required": true,
+            "styling_metadata": {
+                "phc": {
+                    "short": "Reason",
+                    "help": "What the receiving facility needs to know before she arrives."
+                }
+            }
+        }
+    ]
+}

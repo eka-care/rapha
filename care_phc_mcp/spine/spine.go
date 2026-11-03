@@ -217,6 +217,7 @@ func Episodes(s Reader, cat *carephc.Catalogue, wf *carephc.Workflow,
 	for i := range out {
 		ep := schedule.Episode{
 			ID: out[i].ID, Type: out[i].Type, Status: out[i].Status,
+			OpenedAt:   out[i].OpenedAt,
 			AnchorDate: out[i].AnchorDate, AnchorBasis: out[i].AnchorBasis,
 			Encounters: out[i].Encounters,
 		}

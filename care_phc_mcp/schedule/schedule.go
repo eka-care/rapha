@@ -46,6 +46,7 @@ type Episode struct {
 	ID          string
 	Type        string
 	Status      string
+	OpenedAt    string
 	AnchorDate  string
 	AnchorBasis string
 	Encounters  []string
@@ -125,12 +126,20 @@ func ForEpisode(cat *carephc.Catalogue, ep Episode) *carephc.Schedule {
 // than assumed to be zero, because assuming would date a pregnancy from a
 // scan's delivery date as though it were a last period.
 func StartOf(s *carephc.Schedule, ep Episode) (time.Time, bool) {
-	anchored, parsed := day(ep.AnchorDate)
-	if !parsed {
-		return time.Time{}, false
-	}
 	offset, known := s.Anchor[ep.AnchorBasis]
 	if !known {
+		return time.Time{}, false
+	}
+	// WHERE THE DATE COMES FROM IS THE SCHEDULE'S TO SAY. A pregnancy is
+	// measured from a date somebody recorded, because the event happened
+	// before the record of it. A referral is measured from the moment it
+	// was raised, which IS the record.
+	source := ep.AnchorDate
+	if s.AnchorFrom == "opened" {
+		source = ep.OpenedAt
+	}
+	anchored, parsed := day(source)
+	if !parsed {
 		return time.Time{}, false
 	}
 	return anchored.AddDate(0, 0, offset), true
@@ -211,7 +220,11 @@ func Why(cat *carephc.Catalogue, ep Episode) string {
 	if sched == nil {
 		return "nothing is scheduled for this kind of episode"
 	}
-	if _, dated := day(ep.AnchorDate); !dated {
+	source := ep.AnchorDate
+	if sched.AnchorFrom == "opened" {
+		source = ep.OpenedAt
+	}
+	if _, dated := day(source); !dated {
 		return "nobody has dated this yet"
 	}
 	if _, known := StartOf(sched, ep); !known {

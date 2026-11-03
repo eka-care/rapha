@@ -345,13 +345,16 @@
       "phc.op.handover-reply",
       "phc.op.pregnancy-open",
       "phc.op.pregnancy-close",
+      "phc.op.referral-raise",
+      "phc.op.referral-close",
       "phc.op.context-add",
       "phc.op.ncd-review",
       "phc.op.antenatal-visit",
       "phc.op.followup"
     ],
     "schedules": [
-      "phc.sched.antenatal"
+      "phc.sched.antenatal",
+      "phc.sched.referral"
     ],
     "title": "Primary health centre",
     "version": "2026.09.10",
@@ -1049,6 +1052,88 @@
         "per_row": null,
         "questions": {},
         "resource": "episode_of_care"
+      }
+    ],
+    "phc.op.referral-close": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "outcome": {
+            "answer": "outcome"
+          },
+          "status": {
+            "const": "ended"
+          },
+          "type": {
+            "const": "referral"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "episode_of_care"
+      },
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "payload": {
+            "json": "payload"
+          },
+          "questionnaire": {
+            "const": "phc.schema.referral-close-v1"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "questionnaire_response"
+      }
+    ],
+    "phc.op.referral-raise": [
+      {
+        "fields": {
+          "anchor_basis": {
+            "const": "raised"
+          },
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "active"
+          },
+          "type": {
+            "const": "referral"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "episode_of_care"
+      },
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "payload": {
+            "json": "payload"
+          },
+          "questionnaire": {
+            "const": "phc.schema.referral-raise-v1"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "questionnaire_response"
       }
     ],
     "phc.op.rx-prescribe": [
@@ -2722,6 +2807,104 @@
         "episode_of_care"
       ]
     },
+    "phc.op.referral-close": {
+      "capability": "handover",
+      "description": "Somebody found out what happened to a woman who was sent on, and this is\nwhere they say so. It is the second half of \"every referral closed\".",
+      "emits": [],
+      "fields": [
+        {
+          "link_id": "outcome",
+          "options": [
+            "attended",
+            "did_not_attend",
+            "no_longer_needed",
+            "unable_to_contact"
+          ],
+          "required": true,
+          "text": "What happened to this referral?",
+          "type": "choice"
+        },
+        {
+          "link_id": "evidence",
+          "options": null,
+          "required": true,
+          "text": "How do you know?",
+          "type": "text"
+        }
+      ],
+      "id": "phc.op.referral-close",
+      "input": "phc.schema.referral-close-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "referral.open"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "Close referral",
+      "station": "doctor",
+      "summary": "Record what happened to a referral, and stop chasing it.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Close a referral",
+      "tool": "propose_referral_close",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "episode_of_care",
+        "questionnaire_response"
+      ]
+    },
+    "phc.op.referral-raise": {
+      "capability": "handover",
+      "description": "The centre cannot do what this woman needs, so she is sent on. The\nreferral stays open from that moment until somebody records what happened\nto her, and while it is open it is something this centre owes.\n\nHera's line is \"every voice heard, every referral closed\", and this is the\nfirst half of the second clause.",
+      "emits": [],
+      "fields": [
+        {
+          "link_id": "refer_to",
+          "options": null,
+          "required": true,
+          "text": "Where are you sending her?",
+          "type": "string"
+        },
+        {
+          "link_id": "reason",
+          "options": null,
+          "required": true,
+          "text": "Why",
+          "type": "text"
+        }
+      ],
+      "id": "phc.op.referral-raise",
+      "input": "phc.schema.referral-raise-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "registered",
+        "not referral.open"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "Refer onward",
+      "station": "doctor",
+      "summary": "Send her somewhere else, and keep the referral open until somebody closes it.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Refer this patient onward",
+      "tool": "propose_referral_raise",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "episode_of_care",
+        "questionnaire_response"
+      ]
+    },
     "phc.op.rx-prescribe": {
       "capability": "rx.prescribe",
       "description": "The doctor prescribes. Confirming the prescription is what makes the\npharmacist's dispense action exist at all.",
@@ -2942,6 +3125,7 @@
         "dating_scan": -280,
         "last_menstrual_period": 0
       },
+      "anchor_from": "recorded",
       "contacts": [
         {
           "authority": "statutory",
@@ -2996,6 +3180,31 @@
       "id": "phc.sched.antenatal",
       "summary": "What this centre owes a pregnant woman, and the window each is due in.",
       "title": "Antenatal contacts",
+      "type": "schedule"
+    },
+    "phc.sched.referral": {
+      "anchor": {
+        "raised": 0
+      },
+      "anchor_from": "opened",
+      "contacts": [
+        {
+          "authority": "centre",
+          "closes": 30,
+          "due": 7,
+          "escalates_to": "mo",
+          "id": "confirm",
+          "opens": 2,
+          "operation": "phc.op.referral-close",
+          "owner": "nurse",
+          "reports_as": null,
+          "title": "Find out what happened"
+        }
+      ],
+      "episode": "referral",
+      "id": "phc.sched.referral",
+      "summary": "What this centre owes a woman it sent somewhere else.",
+      "title": "Chasing a referral",
       "type": "schedule"
     }
   },
@@ -3136,6 +3345,8 @@
     "order.accessioned",
     "pregnancy.ended",
     "pregnancy.open",
+    "referral.ended",
+    "referral.open",
     "registered",
     "report.released",
     "result.entered",
@@ -3529,6 +3740,8 @@
       "lab.validated",
       "pregnancy.ended",
       "pregnancy.open",
+      "referral.ended",
+      "referral.open",
       "registered",
       "rx.confirmed",
       "vitals.flagged",
@@ -3556,6 +3769,8 @@
         "followup.booked",
         "pregnancy.ended",
         "pregnancy.open",
+        "referral.ended",
+        "referral.open",
         "capture.agreed",
         "capture.declined",
         "capture.withdrawn",
@@ -3690,6 +3905,38 @@
             "not pregnancy.ended"
           ]
         },
+        "referral.ended": {
+          "gte": [
+            {
+              "resource": "episode_of_care",
+              "where": {
+                "status": "ended",
+                "type": "referral"
+              }
+            },
+            {
+              "resource": "episode_of_care",
+              "where": {
+                "status": "active",
+                "type": "referral"
+              }
+            }
+          ]
+        },
+        "referral.open": {
+          "all_of": [
+            {
+              "exists": {
+                "resource": "episode_of_care",
+                "where": {
+                  "status": "active",
+                  "type": "referral"
+                }
+              }
+            },
+            "not referral.ended"
+          ]
+        },
         "registered": {
           "exists": {
             "resource": "patient"
@@ -3748,7 +3995,9 @@
             "phc.op.lab-order",
             "phc.op.capture-withdraw",
             "phc.op.handover",
-            "phc.op.handover-reply"
+            "phc.op.handover-reply",
+            "phc.op.referral-raise",
+            "phc.op.referral-close"
           ],
           "station": "doctor"
         },

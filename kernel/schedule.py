@@ -92,11 +92,20 @@ def start_of(schedule, episode):
     assuming zero would silently date a pregnancy from a scan's delivery
     date as though it were a period.
     """
-    anchored = _day(episode.get("anchor_date"))
-    if anchored is None:
-        return None
     basis = episode.get("anchor_basis") or ""
     if basis not in schedule.anchor:
+        return None
+    # WHERE THE DATE COMES FROM IS THE SCHEDULE'S TO SAY. A pregnancy is
+    # measured from a date somebody recorded, because the event it is
+    # measured from happened before the record of it. A referral is
+    # measured from the moment it was raised, which IS the record, and
+    # asking a clinician to type today's date on every referral is friction
+    # that will be wrong a fair share of the time.
+    if getattr(schedule, "anchor_from", "recorded") == "opened":
+        anchored = _day(episode.get("opened_at"))
+    else:
+        anchored = _day(episode.get("anchor_date"))
+    if anchored is None:
         return None
     return anchored + timedelta(days=int(schedule.anchor[basis]))
 
@@ -174,7 +183,9 @@ def why(bundle, store, workflow, episode):
     schedule = for_episode(bundle, workflow, episode)
     if schedule is None:
         return "nothing is scheduled for this kind of episode"
-    if _day(episode.get("anchor_date")) is None:
+    source = ("opened_at" if getattr(schedule, "anchor_from", "recorded") == "opened"
+              else "anchor_date")
+    if _day(episode.get(source)) is None:
         return "nobody has dated this yet"
     if start_of(schedule, episode) is None:
         return "it is dated in a way this schedule does not know"

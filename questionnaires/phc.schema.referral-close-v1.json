@@ -1,0 +1,44 @@
+{
+    "version": "1.0",
+    "slug": "phc-referral-close-v1",
+    "title": "Close a referral",
+    "status": "active",
+    "subject_type": "encounter",
+    "styling_metadata": {
+        "phc": {
+            "operation": "phc.op.referral-close"
+        }
+    },
+    "questions": [
+        {
+            "link_id": "outcome",
+            "text": "What happened to this referral?",
+            "type": "choice",
+            "required": true,
+            "answer_option": [
+                {"value": "attended"},
+                {"value": "did_not_attend"},
+                {"value": "no_longer_needed"},
+                {"value": "unable_to_contact"}
+            ],
+            "styling_metadata": {
+                "phc": {
+                    "short": "Outcome",
+                    "help": "Only the first means she was seen. The other three close the chase and say why, which is not the same thing."
+                }
+            }
+        },
+        {
+            "link_id": "evidence",
+            "text": "How do you know?",
+            "type": "text",
+            "required": true,
+            "styling_metadata": {
+                "phc": {
+                    "short": "Evidence",
+                    "help": "Who told you, or what you saw. A referral closed on nothing is a referral nobody checked."
+                }
+            }
+        }
+    ]
+}

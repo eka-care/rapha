@@ -28,7 +28,8 @@ steps:
     operations: [phc.op.consult-document, phc.op.ncd-review,
                  phc.op.antenatal-visit, phc.op.followup,
                  phc.op.rx-prescribe, phc.op.lab-order,
-                 phc.op.capture-withdraw, phc.op.handover, phc.op.handover-reply]
+                 phc.op.capture-withdraw, phc.op.handover, phc.op.handover-reply,
+                 phc.op.referral-raise, phc.op.referral-close]
   - station: lab
     done_when: lab.resulted
     applies_when: lab.ordered
@@ -90,6 +91,16 @@ states:
     all_of:
       - {exists: {resource: episode_of_care, where: {type: pregnancy, status: active}}}
       - "not pregnancy.ended"
+  # The same pair over the same table, for the other kind of episode this
+  # bundle keeps. "Every referral closed" is this flag being false.
+  referral.ended:
+    gte:
+      - {resource: episode_of_care, where: {type: referral, status: ended}}
+      - {resource: episode_of_care, where: {type: referral, status: active}}
+  referral.open:
+    all_of:
+      - {exists: {resource: episode_of_care, where: {type: referral, status: active}}}
+      - "not referral.ended"
   capture.agreed: {stored: true}
   capture.declined: {stored: true}
   capture.withdrawn: {stored: true}
