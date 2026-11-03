@@ -67,16 +67,28 @@
   --shadow-lg: 0 1px 2px rgba(20,20,19,.04), 0 8px 24px rgba(20,20,19,.06);
   --shadow-overlay: 0 24px 70px rgba(20,20,19,.20);
 
-  /* ---- grounds ---- */
-  --color-bg-canvas: #FAFAF9;
+  /* ---- grounds ----
+     THE WARM CREAM IS THE HERA DECK'S OWN, sampled off the rendered PDF
+     rather than guessed at: #FAF6F0 everywhere behind the content.
+
+     The rest of this ramp moved with it, and had to. The greys here were
+     neutral stone, which is a fine ground on its own and reads distinctly
+     green the moment it sits beside a warm cream -- a rail, a hovered row
+     and a border would each have looked slightly dirty against the page
+     they are drawn on. Same lightness steps as before, hue carried over.
+
+     White stays white. Cards are the one thing that does not warm, because
+     the deck does exactly this: white cards standing clear of a cream
+     page, which is where its crispness comes from. */
+  --color-bg-canvas: #FAF6F0;
   --color-dot: rgba(20,20,19,.2);
   /* The chrome the content passes under. Translucent, so the canvas and the
      list scrolling beneath it are both still there. */
-  --color-bg-nav: rgba(250,250,249,.72);
+  --color-bg-nav: rgba(250,246,240,.72);
   --color-bg-surface: #FFFFFF;
-  --color-bg-subtle: #F3F3F1;
-  --color-bg-rail: #F6F6F4;
-  --color-bg-hover: #F1F1EF;
+  --color-bg-subtle: #F3EEE6;
+  --color-bg-rail: #F6F1EA;
+  --color-bg-hover: #F1ECE4;
   --color-bg-selected: #EFECFD;
   /* The tint under something inert: an avatar's square, a progress rail, the
      ground of a hovered row. Alpha, not a grey, because it has to sit over
@@ -88,13 +100,17 @@
   --color-glass: rgba(255,255,255,.62);
   --color-glass-edge: rgba(255,255,255,.75);
 
-  --color-border-subtle: #E7E7E4;
-  --color-border-strong: #D4D4D0;
-  --color-border-control: #8A8A84;
+  --color-border-subtle: #E8E1D6;
+  --color-border-strong: #D6CDBF;
+  --color-border-control: #8B8479;
 
   --color-text-primary: #141413;
   --color-text-secondary: #5C5C58;
-  --color-text-tertiary: #6F6F6A;
+  /* Warmed with the ground, and darkened a little while it moved. On the
+     old neutral rail it cleared 4.5:1 by a hair; on the cream one it came
+     to 4.49, which style.check.ts caught. 4.99 now, and it belongs to the
+     page rather than sitting slightly cold on it. */
+  --color-text-tertiary: #6C675F;
   --color-text-disabled: #93938E;
 
   /* The one accent, and it is ink. Colour means clinical risk here, so the
