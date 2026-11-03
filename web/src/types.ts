@@ -326,6 +326,50 @@ export type SubjectView = {
      *  declaration, deduplicated, refusals excluded. §26's timeline entry. */
     did: { operation: string; title: string }[];
   }[];
+  /** The level between a person and a visit: one course of care that
+   *  starts, runs and ends. Empty for a bundle that declares no episode and
+   *  for a person who has had none. */
+  episodes: Episode[];
+};
+
+/** One episode, and what it owes. `contacts` is DERIVED by the kernel from
+ *  a schedule declaration and the episode's own date, so this screen draws
+ *  an answer and never computes one: an episode that has ended carries no
+ *  contacts at all, which is the whole safety property. */
+export type Episode = {
+  id: string;
+  type: string;
+  status: string;
+  opened_at: string;
+  ended_at: string;
+  outcome: string;
+  anchor_date: string;
+  anchor_basis: string;
+  encounters: string[];
+  contacts: Contact[];
+  /** Why there is nothing due, in the kernel's words, or "" when there is.
+   *  An empty list is several different situations and a screen that cannot
+   *  tell them apart says "nothing due" to a woman nobody has dated. */
+  nothing_due: string;
+};
+
+export type Contact = {
+  contact: string;
+  title: string;
+  schedule: string;
+  episode: string;
+  opens: string;
+  due: string;
+  closes: string;
+  /** upcoming, due, done or missed. The kernel's vocabulary, the same way a
+   *  line step's status is. */
+  state: string;
+  owner: string;
+  operation: string;
+  authority: string;
+  reports_as: string;
+  done_at: string;
+  basis: string;
 };
 
 /** The register: a person, and how many times they have been. The visits

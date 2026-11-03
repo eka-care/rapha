@@ -289,3 +289,39 @@
 }
 .reg-all:hover { background: var(--color-agent-tint); }
 .reg-all:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+
+/* ---- a course of care, as the contacts it owes (thread/Arc.tsx) -------
+   Every value drawn here arrives computed from the kernel. The tones say
+   one thing each: MISSED is the only state that takes clinical red, because
+   it is the only one where somebody has to go and find her. Due is ordinary
+   work, and a screen that is red for everybody expected this fortnight is a
+   screen nobody reads. */
+.arc-basis {
+  margin: 0 15px 10px; font-size: 11.5px; color: var(--color-text-tertiary);
+}
+.arc-list { list-style: none; margin: 0; padding: 0 15px 13px; }
+.arc-step {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 9px 0; border-top: 1px solid var(--color-border-subtle);
+}
+.arc-step:first-child { border-top: 0; }
+.arc-dot {
+  flex-shrink: 0; margin-top: 1px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: var(--radius-pill);
+  background: var(--color-bg-subtle); color: var(--color-text-tertiary);
+}
+.arc-step.s-done .arc-dot { background: var(--color-success-soft); color: var(--color-success); }
+.arc-step.s-missed .arc-dot { background: var(--color-critical-soft); color: var(--color-critical); }
+.arc-step.s-due .arc-dot { background: var(--color-accent-soft); color: var(--color-accent); }
+.arc-b { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.arc-t {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  font-size: 12.5px; font-weight: 600; color: var(--color-text-primary);
+}
+.arc-when { font-size: 11.5px; color: var(--color-text-tertiary); }
+/* A contact nobody need do anything about yet is quiet. */
+.arc-step.s-upcoming .arc-t { font-weight: 500; color: var(--color-text-secondary); }
+/* The sentence that stands where the contacts would be. It is inside the
+   card and has to be padded like them; `rail-none` is shaped for a rail. */
+.arc .rail-none { padding: 2px 15px 14px; }

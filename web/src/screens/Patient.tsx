@@ -15,22 +15,33 @@ import { displayFor, questionnaire } from "../declarations";
 import { Icon } from "../icons";
 import { header, queueViewFor, valuesOf } from "../messages";
 import { Failed, Loading } from "../parts";
+import { Arc } from "../thread/Arc";
 import type { Catalogue, SubjectView, ThreadView } from "../types";
 import { wrote } from "../types";
 import { human, title } from "../words";
 
-type Tab = "overview" | "encounters" | "timeline";
+type Tab = "care" | "overview" | "encounters" | "timeline";
 
 export function Patient({ id, cat, onOpenThread }: {
   id: string; cat: Catalogue; onOpenThread: (thread: string) => void;
 }) {
   const { data, error, loading, reload } = useAsync(() => api.subject(id), [id]);
   // §2.3: the encounters are what somebody came here for, not the demographics.
-  const [tab, setTab] = useState<Tab>("encounters");
+  // A PERSON WITH SOMETHING OPEN OPENS ON IT. A pregnancy being followed is
+  // the reason this record is being read, and it outranks the list of
+  // visits that a person with nothing open has nothing but.
+  const [tab, setTab] = useState<Tab | null>(null);
 
   if (loading) return <Loading what="this patient" shape="blocks" rows={3} />;
   if (error) return <Failed error={error} what="open this patient" onRetry={reload} />;
   const view = data!;
+  // The Care tab exists only for somebody who has an episode, because a tab
+  // that is always empty for most of a register is furniture. A person with
+  // one opens on it; everybody else opens where they always did.
+  const tabs: Tab[] = view.episodes.length
+    ? ["care", "encounters", "overview", "timeline"]
+    : ["encounters", "overview", "timeline"];
+  const open_tab: Tab = tab ?? tabs[0];
 
   // Which fields name a subject and which describe one is the queue view's own
   // `columns:` declaration, and messages.header() is where that rule already
@@ -75,18 +86,19 @@ export function Patient({ id, cat, onOpenThread }: {
           </div>
         </div>
         <div className="qtabs" style={{ margin: "12px 14px 14px" }} role="tablist">
-          {(["encounters", "overview", "timeline"] as Tab[]).map((t) => (
-            <button key={t} role="tab" aria-selected={tab === t}
-              className={`qtab${tab === t ? " on" : ""}`} onClick={() => setTab(t)}>
-              {title(t)}
+          {tabs.map((t) => (
+            <button key={t} role="tab" aria-selected={open_tab === t}
+              className={`qtab${open_tab === t ? " on" : ""}`} onClick={() => setTab(t)}>
+              {t === "care" ? "Care" : title(t)}
             </button>
           ))}
         </div>
       </section>
 
-      {tab === "encounters" && <Encounters view={view} cat={cat} onOpenThread={onOpenThread} />}
-      {tab === "overview" && <Overview view={view} />}
-      {tab === "timeline" && <Timeline view={view} onOpenThread={onOpenThread} />}
+      {open_tab === "care" && <Arc episodes={view.episodes} />}
+      {open_tab === "encounters" && <Encounters view={view} cat={cat} onOpenThread={onOpenThread} />}
+      {open_tab === "overview" && <Overview view={view} />}
+      {open_tab === "timeline" && <Timeline view={view} onOpenThread={onOpenThread} />}
     </div>
   );
 }
