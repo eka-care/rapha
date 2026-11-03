@@ -640,7 +640,7 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   // panel has to go through the rule. Two call sites, and a second one added
   // later without the seed would silently cost a patient an OTP again.
   const enc = code(readFileSync(join(SRC, "screens", "Encounter.tsx"), "utf8"));
-  assert.match(enc, /onDone=\{\(got\) => \{\s*if \(got\) setCarried\(\{ thread: thread\.id, payload: got \}\)/,
+  assert.match(enc, /onDone=\{\(got\) => \{\s*if \(got && !form\.amending\) setCarried\(\{ thread: thread\.id, payload: got \}\)/,
     "the encounter drops what the panel handed up, so the identifier a journey " +
     "produced is lost and the next panel asks for a second one time password");
   assert.match(enc, /carriedInto\(carried, thread\.id, walk\(questionnaire\(op\.input\)\?\.questions \?\? \[\]\)\)/,
@@ -651,8 +651,13 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   // shape it could not see, and the mutation that removed a seed passed. Any
   // word boundary after `op` now, and the two counts are compared rather than
   // either being trusted alone.
-  const opens = [...enc.matchAll(/setModal\(\{\s*op\b/g)].length;
-  const seeded = [...enc.matchAll(/setModal\(\{ op, seed: carry\(op\) \}\)/g)].length;
+  // `setModal` was the name while the form covered the screen. It opens in
+  // place now, under the line that asked for it, and the state it sets is
+  // `form` -- but the rule this counts is unchanged and has to stay
+  // countable: a NEW form is seeded, and only a correction is not, because a
+  // correction arrives holding the answers it is correcting.
+  const opens = [...enc.matchAll(/setForm\(\{\s*op\b/g)].length;
+  const seeded = [...enc.matchAll(/setForm\(\{ op, seed: carry\(op\) \}\)|setForm\(\{ op, start: [^}]*amending: true \}\)/g)].length;
   // ONE CALL SITE SINCE 2026-11-02, the stronger version of the same rule:
   // `openPanel` is now the only thing that opens one, so a screen added
   // later cannot forget the seed without deleting the helper. The two counts

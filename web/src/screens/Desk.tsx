@@ -227,6 +227,11 @@ export function Desk({ cat, decl, workflow, client, queue, loadingQueue, q, onOp
 
       {error && <Failed error={error} what="search for this patient" onRetry={() => setError(null)} />}
 
+      {/* THE LIST GOES WHILE THE FORM IS OPEN. The clerk has chosen who
+          this is; a list of other people it might have been is now the
+          loudest thing on the screen and answers a question already
+          answered. It comes back on Cancel. */}
+      {!opening && (<>
       <div className="desk-hits" id="desk-hits" role="listbox" aria-label="Who this might be">
         {rows.map((r, i) => (
           <button
@@ -291,8 +296,9 @@ export function Desk({ cat, decl, workflow, client, queue, loadingQueue, q, onOp
           largest thing on a screen whose job is the patient. Colour here
           means clinical risk; a missing directory is not one. */}
       {note && <p className="desk-note">{note}</p>}
+      </>)}
 
-      {!searched && (
+      {!searched && !opening && (
         <Day
           decl={decl}
           rows={queue ?? []}
@@ -302,10 +308,14 @@ export function Desk({ cat, decl, workflow, client, queue, loadingQueue, q, onOp
         />
       )}
 
+      {/* IN PLACE, UNDER THE SEARCH BOX, not over the screen. The front
+          desk is the one screen where a form is the whole job, and it was
+          the screen drawing that form over a list of search results nobody
+          needs any more. */}
       {op && thread && opening && (
-        <>
-          <div className="scrim" onClick={() => setOpening(null)} />
+        <div className="desk-form">
           <OperationPanel
+            inline
             op={op}
             thread={thread}
             client={client}
@@ -331,7 +341,7 @@ export function Desk({ cat, decl, workflow, client, queue, loadingQueue, q, onOp
             onDone={() => { setOpening(null); setThread(null); onOpenThread(thread); }}
             onCancel={() => setOpening(null)}
           />
-        </>
+        </div>
       )}
     </div>
   );

@@ -9,7 +9,7 @@
  *  (§21), ink-filled for the one that closes this station's step. Every word
  *  on them is the operation's own declaration.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { threadAsks } from "../agent";
 import type { Client } from "../api";
 import { OperationPanel } from "../form/Panel";
@@ -86,7 +86,20 @@ export function Encounter({
   onChanged: () => void;
   onOpenSubject: (subjectId: string) => void;
 }) {
-  const [modal, setModal] = useState<{ op: Operation; seed?: Payload } | null>(null);
+  /** THE FORM IS NOT A POP-UP. One state for both ways a form opens -- a
+   *  new record and a correction -- because both are drawn in the same
+   *  place: at the foot of the conversation, in the thread, under the line
+   *  that asked for them.
+   *
+   *  A modal was the most form-like thing this interface could do, on a
+   *  product whose promise to a frontline worker is that there are no forms.
+   *  It also covered the record the person was reading in order to fill it
+   *  in: a correction opened on top of the card it was correcting.
+   *
+   *  `start` is a correction's existing answers, `seed` is what an earlier
+   *  commit on this visit already learned; the two never arrive together. */
+  const [form, setForm] = useState<
+    { op: Operation; seed?: Payload; start?: Payload; amending?: boolean } | null>(null);
   /** What a commit on this screen learned that a LATER panel will be asked
    *  for again.
    *
@@ -124,7 +137,16 @@ export function Encounter({
    *  would be the worst possible first screen. */
   const [tab, setTab] = useState<TabId>("messages");
 
-  const [editing, setEditing] = useState<{ op: Operation; start: Payload } | null>(null);
+  /** A FORM OPENED BELOW THE FOLD IS A BUTTON THAT DID NOTHING. On a visit
+   *  with any history the foot of the thread is off screen, and the whole
+   *  point of drawing the form there instead of over the top is lost if
+   *  nobody can see it arrive. */
+  const formBox = useRef<HTMLDivElement | null>(null);
+  const opened = form ? `${form.op.id}:${form.amending ? "amend" : "new"}` : "";
+  useEffect(() => {
+    if (opened) formBox.current?.scrollIntoView({ block: "nearest" });
+  }, [opened]);
+
   const [carried, setCarried] = useState<{ thread: string; payload: Payload } | null>(null);
   const [scribing, setScribing] = useState<string | null>(null);
   /** The action somebody tapped, waiting on how they want to record it.
@@ -200,7 +222,14 @@ export function Encounter({
    *  call site added later. It used to be three call sites, each repeating
    *  the seed, and a fourth without it would have cost a patient a second
    *  one time password in silence. */
-  const openPanel = (op: Operation) => setModal({ op, seed: carry(op) });
+  const openPanel = (op: Operation) => {
+    // THE FORM IS AT THE FOOT OF THE CONVERSATION, so an action taken from
+    // the scribe tab or the assistant must bring the conversation with it.
+    // Opening a form into a tab nobody is looking at is a tap that does
+    // nothing.
+    setTab("messages");
+    setForm({ op, seed: carry(op) });
+  };
   const take = (op: Operation) => {
     if (speakable.has(op.id)) setStarting(op);
     else openPanel(op);
@@ -329,7 +358,7 @@ export function Encounter({
           editable={editable}
           onEdit={(m) => {
             const op = cat.operations[m.operation];
-            if (op) setEditing({ op, start: m.payload as Payload });
+            if (op) { setTab("messages"); setForm({ op, start: m.payload as Payload, amending: true }); }
           }}
         >
           {/* §21: the agent's own message, and the actions it is offering. */}
@@ -376,6 +405,33 @@ export function Encounter({
               </div>
             </div>
           )}
+
+        {/* THE FORM, IN PLACE. At the foot of the conversation, under the
+            line that asked for it, with the record it is correcting still
+            on screen above it. Nothing is stacked over the thread and
+            nothing is dimmed behind a scrim.
+
+            The composer goes while it is open: a person filling in a form
+            is not also typing a message, and two text surfaces one above
+            the other is a choice nobody wants to make. Cancel brings it
+            back. */}
+        {form && (
+          <div className="vform" ref={formBox}>
+            <OperationPanel
+              key={`${form.op.id}:${form.amending ? "amend" : "new"}`}
+              op={form.op} thread={thread.id} client={client} inline
+              amending={form.amending}
+              instruments={cat.instruments} flags={thread.flags}
+              seed={form.seed} start={form.start}
+              onDone={(got) => {
+                if (got && !form.amending) setCarried({ thread: thread.id, payload: got });
+                setForm(null);
+                onChanged();
+              }}
+              onCancel={() => setForm(null)}
+            />
+          </div>
+        )}
         </Stream>
 
         {/* The station comes off the thread view, the same field the header
@@ -403,7 +459,7 @@ export function Encounter({
             came from. Both moved into the view beside the thread, which has
             the width, and the thread went back to being a thread. */}
 
-        <Composer
+        {!form && <Composer
           about={head.name}
           actions={ranked}
           roles={Object.keys(cat.bundles ?? {})}
@@ -422,7 +478,7 @@ export function Encounter({
               ))}
             </>
           }
-        />
+        />}
         </>}
       </div>
 
@@ -486,33 +542,6 @@ export function Encounter({
         </aside>
       )}
 
-      {editing && (
-        <>
-          <div className="scrim" onClick={() => setEditing(null)} />
-          <OperationPanel
-            op={editing.op} thread={thread.id} client={client} amending
-            instruments={cat.instruments} flags={thread.flags} start={editing.start}
-            onDone={() => { setEditing(null); onChanged(); }}
-            onCancel={() => setEditing(null)}
-          />
-        </>
-      )}
-
-      {modal && (
-        <>
-          <div className="scrim" onClick={() => setModal(null)} />
-          <OperationPanel
-            op={modal.op} thread={thread.id} client={client}
-            instruments={cat.instruments} flags={thread.flags} seed={modal.seed}
-            onDone={(got) => {
-              if (got) setCarried({ thread: thread.id, payload: got });
-              setModal(null);
-              onChanged();
-            }}
-            onCancel={() => setModal(null)}
-          />
-        </>
-      )}
     </div>
   );
 }

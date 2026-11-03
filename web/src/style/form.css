@@ -30,6 +30,22 @@
 .mod-h { padding: var(--space-5) var(--space-5) var(--space-3); }
 .mod.inline .mod-h { padding: var(--space-4) var(--space-4) var(--space-2); }
 .mod-t { font-size: 17px; line-height: 24px; font-weight: 600; }
+/* Inline, the title is a label on a form in a conversation, not the name of
+   a thing that just covered the screen. */
+.mod-t-in { font-size: 13px; line-height: 18px; font-weight: 700; }
+
+/* The form at the foot of the thread. It sits where the composer was, so
+   the eye does not have to go anywhere, and it is separated from the
+   conversation by space rather than by a line. */
+/* Inside the thread's own scroller, so the conversation above it keeps its
+   height and scrolls past as a person works down the form. A sibling of the
+   thread crushed it to one line. */
+.vform { margin-top: var(--space-3); }
+.vform .mod.inline { width: 100%; max-width: 760px; }
+
+/* The front desk's own form, where the search results were. */
+.desk-form { margin-top: var(--space-4); }
+.desk-form .mod.inline { width: 100%; }
 .mod-b { padding: 0 var(--space-5) var(--space-4); overflow-y: auto; flex: 1; min-height: 0; }
 .mod.inline .mod-b { padding: 0 var(--space-4) var(--space-3); }
 .mod-f {

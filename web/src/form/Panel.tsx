@@ -382,7 +382,13 @@ export function OperationPanel({
             or it is not, and an irreversible operation says so by making you
             do it twice (the confirm stage below), not by a word beside the
             title. */}
-        {!inline && <div className="mod-t">{op.title}</div>}
+        {/* A FORM SAYS WHAT IT IS, wherever it is drawn. Inline used to be
+            silent, which was right while the only inline form was a
+            proposal sitting under a sentence that had just named it. Now
+            every form opens inline, including one somebody chose from a row
+            of eight actions, and an unnamed form is a form you have to
+            infer from its fields. */}
+        <div className={inline ? "mod-t mod-t-in" : "mod-t"}>{op.title}</div>
       </div>
 
       <div className="mod-b">
