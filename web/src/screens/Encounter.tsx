@@ -20,6 +20,7 @@ import { carriedInto, weigh } from "../loops";
 import { agentLine, header, messages, queueViewFor, type Ctx, type Said } from "../messages";
 import type { Catalogue, Facility, Operation, Payload, ThreadView } from "../types";
 import { Composer } from "../thread/Composer";
+import { commands } from "../thread/commands";
 import { ScribeBar } from "../scribe/ScribeBar";
 import { ScribeStart } from "../scribe/Start";
 import { mergeDrafts, type Opened } from "../scribe/session";
@@ -235,6 +236,7 @@ export function Encounter({
     else openPanel(op);
   };
 
+
   /** WHAT CAN STILL BE CORRECTED, and the three conditions are the kernel's
    *  own, said again here so the screen does not offer a control that would
    *  be refused: the visit is still open, the operation is not irreversible,
@@ -262,6 +264,22 @@ export function Encounter({
    *  nothing in it. */
   const past = usePast(thread, cat, spineId);
   const todayVisit = useMemo(() => visitOf(thread, cat), [thread, cat]);
+  /** WHAT `/` CAN DO BESIDE RECORDING SOMETHING. The kernel decides the
+   *  actions half of that menu; this is the screen's own half, and it is
+   *  built in thread/commands.ts so what it offers can be checked without a
+   *  browser. Every verb here is a control already on this screen: the
+   *  point is that `/` is now the way to all of it without hunting for a
+   *  pixel. */
+  const verbs = useMemo(() => commands({
+    tabs: tabsFor(past.length),
+    open: tab,
+    goTab: (id) => setTab(id as TabId),
+    // Absent, not disabled: the same rule the actions half keeps.
+    record: consented ? () => { setTab("scribe"); setScribing(""); } : undefined,
+    railFolded: folded,
+    toggleRail: () => fold(!folded),
+    openRecord: spineId ? () => onOpenSubject(spineId) : undefined,
+  }), [past.length, tab, consented, folded, spineId, onOpenSubject]);
 
   return (
     <div className={`chatgrid${folded ? " folded" : ""}`}>
@@ -463,6 +481,7 @@ export function Encounter({
           about={head.name}
           actions={ranked}
           roles={Object.keys(cat.bundles ?? {})}
+          verbs={verbs}
           asking={asking}
           onSay={onSay}
           onAction={(op) => take(op)}

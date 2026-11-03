@@ -9,13 +9,35 @@
  */
 import type { Operation } from "../types";
 import { title } from "../words";
+import type { Verb } from "./commands";
 
-export type Item = { key: string; label: string; sub?: string; group: string; op?: Operation };
+export type Item = {
+  key: string; label: string; sub?: string; group: string;
+  op?: Operation;
+  /** Something the SCREEN does rather than something the kernel records.
+   *  Never both: an item is one or the other. */
+  verb?: Verb;
+};
+
+/** The operations first, under their own stations, then the screen's own
+ *  verbs under one heading at the foot. That order is deliberate: the
+ *  clinical thing a person came to do outranks the furniture, and the first
+ *  item is the one Enter takes. */
+export function slashItems(actions: Operation[], query: string, verbs: Verb[] = []): Item[] {
+  return [...operationItems(actions, query), ...verbItems(verbs, query)];
+}
+
+function verbItems(verbs: Verb[], query: string): Item[] {
+  return verbs
+    .filter((v) => v.label.toLowerCase().includes(query))
+    .map((v) => ({ key: `verb:${v.key}`, label: v.label, sub: v.sub,
+                   group: "On this screen", verb: v }));
+}
 
 /** Group the offered operations under their own declared station. A station is
  *  the bundle's word for where work happens, so it is the bundle that decides
  *  the headings, not this file. */
-export function slashItems(actions: Operation[], query: string): Item[] {
+function operationItems(actions: Operation[], query: string): Item[] {
   return actions
     .filter((o) => `${o.short} ${o.title}`.toLowerCase().includes(query))
     .map((o) => ({

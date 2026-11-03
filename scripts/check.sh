@@ -229,6 +229,7 @@ if [ -d web/node_modules ]; then
   # two visits' values, so no browser and no kernel.
   (cd web && node --experimental-strip-types src/thread/earlier.check.ts)
   (cd web && node --experimental-strip-types src/thread/fold.check.ts)
+  (cd web && node --experimental-strip-types src/thread/commands.check.ts)
   # The tour: it points at elements that are really on screen, and its card
   # never leaves one. Pure rules over a rectangle, so no browser.
   (cd web && node --experimental-strip-types src/app/guide.check.ts)

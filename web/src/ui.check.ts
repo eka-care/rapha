@@ -330,7 +330,23 @@ const IMPLEMENTED = [
     "no literal list of menu entries");
 
   const composer = code(readFileSync(join(SRC, "thread", "Composer.tsx"), "utf8"));
-  assert.match(composer, /slashItems\(actions, query\)/, "the / menu reads the actions prop");
+  assert.match(composer, /slashItems\(actions, query, verbs\)/,
+    "the / menu reads the actions prop");
+  // The screen's own verbs are the one category this layer may name, and they
+  // are built in a module of their own so what the menu offers can be checked
+  // without a browser. A verb typed into the component instead would be a
+  // list nothing tests and nothing can turn off.
+  assert.ok(!/label: ["'`]/.test(composer) && !/label: ["'`]/.test(menu),
+    "a menu entry is written into the component rather than built in commands.ts");
+  const verbs = code(readFileSync(join(SRC, "thread", "commands.ts"), "utf8"));
+  for (const forbidden of [/station/i, /capability/i, /\bflag\b/i, /phc\./]) {
+    assert.ok(!forbidden.test(verbs.replace(/^import .*$/gm, "")),
+      `the screen's own verbs name something declared: ${forbidden}`);
+  }
+  assert.match(code(readFileSync(join(SRC, "screens", "Encounter.tsx"), "utf8")),
+    /record: consented \? /,
+    "the microphone is offered on the / menu whether or not it could start, " +
+    "which is the one thing that menu has never done");
   assert.match(composer, /atItems\(roles, query\)/, "the @ menu reads the roles prop");
   // The trigger must not fire mid-word, or an address opens a menu.
   assert.match(composer, /\/\(\^\|\\s\)\(\[\/@\]\)/,

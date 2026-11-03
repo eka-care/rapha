@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "../icons";
 import type { Operation } from "../types";
+import type { Verb } from "./commands";
 import { Menu, atItems, slashItems, type Item } from "./Menu";
 
 /* No cap. The menu is 360px tall and scrolls, and typing narrows it, so a
@@ -18,15 +19,25 @@ import { Menu, atItems, slashItems, type Item } from "./Menu";
    bundle's ninth role became invisible while the other eight looked complete. */
 const clamp = (n: number, len: number) => ((n % len) + len) % len;
 
+/** Take the command the person was typing back out of the box, leaving
+ *  anything they had written around it. A whole-line command leaves nothing;
+ *  a `/` typed after a sentence leaves the sentence. */
+const strip = (text: string) =>
+  /^\//.test(text) ? "" : text.replace(/(^|\s)[/][^\s]*$/, "$1");
+
 export type Recording = { seconds: number; onStop: () => void } | null;
 
 export function Composer({
-  about, actions, roles, asking, recording, quick,
+  about, actions, roles, verbs, asking, recording, quick,
   onSay, onAction, onStartScribe, micReason,
 }: {
   about: string;
   actions: Operation[];
   roles: string[];
+  /** What the SCREEN can do, beside what the kernel can record. Built in
+   *  thread/commands.ts and passed in, because which tabs exist and whether
+   *  the microphone may start are the screen's own facts. */
+  verbs?: Verb[];
   asking?: boolean;
   recording?: Recording;
   onSay: (text: string) => void;
@@ -53,19 +64,43 @@ export function Composer({
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
   }, [text]);
 
+  // A COMMAND IS A PHRASE, NOT A WORD. The trigger is still the last run of
+  // non-space characters -- an address mid-sentence never opens a menu --
+  // with one exception: a slash at the very start of the box takes the whole
+  // rest of the line as its query. Without that, typing the second word of
+  // "Go to earlier visits" closed the menu and sent the command to the agent
+  // as a sentence, which is what every slash menu anywhere else does not do.
+  const whole = /^\/(.*)$/.exec(text);
   const tail = /(^|\s)([/@])([^\s]*)$/.exec(text);
-  const kind = tail?.[2];
-  const query = (tail?.[3] ?? "").toLowerCase();
+  const kind = whole ? "/" : tail?.[2];
+  // §15 keeps working: `/handover @Priya repeat BP` carries an addressee and
+  // a note, neither of which is part of the command's name. The address and
+  // anything after the words that still match are dropped from the query,
+  // and a phrase that narrows to nothing falls back to its first word rather
+  // than to an empty menu.
+  const phrase = (whole ? whole[1].replace(/(^|\s)@[^\s]+/g, " ") : tail?.[3] ?? "")
+    .trim().toLowerCase();
+  const query = phrase;
+  const narrowed = kind === "/" ? slashItems(actions, query, verbs) : [];
   const items: Item[] = !kind
     ? []
-    : kind === "/" ? slashItems(actions, query) : atItems(roles, query);
+    : kind === "/"
+      ? (narrowed.length || !query
+          ? narrowed
+          : slashItems(actions, query.split(/\s+/)[0], verbs))
+      : atItems(roles, query);
 
   const choose = (it: Item) => {
-    if (it.op) {
+    if (it.verb) {
+      // The screen's own verb: take the command off the box and do it. No
+      // mention travels with it -- a tab does not have an addressee.
+      setText(strip(text));
+      it.verb.run();
+    } else if (it.op) {
       // §15: `/handover @Priya repeat BP` and `@Priya please repeat BP` resolve
       // to the same operation, so an @ already in the box travels with it.
       const mention = /(^|\s)@([^\s]+)/.exec(text)?.[2];
-      setText(text.replace(/(^|\s)[/][^\s]*$/, "$1"));
+      setText(strip(text));
       onAction(it.op, mention);
     } else {
       setText(text.replace(/(^|\s)@[^\s]*$/, `$1@${it.label} `));
