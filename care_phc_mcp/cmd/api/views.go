@@ -158,7 +158,7 @@ func (k *kernel) subject(w http.ResponseWriter, r *http.Request) {
 	}
 	// 200 is kernel/spine.of's own default limit, which is a person's whole
 	// timeline and not a page of it.
-	found, err := spine.Of(k.store, k.cat.Workflow, k.operations, id, 200)
+	found, err := spine.Of(k.store, k.cat, k.cat.Workflow, k.operations, id, 200)
 	if err != nil {
 		detail(w, http.StatusInternalServerError, "%v", err)
 		return

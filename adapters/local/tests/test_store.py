@@ -193,8 +193,9 @@ def test_proposals_and_audit_round_trip_with_their_json_columns():
 def test_the_seed_puts_people_at_different_points_in_the_line():
     store = fresh()
     threads = store.threads(workflow="phc.wf.outpatient", scope="today")
-    assert len(threads) == 6
-    assert {t.subject.get("name") for t in threads} >= {"Ramesh Kumar", "Meera Patel"}
+    assert len(threads) == 7
+    assert {t.subject.get("name") for t in threads} >= {"Ramesh Kumar", "Meera Patel",
+                                                        "Lakshmi Devi"}
     # The seed declares enc-003's consent to ambient capture as well, which is
     # what makes the scribe offerable on the demo day. capture.consented is not
     # here because it is composed by the workflow and never stored.
@@ -240,7 +241,10 @@ def test_a_stale_demo_day_walks_forward_and_real_work_stays_put():
 
     reopened = SqliteStore(path)          # roll_seed_forward runs in __init__
     today = [t.id for t in reopened.threads(workflow="w", scope="today")]
-    assert len(today) == 6, today
+    # 7 since the pregnancy was seeded. The count is the seed's, so it moves
+    # when the seed does; what this is checking is that the whole demo day
+    # walked forward together and that a real thread did not come with it.
+    assert len(today) == 7, today
     assert mine not in today, "a thread a person opened is not the demo day"
     tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
     for table, column in dated:

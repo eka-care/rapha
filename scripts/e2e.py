@@ -604,8 +604,16 @@ def main():
         stations = {r["thread"]: r["station"] for r in queue["rows"]}
         assert stations == {"enc-001": "reception", "enc-002": "nurse",
                             "enc-003": "doctor", "enc-004": "lab",
-                            "enc-005": "pharmacy", "enc-006": None}, stations
-        ok("the queue puts six seeded threads at six stations")
+                            "enc-005": "pharmacy", "enc-006": None,
+                            # The pregnancy stands at the doctor like any
+                            # other visit whose vitals are taken and whose
+                            # consultation is not written. BEING FOLLOWED IS
+                            # NOT A STATION: a woman is in the line where
+                            # the line says she is, and the arc is a
+                            # separate question asked of her record.
+                            "enc-007": "doctor"}, stations
+        ok("the queue puts seven seeded threads at their stations, and a "
+           "pregnancy stands in the line like anybody else")
 
         panel = call(base, "/threads/enc-002/")
         assert panel["station"] == "nurse"

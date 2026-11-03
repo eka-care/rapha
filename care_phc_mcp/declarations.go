@@ -139,6 +139,7 @@ func (c *Catalogue) LoadDeclarations() error {
 		Operations map[string]json.RawMessage `json:"operations"`
 		Views      json.RawMessage            `json:"views"`
 		Metrics    json.RawMessage            `json:"metrics"`
+		Schedules  json.RawMessage            `json:"schedules"`
 		Documents  json.RawMessage            `json:"documents"`
 	}
 	// c.raw and not the embedded copy: Load may have read the tree, and two
@@ -175,6 +176,16 @@ func (c *Catalogue) LoadDeclarations() error {
 			return fmt.Errorf("the compiled metrics are not readable: %w", err)
 		}
 		c.Metrics = metrics
+	}
+
+	// The schedules, through pyval for the same reason: a contact's days are
+	// whole numbers in the declaration and encoding/json would make them
+	// float64, which is a different thing to add to a date.
+	c.Schedules = map[string]Schedule{}
+	if len(raw.Schedules) > 0 {
+		if err := pyval.Decode(raw.Schedules, &c.Schedules); err != nil {
+			return fmt.Errorf("the compiled schedules are not readable: %w", err)
+		}
 	}
 
 	// Where each kind of row is filed when this bundle publishes. Through

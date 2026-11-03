@@ -188,7 +188,9 @@ ok("with every plugin on, no role loses a capability; with the laboratory off, "
 # The facility's demo day is its own, because a seeded thread whose history
 # names an operation nobody here may perform is a lie about what happened here
 # and draws a card no person can confirm.
-assert len(WHOLE.seed) == 7 and len(NO_LAB.seed) == 6, (len(WHOLE.seed), len(NO_LAB.seed))
+# 8 and 7 since the pregnancy was seeded: every shape gains her, because
+# following a pregnancy is not a plugin and no centre switches it off.
+assert len(WHOLE.seed) == 8 and len(NO_LAB.seed) == 7, (len(WHOLE.seed), len(NO_LAB.seed))
 for bundle in (NO_LAB, LEAST):
     for thread in bundle.seed:
         for entry in (thread.get("proposals") or []) + (thread.get("audit") or []):

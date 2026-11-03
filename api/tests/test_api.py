@@ -27,9 +27,12 @@ VITALS = {"systolic": 118, "diastolic": 76, "pulse": 80}
 def test_the_queue_draws_the_declared_view_with_everyone_on_it():
     body = client.get("/api/queue").json()
     assert body["kind"] == "queue"
-    assert len(body["rows"]) == 6
-    assert sum(g["count"] for g in body["groups"]) == 6
+    assert len(body["rows"]) == 7
+    assert sum(g["count"] for g in body["groups"]) == 7
     stations = {r["thread"]: r["station"] for r in body["rows"]}
+    # The pregnancy stands at the nurse, like any other registered visit
+    # whose vitals are not yet taken. Being followed is not a station.
+    assert stations["enc-007"] == "doctor"
     assert stations["enc-001"] == "reception", "a walk in is not registered yet"
     assert stations["enc-002"] == "nurse"
     assert stations["enc-003"] == "doctor"
@@ -172,11 +175,14 @@ def test_the_dashboard_evaluates_its_metrics_locally():
     body = client.get("/api/views/phc.view.facility-dashboard").json()
     assert body["kind"] == "dashboard"
     by_id = {row["metric"]: row for row in body["rows"]}
-    assert by_id["phc.metric.visits"]["numerator"] == 6
+    # 7 since the pregnancy was seeded, and she has no ABHA number, so she
+    # is a sixth patient and not a fourth linked one. The coverage falls
+    # from 60% to 50% because of her, which is the metric doing its job.
+    assert by_id["phc.metric.visits"]["numerator"] == 7
     coverage = by_id["phc.metric.abha-coverage"]
     assert coverage["unit"] == "percent" and 0 <= coverage["value"] <= 100
-    assert coverage["denominator"] == 5, "five of the six threads have a patient"
-    assert coverage["numerator"] == 3 and coverage["value"] == 60.0
+    assert coverage["denominator"] == 6, "six of the seven threads have a patient"
+    assert coverage["numerator"] == 3 and coverage["value"] == 50.0
     assert client.get("/api/views/phc.view.facility-dashboard?role=lab").status_code == 403
 
 

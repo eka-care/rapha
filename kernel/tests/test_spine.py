@@ -169,7 +169,20 @@ ok("a subject with no episode gets an empty list rather than a missing answer")
 # And a bundle that declares none never looks.
 class NoEpisodes:
     subject, spine, episode, states, stored = WF.subject, WF.spine, None, WF.states, WF.stored
-assert spine.episodes(store, NoEpisodes(), "p-amina", []) == []
+assert spine.episodes(BUNDLE, store, NoEpisodes(), "p-amina", []) == []
 ok("a workflow declaring no episode has none, whatever rows happen to exist")
+
+# -- and the arc rides on the same answer ---------------------------------
+
+arcs = spine.of(BUNDLE, store, WF, "p-amina")["episodes"]
+live = arcs[0]
+assert [c["contact"] for c in live["contacts"]] == ["anc1", "anc2", "anc3", "anc4"], \
+    "an open pregnancy carries what it owes, in the schedule's own order"
+assert live["nothing_due"] == ""
+ok("a person's record carries the arc of an open pregnancy, not only its visits")
+
+closed = arcs[1]
+assert closed["contacts"] == [] and closed["nothing_due"] == "this is over", closed
+ok("and a pregnancy that ended owes nothing on the same screen, with a reason")
 
 print("\nok   spine: %d checks" % checks)

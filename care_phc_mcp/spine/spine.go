@@ -34,6 +34,7 @@ import (
 
 	carephc "github.com/eka-care/care_phc_mcp"
 	"github.com/eka-care/care_phc_mcp/kstate"
+	"github.com/eka-care/care_phc_mcp/schedule"
 	"github.com/eka-care/care_phc_mcp/store"
 )
 
@@ -86,6 +87,11 @@ type Episode struct {
 	AnchorDate  string   `json:"anchor_date"`
 	AnchorBasis string   `json:"anchor_basis"`
 	Encounters  []string `json:"encounters"`
+	// WHAT IT OWES, derived here rather than by the caller so every reader
+	// of a person's record gets the arc and not just the list, and so both
+	// engines compose it the same way.
+	Contacts   []schedule.Contact `json:"contacts"`
+	NothingDue string             `json:"nothing_due"`
 }
 
 // Declared is the spine resource for this workflow, or "" if it declares none.
@@ -96,7 +102,8 @@ func Declared(wf *carephc.Workflow) string { return wf.Spine }
 // Returns nil when the workflow declares no spine or the subject does not
 // exist. The caller turns that into a 404; inventing an empty subject here
 // would let a typo render as a person with no visits.
-func Of(s Reader, wf *carephc.Workflow, operations map[string]carephc.Operation,
+func Of(s Reader, cat *carephc.Catalogue, wf *carephc.Workflow,
+	operations map[string]carephc.Operation,
 	subjectID string, limit int) (*Found, error) {
 	link := Declared(wf)
 	if link == "" {
@@ -143,7 +150,7 @@ func Of(s Reader, wf *carephc.Workflow, operations map[string]carephc.Operation,
 	sort.SliceStable(visits, func(i, j int) bool {
 		return visits[i].OpenedAt > visits[j].OpenedAt
 	})
-	arcs, err := Episodes(s, wf, subjectID, visits)
+	arcs, err := Episodes(s, cat, wf, subjectID, visits, time.Time{})
 	if err != nil {
 		return nil, err
 	}
@@ -162,8 +169,8 @@ func Of(s Reader, wf *carephc.Workflow, operations map[string]carephc.Operation,
 // WHICH VISITS BELONG TO ONE IS DERIVED FROM THE DATES. A column on the
 // encounter would have to be written before anybody knew the answer, and a
 // column nothing writes is a column that lies.
-func Episodes(s Reader, wf *carephc.Workflow, subjectID string,
-	visits []Visit) ([]Episode, error) {
+func Episodes(s Reader, cat *carephc.Catalogue, wf *carephc.Workflow,
+	subjectID string, visits []Visit, at time.Time) ([]Episode, error) {
 	if wf.Episode == "" {
 		return []Episode{}, nil
 	}
@@ -207,6 +214,20 @@ func Episodes(s Reader, wf *carephc.Workflow, subjectID string,
 			}
 		}
 	}
+	for i := range out {
+		ep := schedule.Episode{
+			ID: out[i].ID, Type: out[i].Type, Status: out[i].Status,
+			AnchorDate: out[i].AnchorDate, AnchorBasis: out[i].AnchorBasis,
+			Encounters: out[i].Encounters,
+		}
+		contacts, err := schedule.Contacts(cat, s, ep, at)
+		if err != nil {
+			return nil, err
+		}
+		out[i].Contacts = contacts
+		out[i].NothingDue = schedule.Why(cat, ep)
+	}
+
 	sort.SliceStable(out, func(i, j int) bool {
 		return out[i].OpenedAt > out[j].OpenedAt
 	})

@@ -110,16 +110,25 @@ whether she delivered at a facility or at home, which needs a delivery
 record this build does not have, and a schedule line needs an
 `applies_when` that this type does not carry yet.
 
-## The windows, and why they are wide
+## The windows, and the gaps between them
 
 A contact aimed at twenty eight weeks is not late at twenty eight weeks and
 one day. A woman who walks eleven kilometres and arrives nine days after the
-day a piece of software picked has not failed, and neither have we.
+day a piece of software picked has not failed, and neither have we. That is
+what the window is for, and it is why a contact has three dates rather than
+one.
 
-The windows above are drawn to touch: the day one closes, the next has
-already opened. That is deliberate. A gap between two windows is a stretch
-of pregnancy in which nothing is due and nothing is late, which reads on a
-screen as everything being fine.
+THE WINDOWS DO NOT ALL TOUCH, and an earlier draft of this file claimed they
+did. The second contact runs to twenty six weeks and the third opens at
+twenty eight, so there are about two weeks of a pregnancy in which nothing
+is due and nothing is late. That gap is the programme's, not a mistake here,
+and the honest thing is to say so rather than to widen a clinical window to
+make a screen tidier.
+
+What it means for a reader: in a gap, the arc shows the contact she has just
+missed or completed and the one coming, and nothing is asked of anybody. It
+is not the same as everything being fine, and a screen drawing this should
+not say "nothing due" without saying which of those two it means.
 
 ## Who owns one, and the thing that found out
 

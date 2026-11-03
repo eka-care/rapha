@@ -220,6 +220,19 @@ DEFAULT_THREAD_COLUMN = "encounter"
 # not, so it stays in THREAD_COLUMN above.
 KERNEL_RECORD = {"proposal": ("thread", "created_at"), "audit": ("thread", "at")}
 
+# A DEMO DAY THAT MOVES HAS TO MOVE ITS CLINICAL DATES TOO. roll_seed_forward
+# shifts the one column that dates each row, which is enough for a record: a
+# reading taken then was taken then. It is not enough for a date the record
+# POINTS AT. A seeded pregnancy's anchor is the date its whole schedule is
+# measured from, so leaving it behind while the demo day walks forward ages
+# the pregnancy by a day for every day the file is not opened, and a demo
+# seeded at twelve weeks is overdue for delivery inside a year.
+#
+# These are plain date columns (`YYYY-MM-DD`) rather than timestamps, so they
+# are shifted by date arithmetic and are not clamped to now: a due date in
+# the future is the point of one.
+ROLLING_DATES = {"episode_of_care": ("anchor_date",)}
+
 # What the seed writes as the author of a thread it opened. It is how a demo
 # thread is told from a real one, which is what roll_seed_forward() needs.
 SEED_ACTOR = "seed"
@@ -350,6 +363,14 @@ class SqliteStore:
                 "UPDATE %s SET %s = MIN(replace(datetime(%s, ?), ' ', 'T') || '+00:00', ?)"
                 " WHERE %s AND %s < ?" % (table, column, column, where, column),
                 ["+%d days" % days, now] + threads + [cutoff])
+            for extra in ROLLING_DATES.get(table, ()):
+                # No clamp and no cutoff: see ROLLING_DATES. A date the
+                # record points at may legitimately be in the future, and
+                # every seeded row of this table moves with the day.
+                self.db.execute(
+                    "UPDATE %s SET %s = date(%s, ?) WHERE %s AND %s IS NOT NULL"
+                    % (table, extra, extra, where, extra),
+                    ["+%d days" % days] + threads)
         return days
 
     @property
@@ -526,6 +547,17 @@ class SqliteStore:
             record.setdefault(column, thread)
         elif resource == "encounter":
             record.setdefault("id", thread)
+        elif column is None and resource != "patient" and "patient" in columns:
+            # REACHED THROUGH THE THREAD'S PATIENT, so the join has to be
+            # filled from it: an episode belongs to a person and outlives
+            # the visit it was opened at. Without this the row lands with a
+            # null patient, every read of it comes back empty, and the
+            # pregnancy simply does not exist on any screen -- which is
+            # what happened the first time one was seeded.
+            found = self.db.execute(
+                "SELECT patient FROM encounter WHERE id = ?", [thread]).fetchone()
+            if found and found["patient"]:
+                record.setdefault("patient", found["patient"])
         record.setdefault("id", new_id(resource))
         record.setdefault("created_date", now())
         rid = record["id"]
@@ -841,7 +873,30 @@ def seed(store, threads=None):
         serial[0] += 1
         return "seed-%04d" % serial[0]
 
+    seed_day = datetime.now(timezone.utc).date()
+
+    def _ago(days, default):
+        if not days:
+            return default
+        return (datetime.now(timezone.utc)
+                - timedelta(days=int(days))).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+
     def stamped(record):
+        # A DATE THE RECORD POINTS AT, declared relative to the demo day.
+        # `minutes_ago` on a thread already does this for the one column
+        # that dates a row; this does it for a column that dates something
+        # else, which is what a pregnancy's anchor is. Writing a literal
+        # would be right on the day it was typed and a month stale a month
+        # later, and a demo whose pregnant woman is overdue for delivery
+        # proves nothing about a tracker.
+        record = dict(record)
+        for column in list(record):
+            suffix = "_days_ago"
+            if not column.endswith(suffix):
+                continue
+            days = record.pop(column)
+            record[column[:-len(suffix)]] = (
+                seed_day - timedelta(days=int(days))).isoformat()
         return dict({"id": row_id(), "created_by": SEED_ACTOR,
                      "created_date": stamp}, **record)
 
@@ -905,7 +960,12 @@ def seed(store, threads=None):
                 id=row_id(), thread=thread, operation=entry["operation"],
                 actor=entry.get("actor"), surface=entry.get("surface", "rendered"),
                 payload=entry.get("payload") or {},
-                outcome=entry.get("outcome", "confirmed"), at=stamp))
+                outcome=entry.get("outcome", "confirmed"),
+                # A seeded entry may say how long ago it happened, for the
+                # same reason a row may (see `stamped`): a contact attended
+                # four months ago is what makes a tracker's demo a tracker's
+                # rather than a list of things nobody has done.
+                at=_ago(entry.get("days_ago"), stamp)))
         for p in t.get("proposals") or []:
             pid = p.get("id") or row_id()
             payload = p.get("payload") or {}

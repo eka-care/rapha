@@ -795,6 +795,24 @@ func (s *SQLite) put(resource string, record map[string]any, thread string) (str
 		if _, set := row["id"]; !set {
 			row["id"] = thread
 		}
+	} else if column == "" && name != "patient" && hasColumn(name, "patient") {
+		// REACHED THROUGH THE THREAD'S PATIENT, so the join is filled from
+		// it: an episode belongs to a person and outlives the visit it was
+		// opened at. Without this the row lands with a null patient, every
+		// read comes back empty, and the pregnancy does not exist on any
+		// screen. adapters/local/store._put is the Python half, and the
+		// parity check is what caught this engine lacking it.
+		if _, set := row["patient"]; !set {
+			var owner sql.NullString
+			err := s.db.QueryRow(
+				"SELECT patient FROM encounter WHERE id = ?", thread).Scan(&owner)
+			if err != nil && err != sql.ErrNoRows {
+				return "", err
+			}
+			if owner.Valid && owner.String != "" {
+				row["patient"] = owner.String
+			}
+		}
 	}
 	if _, set := row["id"]; !set {
 		row["id"] = NewID(name)

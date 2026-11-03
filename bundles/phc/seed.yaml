@@ -328,6 +328,51 @@ threads:
   # a join that had stopped joining would look exactly the same.
   # Its token is from THAT day's sequence, not today's: the sequence restarts
   # every morning, so a number only means anything beside its own date.
+  # A PREGNANCY IN THE MIDDLE OF ITS ARC, and the one thread that
+  # demonstrates the tracker rather than the line.
+  #
+  # Dated 210 days before whichever day this file is opened, from a
+  # remembered last period, so the demo never drifts. At 30 weeks she is in
+  # the window of her third contact, her first was attended four months ago,
+  # and her second was not attended at all.
+  #
+  # THAT SHAPE IS THE POINT: a done one, a missed one and a due one on the
+  # same woman, on one screen. A fixture where everything is green proves
+  # nothing about a tracker, and one where everything is red proves nothing
+  # about recording.
+  #
+  # `anchor_date_days_ago` is read by the seed writer in both engines and
+  # becomes a date relative to the demo day. A literal would be right on the
+  # day it was typed and a month stale a month later.
+  - id: enc-007
+    token: "7"
+    status: in_progress
+    patient: {operation: phc.op.patient-register, name: Lakshmi Devi, age: 24, sex: female,
+              phone: "9800000007", village: Sonpur, category: anc}
+    rows:
+      - {resource: episode_of_care, operation: phc.op.pregnancy-open, type: pregnancy,
+         status: active, anchor_date_days_ago: 210, anchor_basis: last_menstrual_period}
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
+         code: "8480-6", code_system: "http://loinc.org", code_display: "Systolic blood pressure",
+         value: 118, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
+      - {resource: observation, operation: phc.op.vitals-record, status: final, category: vital-signs,
+         code: "8462-4", code_system: "http://loinc.org", code_display: "Diastolic blood pressure",
+         value: 74, unit: "mm[Hg]", unit_system: "http://unitsofmeasure.org"}
+    audit:
+      - {operation: phc.op.pregnancy-open, actor: "user:anm", days_ago: 150,
+         payload: {dating_basis: last_menstrual_period, dating_date: "2026-01-01"}}
+      # Her first antenatal contact, attended at about eleven weeks. Four
+      # months ago, so it falls inside that contact's own window and closes
+      # it; an entry stamped today would close whichever contact is open NOW
+      # instead, which is the bug this backdating exists to avoid.
+      - {operation: phc.op.antenatal-visit, actor: "user:cho", days_ago: 133,
+         payload: {history: "First visit. No bleeding, no fever.",
+                   examination: "Uterus consistent with dates.",
+                   assessment: "Progressing normally.",
+                   plan: "Iron and folic acid started. Review as scheduled."}}
+      - {operation: phc.op.vitals-record, actor: "user:nurse",
+         payload: {systolic: 118, diastolic: 74, pulse: 78}}
+
   - id: enc-000
     token: "12"
     status: completed

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from catalogue import vocab
 
+from kernel import schedule as sched
 from kernel import state
 
 
@@ -73,10 +74,10 @@ def of(bundle, store, workflow, subject_id, *, limit=200):
         })
     visits.sort(key=lambda v: v["opened_at"], reverse=True)
     return {"subject": subject, "spine": link, "encounters": visits,
-            "episodes": episodes(store, workflow, subject_id, visits)}
+            "episodes": episodes(bundle, store, workflow, subject_id, visits)}
 
 
-def episodes(store, workflow, subject_id, visits):
+def episodes(bundle, store, workflow, subject_id, visits, *, at=None):
     """This subject's episodes, newest first, each holding its own visits.
 
     THE LEVEL BETWEEN A PERSON AND A VISIT. A flat list of visits cannot say
@@ -139,6 +140,14 @@ def episodes(store, workflow, subject_id, visits):
             v["thread"] for v in visits
             if v["opened_at"] >= episode["opened_at"]
             and (not episode["ended_at"] or v["opened_at"] <= episode["ended_at"])]
+    # WHAT EACH ONE OWES. Derived here rather than by the caller, so every
+    # reader of a person's record gets the arc and not just the list, and so
+    # the two engines compose it the same way. kernel/schedule.py is where
+    # the rule lives and why nothing is stored.
+    for episode in out:
+        episode["contacts"] = sched.contacts(bundle, store, workflow, episode, at=at)
+        episode["nothing_due"] = sched.why(bundle, store, workflow, episode)
+
     out.sort(key=lambda e: e["opened_at"], reverse=True)
     return out
 

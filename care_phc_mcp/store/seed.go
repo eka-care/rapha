@@ -203,10 +203,31 @@ func Seed(s *SQLite, threads []map[string]any) ([]string, error) {
 		serial++
 		return fmt.Sprintf("seed-%04d", serial)
 	}
+	seedDay := time.Now().UTC()
+	ago := func(declared any, fallback string) string {
+		days, given := asInt(declared)
+		if !given || days == 0 {
+			return fallback
+		}
+		return time.Now().UTC().AddDate(0, 0, -days).Format("2006-01-02T15:04:05+00:00")
+	}
 	stamped := func(record map[string]any) map[string]any {
 		out := map[string]any{"id": rowID(), "created_by": SeedActor,
 			"created_date": stamp}
 		for k, v := range record {
+			// A DATE THE RECORD POINTS AT, declared relative to the demo
+			// day. `minutes_ago` on a thread already does this for the one
+			// column that dates a row; this does it for a column that
+			// dates something else, which is what a pregnancy's anchor is.
+			// A literal would be right the day it was typed and stale a
+			// month later. adapters/local/store.seed is the Python half.
+			if strings.HasSuffix(k, "_days_ago") {
+				if days, given := asInt(v); given {
+					out[strings.TrimSuffix(k, "_days_ago")] =
+						seedDay.AddDate(0, 0, -days).Format("2006-01-02")
+					continue
+				}
+			}
 			out[k] = v
 		}
 		return out
@@ -311,7 +332,12 @@ func Seed(s *SQLite, threads []map[string]any) ([]string, error) {
 				ID: rowID(), Thread: thread, Operation: operation, Actor: actor,
 				Surface: orDefault(textOf(entry["surface"]), "rendered"),
 				Payload: asMap(entry["payload"]),
-				Outcome: orDefault(textOf(entry["outcome"]), "confirmed"), At: stamp,
+				Outcome: orDefault(textOf(entry["outcome"]), "confirmed"),
+				// A seeded entry may say how long ago it happened, for the
+				// same reason a row may: a contact attended four months ago
+				// is what makes a tracker's demo a tracker's rather than a
+				// list of things nobody has done.
+				At: ago(entry["days_ago"], stamp),
 			}); err != nil {
 				return nil, err
 			}

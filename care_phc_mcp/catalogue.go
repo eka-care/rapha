@@ -298,6 +298,35 @@ type View struct {
 // Metric is kernel/contracts.Metric. Denominator is a pointer because None
 // and an empty query are different facts: a plain count declares none, and a
 // rate with an empty denominator is zero rather than an error.
+// Contact is kernel/contracts.Contact: one thing a schedule says is owed,
+// measured in days from the anchor. `Due` is the day it is aimed at and
+// Opens/Closes are the window either side, because a visit due at 28 weeks
+// is not late at 28 weeks and one day.
+type Contact struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Due         int    `json:"due"`
+	Opens       int    `json:"opens"`
+	Closes      int    `json:"closes"`
+	Owner       string `json:"owner"`
+	Operation   string `json:"operation"`
+	Authority   string `json:"authority"`
+	EscalatesTo string `json:"escalates_to"`
+	ReportsAs   string `json:"reports_as"`
+}
+
+// Schedule is kernel/contracts.Schedule: what a centre owes somebody over
+// the life of one episode. A PlanDefinition in FHIR; what it produces for
+// one person is a CarePlan, and nothing of it is stored.
+type Schedule struct {
+	ID       string         `json:"id"`
+	Title    string         `json:"title"`
+	Summary  string         `json:"summary"`
+	Episode  string         `json:"episode"`
+	Anchor   map[string]int `json:"anchor"`
+	Contacts []Contact      `json:"contacts"`
+}
+
 type Metric struct {
 	ID          string      `json:"id"`
 	Title       string      `json:"title"`
@@ -352,6 +381,7 @@ type Catalogue struct {
 	Vocabulary Vocabulary        `json:"vocabulary"`
 	Views      map[string]View   `json:"views"`
 	Metrics    map[string]Metric `json:"metrics"`
+	Schedules  map[string]Schedule `json:"schedules"`
 	Workflows  map[string]any    `json:"workflows"`
 
 	// Where this catalogue was read from: a path, or Embedded. Carried so a
