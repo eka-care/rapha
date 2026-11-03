@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from kernel import clock
 from kernel import contracts as c
 from kernel.state import actions, count, flags, line, station
 
@@ -121,8 +122,11 @@ def _summary(bundle, view, store, thread, caps):
     out = []
     for section in view.sections:
         if section.resource is not None:
+            # Bound for the same reason state.count binds: a declared
+            # `where` may name `now`, and an adapter must never learn what
+            # that means. kernel/clock.py.
             rows = store.select(section.resource, thread=thread,
-                                where=dict(section.where or {}),
+                                where=clock.bind(section.where),
                                 fields=list(section.fields), limit=50)
         elif section.show == "line":
             rows = [s.__dict__ for s in line(wf, known)]

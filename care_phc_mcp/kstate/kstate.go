@@ -27,6 +27,7 @@ package kstate
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	carephc "github.com/eka-care/care_phc_mcp"
 	"github.com/eka-care/care_phc_mcp/guard"
@@ -41,6 +42,72 @@ type Reader interface {
 	StoredFlags(thread string) (map[string]bool, error)
 	Audit(thread string) ([]store.AuditRecord, error)
 	Proposals(thread, status string) ([]store.Proposal, error)
+}
+
+// Now is the one symbolic value the query grammar carries besides a metric's
+// window.start. kernel/clock.py is the Python half and holds the reasoning;
+// the short version is that every flag in this product was a count with no
+// date in it, so the kernel could answer "has she had a visit" and not "is
+// one due".
+const Now = "now"
+
+// Instant is kernel/clock.instant: the moment a question is being asked, in
+// the shape the store spells a date. A string comparison is what makes `lt`
+// work, so the format has to be the adapter's own and sort as text.
+//
+// A zero `at` means this caller was given no instant and falls back to the
+// machine's clock. That is right for a script and wrong for the gate:
+// scripts/check_go_parity.py runs two engines on two sockets, and two wall
+// clocks milliseconds apart disagree about any row sitting exactly on a
+// boundary. When a shipped declaration first uses `now`, the instant has to
+// come from the request in both engines. The parameter is here so that is a
+// change of callers and not a change of shape.
+func Instant(at time.Time) string {
+	if at.IsZero() {
+		at = time.Now().UTC()
+	}
+	return at.UTC().Format("2006-01-02T15:04:05Z")
+}
+
+// Bind is kernel/clock.bind: a query's `where` with `now` replaced by the
+// instant, resolved HERE and never in the store. Which values are symbolic
+// is the grammar's business and the grammar is the kernel's, so an adapter
+// never learns what `now` means and a second adapter inherits this free.
+func Bind(where map[string]any, at time.Time) map[string]any {
+	if len(where) == 0 {
+		return map[string]any{}
+	}
+	resolved := ""
+	stamp := func() string {
+		if resolved == "" {
+			resolved = Instant(at)
+		}
+		return resolved
+	}
+	out := make(map[string]any, len(where))
+	for field, cond := range where {
+		switch t := cond.(type) {
+		case string:
+			if t == Now {
+				out[field] = stamp()
+				continue
+			}
+			out[field] = cond
+		case map[string]any:
+			swapped := make(map[string]any, len(t))
+			for op, value := range t {
+				if text, isText := value.(string); isText && text == Now {
+					swapped[op] = stamp()
+					continue
+				}
+				swapped[op] = value
+			}
+			out[field] = swapped
+		default:
+			out[field] = cond
+		}
+	}
+	return out
 }
 
 // Query turns the compiled `where` of a state rule into the store's query
@@ -89,8 +156,11 @@ func Query(where map[string]any) (store.Query, error) {
 	return out, nil
 }
 
-func count(s Reader, thread string, q carephc.StateQuery) (int, error) {
-	where, err := Query(q.Where)
+// count is kernel/state.count, and like it this is THE SINGLE CHOKE POINT
+// where a declared `where` becomes a store call, which is why `now` is bound
+// here and nowhere else.
+func count(s Reader, thread string, q carephc.StateQuery, at time.Time) (int, error) {
+	where, err := Query(Bind(q.Where, at))
 	if err != nil {
 		return 0, err
 	}
@@ -99,19 +169,19 @@ func count(s Reader, thread string, q carephc.StateQuery) (int, error) {
 
 // ruleTrue is kernel/state._true: one state rule, in one of its four forms.
 func ruleTrue(s Reader, thread string, rule carephc.StateRule,
-	known, stored map[string]bool, flag string) (bool, error) {
+	known, stored map[string]bool, flag string, at time.Time) (bool, error) {
 	switch rule.Form {
 	case "stored":
 		return stored[flag], nil
 	case "exists":
-		n, err := count(s, thread, rule.Exists)
+		n, err := count(s, thread, rule.Exists, at)
 		return n > 0, err
 	case "gte":
-		a, err := count(s, thread, rule.Gte[0])
+		a, err := count(s, thread, rule.Gte[0], at)
 		if err != nil {
 			return false, err
 		}
-		b, err := count(s, thread, rule.Gte[1])
+		b, err := count(s, thread, rule.Gte[1], at)
 		if err != nil {
 			return false, err
 		}
@@ -132,7 +202,7 @@ func ruleTrue(s Reader, thread string, rule carephc.StateRule,
 				}
 				continue
 			}
-			held, err := ruleTrue(s, thread, *item.Rule, known, stored, flag)
+			held, err := ruleTrue(s, thread, *item.Rule, known, stored, flag, at)
 			if err != nil || !held {
 				return false, err
 			}
@@ -147,7 +217,9 @@ func ruleTrue(s Reader, thread string, rule carephc.StateRule,
 // A stored flag the workflow does not declare stored is dropped, the way the
 // Python drops one: a stored copy of a derived fact desyncs, and a desynced
 // copy shows a pharmacist a Dispense button that should not exist.
-func Flags(s Reader, thread string, wf *carephc.Workflow) (map[string]bool, error) {
+// `at` is what "right now" means for a rule that asks a date-relative
+// question; a zero value falls back to this machine's clock. See Instant.
+func Flags(s Reader, thread string, wf *carephc.Workflow, at time.Time) (map[string]bool, error) {
 	held, err := s.StoredFlags(thread)
 	if err != nil {
 		return nil, err
@@ -168,7 +240,7 @@ func Flags(s Reader, thread string, wf *carephc.Workflow) (map[string]bool, erro
 		if !declaredRule {
 			continue
 		}
-		on, err := ruleTrue(s, thread, rule, known, stored, flag)
+		on, err := ruleTrue(s, thread, rule, known, stored, flag, at)
 		if err != nil {
 			return nil, err
 		}
@@ -411,7 +483,7 @@ func View(s Reader, ref store.ThreadRef, wf *carephc.Workflow,
 	operations map[string]carephc.Operation, atoms map[string]map[string]any,
 	caps map[string]bool, vocabularyCaps []string, actorGiven bool, actor string,
 	nudge string) (*ThreadView, error) {
-	known, err := Flags(s, ref.ID, wf)
+	known, err := Flags(s, ref.ID, wf, time.Time{})
 	if err != nil {
 		return nil, err
 	}

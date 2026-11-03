@@ -30,6 +30,7 @@ package spine
 import (
 	"sort"
 	"strings"
+	"time"
 
 	carephc "github.com/eka-care/care_phc_mcp"
 	"github.com/eka-care/care_phc_mcp/kstate"
@@ -106,7 +107,7 @@ func Of(s Reader, wf *carephc.Workflow, operations map[string]carephc.Operation,
 	visits := make([]Visit, 0, len(encounters))
 	for _, row := range encounters {
 		thread, _ := row["id"].(string)
-		known, err := kstate.Flags(s, thread, wf)
+		known, err := kstate.Flags(s, thread, wf, time.Time{})
 		if err != nil {
 			return nil, err
 		}

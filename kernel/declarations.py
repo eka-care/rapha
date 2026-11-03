@@ -159,6 +159,10 @@ def _query(q, where, fail, *, resources, allow_window):
                 fail(f"{where}: unknown condition '{op}' on {fld}")
             if val == "window.start" and not allow_window:
                 fail(f"{where}: window.start is only for a metric")
+            # `now` is legal everywhere a literal is, which is the difference
+            # between it and window.start above: one means "the start of the
+            # bucket this metric is being asked about" and the other means
+            # the instant the question was asked. kernel/clock.py.
 
 
 def _rule(flag, rule, seen, fail, stored):

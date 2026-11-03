@@ -2,6 +2,7 @@ package queues
 
 import (
 	"fmt"
+	"time"
 
 	carephc "github.com/eka-care/care_phc_mcp"
 	"github.com/eka-care/care_phc_mcp/guard"
@@ -105,7 +106,7 @@ func (g GuardPermit) Permit(item Item) Decision {
 	if !g.Caps[op.Capability] {
 		return g.refuse(item, "missing capability "+op.Capability)
 	}
-	flags, err := kstate.Flags(g.Store, item.Thread, g.Workflow)
+	flags, err := kstate.Flags(g.Store, item.Thread, g.Workflow, time.Time{})
 	if err != nil {
 		// A permit that cannot read the thread must not allow the send. Fail
 		// closed, which is guard step 3's rule when a precondition cannot be

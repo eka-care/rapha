@@ -16,22 +16,29 @@ from typing import Optional
 
 from catalogue import guard, vocab
 from catalogue.guard import visible
+from kernel import clock
 from kernel import contracts as c
 
 
-def count(store, thread, query):
+def count(store, thread, query, at=None):
+    """One query's count. THE SINGLE CHOKE POINT where a declared `where`
+    becomes a store call, which is why the grammar's symbolic values are
+    resolved here and nowhere else: a state rule, a metric numerator and a
+    metric denominator all arrive through this function, so binding here
+    binds all three. See kernel/clock.py for what `now` is and why an
+    adapter never learns it."""
     return store.count(query["resource"], thread=thread,
-                       where=dict(query.get("where") or {}))
+                       where=clock.bind(query.get("where"), at))
 
 
-def _true(store, thread, rule, known, stored, flag):
+def _true(store, thread, rule, known, stored, flag, at=None):
     (form, arg), = rule.items()
     if form == "stored":
         return flag in stored
     if form == "exists":
-        return count(store, thread, arg) > 0
+        return count(store, thread, arg, at) > 0
     if form == "gte":
-        a, b = (count(store, thread, q) for q in arg)
+        a, b = (count(store, thread, q, at) for q in arg)
         # Partial dispense is a normal outcome, so this is a comparison and
         # not a boolean, and an empty denominator is never "complete".
         return b > 0 and a >= b
@@ -43,23 +50,28 @@ def _true(store, thread, rule, known, stored, flag):
                         return False
                 elif item not in known:
                     return False
-            elif not _true(store, thread, item, known, stored, flag):
+            elif not _true(store, thread, item, known, stored, flag, at):
                 return False
         return True
     raise ValueError(f"unknown state rule form '{form}'")
 
 
-def flags(store, thread, workflow):
+def flags(store, thread, workflow, at=None):
     """The flags true for this thread right now, in declaration order.
 
     A stored flag the workflow does not declare stored is dropped, the way
     derive() drops one today: a stored copy of a derived fact desyncs, and a
     desynced copy shows a pharmacist a Dispense button that should not exist.
+
+    `at` is what "right now" means, for a rule that asks a date-relative
+    question. It defaults to this machine's clock, which is right for a
+    script and is the thing the gate must not rely on; kernel/clock.py says
+    why in full.
     """
     stored = frozenset(store.stored_flags(thread)) & frozenset(workflow.stored)
     known = set()
     for flag, rule in workflow.states.items():
-        if _true(store, thread, rule, known, stored, flag):
+        if _true(store, thread, rule, known, stored, flag, at):
             known.add(flag)
     return known
 

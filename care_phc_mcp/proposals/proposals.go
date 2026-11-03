@@ -222,7 +222,7 @@ func (b *Bundle) decideWith(s Store, op carephc.Operation, thread string,
 			},
 		}, nil
 	}
-	flags, err := kstate.Flags(s, thread, b.Workflow)
+	flags, err := kstate.Flags(s, thread, b.Workflow, time.Time{})
 	if err != nil {
 		return guard.Decision{}, err
 	}
@@ -478,7 +478,7 @@ func (b *Bundle) Amend(s Store, op carephc.Operation, thread string,
 		return decision, nil
 	}
 
-	flags, err := kstate.Flags(s, thread, b.Workflow)
+	flags, err := kstate.Flags(s, thread, b.Workflow, time.Time{})
 	if err != nil {
 		return guard.Decision{}, err
 	}

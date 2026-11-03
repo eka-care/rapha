@@ -127,7 +127,9 @@ func bind(q carephc.StateQuery, start string) carephc.StateQuery {
 }
 
 func count(s Reader, q carephc.StateQuery) (int, error) {
-	where, err := kstate.Query(q.Where)
+	// Bound for the same reason kstate.count binds: a declared `where` may
+	// name `now`, and an adapter must never learn what that means.
+	where, err := kstate.Query(kstate.Bind(q.Where, time.Time{}))
 	if err != nil {
 		return 0, err
 	}
@@ -237,7 +239,7 @@ func queue(b Bundle, view carephc.View, s Reader) ([]QueueRow, []Group, error) {
 	}
 	rows := make([]QueueRow, 0, len(refs))
 	for _, ref := range refs {
-		known, err := kstate.Flags(s, ref.ID, wf)
+		known, err := kstate.Flags(s, ref.ID, wf, time.Time{})
 		if err != nil {
 			return nil, nil, err
 		}
@@ -323,7 +325,7 @@ func tasklist(b Bundle, view carephc.View, s Reader) ([]TaskRow, error) {
 	}
 	knownByThread := map[string]map[string]bool{}
 	for _, ref := range refs {
-		known, err := kstate.Flags(s, ref.ID, wf)
+		known, err := kstate.Flags(s, ref.ID, wf, time.Time{})
 		if err != nil {
 			return nil, err
 		}
@@ -383,7 +385,7 @@ type SummaryBlock struct {
 func summary(b Bundle, view carephc.View, s Reader, thread string,
 	caps map[string]bool) ([]SummaryBlock, error) {
 	wf := b.Workflow
-	known, err := kstate.Flags(s, thread, wf)
+	known, err := kstate.Flags(s, thread, wf, time.Time{})
 	if err != nil {
 		return nil, err
 	}
@@ -392,7 +394,7 @@ func summary(b Bundle, view carephc.View, s Reader, thread string,
 		var rows any
 		switch {
 		case section.Resource != nil:
-			where, err := kstate.Query(section.Where)
+			where, err := kstate.Query(kstate.Bind(section.Where, time.Time{}))
 			if err != nil {
 				return nil, err
 			}
