@@ -70,6 +70,22 @@ type Found struct {
 	Subject    map[string]any `json:"subject"`
 	Spine      string         `json:"spine"`
 	Encounters []Visit        `json:"encounters"`
+	Episodes   []Episode      `json:"episodes"`
+}
+
+// Episode is the level between a person and a visit: one course of care that
+// starts, runs and ends, holding the visits that happened during it.
+// kernel/spine.episodes is the Python half and carries the reasoning.
+type Episode struct {
+	ID          string   `json:"id"`
+	Type        string   `json:"type"`
+	Status      string   `json:"status"`
+	OpenedAt    string   `json:"opened_at"`
+	EndedAt     string   `json:"ended_at"`
+	Outcome     string   `json:"outcome"`
+	AnchorDate  string   `json:"anchor_date"`
+	AnchorBasis string   `json:"anchor_basis"`
+	Encounters  []string `json:"encounters"`
 }
 
 // Declared is the spine resource for this workflow, or "" if it declares none.
@@ -127,7 +143,74 @@ func Of(s Reader, wf *carephc.Workflow, operations map[string]carephc.Operation,
 	sort.SliceStable(visits, func(i, j int) bool {
 		return visits[i].OpenedAt > visits[j].OpenedAt
 	})
-	return &Found{Subject: subject, Spine: link, Encounters: visits}, nil
+	arcs, err := Episodes(s, wf, subjectID, visits)
+	if err != nil {
+		return nil, err
+	}
+	return &Found{Subject: subject, Spine: link, Encounters: visits, Episodes: arcs}, nil
+}
+
+// Episodes is kernel/spine.episodes: this subject's episodes, newest first,
+// each holding its own visits.
+//
+// AN EPISODE ENDS BY GAINING A ROW rather than by having its first one
+// rewritten, so the rows come back in pairs and an implementation that
+// simply listed them would report a closed pregnancy as two episodes, one
+// of them still open. An episode that reads as open is an episode something
+// goes on chasing.
+//
+// WHICH VISITS BELONG TO ONE IS DERIVED FROM THE DATES. A column on the
+// encounter would have to be written before anybody knew the answer, and a
+// column nothing writes is a column that lies.
+func Episodes(s Reader, wf *carephc.Workflow, subjectID string,
+	visits []Visit) ([]Episode, error) {
+	if wf.Episode == "" {
+		return []Episode{}, nil
+	}
+	rows, err := s.SelectNullable(wf.Episode, nil,
+		store.Query{"patient": {Equals: subjectID}}, nil, 200)
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		return text(rows[i]["created_date"]) < text(rows[j]["created_date"])
+	})
+
+	out := []Episode{}
+	openOfType := map[string]int{}
+	for _, row := range rows {
+		of := text(row["type"])
+		if text(row["status"]) == "ended" {
+			if at, open := openOfType[of]; open {
+				out[at].EndedAt = text(row["created_date"])
+				out[at].Outcome = text(row["outcome"])
+				out[at].Status = "ended"
+				delete(openOfType, of)
+			}
+			continue
+		}
+		out = append(out, Episode{
+			ID: text(row["id"]), Type: of, Status: "active",
+			OpenedAt:    text(row["created_date"]),
+			AnchorDate:  text(row["anchor_date"]),
+			AnchorBasis: text(row["anchor_basis"]),
+		})
+		openOfType[of] = len(out) - 1
+	}
+
+	for i := range out {
+		out[i].Encounters = []string{}
+		for _, v := range visits {
+			if v.OpenedAt >= out[i].OpenedAt &&
+				(out[i].EndedAt == "" || v.OpenedAt <= out[i].EndedAt) {
+				out[i].Encounters = append(out[i].Encounters, v.Thread)
+			}
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].OpenedAt > out[j].OpenedAt
+	})
+	return out, nil
 }
 
 // committed are the audit outcome prefixes that mean this visit did the thing.

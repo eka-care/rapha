@@ -1,0 +1,34 @@
+{
+    "version": "1.0",
+    "slug": "phc-pregnancy-close-v1",
+    "title": "Close a pregnancy record",
+    "status": "active",
+    "subject_type": "encounter",
+    "styling_metadata": {
+        "phc": {
+            "operation": "phc.op.pregnancy-close"
+        }
+    },
+    "questions": [
+        {
+            "link_id": "outcome",
+            "text": "How did this pregnancy end?",
+            "type": "choice",
+            "required": true,
+            "answer_option": [
+                {"value": "live_birth"},
+                {"value": "stillbirth"},
+                {"value": "miscarriage"},
+                {"value": "termination"},
+                {"value": "moved_away"},
+                {"value": "not_pregnant"}
+            ],
+            "styling_metadata": {
+                "phc": {
+                    "short": "Outcome",
+                    "help": "Everything still scheduled for this pregnancy stops the moment you record this."
+                }
+            }
+        }
+    ]
+}

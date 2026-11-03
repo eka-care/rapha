@@ -54,6 +54,20 @@ CARE_RESOURCES = frozenset({
     # care/emr/models/scheduling/booking.py TokenBooking. Unverified name;
     # read only, no operation writes it yet.
     "token_booking",
+    # FHIR R4 EpisodeOfCare. THE LEVEL BETWEEN A PERSON AND A VISIT, which
+    # this kernel had no word for: a thread is one encounter, which is the
+    # right unit for a guard and the wrong one for a pregnancy, a course of
+    # treatment or a child's first two years. Those have a start, an end and
+    # a sequence of contacts in between, and a flat list of a patient's
+    # visits cannot say which belong to which, cannot carry the date the
+    # sequence is measured from, and cannot END -- so nothing derived from
+    # it can ever stop.
+    #
+    # Universal rather than a facility's word, which is why it is here: a
+    # laboratory has courses of treatment too, and WHAT an episode is called
+    # is the bundle's (`type` on the row). A bundle that declares no episode
+    # on its workflow never writes one and behaves exactly as before.
+    "episode_of_care",
 })
 
 # §10 of the UI/UX spec: the first-class objects a thread can contain. An

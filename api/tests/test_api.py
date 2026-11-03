@@ -253,7 +253,12 @@ def test_an_utterance_proposes_and_the_card_carries_what_the_thread_must_draw():
     # BEHIND the reading -- which is what "1 of" still being the vitals is
     # checking. The count moves when the bundle adds an action; the position
     # moves only if the line changes its mind about what this bench is for.
-    assert card["order"] == "the kernel lists it 1 of 9 at nurse", \
+    # 10 later the same day: STARTING a pregnancy is seated here too, behind
+    # the reading for the same reason. Closing one is not counted, and that
+    # is the preconditions working rather than an omission: this visit has
+    # no open pregnancy, so there is nothing to close and the action is
+    # absent rather than drawn and refused.
+    assert card["order"] == "the kernel lists it 1 of 10 at nurse", \
         "ordering is read from kernel actions(), never decided by the agent"
     assert card["offered_here"] is True
 

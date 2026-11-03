@@ -1,0 +1,43 @@
+{
+    "version": "1.0",
+    "slug": "phc-pregnancy-open-v1",
+    "title": "Start a pregnancy record",
+    "status": "active",
+    "subject_type": "encounter",
+    "styling_metadata": {
+        "phc": {
+            "operation": "phc.op.pregnancy-open"
+        }
+    },
+    "questions": [
+        {
+            "link_id": "dating_basis",
+            "text": "How is this pregnancy dated?",
+            "type": "choice",
+            "required": true,
+            "answer_option": [
+                {"value": "last_menstrual_period"},
+                {"value": "dating_scan"},
+                {"value": "best_estimate"}
+            ],
+            "styling_metadata": {
+                "phc": {
+                    "short": "Dated from",
+                    "help": "A remembered period and a scan are not equally reliable, and every date after this one is measured from whichever you pick."
+                }
+            }
+        },
+        {
+            "link_id": "dating_date",
+            "text": "The date that refers to",
+            "type": "date",
+            "required": true,
+            "styling_metadata": {
+                "phc": {
+                    "short": "Dated",
+                    "help": "The first day of her last period, the date the scan gave, or your best estimate."
+                }
+            }
+        }
+    ]
+}

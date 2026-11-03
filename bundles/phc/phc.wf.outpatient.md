@@ -5,6 +5,11 @@ title: Outpatient line
 summary: Reception, vitals, doctor, then lab and pharmacy when ordered.
 subject: encounter
 spine: patient
+# THE LEVEL BETWEEN THE TWO. `spine` says what joins visits into a person;
+# this says what joins some of a person's visits into one course of care
+# that starts, runs and ends. A bundle declaring none writes no episode row
+# and behaves exactly as before, which is bundles/lab.
+episode: episode_of_care
 steps:
   - station: reception
     done_when: registered
@@ -16,7 +21,8 @@ steps:
     # Background from elsewhere is seated behind it on purpose -- copying
     # in somebody else's letter must never be the headline advice at a
     # bench whose job is to take a reading.
-    operations: [phc.op.vitals-record, phc.op.context-add]
+    operations: [phc.op.vitals-record, phc.op.context-add,
+                 phc.op.pregnancy-open, phc.op.pregnancy-close]
   - station: doctor
     done_when: consult.documented
     operations: [phc.op.consult-document, phc.op.ncd-review,
@@ -67,6 +73,23 @@ states:
       - "not dispensed.complete"
   followup.booked:
     exists: {resource: token_booking, where: {status: booked}}
+  # AN EPISODE ENDS BY GAINING A ROW, so "closed" is the count of endings
+  # against the count of openings and "open" is an opening with no ending
+  # yet. This is `dispensed.complete` and `dispensed.partial` exactly, over
+  # a different pair of rows, which is why it needs no new rule form.
+  #
+  # Both are patient scoped rather than visit scoped: the adapter reads an
+  # episode through the thread's patient, so a pregnancy opened at one
+  # visit is still open at the next one without anything being carried
+  # across a thread boundary.
+  pregnancy.ended:
+    gte:
+      - {resource: episode_of_care, where: {type: pregnancy, status: ended}}
+      - {resource: episode_of_care, where: {type: pregnancy, status: active}}
+  pregnancy.open:
+    all_of:
+      - {exists: {resource: episode_of_care, where: {type: pregnancy, status: active}}}
+      - "not pregnancy.ended"
   capture.agreed: {stored: true}
   capture.declined: {stored: true}
   capture.withdrawn: {stored: true}

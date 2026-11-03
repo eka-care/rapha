@@ -7,7 +7,8 @@
       "visit.household",
       "assessment.record",
       "appointment.book",
-      "vitals.record"
+      "vitals.record",
+      "episode.manage"
     ],
     "asha": [
       "patient.find",
@@ -27,7 +28,8 @@
       "vitals.record",
       "encounter.document",
       "lab.order",
-      "rx.prescribe"
+      "rx.prescribe",
+      "episode.manage"
     ],
     "frontdesk": [
       "patient.find",
@@ -56,7 +58,8 @@
       "assessment.record",
       "reporting.view",
       "context.record",
-      "handover"
+      "handover",
+      "episode.manage"
     ],
     "nurse": [
       "patient.find",
@@ -66,7 +69,8 @@
       "vitals.record",
       "assessment.record",
       "context.record",
-      "handover"
+      "handover",
+      "episode.manage"
     ],
     "pathologist": [
       "worklist.read",
@@ -100,6 +104,7 @@
     "assessment.record",
     "context.record",
     "encounter.document",
+    "episode.manage",
     "facility.admin",
     "handover",
     "lab.order",
@@ -338,6 +343,8 @@
       "phc.op.household-visit",
       "phc.op.handover",
       "phc.op.handover-reply",
+      "phc.op.pregnancy-open",
+      "phc.op.pregnancy-close",
       "phc.op.context-add",
       "phc.op.ncd-review",
       "phc.op.antenatal-visit",
@@ -990,6 +997,55 @@
         "per_row": null,
         "questions": {},
         "resource": "inventory_item"
+      }
+    ],
+    "phc.op.pregnancy-close": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "outcome": {
+            "answer": "outcome"
+          },
+          "status": {
+            "const": "ended"
+          },
+          "type": {
+            "const": "pregnancy"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "episode_of_care"
+      }
+    ],
+    "phc.op.pregnancy-open": [
+      {
+        "fields": {
+          "anchor_basis": {
+            "answer": "dating_basis"
+          },
+          "anchor_date": {
+            "answer": "dating_date"
+          },
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "active"
+          },
+          "type": {
+            "const": "pregnancy"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "episode_of_care"
       }
     ],
     "phc.op.rx-prescribe": [
@@ -2568,6 +2624,101 @@
         "inventory_item"
       ]
     },
+    "phc.op.pregnancy-close": {
+      "capability": "episode.manage",
+      "description": "The pregnancy is over, however it ended, and this is what says so. It is\nthe most important operation in the maternal half of this product, and not\nbecause of what it records.\n\nIt is important because of what it STOPS.",
+      "emits": [],
+      "fields": [
+        {
+          "link_id": "outcome",
+          "options": [
+            "live_birth",
+            "stillbirth",
+            "miscarriage",
+            "termination",
+            "moved_away",
+            "not_pregnant"
+          ],
+          "required": true,
+          "text": "How did this pregnancy end?",
+          "type": "choice"
+        }
+      ],
+      "id": "phc.op.pregnancy-close",
+      "input": "phc.schema.pregnancy-close-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "pregnancy.open"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "End pregnancy",
+      "station": "nurse",
+      "summary": "Record how the pregnancy ended, and stop everything still scheduled for it.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Close a pregnancy record",
+      "tool": "propose_pregnancy_close",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "episode_of_care"
+      ]
+    },
+    "phc.op.pregnancy-open": {
+      "capability": "episode.manage",
+      "description": "A woman is pregnant and this centre is going to follow her for nine months.\nThis is the record that says so, and it is the thing every later date hangs\noff.\n\nIt exists because a thread is one visit. A visit is the right unit for the\nguard, which asks questions about what has happened here today, and it is\nthe wrong unit for a pregnancy, which has a start, a sequence of contacts\nand an end. A flat list of a woman's visits cannot say which of them belong\nto this pregnancy, cannot carry the date the sequence is measured from, and\ncannot END, so nothing derived from it can ever stop.",
+      "emits": [],
+      "fields": [
+        {
+          "link_id": "dating_basis",
+          "options": [
+            "last_menstrual_period",
+            "dating_scan",
+            "best_estimate"
+          ],
+          "required": true,
+          "text": "How is this pregnancy dated?",
+          "type": "choice"
+        },
+        {
+          "link_id": "dating_date",
+          "options": null,
+          "required": true,
+          "text": "The date that refers to",
+          "type": "date"
+        }
+      ],
+      "id": "phc.op.pregnancy-open",
+      "input": "phc.schema.pregnancy-open-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "registered",
+        "not pregnancy.open"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "New pregnancy",
+      "station": "nurse",
+      "summary": "Open the pregnancy this centre will follow, and the date it is measured from.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Start a pregnancy record",
+      "tool": "propose_pregnancy_open",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "episode_of_care"
+      ]
+    },
     "phc.op.rx-prescribe": {
       "capability": "rx.prescribe",
       "description": "The doctor prescribes. Confirming the prescription is what makes the\npharmacist's dispense action exist at all.",
@@ -2748,7 +2899,8 @@
         "encounter.document",
         "appointment.book",
         "handover",
-        "facility.admin"
+        "facility.admin",
+        "episode.manage"
       ],
       "title": "The line itself"
     },
@@ -2915,6 +3067,8 @@
     "lab.resulted",
     "lab.validated",
     "order.accessioned",
+    "pregnancy.ended",
+    "pregnancy.open",
     "registered",
     "report.released",
     "result.entered",
@@ -3166,6 +3320,7 @@
       "assessment.record",
       "context.record",
       "encounter.document",
+      "episode.manage",
       "facility.admin",
       "handover",
       "lab.order",
@@ -3185,6 +3340,7 @@
       "assessment.record": "Record an assessment",
       "context.record": "Add background from elsewhere",
       "encounter.document": "Document a consultation",
+      "episode.manage": "Open or close a pregnancy",
       "facility.admin": "Administer this centre",
       "handover": "Hand over to a colleague",
       "lab.order": "Order an investigation",
@@ -3217,7 +3373,8 @@
         "visit.household",
         "assessment.record",
         "appointment.book",
-        "vitals.record"
+        "vitals.record",
+        "episode.manage"
       ],
       "asha": [
         "patient.find",
@@ -3237,7 +3394,8 @@
         "vitals.record",
         "encounter.document",
         "lab.order",
-        "rx.prescribe"
+        "rx.prescribe",
+        "episode.manage"
       ],
       "frontdesk": [
         "patient.find",
@@ -3266,7 +3424,8 @@
         "assessment.record",
         "reporting.view",
         "context.record",
-        "handover"
+        "handover",
+        "episode.manage"
       ],
       "nurse": [
         "patient.find",
@@ -3276,7 +3435,8 @@
         "vitals.record",
         "assessment.record",
         "context.record",
-        "handover"
+        "handover",
+        "episode.manage"
       ],
       "pharmacist": [
         "patient.find",
@@ -3300,6 +3460,8 @@
       "lab.ordered",
       "lab.resulted",
       "lab.validated",
+      "pregnancy.ended",
+      "pregnancy.open",
       "registered",
       "rx.confirmed",
       "vitals.flagged",
@@ -3308,6 +3470,7 @@
   },
   "workflows": {
     "phc.wf.outpatient": {
+      "episode": "episode_of_care",
       "id": "phc.wf.outpatient",
       "spine": "patient",
       "state_order": [
@@ -3324,6 +3487,8 @@
         "dispensed.complete",
         "dispensed.partial",
         "followup.booked",
+        "pregnancy.ended",
+        "pregnancy.open",
         "capture.agreed",
         "capture.declined",
         "capture.withdrawn",
@@ -3426,6 +3591,38 @@
             }
           }
         },
+        "pregnancy.ended": {
+          "gte": [
+            {
+              "resource": "episode_of_care",
+              "where": {
+                "status": "ended",
+                "type": "pregnancy"
+              }
+            },
+            {
+              "resource": "episode_of_care",
+              "where": {
+                "status": "active",
+                "type": "pregnancy"
+              }
+            }
+          ]
+        },
+        "pregnancy.open": {
+          "all_of": [
+            {
+              "exists": {
+                "resource": "episode_of_care",
+                "where": {
+                  "status": "active",
+                  "type": "pregnancy"
+                }
+              }
+            },
+            "not pregnancy.ended"
+          ]
+        },
         "registered": {
           "exists": {
             "resource": "patient"
@@ -3466,7 +3663,9 @@
           "done_when": "vitals.recorded",
           "operations": [
             "phc.op.vitals-record",
-            "phc.op.context-add"
+            "phc.op.context-add",
+            "phc.op.pregnancy-open",
+            "phc.op.pregnancy-close"
           ],
           "station": "nurse"
         },

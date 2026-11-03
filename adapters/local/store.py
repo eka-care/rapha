@@ -77,6 +77,26 @@ TABLES = {
     # true; nothing else may set it.
     "encounter": ("id", "patient", "status", "token", "arrival",
                   "operation", "created_by", "created_date"),
+    # FHIR R4 EpisodeOfCare, and generic on purpose: `type` is the bundle's
+    # word for what kind of episode this is, and no column here is obstetric.
+    #
+    # `anchor_date` and `anchor_basis` are the pair a schedule is measured
+    # from: the date, and how that date was arrived at. A pregnancy dated
+    # from a remembered period and one dated from a scan are not equally
+    # trustworthy, and a screen that does not say which is quoting a false
+    # precision back at a clinician. Which basis means what, and how many
+    # days from it the arc starts, is the schedule's declaration and not
+    # this table's business.
+    # INSERT ONLY, like every other clinical table here, and an episode
+    # therefore ENDS BY GAINING A SECOND ROW rather than by having its first
+    # one rewritten: one row `status: active` when it opens, one row
+    # `status: ended` carrying the outcome when it closes. A pregnancy is
+    # open while it has more of the first than the second, which is the
+    # same count comparison `dispensed.complete` already is, so it needs no
+    # new rule form and no row mutation. The audit keeps both.
+    "episode_of_care": ("id", "patient", "type", "status",
+                        "anchor_date", "anchor_basis", "outcome",
+                        "operation", "created_by", "created_date"),
     # A coding is three columns, not one: the code, the system it is from, and
     # the display the value set gave it. Flat, because a district count is
     # `WHERE code = '8480-6'` and a trend is an ORDER BY, and both want a
@@ -188,7 +208,11 @@ SEQUENCE_DDL = (
 
 # The adapter's private knowledge: which column ties a row to its thread.
 # "encounter" is the thread itself; a patient is reached through it.
-THREAD_COLUMN = {"encounter": "id", "thread_flag": "thread", "patient": None}
+# None means the resource is not thread scoped and is reached through the
+# thread's patient instead: asking a visit for "the episodes" means this
+# person's, the same way asking it for "the patient" does.
+THREAD_COLUMN = {"encounter": "id", "thread_flag": "thread", "patient": None,
+                 "episode_of_care": None}
 DEFAULT_THREAD_COLUMN = "encounter"
 
 # The kernel's own two records join and date themselves differently from a
@@ -308,6 +332,13 @@ class SqliteStore:
             elif table == "patient":
                 where = ("id IN (SELECT patient FROM encounter WHERE id IN (%s))"
                          % marks)
+            elif join is None:
+                # A table reached through the thread's patient rather than
+                # through the thread. `patient` above is the special case of
+                # this where the key column IS `id`; everything else that
+                # joins this way carries a `patient` column.
+                where = ("patient IN (SELECT patient FROM encounter"
+                         " WHERE id IN (%s))" % marks)
             else:
                 where = "%s IN (%s)" % (join, marks)
             # SQLite's datetime() understands the +00:00 suffix and drops it,
@@ -345,6 +376,12 @@ class SqliteStore:
             column = THREAD_COLUMN.get(resource, DEFAULT_THREAD_COLUMN)
             if resource == "patient":
                 sql.append("id IN (SELECT patient FROM encounter WHERE id = ?)")
+            elif resource == "episode_of_care":
+                # An episode is this PERSON'S and outlives any one visit, so
+                # a thread scoped read of it means "the episodes of whoever
+                # this visit is about", exactly as the patient read above
+                # means "whoever this visit is about".
+                sql.append("patient IN (SELECT patient FROM encounter WHERE id = ?)")
             else:
                 sql.append("%s = ?" % column)
             params.append(thread)

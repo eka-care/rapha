@@ -208,6 +208,16 @@ def _lint_workflow(fm, ops, fail, voc):
             fail(f"spine '{fm['spine']}' is not a CARE resource")
         elif fm["spine"] == fm["subject"]:
             fail(f"spine '{fm['spine']}' is the subject itself, so it joins nothing")
+    # `episode` is the level between the two, and the same two rules bite
+    # for the same reasons: it has to be a resource an adapter has, and a
+    # level that IS the subject groups nothing.
+    if fm.get("episode") is not None:
+        if fm["episode"] not in vocab.CARE_RESOURCES:
+            fail(f"episode '{fm['episode']}' is not a CARE resource")
+        elif fm["episode"] == fm["subject"]:
+            fail(f"episode '{fm['episode']}' is the subject itself, so it groups nothing")
+        elif fm["episode"] == fm.get("spine"):
+            fail(f"episode '{fm['episode']}' is the spine itself, so it groups nothing")
 
     states = fm["states"] or {}
     if set(states) != set(voc.states):
@@ -693,7 +703,8 @@ def lint(manifest, decls, ops, seed=()):
 def _workflow(fm, stored):
     return c.Workflow(
         id=fm["id"], title=fm["title"], summary=fm["summary"].strip(),
-        subject=fm["subject"], spine=fm.get("spine"), states=fm["states"], stored=stored,
+        subject=fm["subject"], spine=fm.get("spine"), episode=fm.get("episode"),
+        states=fm["states"], stored=stored,
         steps=[c.Step(station=s["station"], done_when=s["done_when"],
                       applies_when=s.get("applies_when"),
                       operations=list(s.get("operations") or []))

@@ -176,6 +176,11 @@ class Workflow:
     # rather than by pointing at a field that means something else. See
     # kernel/spine.py.
     spine: Optional[str] = None
+    # The level between the spine and the subject: one course of care that
+    # starts, runs and ends, holding some of a person's visits. Optional,
+    # and a bundle whose work genuinely does not group that way declares
+    # none and writes no episode row. See kernel/spine.py.
+    episode: Optional[str] = None
 
 
 @dataclass(frozen=True)

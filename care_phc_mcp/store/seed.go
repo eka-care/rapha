@@ -164,6 +164,12 @@ func (s *SQLite) RollSeedForward() (int, error) {
 		case "patient":
 			where = fmt.Sprintf("id IN (SELECT patient FROM encounter WHERE id IN (%s))", marks)
 		default:
+			if join == "" {
+				// Reached through the thread's patient; see ThreadColumn.
+				where = fmt.Sprintf(
+					"patient IN (SELECT patient FROM encounter WHERE id IN (%s))", marks)
+				break
+			}
 			where = fmt.Sprintf("%s IN (%s)", join, marks)
 		}
 		// SQLite's datetime() understands the +00:00 suffix and drops it,

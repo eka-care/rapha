@@ -72,7 +72,75 @@ def of(bundle, store, workflow, subject_id, *, limit=200):
             "did": _did(store, thread, bundle),
         })
     visits.sort(key=lambda v: v["opened_at"], reverse=True)
-    return {"subject": subject, "spine": link, "encounters": visits}
+    return {"subject": subject, "spine": link, "encounters": visits,
+            "episodes": episodes(store, workflow, subject_id, visits)}
+
+
+def episodes(store, workflow, subject_id, visits):
+    """This subject's episodes, newest first, each holding its own visits.
+
+    THE LEVEL BETWEEN A PERSON AND A VISIT. A flat list of visits cannot say
+    which of them belong to one pregnancy, cannot carry the date that
+    pregnancy is measured from, and cannot END, so nothing derived from it
+    can ever stop. A workflow that declares no `episode` gets an empty list
+    and nothing else changes.
+
+    AN EPISODE ENDS BY GAINING A ROW rather than by having its first one
+    rewritten, because every clinical table here is insert only. So the rows
+    come back in pairs: one `active`, and one `ended` carrying the outcome if
+    it has ended. They are paired in date order, which is the only pairing
+    available and is correct as long as a subject has one episode of a type
+    open at a time -- which the preconditions on the operations that write
+    them enforce.
+
+    WHICH VISITS BELONG TO AN EPISODE IS DERIVED FROM THE DATES, not stored
+    on the encounter. An encounter column saying which episode a visit
+    belonged to would have to be written at the moment the visit opened,
+    which is before anybody knows, and a column nothing writes is a column
+    that lies: `token_booking` has been in this kernel unwritten since the
+    beginning and `followup.booked` is still derived from it. A visit that
+    happened between an episode's opening and its ending happened during it,
+    which is what EpisodeOfCare.period means in the standard too.
+    """
+    kind = getattr(workflow, "episode", None)
+    if not kind:
+        return []
+
+    rows = [dict(r) for r in store.select(kind, thread=None,
+                                          where={"patient": subject_id},
+                                          fields=(), limit=200)]
+    rows.sort(key=lambda r: r.get("created_date") or "")
+
+    out, open_of_type = [], {}
+    for row in rows:
+        of = row.get("type") or ""
+        if row.get("status") == "ended":
+            started = open_of_type.pop(of, None)
+            if started is not None:
+                started["ended_at"] = row.get("created_date") or ""
+                started["outcome"] = row.get("outcome") or ""
+                started["status"] = "ended"
+            continue
+        episode = {
+            "id": row.get("id") or "",
+            "type": of,
+            "status": "active",
+            "opened_at": row.get("created_date") or "",
+            "ended_at": "",
+            "outcome": "",
+            "anchor_date": row.get("anchor_date") or "",
+            "anchor_basis": row.get("anchor_basis") or "",
+        }
+        out.append(episode)
+        open_of_type[of] = episode
+
+    for episode in out:
+        episode["encounters"] = [
+            v["thread"] for v in visits
+            if v["opened_at"] >= episode["opened_at"]
+            and (not episode["ended_at"] or v["opened_at"] <= episode["ended_at"])]
+    out.sort(key=lambda e: e["opened_at"], reverse=True)
+    return out
 
 
 def _did(store, thread, bundle):

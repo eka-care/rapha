@@ -116,6 +116,9 @@ type Workflow struct {
 	Summary    string               `json:"summary"`
 	Subject    string               `json:"subject"`
 	Spine      string               `json:"spine"`
+	// The level between the spine and the subject: one course of care that
+	// starts, runs and ends. Empty for a bundle that declares none.
+	Episode    string               `json:"episode"`
 	Steps      []Step               `json:"steps"`
 	States     map[string]StateRule `json:"states"`
 	StateOrder []string             `json:"state_order"`

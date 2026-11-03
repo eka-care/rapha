@@ -87,6 +87,12 @@ var Tables = map[string][]string{
 	"inventory_item":         {"id", "encounter", "code", "quantity", "status", "operation", "created_by", "created_date"},
 	"questionnaire_response": {"id", "encounter", "questionnaire", "payload", "operation", "created_by", "created_date"},
 	"token_booking":          {"id", "encounter", "patient", "status", "operation", "created_by", "created_date"},
+	// FHIR R4 EpisodeOfCare: the level between a person and a visit, insert
+	// only like every other clinical table, so an episode ENDS BY GAINING A
+	// SECOND ROW rather than by having its first rewritten. Generic on
+	// purpose -- `type` is the bundle's word and no column here is
+	// obstetric. adapters/local/store.py TABLES is the Python half.
+	"episode_of_care":        {"id", "patient", "type", "status", "anchor_date", "anchor_basis", "outcome", "operation", "created_by", "created_date"},
 	"thread_flag":            {"id", "thread", "flag", "created_by", "created_date"},
 	"proposal":               {"id", "thread", "operation", "payload", "proposed_by", "surface", "status", "created_at", "flags_raised", "decided_by", "decided_at", "final_payload"},
 	"audit":                  {"id", "thread", "operation", "actor", "surface", "payload", "outcome", "at", "proposal"},
@@ -96,7 +102,11 @@ var Tables = map[string][]string{
 // its thread. "encounter" is the thread itself; a patient is reached through
 // it, so its entry is empty rather than absent and the lookup below says
 // which.
-var ThreadColumn = map[string]string{"encounter": "id", "thread_flag": "thread", "patient": ""}
+// An empty entry means the row is reached through the thread's PATIENT
+// rather than through the thread: asking a visit for "the episodes" means
+// this person's, the same way asking it for "the patient" does.
+var ThreadColumn = map[string]string{"encounter": "id", "thread_flag": "thread",
+	"patient": "", "episode_of_care": ""}
 
 // DefaultThreadColumn is what every clinical resource not named above joins on.
 const DefaultThreadColumn = "encounter"
@@ -479,6 +489,12 @@ func (s *SQLite) where(resource string, thread *string, q Query) (string, []any,
 		}
 		if resource == "patient" {
 			clauses = append(clauses, "id IN (SELECT patient FROM encounter WHERE id = ?)")
+		} else if column == "" {
+			// Reached through the thread's patient. `patient` above is the
+			// special case of this where the key column IS `id`; everything
+			// else joining this way carries a `patient` column.
+			clauses = append(clauses,
+				"patient IN (SELECT patient FROM encounter WHERE id = ?)")
 		} else {
 			clauses = append(clauses, column+" = ?")
 		}

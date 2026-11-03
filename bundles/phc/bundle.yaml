@@ -23,6 +23,10 @@ operations:
   - phc.op.household-visit
   - phc.op.handover
   - phc.op.handover-reply
+  # The pregnancy: the level between a person and a visit. See
+  # docs/superpowers/specs/2026-11-04-maternal-and-child-health-design.md
+  - phc.op.pregnancy-open
+  - phc.op.pregnancy-close
   - phc.op.context-add
   # Generated from the `templates` declaration below.
   - phc.op.ncd-review
@@ -256,6 +260,12 @@ states:
   - dispensed.partial
   - dispensed.complete
   - followup.booked
+  # A pregnancy this centre is following. Derived from the episode rows and
+  # never stored: `pregnancy.ended` is the count of endings against the
+  # count of openings, exactly as `dispensed.complete` is, and
+  # `pregnancy.open` is an opening with no ending yet.
+  - pregnancy.open
+  - pregnancy.ended
 
 # What a person may do here. An atom naming anything else fails the per bundle
 # closure check in kernel/declarations.py.
@@ -294,6 +304,7 @@ capabilities:
   pharmacy.dispense:    {title: Dispense a prescription}
   visit.household:      {title: Record a household visit}
   appointment.book:     {title: Book an appointment}
+  episode.manage:       {title: Open or close a pregnancy}
   handover:             {title: Hand over to a colleague}
   context.record:       {title: Add background from elsewhere}
   facility.admin:       {title: Administer this centre}
@@ -320,11 +331,13 @@ roles:
   nurse:
     title: Staff nurse
     capabilities: [patient.find, patient.register, abha.link, appointment.book,
-                   vitals.record, assessment.record, context.record, handover]
+                   vitals.record, assessment.record, context.record, handover,
+                   episode.manage]
   mo:
     title: Medical officer
     capabilities: [patient.find, encounter.document, rx.prescribe, lab.order,
-                   assessment.record, reporting.view, context.record, handover]
+                   assessment.record, reporting.view, context.record, handover,
+                   episode.manage]
   lab:
     title: Laboratory technician
     capabilities: [patient.find, lab.result.enter, handover]
@@ -341,12 +354,13 @@ roles:
   anm:
     title: ANM
     capabilities: [patient.find, patient.register, abha.link, visit.household,
-                   assessment.record, appointment.book, vitals.record]
+                   assessment.record, appointment.book, vitals.record,
+                   episode.manage]
   cho:
     title: Community health officer
     capabilities: [patient.find, patient.register, abha.link, visit.household,
                    assessment.record, appointment.book, vitals.record,
-                   encounter.document, lab.order, rx.prescribe]
+                   encounter.document, lab.order, rx.prescribe, episode.manage]
 
 # --------------------------------------------------------------------------
 # A facility's shape
@@ -382,7 +396,7 @@ plugins:
     always: true
     capabilities: [patient.find, patient.register, abha.link, vitals.record,
                    assessment.record, encounter.document, appointment.book,
-                   handover, facility.admin]
+                   handover, facility.admin, episode.manage]
   prescriptions:
     title: Prescribing and dispensing
     capabilities: [rx.prescribe, pharmacy.dispense]

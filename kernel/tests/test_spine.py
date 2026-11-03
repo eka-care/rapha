@@ -107,4 +107,69 @@ assert titles == ["Record vitals and triage"], \
 ok("a visit's timeline entry carries the operation's own title, deduplicated")
 ok("and a refusal is not something the visit did")
 
+
+# -- the level between a person and a visit --------------------------------
+#
+# THE MUTATION THIS CATCHES. An episode ends by gaining a second row, so an
+# implementation that simply listed the rows would report a closed pregnancy
+# as TWO episodes, one of them still open. That is not a cosmetic error: an
+# episode that reads as open is an episode something goes on chasing, and
+# chasing a woman whose pregnancy has ended is the failure the whole design
+# is arranged to prevent. So the case below closes one pregnancy, opens a
+# second, and asserts the count and the statuses rather than the contents.
+
+def pregnancies(store, patient, rows):
+    for n, (status, when, extra) in enumerate(rows):
+        record = {"id": "ep-%s-%d" % (patient, n), "patient": patient,
+                  "type": "pregnancy", "status": status, "created_date": when}
+        record.update(extra)
+        store.db.execute(
+            "INSERT INTO episode_of_care (id, patient, type, status, anchor_date,"
+            " anchor_basis, outcome, created_date) VALUES (?,?,?,?,?,?,?,?)",
+            [record["id"], patient, "pregnancy", status,
+             record.get("anchor_date"), record.get("anchor_basis"),
+             record.get("outcome"), when])
+
+
+store = build()
+pregnancies(store, "p-amina", [
+    ("active", "2026-01-05T09:00:00+00:00",
+     {"anchor_date": "2025-12-20", "anchor_basis": "last_menstrual_period"}),
+    ("ended", "2026-06-02T09:00:00+00:00", {"outcome": "live_birth"}),
+    ("active", "2026-09-01T09:00:00+00:00",
+     {"anchor_date": "2026-08-10", "anchor_basis": "dating_scan"}),
+])
+
+amina = spine.of(BUNDLE, store, WF, "p-amina")
+arcs = amina["episodes"]
+assert len(arcs) == 2, "two pregnancies, one of them over, got %d" % len(arcs)
+ok("an ending is paired with its opening rather than counted as an episode of its own")
+
+newest, first = arcs[0], arcs[1]
+assert newest["status"] == "active" and newest["ended_at"] == ""
+assert first["status"] == "ended" and first["outcome"] == "live_birth", first
+ok("the closed one is closed, carries its outcome, and nothing is left open behind it")
+
+assert first["anchor_date"] == "2025-12-20" and first["anchor_basis"] == "last_menstrual_period"
+assert newest["anchor_basis"] == "dating_scan"
+ok("each arc keeps the date it is measured from and how that date was arrived at")
+
+# Amina's visits are 2026-03-02 (during the first pregnancy) and 2026-09-14
+# (during the second). Membership is derived from the dates, so an
+# implementation that put every visit under every episode fails here.
+assert first["encounters"] == ["e-a1"], first["encounters"]
+assert newest["encounters"] == ["e-a2"], newest["encounters"]
+ok("a visit belongs to the episode that was open when it happened, and to no other")
+
+# Bilal has no episodes. An empty list, not a missing key: a screen that has
+# to test for absence twice tests for it once.
+assert spine.of(BUNDLE, store, WF, "p-bilal")["episodes"] == []
+ok("a subject with no episode gets an empty list rather than a missing answer")
+
+# And a bundle that declares none never looks.
+class NoEpisodes:
+    subject, spine, episode, states, stored = WF.subject, WF.spine, None, WF.states, WF.stored
+assert spine.episodes(store, NoEpisodes(), "p-amina", []) == []
+ok("a workflow declaring no episode has none, whatever rows happen to exist")
+
 print("\nok   spine: %d checks" % checks)
