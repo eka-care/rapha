@@ -200,12 +200,22 @@ the demo's story and every one of them needs one.
 2. **What closes a referral?** The receiving facility recording the visit,
    the sending clinician marking it, or the agent seeing the record appear?
    Only the first is real evidence; only the second works offline.
-3. **How does a reminder reach an ASHA?** The deck says Twilio, which means
-   an SMS or a call to a personal phone, which means a patient's name and
-   condition leaving our system over an unencrypted channel. That is a
-   disclosure decision, not a delivery one. A message that says only "a
-   visit is overdue, please open Rapha" avoids it entirely and I would
-   start there.
+3. **How does a reminder reach an ASHA?** Largely answered on 2026-11-03
+   by reading the scribe backend. It already has a provider-agnostic
+   telephony layer (Vobiz, Exotel, Plivo) with a phone-number-to-workspace
+   table, so reminders should go through that rather than adding Twilio as
+   a fourth provider. And Eka's own webhook rule is identifiers only, with
+   the client fetching details over an authenticated API, which settles the
+   disclosure question: the reminder says a visit is overdue and nothing
+   about who. What is left for the owner is only whether that is acceptable
+   to the programme.
+
+5. **NEW — does the demo lead with a phoned-in visit?** The same telephony
+   layer means an ASHA with a feature phone can call a number and speak the
+   visit: no smartphone, no app, no data, no form. It is the strongest
+   version of the deck's "Frontline — no forms" card and the one that works
+   where the deck's version does not. Most of the machinery exists. See
+   `2026-11-03-eka-scribe-backend-notes.md` §5.
 4. **Is the district real or demonstrated?** A genuine multi-facility tier
    is a week of kernel work. A district view over seeded data is an
    afternoon and is honest if the demo says so. For a hackathon I would

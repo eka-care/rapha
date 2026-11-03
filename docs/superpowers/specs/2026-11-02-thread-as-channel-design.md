@@ -167,20 +167,21 @@ width. A tab does not.
      does not — a dead microphone says "Listening" too. Drawn from the audio
      we are already capturing, through the Web Audio API, with no new
      dependency and nothing extra sent anywhere.
-  2. **The transcription, as it arrives.** This is the part we cannot build
-     on the API we are on: today nothing comes back until the whole
-     consultation has been uploaded, transcribed and structured. Eka's
-     current API sends the raw transcript the moment recording ends, and its
-     streaming mode sends it while the person is still talking. **This view
-     is the reason to move**, and it is the same move §11 describes.
+  2. **The transcription, as it arrives.** Corrected 2026-11-03 after
+     reading the scribe backend: the streaming socket is upload-only and
+     sends nothing back. But a chunk's transcript is fetchable the moment
+     that chunk is transcribed, which happens while the consultation is
+     still going on, and each generated document announces itself
+     separately. So real words can appear during the recording — by
+     polling per chunk, not by a stream, and the screen should not pretend
+     otherwise. See `2026-11-03-eka-scribe-backend-notes.md`.
   3. **The draft, and the field each value mapped to**, which the doctor
      reads and signs. Today it is a form in a 42vh letterbox under the
      conversation; here it has the width of the view.
 
-  Until the API moves, the waveform and the draft are real and the
-  transcript area says plainly that the words arrive when the recording
-  finishes. A panel that pretends to stream and does not is worse than one
-  that says what it is waiting for.
+  The waveform, the transcript and the draft are all buildable now. What
+  the screen must not do is imply a live stream when what is happening is
+  a poll each time a chunk is cut.
 - **Files** — this patient's records from the SDK, this visit's first, the rest
   under it. Read a report without leaving the visit.
 - **Ask about this patient** — the private doctor-to-agent conversation. Not in
