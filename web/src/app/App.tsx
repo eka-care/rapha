@@ -30,6 +30,7 @@ import { Khoj } from "./Khoj";
 import { Sidebar, panelFor } from "./Sidebar";
 import { Rail } from "./Rail";
 import { PARTS } from "../screens/Control";
+import { AssistantOverlay } from "../assistant/Overlay";
 import { Topbar } from "./Topbar";
 
 type Route =
@@ -171,6 +172,10 @@ export function App() {
    *  is an interruption, and the control panel is where it starts again. */
   const [tour, setTour] = useState(() => !seenTour());
   const [khojOpen, setKhojOpen] = useState(false);
+  // The medical assistant, outside a visit. `assistSeen` keeps it mounted
+  // after the first opening so closing it does not end the conversation.
+  const [assistOpen, setAssistOpen] = useState(false);
+  const [assistSeen, setAssistSeen] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [said, setSaid] = useState<Record<string, Said[]>>(() => read(SAID_KEY, {}));
   const [recents, setRecents] = useState<Recent[]>(() => read(RECENT_KEY, []));
@@ -422,6 +427,7 @@ export function App() {
           title={title}
           deskLabel={createLabel(catalogue, facility.data?.bundle.workflow)}
           onSearch={() => setKhojOpen(true)}
+          onAssist={route.kind === "thread" ? undefined : () => { setAssistSeen(true); setAssistOpen(true); }}
           onMenu={() => setDrawer((d) => !d)}
           onDesk={() => go("#/desk")}
         />
@@ -511,6 +517,8 @@ export function App() {
           </div>
         </main>
       </div>
+
+      {assistSeen && <AssistantOverlay open={assistOpen} onClose={() => setAssistOpen(false)} />}
 
       {khojOpen && (
         <Khoj

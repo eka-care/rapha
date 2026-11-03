@@ -24,8 +24,10 @@ import { Icon, type IconName } from "../icons";
  *  a feature of ours. Files and the private conversation with the agent are
  *  the next two and are not here yet: both wait on a decision recorded in
  *  the design note, and a tab that opens on an apology is worse than a tab
- *  that is not there. */
-export type TabId = "messages" | "scribe" | "past";
+ *  that is not there. "ask" is the medical assistant, which is general
+ *  medicine and not this visit's own agent: it is given nothing about the
+ *  patient. */
+export type TabId = "messages" | "scribe" | "past" | "ask";
 
 export type Tab = { id: TabId; title: string; icon: IconName; count?: number };
 

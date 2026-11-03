@@ -25,6 +25,7 @@ import { ScribeStart } from "../scribe/Start";
 import { mergeDrafts, type Opened } from "../scribe/session";
 import { Stream } from "../thread/Thread";
 import { Carry, PastVisits, Team, Trend, usePast, visitOf } from "../thread/Past";
+import { AssistantPanel } from "../assistant/Lazy";
 import { Tabs, type Tab, type TabId } from "../thread/Tabs";
 import { Line } from "../view/View";
 import { RAIL, railFolded, railShown, setRailFolded, setRailShown, type RailId } from "./rail";
@@ -58,6 +59,7 @@ const tabsFor = (past: number): Tab[] => [
   { id: "messages", title: "Messages", icon: "chat" },
   { id: "scribe", title: "Scribe", icon: "mic" },
   { id: "past", title: "Earlier visits", icon: "clock", count: past },
+  { id: "ask", title: "Ask", icon: "spark" },
 ];
 
 /** Why the microphone is unavailable, in one place. It was written out
@@ -268,6 +270,14 @@ export function Encounter({
         <Tabs open={tab} tabs={tabsFor(past.length)} onPick={setTab} />
 
         {tab === "past" && <div className="vbody"><PastVisits visits={past} /></div>}
+
+        {/* Mounted only while the tab is open, so the assistant does not
+            connect for a visit nobody asked it about. */}
+        {tab === "ask" && (
+          <div className="vbody">
+            <div className="assist assist--tab"><AssistantPanel /></div>
+          </div>
+        )}
 
         {tab === "scribe" && (
           <div className="vbody">

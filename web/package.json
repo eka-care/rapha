@@ -12,6 +12,7 @@
     "dev:eka": "VITE_API_BASE= vite"
   },
   "dependencies": {
+    "@eka-care/medassist-react": "0.1.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },

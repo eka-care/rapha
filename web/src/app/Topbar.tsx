@@ -22,12 +22,14 @@
 import { NAME } from "../brand";
 import { Icon } from "../icons";
 
-export function Topbar({ title, deskLabel, onSearch, onMenu, onDesk }: {
+export function Topbar({ title, deskLabel, onSearch, onMenu, onDesk, onAssist }: {
   title: string;
   deskLabel: string;
   onSearch: () => void;
   onMenu: () => void;
   onDesk: () => void;
+  /** Absent inside a visit, where the assistant is a tab of that visit. */
+  onAssist?: () => void;
 }) {
   return (
     <header className="topbar">
@@ -43,6 +45,12 @@ export function Topbar({ title, deskLabel, onSearch, onMenu, onDesk }: {
         <Icon name="plus" className="i sm" />
         {deskLabel}
       </button>
+      {onAssist && (
+        <button className="pill" onClick={onAssist} aria-label="Medical assistant">
+          <Icon name="spark" className="i sm" />
+          <span className="pill__long">Medical assistant</span>
+        </button>
+      )}
       <button className="pill" onClick={onSearch}>
         <Icon name="search" className="i sm" />
         Ask {NAME}

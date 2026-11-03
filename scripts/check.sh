@@ -235,6 +235,7 @@ if [ -d web/node_modules ]; then
   # refreshing, and the one origin where the gate cannot apply. Nectar's own
   # rules, so the claims product and this one behave the same way.
   (cd web && node --experimental-strip-types src/auth/client.check.ts)
+  (cd web && node --experimental-strip-types src/assistant/assistant.check.ts)
   # One primary action per station, everything else in overflow: pure rules
   # over declarations, checked without a browser.
   (cd web && node --experimental-strip-types src/loops.check.ts)
