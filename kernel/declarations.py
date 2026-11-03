@@ -48,7 +48,13 @@ REQUIRED = {
     "instrument": ("id", "type", "title", "summary", "kind", "operations",
                    "readback", "commit", "fallback"),
     "metric": ("id", "type", "title", "summary", "unit", "window", "numerator"),
+    "schedule": ("id", "type", "title", "summary", "episode", "anchor", "contacts"),
 }
+# What a contact must say. `escalates_to` and `reports_as` are optional: not
+# every contact escalates, and not every one fills a line in a register.
+CONTACT_REQUIRED = ("id", "title", "due", "opens", "closes", "owner",
+                    "operation", "authority")
+AUTHORITY = ("statutory", "clinical", "centre")
 BADGE_STYLES = ("warn", "crit", "ok", "mute")
 # What a queue view's `provenance` is made of. Closed, because each one is
 # something a renderer reads and a fourth key would be silently ignored.
@@ -77,6 +83,7 @@ class Bundle:
     views: dict
     instruments: dict
     metrics: dict
+    schedules: dict = dataclasses.field(default_factory=dict)
     seed: list = dataclasses.field(default_factory=list)
     scribe: dict = dataclasses.field(default_factory=dict)
     documents: dict = dataclasses.field(default_factory=dict)
@@ -506,6 +513,77 @@ def _documents(manifest):
     return out
 
 
+def _lint_schedule(fm, manifest, ops, fail):
+    """One schedule. Everything here is a rule somebody can get wrong in a
+    way that produces a plausible wrong answer rather than an error."""
+    voc = vocab.from_manifest(manifest)
+    roles = set((manifest.get("roles") or {}))
+
+    anchor = fm.get("anchor")
+    if not isinstance(anchor, dict) or not anchor:
+        return fail("anchor: a schedule is measured from something")
+    for basis, offset in anchor.items():
+        if not isinstance(offset, int):
+            fail(f"anchor '{basis}': the offset is a whole number of days")
+
+    contacts = fm.get("contacts")
+    if not isinstance(contacts, list) or not contacts:
+        return fail("contacts: a schedule with none schedules nothing")
+
+    seen = set()
+    for contact in contacts:
+        if not isinstance(contact, dict):
+            fail("contacts: each one is a mapping")
+            continue
+        cid = contact.get("id") or "?"
+        for key in CONTACT_REQUIRED:
+            if contact.get(key) is None:
+                fail(f"contact '{cid}': missing '{key}'")
+        if cid in seen:
+            fail(f"contact '{cid}': declared twice")
+        seen.add(cid)
+
+        if contact.get("authority") not in AUTHORITY:
+            fail(f"contact '{cid}': authority must be one of {AUTHORITY}")
+        # THE WINDOW HAS TO CONTAIN THE DAY IT IS AIMED AT. A contact whose
+        # due date falls outside its own window is due on a day arriving on
+        # which is already late, which is not a thing anybody meant to
+        # declare and reads as a working schedule.
+        days = [contact.get(k) for k in ("opens", "due", "closes")]
+        if all(isinstance(d, int) for d in days):
+            if not days[0] <= days[1] <= days[2]:
+                fail(f"contact '{cid}': opens {days[0]}, due {days[1]}, closes "
+                     f"{days[2]} -- the window has to contain the day it is for")
+        else:
+            fail(f"contact '{cid}': opens, due and closes are whole days")
+
+        if contact.get("owner") and contact["owner"] not in roles:
+            fail(f"contact '{cid}': owner '{contact['owner']}' is not a role "
+                 "this bundle declares")
+        if contact.get("escalates_to") and contact["escalates_to"] not in roles:
+            fail(f"contact '{cid}': escalates_to '{contact['escalates_to']}' is "
+                 "not a role this bundle declares")
+        # The operation is what CLOSES this contact, so one the bundle does
+        # not load can never be performed and the contact can never be done.
+        op = contact.get("operation")
+        if op and op not in (manifest.get("operations") or []):
+            fail(f"contact '{cid}': operation '{op}' is not one this bundle loads, "
+                 "so nothing could ever close it")
+        elif op and op in ops:
+            capability = ops[op].get("capability")
+            held = {capability} & set(
+                (manifest.get("roles") or {}).get(contact.get("owner"), {}).get(
+                    "capabilities", [])
+                if isinstance((manifest.get("roles") or {}).get(contact.get("owner")), dict)
+                else (manifest.get("roles") or {}).get(contact.get("owner"), []))
+            if capability and not held:
+                fail(f"contact '{cid}': owner '{contact.get('owner')}' does not "
+                     f"hold '{capability}', so the person this is assigned to "
+                     "could not perform it")
+    del voc
+    return None
+
+
 def _lint_metric(fm, fail):
     if fm["unit"] not in c.METRIC_UNITS:
         fail(f"unit must be one of {c.METRIC_UNITS}")
@@ -635,6 +713,7 @@ def lint(manifest, decls, ops, seed=()):
 
     listed = {i for k in ("workflows", "views", "instruments", "metrics")
               for i in manifest[k] or []}
+    listed |= {i for i in manifest.get("schedules") or []}
     for i in sorted(listed - set(decls)):
         bad.append(f"bundle.yaml: lists '{i}' but there is no such declaration file")
     for i in sorted(set(decls) - listed):
@@ -692,6 +771,8 @@ def lint(manifest, decls, ops, seed=()):
             _lint_instrument(fm, ops, fail, voc)
         elif kind == "metric":
             _lint_metric(fm, fail)
+        elif kind == "schedule":
+            _lint_schedule(fm, manifest, ops, fail)
 
     return bad
 
@@ -776,7 +857,7 @@ def load(bundle_id="phc", catalogue=None, facility=None):
     if bad:
         raise DeclarationError("\n".join(bad))
 
-    workflows, views, instruments, metrics = {}, {}, {}, {}
+    workflows, views, instruments, metrics, schedules = {}, {}, {}, {}, {}
     for did, (fm, _) in decls.items():
         if fm["type"] == "workflow":
             workflows[did] = _workflow(fm, [f for f, r in fm["states"].items()
@@ -787,15 +868,24 @@ def load(bundle_id="phc", catalogue=None, facility=None):
             instruments[did] = _plain(c.Instrument, fm)
         elif fm["type"] == "metric":
             metrics[did] = _plain(c.Metric, fm)
+        elif fm["type"] == "schedule":
+            schedules[did] = c.Schedule(
+                id=fm["id"], title=fm["title"], summary=fm["summary"],
+                episode=fm["episode"], anchor=dict(fm["anchor"]),
+                contacts=tuple(c.Contact(**{k: v for k, v in contact.items()
+                                            if k in c.Contact.__annotations__})
+                               for contact in fm["contacts"]))
 
     return Bundle(
         manifest=c.Manifest(id=manifest["id"], version=str(manifest["version"]),
                             title=manifest["title"],
-                            **{k: list(manifest[k] or []) for k in
-                               ("operations", "workflows", "views", "instruments", "metrics")}),
+                            **{k: list(manifest.get(k) or []) for k in
+                               ("operations", "workflows", "views", "instruments",
+                                "metrics", "schedules")}),
         operations={oid: dict(ops[oid], mapping=mappings.get(oid, []))
                     for oid in manifest["operations"]},
         workflows=workflows, views=views, instruments=instruments, metrics=metrics,
+        schedules=schedules,
         seed=seed, scribe=dict(manifest.get("scribe") or {}),
         documents=_documents(manifest), instruments_raw=raw_instruments,
         facility=plugins.chosen(manifest, facility), withheld=held_back,
@@ -855,6 +945,10 @@ def compile_json(bundle):
         "views": {k: dataclasses.asdict(v) for k, v in bundle.views.items()},
         "instruments": {k: dataclasses.asdict(v) for k, v in bundle.instruments.items()},
         "metrics": {k: dataclasses.asdict(v) for k, v in bundle.metrics.items()},
+        # Compiled for the renderer and the Go engine, which both have to
+        # draw and serve the arc. `contacts` is a tuple of dataclasses, so
+        # asdict turns it into a list of mappings.
+        "schedules": {k: dataclasses.asdict(v) for k, v in bundle.schedules.items()},
         "scribe": bundle.scribe,
         # The unresolved declarations a second engine needs to answer
         # GET /facility for itself. See the Bundle fields.

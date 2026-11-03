@@ -62,7 +62,8 @@ from catalogue.vocab import INSTRUMENT_KINDS  # noqa: F401  re-exported
 # the ones in catalogue/vocab.py. Lint rejects anything outside them.
 # --------------------------------------------------------------------------
 
-DECLARATION_TYPES = ("operation", "workflow", "view", "instrument", "metric")
+DECLARATION_TYPES = ("operation", "workflow", "view", "instrument", "metric",
+                     "schedule")
 VIEW_KINDS = ("queue", "summary", "dashboard", "tasklist")
 VIEW_SCOPES = ("today", "open", "all")
 SUMMARY_SHOW = ("line", "actions", "proposals", "audit", "flags")
@@ -323,6 +324,64 @@ KHOJ = {
 
 
 @dataclass(frozen=True)
+class Contact:
+    """One thing a schedule says is owed, measured in days from the anchor.
+
+    `due` is the day it is aimed at and `opens`/`closes` are the window
+    either side, because A VISIT DUE AT 28 WEEKS IS NOT LATE AT 28 WEEKS AND
+    ONE DAY. Collapsing the window to a single date paints a screen red
+    every day for women who are doing nothing wrong, and a screen that is
+    red every day is one nobody reads.
+
+    `authority` is `statutory` (the programme requires it and the centre
+    reports it), `clinical` (good practice this centre follows) or `centre`
+    (this facility's own choice). Without it nobody can tell what a centre
+    is obliged to do from what somebody added, and the first dispute with a
+    district officer settles it the wrong way.
+    """
+    id: str
+    title: str
+    due: int
+    opens: int
+    closes: int
+    owner: str
+    operation: str
+    authority: str
+    escalates_to: Optional[str] = None
+    # The line this contact fills in the programme's own register, which is
+    # not the same as the contact: a centre following eight antenatal
+    # contacts still reports four.
+    reports_as: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class Schedule:
+    """What a centre owes somebody over the life of one episode.
+
+    In FHIR this is a PlanDefinition and what it produces for one person is
+    a CarePlan. It is a declaration rather than a key in bundle.yaml --
+    against the standing presumption there, which plugins, templates and the
+    catchment all follow -- because it carries data that exists nowhere else
+    and needs a body naming each line's clinical source and its sign off. A
+    clinical protocol folded into a YAML key with no body is a protocol
+    nobody can audit.
+    """
+    id: str
+    title: str
+    summary: str
+    # The episode TYPE this applies to, in the bundle's own word.
+    episode: str
+    # Days from the recorded date to the start of the arc, per dating basis.
+    # A woman dated from her last period is at day 0 on that date; one dated
+    # from a scan's estimated delivery date is 280 days before it. THIS IS
+    # THE ONLY OBSTETRICS IN THE SYSTEM and it is in a bundle, where a
+    # facility can read it and a clinician can sign it off.
+    anchor: dict
+    contacts: tuple
+    type: str = "schedule"
+
+
+@dataclass(frozen=True)
 class Manifest:
     """catalogue.json["manifest"]: which declarations this build loaded, from
     bundles/<id>/bundle.yaml. Named manifest and not bundle because
@@ -336,6 +395,11 @@ class Manifest:
     views: list
     instruments: list
     metrics: list
+    # Optional, and the only manifest list that is: every bundle that
+    # existed before schedules did has no `schedules:` key, and a required
+    # one would have made adding this type a change to every bundle file
+    # including a laboratory's, which schedules nothing.
+    schedules: list = field(default_factory=list)
     khoj: dict = field(default_factory=lambda: dict(KHOJ))
 
 
@@ -889,7 +953,7 @@ CATALOGUE_KEYS = ("capabilities", "bundles", "states", "operations")
 # the thing it orders.
 BUNDLE_KEYS = ("manifest", "workflows", "views", "instruments", "metrics",
                "scribe", "plugins", "facilities", "vocabulary", "mapping",
-               "documents")
+               "documents", "schedules")
 
 
 def compiled_keys() -> Iterable[str]:

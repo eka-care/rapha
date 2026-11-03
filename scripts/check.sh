@@ -78,6 +78,10 @@ python3 -m kernel.tests.test_spine
 # `now` in the query grammar: the one symbolic value a state rule may
 # compare a date against, resolved in the kernel so no adapter learns it.
 python3 -m kernel.tests.test_clock
+# What a pregnancy owes, derived from the schedule declaration and the
+# episode's own date. An episode that has ended owes nothing, with no
+# cancellation step anybody could forget to call.
+python3 -m kernel.tests.test_schedule
 python3 -m bundles.lab.check      # a second bundle on the same kernel; SKIP_E2E=1 skips its socket half
 python3 -m bundles.phc.check      # capture consent: raised, declined, scoped to the visit, withdrawable
 # One vertical slice through every layer: a nurse records a blood pressure, it

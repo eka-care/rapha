@@ -350,6 +350,9 @@
       "phc.op.antenatal-visit",
       "phc.op.followup"
     ],
+    "schedules": [
+      "phc.sched.antenatal"
+    ],
     "title": "Primary health centre",
     "version": "2026.09.10",
     "views": [
@@ -2930,6 +2933,70 @@
         "reporting.view"
       ],
       "title": "The facility's own numbers"
+    }
+  },
+  "schedules": {
+    "phc.sched.antenatal": {
+      "anchor": {
+        "best_estimate": 0,
+        "dating_scan": -280,
+        "last_menstrual_period": 0
+      },
+      "contacts": [
+        {
+          "authority": "statutory",
+          "closes": 90,
+          "due": 84,
+          "escalates_to": "mo",
+          "id": "anc1",
+          "opens": 0,
+          "operation": "phc.op.antenatal-visit",
+          "owner": "cho",
+          "reports_as": "ANC1",
+          "title": "First antenatal contact"
+        },
+        {
+          "authority": "statutory",
+          "closes": 182,
+          "due": 154,
+          "escalates_to": "mo",
+          "id": "anc2",
+          "opens": 98,
+          "operation": "phc.op.antenatal-visit",
+          "owner": "cho",
+          "reports_as": "ANC2",
+          "title": "Second antenatal contact"
+        },
+        {
+          "authority": "statutory",
+          "closes": 238,
+          "due": 210,
+          "escalates_to": "mo",
+          "id": "anc3",
+          "opens": 196,
+          "operation": "phc.op.antenatal-visit",
+          "owner": "cho",
+          "reports_as": "ANC3",
+          "title": "Third antenatal contact"
+        },
+        {
+          "authority": "statutory",
+          "closes": 294,
+          "due": 252,
+          "escalates_to": "mo",
+          "id": "anc4",
+          "opens": 245,
+          "operation": "phc.op.antenatal-visit",
+          "owner": "cho",
+          "reports_as": "ANC4",
+          "title": "Fourth antenatal contact"
+        }
+      ],
+      "episode": "pregnancy",
+      "id": "phc.sched.antenatal",
+      "summary": "What this centre owes a pregnant woman, and the window each is due in.",
+      "title": "Antenatal contacts",
+      "type": "schedule"
     }
   },
   "scribe": {

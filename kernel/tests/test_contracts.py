@@ -37,7 +37,12 @@ def _resources(query):
 
 
 def test_manifest_lists_every_declaration_and_every_operation():
-    listed = set(sum((MANIFEST[k] for k in ("workflows", "views", "instruments", "metrics")), []))
+    # `schedules` is optional in a manifest -- bundles/lab declares none and
+    # a required key would have made adding the type a change to every
+    # bundle file -- so it is read with a default rather than indexed.
+    listed = set(sum((MANIFEST[k] for k in ("workflows", "views", "instruments",
+                                            "metrics")), []))
+    listed |= set(MANIFEST.get("schedules") or [])
     assert listed == set(DECLS), f"manifest and files disagree: {listed ^ set(DECLS)}"
     # catalogue/ops is shared between bundles (bundles/lab references its own
     # lab.* atoms), so the PHC manifest owns the phc.* atoms and no others.

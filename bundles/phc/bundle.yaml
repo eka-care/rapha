@@ -44,6 +44,10 @@ instruments:
   - phc.inst.vitals-device
   - phc.inst.consult-scribe
   - phc.inst.consent-speak
+# What this centre owes somebody over the life of one episode. A schedule is
+# a clinical protocol and carries its own sign off; see the atom.
+schedules:
+  - phc.sched.antenatal
 metrics:
   - phc.metric.visits
   - phc.metric.abha-coverage
