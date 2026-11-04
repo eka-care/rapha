@@ -13,7 +13,7 @@ import { Icon } from "../icons";
 import { Loading } from "../parts";
 import { MARK, TONE } from "../thread/Arc";
 import type { CalendarRow, ViewResult } from "../types";
-import { dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView } from "./day";
+import { dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView, atOf } from "./day";
 import { Grid } from "./Grid";
 import { span, step, type Scale } from "./cells";
 
@@ -66,7 +66,7 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
   // for, so a month is never drawn from a week's rows while the next read is
   // in flight.
   const scale = scaleOf(hash);
-  const anchor = asked || today;
+  const anchor = atOf(hash) || asked || today;
   const { from, to } = span(scale, anchor);
   const grid = useAsync(
     () => (from ? api.view(result.view, undefined, undefined, { from, to }).then((r) => ({ key: `${from}|${to}`, r })) : Promise.resolve(null)),
@@ -154,13 +154,13 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
      <section className="cal-main" aria-label="Dates">
       <div className="cal-bar-tools">
         <div className="cal-nav" data-scale={scale}>
-          <button type="button" className="gr-arrow" aria-label={`Previous ${scale}`} onClick={() => goTo({ on: step(scale, anchor, -1) })}>
+          <button type="button" className="gr-arrow" aria-label={`Previous ${scale}`} onClick={() => goTo({ at: step(scale, anchor, -1) })}>
             <Icon name="chev" className="i" />
           </button>
-          <button type="button" className="gr-arrow gr-next" aria-label={`Next ${scale}`} onClick={() => goTo({ on: step(scale, anchor, 1) })}>
+          <button type="button" className="gr-arrow gr-next" aria-label={`Next ${scale}`} onClick={() => goTo({ at: step(scale, anchor, 1) })}>
             <Icon name="chev" className="i" />
           </button>
-          <button type="button" className="cal-chip" onClick={() => goTo({ on: "" })}>Today</button>
+          <button type="button" className="cal-chip" onClick={() => goTo({ on: "", at: "" })}>Today</button>
         </div>
         <h2 className="cal-title">{spanTitle(scale, anchor)}</h2>
         <div className="cal-scales" role="group" aria-label="Scale">
@@ -176,7 +176,7 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
       {gridHave && (
         <Grid
           scale={scale} anchor={anchor} today={today} rows={gridShown} nameOf={nameOf}
-          onOpenPatient={onOpenPatient} onPickDay={(d) => goTo({ on: d })} onAnchor={(d) => goTo({ on: d })}
+          onOpenPatient={onOpenPatient} onPickDay={(d) => goTo({ on: d, at: d })} onAnchor={(d) => goTo({ at: d })}
         />
       )}
      </section>

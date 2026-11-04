@@ -35,7 +35,7 @@
 import assert from "node:assert/strict";
 import { WROTE } from "./types.ts";
 import type { CalendarRow } from "./types.ts";
-import { cardDays, monthAfter, wantsNextMonth, comingUp, dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView } from "./view/day.ts";
+import { cardDays, monthAfter, wantsNextMonth, comingUp, dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView, atOf } from "./view/day.ts";
 import { span, cells } from "./view/cells.ts";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -1457,6 +1457,10 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.equal(withView("#/views/calendar?on=2026-11-04&scale=week", { on: "" }), "#/views/calendar?scale=week",
     "an empty date leaves the address without one");
   assert.equal(dayOn(withView("#/views/calendar", { on: "2026-11-09" })), "2026-11-09", "?on= still reads");
+  // The grid's date is read from the address, separately from the day list's.
+  assert.equal(atOf("#/views/phc.view.calendar?scale=month&at=2026-02-15"), "2026-02-15");
+  assert.equal(atOf("#/views/phc.view.calendar?on=2026-11-04"), "", "the day list's date is not the grid's");
+  assert.equal(withView("#/v?scale=week&at=2026-02-15", { at: "2026-03-01" }), "#/v?at=2026-03-01&scale=week");
   // Switching scale asks for the new span, never the old one.
   assert.notDeepEqual(span("month", "2026-11-04"), span("week", "2026-11-04"));
   assert.deepEqual(span("year", "2026-11-04"), { from: "2026-01-01", to: "2026-12-31" });
@@ -1465,6 +1469,13 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.match(page, /from "\.\/Grid"/, "the grid is imported as ./Grid");
   assert.match(page, /from "\.\/cells"/, "the pure logic is imported as ./cells");
   assert.match(page, /span\(scale, /, "the range asked for follows the scale");
+  assert.match(page, /atOf\(hash\)/, "the grid opens on the date the address carries");
+  assert.match(page, /addEventListener\("hashchange"/, "going back re-reads the address");
+  assert.match(page, /api\.view\(result\.view, undefined, other\b/, "the day list asks for its own day");
+  assert.ok(!/api\.view\([^)]*anchor/.test(page.replace(/\{ from, to \}/g, "")), "paging the grid does not move the day list");
+  assert.match(page, /goTo\(\{ at: step\(/, "paging moves the grid's date only");
+  const gridSrc = code(readFileSync(join(SRC, "view", "Grid.tsx"), "utf8"));
+  assert.ok(gridSrc.indexOf("gr-chip-who") < gridSrc.indexOf("gr-chip-t\""), "a chip leads with the person");
   assert.match(page, /scaleOf\(/, "the scale is read from the address");
   assert.match(page, /withView\(/, "the scale and date are written to the address");
   assert.match(page, /forRole\(gridRows|forRole\(.*grid/s, "the role chips filter the grid too");

@@ -150,12 +150,20 @@ export function scaleOf(hash: string): Scale {
 
 /** The same address with the date and/or scale changed. A part left out is
  *  kept; an empty date is removed. Anything else in the query is kept too. */
-export function withView(hash: string, change: { on?: string; scale?: Scale }): string {
+export function withView(hash: string, change: { on?: string; at?: string; scale?: Scale }): string {
   const [path, query = ""] = (hash ?? "").split("?");
   const parts = new Map(query.split("&").filter(Boolean).map((kv) => [kv.split("=")[0], kv] as const));
   if (change.on !== undefined) { if (change.on) parts.set("on", `on=${change.on}`); else parts.delete("on"); }
+  if (change.at !== undefined) { if (change.at) parts.set("at", `at=${change.at}`); else parts.delete("at"); }
   if (change.scale) parts.set("scale", `scale=${change.scale}`);
-  const order = ["on", "scale", ...[...parts.keys()].filter((k) => k !== "on" && k !== "scale")];
+  const order = ["on", "at", "scale", ...[...parts.keys()].filter((k) => !["on", "at", "scale"].includes(k))];
   const q = order.filter((k) => parts.has(k)).map((k) => parts.get(k)).join("&");
   return q ? `${path}?${q}` : path;
+}
+
+/** The date the grid is paged to (`at=YYYY-MM-DD`), or "" when the address
+ *  carries none. The day list has its own date (`on=`); the two are separate. */
+export function atOf(hash: string): string {
+  const m = /[?&]at=(\d{4}-\d{2}-\d{2})(?:&|$)/.exec(hash ?? "");
+  return m ? m[1] : "";
 }

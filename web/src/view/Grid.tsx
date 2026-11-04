@@ -76,9 +76,9 @@ function Chip({ row, cell, nameOf, onOpenPatient }: Pick<GridProps, "nameOf" | "
       title={said} aria-label={said} onClick={() => onOpenPatient?.(row.subject)}
     >
       <Icon name={(MARK[row.state] ?? "clock") as never} className="i sm" />
-      <span className="gr-chip-t">{row.title}</span>
-      {was && <span className="gr-chip-was">due {was}</span>}
       <span className="gr-chip-who">{who}</span>
+      {was && <span className="gr-chip-was">due {was}</span>}
+      <span className="gr-chip-t">{row.title}</span>
     </button>
   );
 }

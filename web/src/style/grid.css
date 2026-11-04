@@ -15,8 +15,8 @@
 .gr-chip[data-tone="b-ok"] { border-left-color: var(--color-success); background: var(--color-success-soft); }
 .gr-chip[data-tone="b-ink"] { border-left-color: var(--color-text-primary); }
 .gr-chip .i { flex: none; }
-.gr-chip-t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
-.gr-chip-who { color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 0; min-width: 0; }
+.gr-chip-t { color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 100 auto; min-width: 0; }
+.gr-chip-who { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 4.5em; }
 .gr-more { border: 0; background: none; font: inherit; font-size: 12px; color: var(--color-text-secondary); text-align: left; padding: 0 var(--space-2); cursor: pointer; }
 .gr-more:hover { text-decoration: underline; }
 
@@ -86,11 +86,10 @@
   .gr-year { grid-template-columns: 1fr; }
   .gr-dot { font-size: 13px; }
   .gr-cell { min-height: 72px; }
-  .gr-chip-who { display: none; }
+  .gr-month .gr-chip-who { display: none; }
   /* A month cell is about 50px wide: the mark and tone say what and how urgent, the tap says who. */
   .gr-month .gr-chip { width: auto; justify-self: start; min-height: 26px; }
   .gr-month .gr-chip-t { display: none; }
 }
-.gr-month .gr-chip-who { display: none; }
 .gr-chip-was { flex: none; font-size: 11px; font-weight: 600; color: var(--color-critical); white-space: nowrap; }
 @media (max-width: 600px) { .gr-month .gr-chip-was { display: none; } }
