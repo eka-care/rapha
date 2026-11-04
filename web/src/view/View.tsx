@@ -69,7 +69,9 @@ export const NO_NAME = "No name yet";
 
 export function fields(
   decl: ViewDecl | undefined,
-  row: QueueRow,
+  /** Only the subject and station are read, so a caller with just a subject
+   *  (a calendar row's record) passes that and nothing is cast. */
+  row: Pick<QueueRow, "station"> & { subject?: QueueRow["subject"] },
   labelCols: string[] = [],
   /** The provenance column, if the view declared one. Kept out of the line
    *  under the name for the same reason a label is: it is drawn elsewhere on
@@ -79,6 +81,9 @@ export function fields(
   provenanceCol?: string,
 ): {
   name: string; meta: string; token: string; named: boolean;
+  /** The values `meta` joins, before they are joined, so a caller can take
+   *  some of them without splitting a value that contains the separator. */
+  facts: string[];
 } {
   const subject = row.subject ?? {};
   const has = (k: string) => subject[k] !== null && subject[k] !== undefined && subject[k] !== "";
@@ -103,6 +108,7 @@ export function fields(
     // to compare the name against an id to find out.
     name: nameKey ? String(subject[nameKey]) : NO_NAME,
     named: !!nameKey,
+    facts: rest.slice(1, 4).map((k) => String(subject[k])),
     meta: [...rest.slice(1, 4).map((k) => String(subject[k])), human(row.station)]
       .filter(Boolean).join(" · "),
     token: tokenKey ? String(subject[tokenKey]) : "",

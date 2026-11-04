@@ -41,3 +41,7 @@ button.stk-card:hover { background: var(--color-bg-hover); box-shadow: var(--sha
 .stk-arrow .i { transform: rotate(-90deg); }
 .stk-arrow .stk-flip { transform: rotate(90deg); }
 @media (prefers-reduced-motion: reduce) { .stk-card { transition: none; } }
+.stk-more {
+  display: block; width: 100%; text-align: center; min-height: 44px; margin-bottom: var(--space-2); padding: 0 var(--space-4); border: 0; background: none;
+  font: inherit; font-size: 13px; color: var(--color-accent); cursor: pointer;
+}

@@ -1489,7 +1489,9 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.match(src, /\.title/, "a card says which contact it is");
   assert.match(src, /owedLine\(/, "a card says when it is owed");
   assert.match(src, /roleName\(/, "a card names the owning role");
-  assert.ok((src.match(/\.owner\b/g) ?? []).length === 2 && /roleName\(r\.owner\)/.test(src) && !/assignee|worker|staff/i.test(src), "a card names a role, never a person");
+  assert.match(src, /roleName\(r\.owner\)/, "a card names the owning role");
+  assert.ok(!/\.owner\b/.test(src.replace(/roleName\(r\.owner\)/g, "").replace(/r\.owner &&/g, "")) && !/assignee|worker|staff/i.test(src),
+    "a card names a role, never a person; the only other use of owner is whether there is one");
   // A register field she does not carry is omitted, not drawn as a blank label.
   assert.match(src, /meta && /, "the register line only draws when there is something in it");
   assert.ok(!/weeks|gestation|pregnan/i.test(src), "no dating is derived on the card");
@@ -1512,7 +1514,25 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.match(home, /currentRole\(\)/, "the stack opens on the viewer's own role");
   assert.ok(!/Coming up<\/div>[\s\S]*contacts? owed/.test(home) && !/contacts owed/.test(home), "the count table is gone");
   // The renderer never names a station, flag, capability, operation or column.
-  assert.ok(!/\.(station|flags|operation|reports_as|authority)\b/.test(src), "a card reads a field it should not know");
+  // Today.tsx also draws the line of patients, which reads stations on purpose;
+  // the stack's own parts are the read of the visits and the card that draws them.
+  const stackPart = home.slice(home.indexOf("const calId"), home.indexOf("if (loading")) + home.slice(home.indexOf("{cal && ("), home.indexOf('<div className="hgrid">'));
+  assert.ok(stackPart.length > 400, "the scan found the stack's parts of Today.tsx");
+  const dayLogic = code(readFileSync(join(SRC, "view", "day.ts"), "utf8"));
+  for (const [name, text] of [["Cards.tsx", src], ["the stack's part of Today.tsx", stackPart], ["day.ts", dayLogic]] as const) {
+    assert.ok(!/\.(flags|operation|reports_as|authority)\b/.test(text) && !/\.station\b/.test(text.replace(/\bQueueRow\b[^\n]*/g, "").replace(/r\.station\b/g, "")),
+      `${name} reads a field it should not know`);
+  }
+  // A failed read of the visits is said, never swallowed into a quiet card.
+  assert.match(home, /setOwed\("failed"\)/, "a failed read of the visits is recorded, not swallowed");
+  assert.ok(!/,\s*\(\)\s*=>\s*\{\s*\}\)/.test(home), "an empty catch hides a failed read");
+  assert.match(home, /Could not load the visits coming up/, "the failure is shown");
+  // The stack opens on the viewer's role and says what else exists.
+  assert.match(home, /more owed to others/, "the stack says how much belongs to others");
+  assert.match(home, /setEveryone\(/, "and offers a way to see it");
+  assert.ok(!/split\(" · "\)/.test(home), "a value containing the separator is not cut: facts are taken before they are joined");
+  assert.ok(!/as unknown as QueueRow/.test(home.split("<Cards")[1] ?? ""), "no cast to get a subject through the types");
+  assert.ok(!/Open her/.test(src), "the button does not assume the subject's sex");
   // Nothing derived is kept.
   assert.ok(!/useMemo|localStorage|sessionStorage|new Map\(/.test(src), "no cache of derived rows");
   ok("the card stack: late first, one per contact, role first, paged without overshoot, opens her calendar on the due date");

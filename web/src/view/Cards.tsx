@@ -43,7 +43,7 @@ export function Cards({ rows, now, nameOf, metaOf, roleName, onOpen }: {
             <button key={key} type="button" className="stk-card" style={{ "--depth": 0 } as React.CSSProperties}
                     onClick={() => onOpen(r)}>
               {body}
-              <span className="stk-go">Open her calendar</span>
+              <span className="stk-go">Open record</span>
             </button>
           ) : (
             <div key={key} className="stk-card stk-behind" aria-hidden="true"

@@ -18,7 +18,7 @@ import { Loading } from "../parts";
 import type { CalendarRow, Catalogue, QueueRow, TaskRow } from "../types";
 import { Cards } from "../view/Cards";
 import { step } from "../view/cells";
-import { cardHash, dateOf, stack } from "../view/day";
+import { cardHash, dateOf, EVERYONE, stack } from "../view/day";
 import { fields } from "../view/View";
 import { human, title } from "../words";
 
@@ -106,7 +106,13 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
       .then((r) => live && setOwed((r.rows ?? []) as CalendarRow[]), () => live && setOwed("failed"));
     return () => { live = false; };
   }, [calId, today]);
-  const cards = Array.isArray(owed) ? stack(owed, today, currentRole()) : [];
+  // The stack opens on the viewer's own role; the line under it says how much
+  // belongs to others and is the way to see it.
+  const [everyone, setEveryone] = useState(false);
+  const all = Array.isArray(owed) ? stack(owed, today, EVERYONE) : [];
+  const mine = Array.isArray(owed) ? stack(owed, today, currentRole()) : [];
+  const cards = everyone ? all : mine;
+  const others = all.length - mine.length;
 
   if (loading && !loaded.length) return <Loading what="the facility" shape="blocks" rows={4} />;
   // The greeting and the centre's own name were a line above the heading --
@@ -275,12 +281,20 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
           ) : cards.length === 0 ? (
             owed && <div className="state-empty">Nobody is owed a contact in the coming year.</div>
           ) : (
-            <Cards rows={cards} now={today} roleName={(r) => cat.vocabulary?.role_titles?.[r] ?? r}
-                   nameOf={(s) => fields(cal.decl, { subject: s } as unknown as QueueRow).name}
-                   /* The register's own declared columns, first two values: the renderer may not
-                      name a column (age, village), so it takes what the declaration offers. */
-                   metaOf={(s) => fields(cal.decl, { subject: s } as unknown as QueueRow).meta.split(" · ").slice(0, 2).join(" · ")}
+            <>
+            <Cards key={everyone ? "all" : "mine"} rows={cards} now={today} roleName={(r) => cat.vocabulary?.role_titles?.[r] ?? r}
+                   nameOf={(s) => fields(cal.decl, { station: null, subject: s }).name}
+                   /* The register's own declared columns, the first two values: the
+                      renderer may not name a column (age, village), so it takes
+                      what the declaration offers. Taken before they are joined. */
+                   metaOf={(s) => fields(cal.decl, { station: null, subject: s }).facts.slice(0, 2).join(" · ")}
                    onOpen={(r) => { location.hash = cardHash(r); }} />
+            {others > 0 && (
+              <button type="button" className="stk-more" onClick={() => setEveryone(!everyone)}>
+                {everyone ? "Show only mine" : `${others} more owed to others. Show everyone's`}
+              </button>
+            )}
+            </>
           )}
         </div>
       )}
