@@ -200,6 +200,27 @@ def test_an_episode_with_no_subject_is_skipped_and_its_neighbours_are_not():
     assert all(r["subject_row"] for r in rows)
 
 
+def test_the_womans_own_record_and_the_facilitys_day_pick_the_same_open_pregnancy():
+    # `spine.episodes` (her record) and `cohort.owed` (the centre's day) each
+    # pair openings with endings, in two places in two files. If their
+    # tie-break ever diverged, her record and the facility's day would disagree
+    # about whether she is pregnant. One pregnancy opened and ended at the very
+    # same instant (a delivery is one commit); a second is open.
+    from kernel import spine
+    store = centre()
+    same = "2026-02-01T09:00:00+00:00"
+    episode_row(store, "ep-old-end", "p-amina", "pregnancy", "ended", same, anchor=None,
+                basis=None, outcome="live_birth")
+    episode_row(store, "ep-old", "p-amina", "pregnancy", "active", same)
+    episode_row(store, "ep-new", "p-amina", "pregnancy", "active", "2026-06-01T09:00:00+00:00",
+                anchor=day(150))
+    mine = [e["id"] for e in spine.episodes(BUNDLE, store, WF, "p-amina", [], at=noon(day(200)))
+            if e["status"] == "active"]
+    theirs = {r["episode"] for r in owed(store, day(150), day(400), at=day(200))}
+    assert mine == ["ep-new"], mine
+    assert theirs == {"ep-new"}, theirs
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

@@ -1318,6 +1318,11 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   // Emptiness is read from what the piles hold: a role whose rows are all
   // unexpected is not an empty day.
   assert.ok(inPiles(forRole([row("u", "upcoming", "r.x")], "r.x")).length > 0);
+  // THE HEADING IS TRUE OF THE DAY SHOWN: "Owed today" only on today.
+  assert.equal(inPiles(rows).find((p) => p.pile === "owed")?.label, "Owed today");
+  assert.equal(inPiles(rows, false).find((p) => p.pile === "owed")?.label, "Owed",
+    "a day that is not today must not say 'owed today'");
+  assert.deepEqual(inPiles(rows, false).map((p) => p.label), ["Late", "Owed", "Done"]);
   // Chips are ordered by what is displayed, not by id.
   assert.deepEqual(roleChips(rows, "", (r) => (r === "r.anm" ? "Zed" : "Alpha")).roles, ["r.mo", "r.anm"]);
 

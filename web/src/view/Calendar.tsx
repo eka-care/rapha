@@ -53,10 +53,13 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
   const answer = other ? have : result;
   const rows = (answer?.rows ?? []) as CalendarRow[];
   const { roles, initial } = roleChips(rows, role, roleName);
-    const [picked, setPicked] = useState<string | null>(null);
-  const selected = picked ?? initial;
+  const [picked, setPicked] = useState<string | null>(null);
+  // A picked role that owns nothing on THIS day is not honoured: the screen
+  // falls back to everyone, so the chip shown pressed is always one that
+  // draws rows and "nothing here" is never said while other roles have work.
+  const selected = picked !== null && (picked === EVERYONE || roles.includes(picked)) ? picked : initial;
   const shown = forRole(rows, selected);
-  const piles = inPiles(shown);
+  const piles = inPiles(shown, !other);
   // Emptiness is what the piles actually hold, not a count taken before them.
   const empty = emptyLine(rows.length, piles.reduce((n, p) => n + p.rows.length, 0));
 
@@ -86,7 +89,7 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
             {g.rows.map((r) => {
               const { day, month } = dayOf(r.due);
               return (
-                <li key={`${r.contact}-${r.subject}`}>
+                <li key={`${r.schedule}|${r.episode}|${r.contact}|${r.subject}`}>
                   <button type="button" className="cal-row" onClick={() => onOpenPatient?.(r.subject)}>
                     <span className="cal-date">
                       <span className="cal-day">{day}</span>
