@@ -82,6 +82,9 @@ python3 -m kernel.tests.test_clock
 # episode's own date. An episode that has ended owes nothing, with no
 # cancellation step anybody could forget to call.
 python3 -m kernel.tests.test_schedule
+# A view declaration whose kind, workflow or episode types name something
+# that does not exist: it would draw an empty screen and report nothing.
+python3 -m kernel.tests.test_declarations
 python3 -m bundles.lab.check      # a second bundle on the same kernel; SKIP_E2E=1 skips its socket half
 python3 -m bundles.phc.check      # consent is gone, and gone from both engines
 # One vertical slice through every layer: a nurse records a blood pressure, it

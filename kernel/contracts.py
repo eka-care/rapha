@@ -64,7 +64,7 @@ from catalogue.vocab import INSTRUMENT_KINDS  # noqa: F401  re-exported
 
 DECLARATION_TYPES = ("operation", "workflow", "view", "instrument", "metric",
                      "schedule")
-VIEW_KINDS = ("queue", "summary", "dashboard", "tasklist")
+VIEW_KINDS = ("queue", "summary", "dashboard", "tasklist", "calendar")
 VIEW_SCOPES = ("today", "open", "all")
 SUMMARY_SHOW = ("line", "actions", "proposals", "audit", "flags")
 # INSTRUMENT_KINDS is re-exported from catalogue/vocab.py above, not defined
@@ -208,15 +208,15 @@ class Task:
 
 @dataclass(frozen=True)
 class View:
-    """catalogue.json["views"][id]. One dataclass for four kinds, because
-    the renderer keys on `kind` and the unused fields stay empty. Four
-    classes would need four renderer entry points and four API shapes."""
+    """catalogue.json["views"][id]. One dataclass for five kinds, because
+    the renderer keys on `kind` and the unused fields stay empty. Five
+    classes would need five renderer entry points and five API shapes."""
     id: str
     kind: str                       # VIEW_KINDS
     title: str
     summary: str
     capability: str                 # who may open it
-    workflow: Optional[str] = None  # queue, summary and tasklist: which thread kind
+    workflow: Optional[str] = None  # queue, summary, tasklist, calendar: thread kind
     # queue
     scope: str = "today"            # VIEW_SCOPES
     group_by: Optional[str] = None  # "station" or a flag; None is one list
@@ -250,6 +250,10 @@ class View:
     window: str = "day"             # METRIC_WINDOWS
     # tasklist
     tasks: list = field(default_factory=list)     # of Task
+    # calendar
+    # Episode type names whose schedules this calendar draws. A name no
+    # schedule declares draws nothing, so lint refuses it.
+    episodes: list = field(default_factory=list)
     # colour law (Vernier): a queue's declared wait limits, in minutes. Both
     # optional; a bundle that declares neither renders pure monochrome. See
     # QueueRow.entered_at and the renderer's colourRule.

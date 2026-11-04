@@ -263,7 +263,7 @@ def _as_list(v):
     return v if isinstance(v, list) else [v]
 
 
-def _lint_view(fm, refs, fail, voc, ops):
+def _lint_view(fm, refs, fail, voc, ops, scheduled=frozenset()):
     if fm["kind"] not in c.VIEW_KINDS:
         fail(f"kind must be one of {c.VIEW_KINDS}")
     if fm["capability"] not in voc.capabilities:
@@ -345,6 +345,18 @@ def _lint_view(fm, refs, fail, voc, ops):
             op = task.get("operation")
             if op is not None and op not in ops:
                 fail(f"task '{title}': operation '{op}' does not exist")
+
+    if fm["kind"] == "calendar":
+        # A calendar draws the contacts its schedules owe. With no episode
+        # named it draws a blank screen, and so does one naming a type no
+        # schedule declares: neither reports anything anywhere.
+        episodes = fm.get("episodes") or []
+        if not episodes:
+            fail("calendar names no episodes, so it would draw nothing")
+        for episode in episodes:
+            if episode not in scheduled:
+                fail(f"calendar names episode '{episode}' which no schedule "
+                     "declares, so it would draw nothing for it")
 
     for section in fm.get("sections") or []:
         title = section.get("title", "?")
@@ -799,6 +811,9 @@ def lint(manifest, decls, ops, seed=()):
              for step in fm.get("steps") or []
              for oid in step.get("operations") or []}
 
+    scheduled = {fm.get("episode") for fm, _ in decls.values()
+                 if fm.get("type") == "schedule"}
+
     for did, (fm, body) in sorted(decls.items()):
         def fail(msg, did=did):
             bad.append(f"{did}: {msg}")
@@ -820,7 +835,7 @@ def lint(manifest, decls, ops, seed=()):
         if kind == "workflow":
             stored_by_workflow[did] = _lint_workflow(fm, ops, fail, voc)
         elif kind == "view":
-            _lint_view(fm, refs, fail, voc, ops)
+            _lint_view(fm, refs, fail, voc, ops, scheduled)
         elif kind == "instrument":
             _lint_instrument(fm, ops, fail, voc)
         elif kind == "metric":

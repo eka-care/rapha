@@ -44,6 +44,7 @@ views:
   - phc.view.visit-summary
   - phc.view.facility-dashboard
   - phc.view.today-tasks
+  - phc.view.calendar
 instruments:
   - phc.inst.vitals-voice
   - phc.inst.vitals-device

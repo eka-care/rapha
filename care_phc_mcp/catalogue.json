@@ -369,7 +369,8 @@
       "phc.view.station-queue",
       "phc.view.visit-summary",
       "phc.view.facility-dashboard",
-      "phc.view.today-tasks"
+      "phc.view.today-tasks",
+      "phc.view.calendar"
     ],
     "workflows": [
       "phc.wf.outpatient"
@@ -3760,10 +3761,36 @@
     "vitals.recorded"
   ],
   "views": {
+    "phc.view.calendar": {
+      "badges": {},
+      "capability": "patient.find",
+      "columns": [],
+      "episodes": [
+        "pregnancy",
+        "postnatal"
+      ],
+      "escalate_minutes": null,
+      "group_by": null,
+      "id": "phc.view.calendar",
+      "kind": "calendar",
+      "labels": [],
+      "metrics": [],
+      "provenance": {},
+      "scope": "today",
+      "sections": [],
+      "summary": "Every contact the centre owes, day by day, across all its patients.",
+      "target_minutes": null,
+      "tasks": [],
+      "title": "Calendar",
+      "type": "view",
+      "window": "day",
+      "workflow": "phc.wf.outpatient"
+    },
     "phc.view.facility-dashboard": {
       "badges": {},
       "capability": "reporting.view",
       "columns": [],
+      "episodes": [],
       "escalate_minutes": null,
       "group_by": null,
       "id": "phc.view.facility-dashboard",
@@ -3802,6 +3829,7 @@
         "category",
         "arrival"
       ],
+      "episodes": [],
       "escalate_minutes": null,
       "group_by": "station",
       "id": "phc.view.station-queue",
@@ -3829,6 +3857,7 @@
       "badges": {},
       "capability": "patient.find",
       "columns": [],
+      "episodes": [],
       "escalate_minutes": null,
       "group_by": null,
       "id": "phc.view.today-tasks",
@@ -3859,6 +3888,7 @@
       "badges": {},
       "capability": "patient.find",
       "columns": [],
+      "episodes": [],
       "escalate_minutes": null,
       "group_by": null,
       "id": "phc.view.visit-summary",
