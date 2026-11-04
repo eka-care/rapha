@@ -229,6 +229,117 @@
       ],
       "patient_key": null,
       "readback": "required",
+      "reads": {
+        "phc.op.consult-document": {
+          "condition": {
+            "rows": true,
+            "section": "assessment",
+            "take": "diagnosis"
+          },
+          "examination": {
+            "format": "{finding}: {detail}",
+            "join": "; ",
+            "section": "physical_examination"
+          },
+          "history": {
+            "join": "; ",
+            "section": "history_of_present_illness"
+          },
+          "plan": {
+            "join": "; ",
+            "section": "advice"
+          }
+        },
+        "phc.op.rx-prescribe": {
+          "dose": {
+            "part": "number",
+            "rows": true,
+            "section": "prescribed_medications",
+            "take": "strength"
+          },
+          "dose_unit": {
+            "part": "unit",
+            "rows": true,
+            "section": "prescribed_medications",
+            "take": "strength"
+          },
+          "drug": {
+            "rows": true,
+            "section": "prescribed_medications",
+            "take": "name"
+          },
+          "duration": {
+            "part": "number",
+            "rows": true,
+            "section": "prescribed_medications",
+            "take": "duration"
+          },
+          "duration_unit": {
+            "part": "unit",
+            "rows": true,
+            "section": "prescribed_medications",
+            "take": "duration"
+          },
+          "frequency": {
+            "rows": true,
+            "section": "prescribed_medications",
+            "take": "frequency"
+          }
+        },
+        "phc.op.vitals-record": {
+          "diastolic": {
+            "section": "vital_signs",
+            "split": [
+              "/",
+              1
+            ],
+            "take": "value",
+            "where": {
+              "vital_name": "Blood Pressure"
+            }
+          },
+          "pulse": {
+            "section": "vital_signs",
+            "take": "value",
+            "where": {
+              "vital_name": "Pulse"
+            }
+          },
+          "spo2": {
+            "section": "vital_signs",
+            "take": "value",
+            "where": {
+              "vital_name": "SpO2"
+            }
+          },
+          "systolic": {
+            "section": "vital_signs",
+            "split": [
+              "/",
+              0
+            ],
+            "take": "value",
+            "where": {
+              "vital_name": "Blood Pressure"
+            }
+          },
+          "temperature": {
+            "section": "vital_signs",
+            "take": "value",
+            "where": {
+              "vital_name": "Temperature"
+            }
+          },
+          "weight": {
+            "section": "vital_signs",
+            "take": "value",
+            "where": {
+              "vital_name": "Weight"
+            }
+          }
+        }
+      },
+      "reads_from": "Default Prescription Print",
       "requires": null,
       "says": null,
       "spoken": true,
@@ -253,6 +364,8 @@
       ],
       "patient_key": "directory_id",
       "readback": "required",
+      "reads": {},
+      "reads_from": null,
       "requires": null,
       "says": null,
       "spoken": true,
@@ -279,6 +392,8 @@
       ],
       "patient_key": null,
       "readback": "required",
+      "reads": {},
+      "reads_from": null,
       "requires": null,
       "says": null,
       "spoken": true,
@@ -307,6 +422,8 @@
       ],
       "patient_key": null,
       "readback": "required",
+      "reads": {},
+      "reads_from": null,
       "requires": null,
       "says": null,
       "spoken": true,

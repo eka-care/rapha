@@ -954,7 +954,11 @@ def scribe_allowed(user):
         for op_id in decl.operations:
             op = BUNDLE.operations.get(op_id)
             if op and op["capability"] in caps:
-                out[op_id] = {"schema": validate.load(op["input"])}
+                out[op_id] = {"schema": validate.load(op["input"]),
+                              # Where this form's answers live in the service's
+                              # structured note, when the instrument declares it.
+                              "reads": (decl.reads or {}).get(op_id) or {},
+                              "reads_from": decl.reads_from or ""}
     return out, instrument
 
 

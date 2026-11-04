@@ -186,6 +186,7 @@ python3 scripts/check_directory.py
 
 echo "\n== the adapter and the service =="
 python3 -m api.scribe          # the scribe's response reading, against a recorded live answer
+python3 -m api.structured      # the structured note read into form answers, evidence found not trusted
 python3 scripts/check_scribe_library.py   # Eka's template library, and a note written in one
 python3 -m api.shaped          # fields from the service's own note, with no model of our own
 python3 -m adapters.local.tests.test_store   # the one adapter, and the Store protocol's ten names

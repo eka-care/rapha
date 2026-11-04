@@ -61,6 +61,7 @@ import os
 import tempfile
 import time
 import uuid
+from urllib.parse import urljoin
 from datetime import date
 
 # Reused, not re-written: one definition in this repository of what an Aadhaar
@@ -70,6 +71,7 @@ from care_phc.connectors.scribe.eka import _scrub
 
 from api import fill as filler
 from api import shaped
+from api import structured
 
 # The action the SDK's v2rx path takes, and the templates worth asking for.
 ACTION = "ekascribe-v2"
@@ -196,6 +198,64 @@ def note(session, template, title=""):
         session["notes"][template] = {"title": title or template, "text": text}
         _kept(session, template, title or template, text)
     return text
+
+
+# ----------------------------------------------------- the structured note
+# Eka's app does not read a consultation back out of text. It asks the service
+# to write the note section by section and edits THAT, and this asks the same
+# way: POST /voice/v1/scribe/agent/runs/{template}, answered as a stream of
+# state patches over the session's transcript. api/structured.py reads the
+# result into form answers. It writes one empty document on the session at the
+# service, which is what the app's own run does too, and nothing else.
+
+AGENT_SECONDS = 120
+# The client version the run route registers its emit tools for. The route
+# picks tools by it; the value that worked is recorded here, not guessed.
+APP_VERSION = "0.9.30"
+
+
+def agent_state(txn, template):
+    """The structured note for this recording in this library template, or a
+    ScribeError saying what to do instead. Bounded: this runs inside a request
+    a doctor is waiting on, and a run takes about half a minute."""
+    try:
+        c = client()
+        url = urljoin(c.base_url, "/voice/v1/scribe/agent/runs/%s" % template)
+        body = {"threadId": txn, "runId": str(uuid.uuid4()), "state": {}, "messages": [],
+                "tools": [], "context": [], "forwardedProps": {}}
+        headers = {"Authorization": "Bearer %s" % c.access_token, "client-id": c.client_id,
+                   "Accept": "text/event-stream", "Content-Type": "application/json",
+                   "app-version": APP_VERSION}
+        reply = sdk(lambda: c.session.post(url, json=body, headers=headers, stream=True,
+                                           timeout=(10, AGENT_SECONDS)))
+        if reply.status_code != 200:
+            raise ScribeError("The scribe service would not write the structured note "
+                              "(%s). The forms are filled from the text note instead."
+                              % reply.status_code)
+        events = structured.parse_stream(reply.iter_lines(decode_unicode=True))
+    except ScribeError:
+        raise
+    except Exception as broke:
+        raise ScribeError("Could not get the structured note (%s). The forms are filled "
+                          "from the text note instead." % _scrub(str(broke))[:300]) from None
+    state = structured.final_state(events)
+    if not state or not state.get("sections"):
+        raise ScribeError("The scribe service returned no structured note. The forms are "
+                          "filled from the text note instead.")
+    return state
+
+
+def _reads_template(session, operations):
+    """The library template id whose structured note some operation here reads,
+    when this session asked for it; else None. A recording that chose no such
+    template has no structured note, and is filled the way it always was."""
+    titles = {str(spec.get("reads_from") or "").strip().lower()
+              for spec in operations.values() if spec.get("reads")}
+    titles.discard("")
+    for template, title in session["want"].items():
+        if str(title).strip().lower() in titles:
+            return template
+    return None
 
 
 # Where a note goes once it exists. Set by the route layer, which knows where
@@ -509,6 +569,18 @@ def refill(session, operations, *, notes=None, today=None, reader=None):
     drafts, unshaped = [], []
     for op_id, spec in sorted(operations.items()):
         fields = filler.flatten(spec["schema"])
+        # THE STRUCTURED NOTE FIRST, when this form declares where its answers
+        # live in it and the recording has one. What it fills is what it fills;
+        # a form it fills nothing of is filled from the text note, as before,
+        # so a structured note that comes back thin never costs a form.
+        if spec.get("reads") and session.get("state"):
+            got = structured.answers(session["state"], spec["reads"], fields, transcript)
+            if got:
+                d = filler.build_draft(op_id, spec["schema"], got, transcript,
+                                       instrument=session["instrument"], today=today)
+                if d:
+                    drafts.append(d)
+                    continue
         try:
             template = session["templates"].get(op_id) or shaped_template(op_id, fields)
         except ScribeError as broke:
@@ -588,6 +660,19 @@ RESHAPE_WAIT = 2.0
 def collect(session, *, reader=None):
     if session["status"] in ("ready", "failed", "withdrawn"):
         return session
+    # A poll and a webhook can arrive while a collect is mid-flight, and the
+    # structured note takes half a minute: a second collect would pay for a
+    # second run. It waits as "still running", which is what it is.
+    if session.get("collecting"):
+        return session
+    session["collecting"] = True
+    try:
+        return _collect(session, reader=reader)
+    finally:
+        session["collecting"] = False
+
+
+def _collect(session, *, reader=None):
     try:
         status = poll(session["txn"])
     except ScribeError as broke:
@@ -608,6 +693,12 @@ def collect(session, *, reader=None):
     # The shaped notes came back in the same body as the transcript, so the
     # ordinary path needs no second call to anything.
     came = decoded(status)
+    reads = _reads_template(session, session["operations"])
+    if reads and not session.get("state"):
+        try:
+            session["state"] = agent_state(session["txn"], reads)
+        except ScribeError as broke:
+            session["state_why"] = str(broke)
     for template, title in session["want"].items():
         if came.get(template):
             session["notes"][template] = {"title": title, "text": came[template]}
@@ -616,7 +707,7 @@ def collect(session, *, reader=None):
 
 
 def withdraw(session):
-    session.update(status="withdrawn", drafts=[], transcript="", notes={},
+    session.update(status="withdrawn", drafts=[], transcript="", notes={}, state=None,
                    reason="Withdrawn. Nothing from this recording was kept.")
     return session
 
@@ -861,6 +952,77 @@ def demo():
                                "text": "S: fever. O: BP 140/90."}], shown["notes"]
     assert note(n, "t-soap") == "S: fever. O: BP 140/90.", "a held note is not asked for twice"
     assert public(withdraw(n))["notes"] == [], "withdrawn means nothing is kept"
+
+    # -- the structured note fills a form, and only when it was asked for -------
+    said = ("Blood pressure is 130/85. Pulse is 84 per minute. "
+            "Fever for three days.")
+    TRANSCRIPT = {"data": {"output": [], "template_results": {"transcript": [
+        {"template_id": "transcript", "status": "success",
+         "value": base64.b64encode(said.encode()).decode()}]}}}
+    vit = {"questions": [
+        {"link_id": "systolic", "text": "Systolic", "type": "integer"},
+        {"link_id": "diastolic", "text": "Diastolic", "type": "integer"},
+        {"link_id": "pulse", "text": "Pulse", "type": "integer"}]}
+    bp = {"section": "vital_signs", "where": {"vital_name": "Blood Pressure"}, "take": "value"}
+    spec = {"schema": vit, "reads_from": "Default Prescription Print", "reads": {
+        "systolic": {**bp, "split": ["/", 0]}, "diastolic": {**bp, "split": ["/", 1]},
+        "pulse": {"section": "vital_signs", "where": {"vital_name": "Pulse"}, "take": "value"}}}
+    NOTE = {"sections": [{"key": "vital_signs", "payload": {"rows": [
+        {"vital_name": "Blood Pressure", "value": "130/85", "unit": "mmHg"},
+        {"vital_name": "Pulse", "value": "92", "unit": "/min"}]}}]}   # 92 was never said
+    ran = []
+
+    def fake_state(txn, template):
+        ran.append(template)
+        return NOTE
+
+    global agent_state
+    real_poll, real_agent = poll, agent_state
+    poll, agent_state = (lambda txn: TRANSCRIPT), fake_state
+    try:
+        asked = begin("enc-1", "user:nurse", "phc-a", {"v.op": spec}, instrument="i",
+                      templates={"v.op": "tpl-v"}, want={"t-rx": "default prescription print "})
+        collect(asked)
+        assert ran == ["t-rx"], "the structured note is asked for once, by the template it names"
+        vals = asked["drafts"][0]["values"]
+        assert vals["systolic"] == 130 and vals["diastolic"] == 85, vals
+        assert "pulse" not in vals, "a pulse the note carried and nobody said is not filled: %r" % vals
+        assert asked["drafts"][0]["evidence"]["systolic"] == "Blood pressure is 130/85.", asked["drafts"][0]
+        assert all(v == 0 for v in asked["drafts"][0]["confidence"].values()), "nothing is scored"
+        assert "state" not in public(asked), "the note itself never leaves the kernel"
+        collect(asked)
+        assert ran == ["t-rx"], "a ready session is not run a second time"
+
+        # not asked for: no run, no cost. Choosing a template is not mandatory.
+        ran.clear()
+        plain = begin("enc-1", "user:nurse", "phc-b", {"v.op": spec}, instrument="i",
+                      templates={"v.op": "tpl-v"})
+        collect(plain, reader=lambda note, fields, transcript: {})
+        assert ran == [] and plain["status"] == "ready", (ran, plain["status"])
+
+        # asked for, and the service would not write it: filled from the text note
+        def refused(txn, template):
+            raise ScribeError("The scribe service would not write the structured note (500).")
+        agent_state = refused
+        fallback = begin("enc-1", "user:nurse", "phc-c", {"v.op": spec}, instrument="i",
+                         templates={"v.op": "tpl-v"}, want={"t-rx": "Default Prescription Print"})
+        fallback["status"] = "running"
+        poll = lambda txn: DONE
+        collect(fallback, reader=fake)
+        assert fallback["status"] == "ready" and "would not write" in fallback["state_why"], fallback
+        assert fallback["drafts"], "a refused structured note still leaves the form filled from the text"
+
+        # a second collect while one is mid-flight does not pay for a second run
+        agent_state = fake_state
+        ran.clear()
+        busy = begin("enc-1", "user:nurse", "phc-d", {"v.op": spec}, instrument="i",
+                     templates={"v.op": "tpl-v"}, want={"t-rx": "Default Prescription Print"})
+        busy["collecting"] = True
+        assert collect(busy) is busy and ran == [] and busy["status"] == "running", busy
+        assert public(withdraw(asked))["drafts"] == [] and asked["state"] is None, \
+            "withdrawn takes the structured note with everything else"
+    finally:
+        poll, agent_state = real_poll, real_agent
 
     print("ok api.scribe")
 

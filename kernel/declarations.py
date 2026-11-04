@@ -402,6 +402,59 @@ def _lint_instrument(fm, ops, fail, voc):
             fail(f"question type '{qtype}' is not a CARE type")
 
 
+READ_KEYS = {"section", "where", "take", "format", "split", "part", "join", "rows"}
+
+
+def _lint_scribe_reads(instruments, ops):
+    """A scribe instrument's `reads` names real operations and real questions.
+
+    The point of declaring where an answer lives is that it can be checked: a
+    rule for a question no form asks would be a promise the recording could
+    not keep, and the value it read would have nowhere to go and nothing to
+    say so.
+    """
+    bad = []
+    for fm in instruments:
+        reads = fm.get("reads")
+        if fm.get("kind") != "scribe" or reads is None:
+            continue
+        who = fm.get("id")
+        if not isinstance(reads, dict) or not reads:
+            bad.append(f"{who}: reads is a mapping of operation to question to rule")
+            continue
+        if not str(fm.get("reads_from") or "").strip():
+            bad.append(f"{who}: reads needs reads_from, the title of the Eka library "
+                       f"template whose sections its rules name")
+        for oid, rules in reads.items():
+            if oid not in (fm.get("operations") or []):
+                bad.append(f"{who}: reads names '{oid}', which this instrument does not fill")
+                continue
+            op = ops.get(oid)
+            schema_id = (op.input if hasattr(op, "input") else op.get("input")) if op else None
+            try:
+                schema = validate.load(schema_id)
+            except (FileNotFoundError, TypeError):
+                bad.append(f"{who}: '{oid}' has no questionnaire to read into")
+                continue
+            asked = {q["link_id"] for q in validate.walk(schema["questions"])}
+            for link_id, rule in (rules or {}).items():
+                where = f"{who}: reads.{oid}.{link_id}"
+                if link_id not in asked:
+                    bad.append(f"{where} is a question '{schema_id}' does not ask")
+                elif not isinstance(rule, dict) or not str(rule.get("section") or "").strip():
+                    bad.append(f"{where} is a rule naming a `section`")
+                elif set(rule) - READ_KEYS:
+                    bad.append(f"{where} has keys this reader does not know: "
+                               f"{sorted(set(rule) - READ_KEYS)}")
+                elif rule.get("part") not in (None, "number", "unit"):
+                    bad.append(f"{where}: part is 'number' or 'unit'")
+                elif rule.get("split") is not None and not (
+                        isinstance(rule["split"], list) and len(rule["split"]) == 2
+                        and isinstance(rule["split"][1], int)):
+                    bad.append(f"{where}: split is [separator, index]")
+    return bad
+
+
 def _lint_documents_instrument(instruments, ops):
     """A document instrument's `fills` names real parts and real questions.
 
@@ -920,6 +973,7 @@ def load(bundle_id="phc", catalogue=None, facility=None):
     raw_instruments = [fm for fm, _ in decls.values() if fm.get("type") == "instrument"]
     bad += _lint_scribe(manifest, raw_instruments)
     bad += _lint_documents_instrument(raw_instruments, ops)
+    bad += _lint_scribe_reads(raw_instruments, ops)
     bad += _lint_documents(manifest, ops)
     # The doctor's templates, which are generated operations. Linted here with
     # everything else that references a questionnaire, and against the

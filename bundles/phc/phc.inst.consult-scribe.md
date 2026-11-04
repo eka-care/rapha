@@ -7,6 +7,32 @@ summary: Transcribes a recording into the station's template.
 operations: [phc.op.patient-register, phc.op.vitals-record, phc.op.consult-document,
              phc.op.ncd-review, phc.op.antenatal-visit, phc.op.followup,
              phc.op.rx-prescribe, phc.op.household-visit]
+# WHERE IN EKA'S STRUCTURED NOTE EACH ANSWER LIVES. The service writes a
+# note section by section, and these name the section and how to take the
+# value from it; api/structured.py is the only reader. A form with no entry is
+# filled from the markdown note, as before. The evidence for each value is
+# looked for in the transcript by the reader, and a value with none is dropped.
+reads_from: Default Prescription Print
+reads:
+  phc.op.vitals-record:
+    systolic:    {section: vital_signs, where: {vital_name: Blood Pressure}, take: value, split: ["/", 0]}
+    diastolic:   {section: vital_signs, where: {vital_name: Blood Pressure}, take: value, split: ["/", 1]}
+    pulse:       {section: vital_signs, where: {vital_name: Pulse}, take: value}
+    spo2:        {section: vital_signs, where: {vital_name: SpO2}, take: value}
+    weight:      {section: vital_signs, where: {vital_name: Weight}, take: value}
+    temperature: {section: vital_signs, where: {vital_name: Temperature}, take: value}
+  phc.op.consult-document:
+    history:     {section: history_of_present_illness, join: "; "}
+    examination: {section: physical_examination, format: "{finding}: {detail}", join: "; "}
+    plan:        {section: advice, join: "; "}
+    condition:   {section: assessment, rows: true, take: diagnosis}
+  phc.op.rx-prescribe:
+    drug:          {section: prescribed_medications, rows: true, take: name}
+    dose:          {section: prescribed_medications, rows: true, take: strength, part: number}
+    dose_unit:     {section: prescribed_medications, rows: true, take: strength, part: unit}
+    frequency:     {section: prescribed_medications, rows: true, take: frequency}
+    duration:      {section: prescribed_medications, rows: true, take: duration, part: number}
+    duration_unit: {section: prescribed_medications, rows: true, take: duration, part: unit}
 readback: required
 commit: tap
 fallback: form

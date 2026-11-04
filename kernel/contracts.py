@@ -310,6 +310,18 @@ class Instrument:
     # directory's `directory_id`, the Eka oid; a bundle whose directory is
     # somebody else's names its own column here and no renderer changes.
     patient_key: Optional[str] = None
+    # FOR A `scribe` INSTRUMENT: WHERE IN THE SERVICE'S STRUCTURED NOTE EACH
+    # QUESTION'S ANSWER LIVES. Eka's note is written section by section (vitals
+    # as rows with a unit, a medicine split into name, strength and frequency),
+    # and `reads_from` names the library template whose sections these are by
+    # its title. `reads` is {operation: {link_id: rule}}, a rule naming a
+    # section and how to take the value from it; api/structured.py is the
+    # only thing that reads it. Declared, because a renderer or a kernel
+    # deciding that "Blood Pressure" is the systolic and the diastolic is
+    # exactly the guess a declaration exists to replace. An operation with no
+    # entry here is filled the way it always was.
+    reads_from: Optional[str] = None
+    reads: dict = field(default_factory=dict)
     type: str = "instrument"
 
 
