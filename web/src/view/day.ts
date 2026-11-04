@@ -9,7 +9,7 @@ import type { Scale } from "./cells.ts";
 /** Late first, because it is the only pile where somebody must act now. */
 export const PILES: { pile: string; label: string; state: string }[] = [
   { pile: "late", label: "Late", state: "missed" },
-  { pile: "owed", label: "Owed today", state: "due" },
+  { pile: "owed", label: "Today", state: "due" },
   { pile: "done", label: "Done", state: "done" },
 ];
 
@@ -18,11 +18,11 @@ export const PILES: { pile: string; label: string; state: string }[] = [
  *  contact the kernel says is owed vanishing from the day with no sign is the
  *  worst thing this screen could do. It gets a pile of its own, last, named by
  *  the state value itself, which is the kernel's word and not ours.
- *  "Owed today" is only true of today; on any other day the pile is "Owed",
+ *  "Today" is only true of today; on any other day the pile is "Due",
  *  because the day's own heading already says which day. */
 export function inPiles(rows: CalendarRow[], isToday = true): { pile: string; label: string; rows: CalendarRow[] }[] {
   const known = new Set(PILES.map((p) => p.state));
-  const piles = PILES.map((p) => ({ pile: p.pile, label: p.pile === "owed" && !isToday ? "Owed" : p.label, rows: rows.filter((r) => r.state === p.state) }));
+  const piles = PILES.map((p) => ({ pile: p.pile, label: p.pile === "owed" && !isToday ? "Due" : p.label, rows: rows.filter((r) => r.state === p.state) }));
   const strange = [...new Set(rows.map((r) => r.state).filter((s) => !known.has(s)))].sort();
   for (const s of strange) piles.push({ pile: s, label: s, rows: rows.filter((r) => r.state === s) });
   return piles.filter((p) => p.rows.length > 0);
@@ -51,8 +51,8 @@ export const forRole = (rows: CalendarRow[], role: string): CalendarRow[] =>
 export function emptyLine(total: number, shown: number): string | null {
   if (shown > 0) return null;
   return total === 0
-    ? "Nobody is owed a contact on this day."
-    : "Nothing here for this role. Choose everyone to see the rest.";
+    ? "No visits this day."
+    : "No visits for you. Choose everyone to see the rest.";
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

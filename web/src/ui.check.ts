@@ -37,7 +37,7 @@ import { WROTE } from "./types.ts";
 import type { CalendarRow } from "./types.ts";
 import { dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView, atOf, stack, pageBy, cardHash, owedLine } from "./view/day.ts";
 import { span, cells } from "./view/cells.ts";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -318,6 +318,26 @@ const IMPLEMENTED = [
   assert.match(view, /for \(const k of fields \?\? \[\]\)/,
     "in the declared order, and from no other list");
   ok("live: the role editor, the patient header and a summary row all read the kernel's decision");
+}
+
+// ------------------------------------------------ her year, in the shared grid
+
+{
+  const patient = code(readFileSync(join(SRC, "screens", "Patient.tsx"), "utf8"));
+  const arc = code(readFileSync(join(SRC, "thread", "Arc.tsx"), "utf8"));
+  // Her grid is the shared one, fed by HER episodes: never a centre-wide read.
+  assert.match(patient, /from "\.\.\/view\/Grid"/, "her record draws the shared grid");
+  assert.match(patient, /ownRows\(/, "her rows are made from her own episodes");
+  assert.ok(!/api\.view\(|\{ from, to \}/.test(patient),
+    "her record asked the centre for a range: it must read her own episodes");
+  assert.match(patient, /Nothing is booked for her/, "no episodes at all is said in a sentence");
+  assert.match(patient, /atOf\(/, "a card's date in the address opens her grid anchored there");
+  // The month strips are gone; the plain list of visits is not.
+  assert.ok(!/arc-scale|arc-months|Months\b/.test(arc), "the month strips are still drawn");
+  assert.match(arc, /arc-list/, "the plain list of visits must stay");
+  assert.ok(!existsSync(join(SRC, "thread", "arc-scale.ts")) && !existsSync(join(SRC, "thread", "arc-scale.check.ts")),
+    "the old month-strip files are back");
+  ok("her record: the shared grid from her own episodes, a sentence when empty, the plain list kept");
 }
 
 // ------------------------------------------------------------ 2. the menus
@@ -1320,10 +1340,10 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   // unexpected is not an empty day.
   assert.ok(inPiles(forRole([row("u", "upcoming", "r.x")], "r.x")).length > 0);
   // THE HEADING IS TRUE OF THE DAY SHOWN: "Owed today" only on today.
-  assert.equal(inPiles(rows).find((p) => p.pile === "owed")?.label, "Owed today");
-  assert.equal(inPiles(rows, false).find((p) => p.pile === "owed")?.label, "Owed",
-    "a day that is not today must not say 'owed today'");
-  assert.deepEqual(inPiles(rows, false).map((p) => p.label), ["Late", "Owed", "Done"]);
+  assert.equal(inPiles(rows).find((p) => p.pile === "owed")?.label, "Today");
+  assert.equal(inPiles(rows, false).find((p) => p.pile === "owed")?.label, "Due",
+    "a day that is not today must not say 'today'");
+  assert.deepEqual(inPiles(rows, false).map((p) => p.label), ["Late", "Due", "Done"]);
   // Chips are ordered by what is displayed, not by id.
   assert.deepEqual(roleChips(rows, "", (r) => (r === "r.anm" ? "Zed" : "Alpha")).roles, ["r.mo", "r.anm"]);
 
@@ -1339,8 +1359,8 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.equal(forRole(rows, EVERYONE).length, 4);
 
   // An empty day says so, and a filtered-empty day says it was the filter.
-  assert.match(emptyLine(0, 0) ?? "", /Nobody is owed/);
-  assert.match(emptyLine(4, 0) ?? "", /Choose everyone/);
+  assert.equal(emptyLine(0, 0), "No visits this day.");
+  assert.equal(emptyLine(4, 0), "No visits for you. Choose everyone to see the rest.");
   assert.equal(emptyLine(4, 2), null);
 
   // A date is read by position: no time zone can move it.

@@ -12,8 +12,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cells, dayTone, span, step, wasDue } from "./cells.ts";
-import type { CalendarRow } from "../types.ts";
+import { cells, dayTone, ownRows, span, step, wasDue } from "./cells.ts";
+import type { CalendarRow, Episode } from "../types.ts";
 
 let checks = 0;
 const ok = (what: string) => { checks++; console.log("ok   " + what); };
@@ -209,6 +209,43 @@ const DEC = "2026-12-09";
     assert.deepEqual(hit, [], `${f} names: ${hit.join(", ")}`);
   }
   ok("neither grid file spells a station, flag, capability, operation, state or column");
+}
+
+// ------------------------------------------------- one woman's own episodes
+{
+  const contact = (n: string, due: string, state = "due") => ({
+    contact: n, title: "Visit " + n, schedule: "s", episode: "", opens: due, due, closes: due, state,
+    owner: "r", operation: "", authority: "", reports_as: "", done_at: "", basis: "",
+  });
+  const ep = (id: string, type: string, cs: ReturnType<typeof contact>[]) =>
+    ({ id, type, status: "open", opened_at: "", ended_at: "", outcome: "", anchor_date: "", anchor_basis: "",
+       encounters: [], contacts: cs, nothing_due: "" }) as unknown as Episode;
+  const she = { name: "Lakshmi" };
+  const one = ownRows([ep("e1", "pregnancy", [contact("a", "2026-09-09", "missed"), contact("b", "2026-11-20")])], "p1", she);
+  // Her contacts sit on their due days, whatever their state, even a missed one
+  // before the range: her page shows when each was due, not a pile on today.
+  assert.deepEqual(one.map((r) => r.cell), ["2026-09-09", "2026-11-20"]);
+  assert.ok(one.every((r) => r.subject === "p1" && r.subject_row === she));
+  assert.ok(one.every((r) => r.episode === "e1"), "each row carries its episode");
+  const g = cells("month", "2026-09-09", one, 3, "2026-11-04");
+  assert.equal(g.find((c) => c.key === "2026-09-09")?.rows.length, 1);
+  assert.equal(g.find((c) => c.key === "2026-11-20"), undefined, "November's visit is not in September's grid");
+  // Nothing at all is nothing, not an error.
+  assert.deepEqual(ownRows([], "p1", she), []);
+  assert.deepEqual(ownRows([ep("e1", "pregnancy", [])], "p1", she), []);
+  // Two episodes stay two: same day, two rows, told apart by the episode's name.
+  const two = ownRows([ep("e1", "pregnancy", [contact("a", "2026-11-20")]), ep("e2", "child_care", [contact("a", "2026-11-20")])], "p1", she);
+  assert.equal(two.length, 2);
+  assert.notEqual(two[0].title, two[1].title, "two episodes on one day must be told apart");
+  assert.ok(two[0].title.startsWith("Visit a") && /Pregnancy/.test(two[0].title) && /Child care/.test(two[1].title));
+  // A single episode needs no tag.
+  assert.equal(one[0].title, "Visit a");
+  // The input is not touched, and nothing is kept between calls.
+  const src = [ep("e1", "pregnancy", [contact("a", "2026-11-20")])];
+  const before = JSON.stringify(src);
+  ownRows(src, "p1", she);
+  assert.equal(JSON.stringify(src), before);
+  ok("her own episodes: placed on their due days, two stay two, none is a sentence's business");
 }
 
 console.log(`\n${checks} checks passed`);

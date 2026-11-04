@@ -15,24 +15,11 @@ import { MARK, TONE } from "../thread/Arc";
 import type { CalendarRow, ViewResult } from "../types";
 import { dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView, atOf } from "./day";
 import { Grid } from "./Grid";
-import { span, step, type Scale } from "./cells";
+import { span, spanTitle, step, type Scale } from "./cells";
 
 const SCALES: { scale: Scale; label: string }[] = [
   { scale: "week", label: "Week" }, { scale: "month", label: "Month" }, { scale: "year", label: "Year" },
 ];
-const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July",
-  "August", "September", "October", "November", "December"];
-
-/** What the toolbar calls the span on screen. */
-function spanTitle(scale: Scale, anchor: string): string {
-  const [y, m] = anchor.split("-");
-  if (scale === "year") return y;
-  if (scale === "month") return `${MONTH_NAMES[Number(m) - 1] ?? ""} ${y}`;
-  const { from, to } = span("week", anchor);
-  const a = dayOf(from), b = dayOf(to);
-  return a.month === b.month ? `${a.day} to ${b.day} ${b.month} ${y}` : `${a.day} ${a.month} to ${b.day} ${b.month} ${y}`;
-}
-
 /** Move the address; the hashchange listener below does the rest. */
 const goTo = (change: Parameters<typeof withView>[1]) => { location.hash = withView(location.hash, change).replace(/^#/, ""); };
 

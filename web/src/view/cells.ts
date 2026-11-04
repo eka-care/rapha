@@ -16,7 +16,8 @@
  *  Nothing here knows a role, a station or a state: rows are placed by one
  *  date and counted. Nothing is stored; every call works from what it is given.
  */
-import type { CalendarRow } from "../types";
+import type { CalendarRow, Episode } from "../types";
+import { human, title } from "../words.ts";
 import { dayOf } from "./day.ts";
 
 export type Scale = "week" | "month" | "year";
@@ -130,4 +131,36 @@ export function wasDue(row: CalendarRow, cell: string): string {
   if (!row.due || row.due === cell) return "";
   const { day, month } = dayOf(row.due);
   return day ? `${day} ${month}` : "";
+}
+
+/** One woman's own episodes as grid rows, for her record.
+ *
+ *  Her page reads her episodes, not the centre's range answer, so her contacts
+ *  have no `cell`; this gives each the one the kernel gives: its due day. A
+ *  late contact keeps its due day here, because her record is the place to see
+ *  when each was due. With more than one episode on the page, each title says
+ *  which episode it belongs to, so two on one day are two and can be told
+ *  apart. A new array each call; the episodes are not touched and nothing is
+ *  kept. */
+export function ownRows(episodes: Episode[], subject: string, subjectRow: Record<string, unknown>): CalendarRow[] {
+  const tag = episodes.length > 1;
+  return episodes.flatMap((e) => e.contacts.map((c) => ({
+    ...c,
+    episode: c.episode || e.id,
+    title: tag ? `${c.title} \u00b7 ${title(human(e.type))}` : c.title,
+    subject, subject_row: subjectRow, cell: c.due,
+  })));
+}
+
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July",
+  "August", "September", "October", "November", "December"];
+
+/** What the toolbar calls the span on screen. */
+export function spanTitle(scale: Scale, anchor: string): string {
+  const [y, m] = anchor.split("-");
+  if (scale === "year") return y;
+  if (scale === "month") return `${MONTH_NAMES[Number(m) - 1] ?? ""} ${y}`;
+  const { from, to } = span("week", anchor);
+  const a = dayOf(from), b = dayOf(to);
+  return a.month === b.month ? `${a.day} to ${b.day} ${b.month} ${y}` : `${a.day} ${a.month} to ${b.day} ${b.month} ${y}`;
 }

@@ -263,8 +263,6 @@ if [ -d web/node_modules ]; then
   (cd web && node --experimental-strip-types src/thread/earlier.check.ts)
   (cd web && node --experimental-strip-types src/thread/fold.check.ts)
   (cd web && node --experimental-strip-types src/thread/commands.check.ts)
-  # An arc laid out as months: first month to last, the empty ones included.
-  (cd web && node --experimental-strip-types src/thread/arc-scale.check.ts)
   # The calendar grid: a contact sits in the one cell the kernel names and no other, a month
   # draws its spill days, a year ignores the room limit, one cell is today.
   (cd web && node --experimental-strip-types src/view/grid.check.ts)

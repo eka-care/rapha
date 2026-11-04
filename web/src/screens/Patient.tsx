@@ -8,7 +8,7 @@
  *  So a visit is a closed card, and opening one reads that thread rather than
  *  pre-loading every visit a person has ever had.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { initialsOf } from "../agent";
 import { api, useAsync } from "../api";
 import { displayFor, questionnaire } from "../declarations";
@@ -16,6 +16,9 @@ import { Icon } from "../icons";
 import { header, queueViewFor, valuesOf } from "../messages";
 import { Failed, Loading } from "../parts";
 import { Arc } from "../thread/Arc";
+import { atOf, scaleOf, withView } from "../view/day";
+import { Grid } from "../view/Grid";
+import { ownRows, spanTitle, step, type Scale } from "../view/cells";
 import type { Catalogue, SubjectView, ThreadView } from "../types";
 import { wrote } from "../types";
 import { human, title } from "../words";
@@ -38,9 +41,11 @@ export function Patient({ id, cat, onOpenThread }: {
   // The Care tab exists only for somebody who has an episode, because a tab
   // that is always empty for most of a register is furniture. A person with
   // one opens on it; everybody else opens where they always did.
+  // A woman with none still has the tab, which says so in a sentence; it
+  // simply does not open on it.
   const tabs: Tab[] = view.episodes.length
     ? ["care", "encounters", "overview", "timeline"]
-    : ["encounters", "overview", "timeline"];
+    : ["encounters", "care", "overview", "timeline"];
   const open_tab: Tab = tab ?? tabs[0];
 
   // Which fields name a subject and which describe one is the queue view's own
@@ -95,11 +100,66 @@ export function Patient({ id, cat, onOpenThread }: {
         </div>
       </section>
 
-      {open_tab === "care" && <Arc episodes={view.episodes} scale="year" />}
+      {open_tab === "care" && <Care view={view} id={id} name={name} />}
       {open_tab === "encounters" && <Encounters view={view} cat={cat} onOpenThread={onOpenThread} />}
       {open_tab === "overview" && <Overview view={view} />}
       {open_tab === "timeline" && <Timeline view={view} onOpenThread={onOpenThread} />}
     </div>
+  );
+}
+
+/** Her course of care: the shared calendar grid over HER OWN episodes, then the
+ *  plain list of each episode's visits. The rows are made here from what her
+ *  record already loaded; nothing is asked of the centre and nothing is kept.
+ *  The scale and the date are in the address, so a card from the home page
+ *  (`?at=`) lands on the month it names, and back and reload keep the place. */
+function Care({ view, id, name }: { view: SubjectView; id: string; name: string }) {
+  const [hash, setHash] = useState(() => location.hash);
+  useEffect(() => {
+    const on = () => setHash(location.hash);
+    addEventListener("hashchange", on);
+    return () => removeEventListener("hashchange", on);
+  }, []);
+  if (!view.episodes.length) {
+    return <div className="state-empty">Nothing is booked for her yet.</div>;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const scale = scaleOf(hash);
+  const anchor = atOf(hash) || today;
+  const goTo = (change: Parameters<typeof withView>[1]) => { location.hash = withView(location.hash, change).replace(/^#/, ""); };
+  const rows = ownRows(view.episodes, id, view.subject);
+  const SCALES: { scale: Scale; label: string }[] = [
+    { scale: "week", label: "Week" }, { scale: "month", label: "Month" }, { scale: "year", label: "Year" },
+  ];
+  return (
+    <>
+      <section className="cal-main" aria-label="Her dates">
+        <div className="cal-bar-tools">
+          <div className="cal-nav" data-scale={scale}>
+            <button type="button" className="gr-arrow" aria-label={`Previous ${scale}`} onClick={() => goTo({ at: step(scale, anchor, -1) })}>
+              <Icon name="chev" className="i" />
+            </button>
+            <button type="button" className="gr-arrow gr-next" aria-label={`Next ${scale}`} onClick={() => goTo({ at: step(scale, anchor, 1) })}>
+              <Icon name="chev" className="i" />
+            </button>
+            <button type="button" className="cal-chip" onClick={() => goTo({ at: "" })}>Today</button>
+          </div>
+          <h2 className="cal-title">{spanTitle(scale, anchor)}</h2>
+          <div className="cal-scales" role="group" aria-label="Scale">
+            {SCALES.map((s) => (
+              <button key={s.scale} type="button" className="cal-chip" aria-pressed={scale === s.scale} onClick={() => goTo({ scale: s.scale })}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Grid
+          scale={scale} anchor={anchor} today={today} rows={rows} nameOf={() => name} own
+          onPickDay={(d) => goTo({ at: d })} onAnchor={(d) => goTo({ at: d })}
+        />
+      </section>
+      <Arc episodes={view.episodes} />
+    </>
   );
 }
 

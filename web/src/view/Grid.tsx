@@ -56,6 +56,9 @@ export type GridProps = {
   onPickDay?: (day: string) => void;
   /** The phone's one-day week moved to another day. */
   onAnchor?: (day: string) => void;
+  /** The grid is one person's own: a chip leaves her name out, since the page
+   *  is already hers. */
+  own?: boolean;
 };
 
 export function Grid(p: GridProps) {
@@ -65,18 +68,18 @@ export function Grid(p: GridProps) {
   return narrow ? <OneDay {...p} /> : <Week {...p} />;
 }
 
-function Chip({ row, cell, nameOf, onOpenPatient }: Pick<GridProps, "nameOf" | "onOpenPatient"> & { row: CalendarRow; cell: string }) {
+function Chip({ row, cell, nameOf, onOpenPatient, own }: Pick<GridProps, "nameOf" | "onOpenPatient" | "own"> & { row: CalendarRow; cell: string }) {
   const who = nameOf(row.subject_row);
   // A late contact is drawn on today; the chip says when she was really due.
   const was = wasDue(row, cell);
-  const said = `${row.title} for ${who}${was ? `, due ${was}` : ""}`;
+  const said = `${row.title}${own ? "" : ` for ${who}`}${was ? `, due ${was}` : ""}`;
   return (
     <button
       type="button" className="gr-chip" data-tone={TONE[row.state] ?? "b-mute"}
       title={said} aria-label={said} onClick={() => onOpenPatient?.(row.subject)}
     >
       <Icon name={(MARK[row.state] ?? "clock") as never} className="i sm" />
-      <span className="gr-chip-who">{who}</span>
+      {!own && <span className="gr-chip-who">{who}</span>}
       {was && <span className="gr-chip-was">due {was}</span>}
       <span className="gr-chip-t">{row.title}</span>
     </button>
@@ -103,7 +106,7 @@ function Month(p: GridProps) {
         <div key={c.key} className="gr-cell" data-out={!c.inMonth || undefined} data-today={c.isToday || undefined}>
           <DayNumber c={c} onPickDay={p.onPickDay} />
           {c.rows.map((r) => (
-            <Chip key={`${r.schedule}|${r.episode}|${r.contact}|${r.subject}`} row={r} cell={c.key} nameOf={p.nameOf} onOpenPatient={p.onOpenPatient} />
+            <Chip key={`${r.schedule}|${r.episode}|${r.contact}|${r.subject}`} row={r} cell={c.key} nameOf={p.nameOf} onOpenPatient={p.onOpenPatient} own={p.own} />
           ))}
           {c.more > 0 && (
             <button type="button" className="gr-more" onClick={() => p.onPickDay?.(c.key)}>+{c.more} more</button>
@@ -135,7 +138,7 @@ function Days({ all, p, single }: { all: Cell[]; p: GridProps; single: boolean }
         {all.map((c) => (
           <div key={c.key} className="gr-band" data-today={c.isToday || undefined}>
             {c.rows.map((r) => (
-              <Chip key={`${r.schedule}|${r.episode}|${r.contact}|${r.subject}`} row={r} cell={c.key} nameOf={p.nameOf} onOpenPatient={p.onOpenPatient} />
+              <Chip key={`${r.schedule}|${r.episode}|${r.contact}|${r.subject}`} row={r} cell={c.key} nameOf={p.nameOf} onOpenPatient={p.onOpenPatient} own={p.own} />
             ))}
             {c.more > 0 && <button type="button" className="gr-more" onClick={() => p.onPickDay?.(c.key)}>+{c.more} more</button>}
           </div>
