@@ -35,7 +35,7 @@
 import assert from "node:assert/strict";
 import { WROTE } from "./types.ts";
 import type { CalendarRow } from "./types.ts";
-import { dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips } from "./view/day.ts";
+import { comingUp, dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips } from "./view/day.ts";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1340,6 +1340,38 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.match(screen, /from "\.\.\/thread\/Arc"/, "tones and marks come from Arc, not a second copy");
   assert.ok(!/\b(TONE|MARK)\s*[:=]/.test(screen), "the day screen redefines the arc's tones");
   ok("the day screen: late, owed, done; the caller's role first; an empty day says so");
+}
+
+// ------------------------------------------------------ the home page's card
+
+{
+  const g = (key: string, count: number) => ({ key, count });
+  const groups = [g("2026-11-02", 3), g("2026-11-04", 2), g("2026-11-05", 0), g("2026-11-06", 4), g("2026-11-07", 1),
+    g("2026-11-08", 1), g("2026-11-09", 1), g("2026-11-10", 1), g("2026-11-11", 1)];
+  // From today on, days with something owed, at most five; a past day is not "coming up".
+  const next = comingUp(groups, "2026-11-04");
+  assert.deepEqual(next.map((d) => d.key), ["2026-11-04", "2026-11-06", "2026-11-07", "2026-11-08", "2026-11-09"]);
+  assert.deepEqual(comingUp([], "2026-11-04"), []);
+  assert.deepEqual(comingUp(undefined, "2026-11-04"), [], "a view that sent no groups gives no days");
+  // Today and tomorrow are named; the rest by weekday, read without a time zone.
+  assert.equal(dayLabel("2026-11-04", "2026-11-04"), "Today");
+  assert.equal(dayLabel("2026-11-05", "2026-11-04"), "Tomorrow");
+  assert.equal(dayLabel("2026-11-06", "2026-11-04"), "Fri 6 Nov");
+  assert.equal(dateOf("2026-11-04T11:52:10Z"), "2026-11-04");
+  assert.equal(dateOf("garbage"), "");
+  // The date a link carries is read only when it is a whole date.
+  assert.equal(dayOn("#/views/x?on=2026-11-06"), "2026-11-06");
+  assert.equal(dayOn("#/views/x?on=soon"), "");
+  assert.equal(dayOn("#/views/x"), "");
+
+  const today = code(readFileSync(join(SRC, "screens", "Today.tsx"), "utf8"));
+  assert.match(today, /decl\.kind === "calendar"/, "the card is found by the declared kind of view");
+  assert.match(today, /comingUp\(/, "the card draws from the groups through day.ts");
+  assert.match(today, /\?on=/, "opening a day goes to the calendar on that date");
+  assert.ok(!/api\.view/.test(today), "the card asks for nothing: the calendar was already loaded for this caller");
+  const cal = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
+  assert.match(cal, /dayOn\(/, "the day screen opens on the date a link carries");
+  ok("the home card: the next days with their counts, absent without the capability, a day opens the calendar on it");
 }
 
 console.log(`\n${checks} checks passed`);

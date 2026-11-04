@@ -7,12 +7,13 @@
  *  here for the same reason it is red on the visit. Filtering by role happens
  *  here, on what the kernel already sent; nothing is stored.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, useAsync } from "../api";
 import { Icon } from "../icons";
+import { Loading } from "../parts";
 import { MARK, TONE } from "../thread/Arc";
 import type { CalendarRow, ViewResult } from "../types";
-import { dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips } from "./day";
+import { dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips } from "./day";
 
 export function Calendar({ result, nameOf, role, onOpenPatient }: {
   result: ViewResult;
@@ -28,7 +29,21 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
   // raw id shows, which is plain, where a cased id would be a word we made up.
   const cat = useAsync(() => api.catalogue(), []);
   const roleName = (r: string) => cat.data?.vocabulary?.role_titles?.[r] ?? r;
-  const rows = (result.rows ?? []) as CalendarRow[];
+  // A link from the home page names a day (`?on=`). It lives in the address,
+  // so the back button and a reload both land on the same day. Nothing is kept.
+  const [hash, setHash] = useState(() => location.hash);
+  useEffect(() => {
+    const on = () => setHash(location.hash);
+    addEventListener("hashchange", on);
+    return () => removeEventListener("hashchange", on);
+  }, []);
+  const today = dateOf(result.generated_at);
+  const asked = dayOn(hash);
+  const other = asked && asked !== today ? asked : "";
+  const fetched = useAsync(
+    () => (other ? api.view(result.view, undefined, other) : Promise.resolve(null)), [other, result.view]);
+  const answer = other ? fetched.data : result;
+  const rows = (answer?.rows ?? []) as CalendarRow[];
   const { roles, initial } = roleChips(rows, role, roleName);
     const [picked, setPicked] = useState<string | null>(null);
   const selected = picked ?? initial;
@@ -50,7 +65,11 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
         ))}
       </div>
 
-      {empty && <div className="state-empty">{empty}</div>}
+      {other && <h2 className="cal-h">{dayLabel(other, today)}</h2>}
+      {other && fetched.loading && !fetched.data && <Loading what="this day" shape="rows" rows={3} />}
+      {other && fetched.error && <div className="state-empty">This day could not be opened.</div>}
+
+      {empty && !(other && !fetched.data) && <div className="state-empty">{empty}</div>}
 
       {piles.map((g) => (
         <section key={g.pile} className="cal-pile" aria-label={g.label}>

@@ -125,8 +125,10 @@ export const api = {
    *  broke when half of it worked. */
   patients: (q: string, limit = 8) =>
     req<Resolution>(`/patients/search/?q=${encodeURIComponent(q)}&limit=${limit}`),
-  view: (id: string, thread?: string) =>
-    req<ViewResult>(`/views/${id}/${thread ? `?thread=${encodeURIComponent(thread)}` : ""}`),
+  view: (id: string, thread?: string, on?: string) => {
+    const q = [thread && `thread=${encodeURIComponent(thread)}`, on && `on=${encodeURIComponent(on)}`].filter(Boolean);
+    return req<ViewResult>(`/views/${id}/${q.length ? `?${q.join("&")}` : ""}`);
+  },
   thread: (id: string) => req<ThreadView>(`/threads/${id}/`),
   /** The spine: one subject and every visit it has had. 404 when the bundle
    *  declares no spine, which is a real answer and not an error to hide. */

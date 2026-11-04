@@ -60,3 +60,45 @@ export function dayOf(iso: string): { day: string; month: string } {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
   return m ? { day: String(Number(m[3])), month: MONTHS[Number(m[2]) - 1] ?? "" } : { day: "", month: "" };
 }
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** The date part of a kernel timestamp, or "" when it is not one. */
+export function dateOf(stamp: string): string {
+  const m = /^(\d{4}-\d{2}-\d{2})(?:T|$)/.exec(stamp ?? "");
+  return m ? m[1] : "";
+}
+
+/** The date a link to the day screen carries (`?on=YYYY-MM-DD`), or "" when
+ *  it carries none or not a whole date. Never trusted further than that. */
+export function dayOn(hash: string): string {
+  const m = /[?&]on=(\d{4}-\d{2}-\d{2})(?:&|$)/.exec(hash ?? "");
+  return m ? m[1] : "";
+}
+
+/** "Today", "Tomorrow", or "Fri 6 Nov". The weekday is worked out in UTC from
+ *  the parts, so no time zone can move it a day. */
+export function dayLabel(iso: string, today: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
+  if (!m) return iso;
+  if (iso === today) return "Today";
+  const t = /^(\d{4})-(\d{2})-(\d{2})$/.exec(today ?? "");
+  if (t && Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(+t[1], +t[2] - 1, +t[3]) === 86_400_000) return "Tomorrow";
+  const wd = WEEKDAYS[new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()];
+  const { day, month } = dayOf(iso);
+  return `${wd} ${day} ${month}`;
+}
+
+/** The days the home page's card lists: from today on, only days with
+ *  something owed, the first `limit`. The kernel's groups are the whole
+ *  month, so earlier days and empty ones are cut here. */
+export function comingUp(
+  groups: { key: string | null; count: number }[] | undefined,
+  today: string,
+  limit = 5,
+): { key: string; count: number }[] {
+  return (groups ?? [])
+    .filter((g): g is { key: string; count: number } => !!g.key && g.key >= today && g.count > 0)
+    .sort((a, b) => (a.key < b.key ? -1 : 1))
+    .slice(0, limit);
+}

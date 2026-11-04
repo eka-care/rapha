@@ -15,6 +15,7 @@ import { Icon } from "../icons";
 import type { Recent } from "../loops";
 import { Loading } from "../parts";
 import type { Catalogue, QueueRow, TaskRow } from "../types";
+import { comingUp, dateOf, dayLabel } from "../view/day";
 import { human, title } from "../words";
 
 /** How many names a flow column shows before it says how many more. */
@@ -110,6 +111,12 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
   const badges = queues[0]?.decl.badges ?? {};
   const columns = line(loaded, stations, badges);
   const busiest = columns.reduce((m, c) => Math.max(m, c.people.length), 0);
+
+  // The calendar is in `loaded` only if this caller holds its capability and
+  // the kernel answered, so a caller without it has no card and no empty frame.
+  const cal = loaded.find((l) => l.decl.kind === "calendar");
+  const today = cal ? dateOf(cal.result.generated_at) : "";
+  const days = cal ? comingUp(cal.result.groups, today) : [];
 
   return (
     <div className="home">
@@ -240,6 +247,27 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
                   </div>
                 )}
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {cal && (
+        <div className="card">
+          <div className="card-h"><div className="card-t">Coming up</div></div>
+          <div className="att">
+            {days.length === 0 ? (
+              <div className="state-empty">Nobody is owed a contact in the coming days.</div>
+            ) : days.map((d) => (
+              <button className="at" key={d.key}
+                      onClick={() => { location.hash = `/views/${cal.decl.id}?on=${d.key}`; }}>
+                <span className="at-b">
+                  <span className="at-t">{dayLabel(d.key, today)}</span>
+                  <span className="at-s">{d.count === 1 ? "1 contact owed" : `${d.count} contacts owed`}</span>
+                </span>
+                <span className="badge b-mute">{d.count}</span>
+                <span className="at-go">Open</span>
+              </button>
             ))}
           </div>
         </div>
