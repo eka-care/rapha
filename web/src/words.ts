@@ -82,6 +82,12 @@ export const sentence = (s: string | null | undefined) => {
   const t = (s ?? "").trim();
   const first = t.split(/[\s:]/)[0] ?? "";
   if (!t || ACRONYMS.has(first.toLowerCase())) return t;
+  // A SYMBOL SOMEBODY CASED ON PURPOSE. The list above holds the letters
+  // this product knows by name; a unit the terminology sent carries its case
+  // in itself, and a capital anywhere after the first letter of the first
+  // word is how it says so. mmHg is not MmHg, mL is not ML, pH is not PH,
+  // and a clinician notices that before they notice anything else.
+  if (/^[a-z][a-zA-Z]*[A-Z]/.test(first)) return t;
   return t.charAt(0).toUpperCase() + t.slice(1);
 };
 

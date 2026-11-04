@@ -26,6 +26,7 @@ import { firstOperation, isAsk, rows } from "./search.ts";
 import { blankRow, itemFields, toRow } from "./structured.ts";
 import { isRowGroup, rowQuestions, walk } from "./validate.ts";
 import { optionsFrom, type ValueSet } from "./valuesets.ts";
+import { sentence } from "./words.ts";
 import type { Catalogue, Display, Operation, Questionnaire, ThreadView, ViewDecl, ViewResult } from "./types";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -430,6 +431,55 @@ for (const [id, link_id, expected] of [
   }
 }
 
+// -- NOTHING A PERSON PICKS FROM STARTS IN LOWER CASE --------------------
+//
+// The terminology keeps its concepts the way a code system keeps them:
+// "centimetre", "degree Celsius", "per minute". That is right for a code
+// system and wrong for a menu, where each one is a standalone label read on
+// its own, and a list of eleven units all starting small reads as unfinished.
+// `sentence()` moves the first letter and nothing else, so the symbols the
+// terminology cased on purpose survive it.
+//
+// Over every choice on every form this bundle has, not over a sample: this
+// is the kind of thing that is right in the two places somebody looked and
+// wrong in the eleven they did not.
+{
+  const symbol = /^[a-z][a-zA-Z]*[A-Z]/;     // mmHg, mL, pH: cased on purpose
+  const bad: string[] = [];
+  let seen = 0;
+  for (const f of readdirSync(root + "questionnaires").filter((f) => f.endsWith(".json"))) {
+    const form = JSON.parse(read(`questionnaires/${f}`)) as Questionnaire;
+    for (const q of walk(form.questions)) {
+      if (q.type !== "choice") continue;
+      for (const o of options(q)) {
+        seen++;
+        if (/^[a-z]/.test(o.display) && !symbol.test(o.display)) {
+          bad.push(`${form.slug}/${q.link_id}: "${o.display}"`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(bad, [],
+    "an option a person picks from, offered starting in lower case:\n  " + bad.join("\n  "));
+  console.log(`ok   every one of ${seen} options on every form starts with a capital, `
+            + `unless it is a symbol cased on purpose`);
+}
+
+// And the rule that does it leaves a symbol exactly as the terminology spelled
+// it, because a unit's case is part of what the unit means.
+assert.equal(sentence("centimetre"), "Centimetre");
+assert.equal(sentence("degree Celsius"), "Degree Celsius");
+assert.equal(sentence("per minute"), "Per minute");
+assert.equal(sentence("thousand per microlitre"), "Thousand per microlitre");
+assert.equal(sentence("mmHg"), "mmHg", "a capital later in the first word means somebody cased it");
+assert.equal(sentence("mL"), "mL");
+assert.equal(sentence("pH"), "pH");
+assert.equal(sentence("ml"), "ml", "a unit this file already knows the spelling of is left to it");
+assert.equal(sentence("Already capital"), "Already capital");
+assert.equal(sentence("229799001"), "229799001", "a code is not a word");
+assert.equal(sentence(""), "");
+console.log("ok   a declared word is set to start a line; a symbol keeps the case it means");
+
 // A row the kernel sent as a bare string keeps its text where mapping.items()
 // would have looked for it, so opening a proposal never loses a line.
 const orderFields = itemFields(cat.operations["phc.op.lab-order"], "investigations");
@@ -485,11 +535,11 @@ const agentSentences = [
   agentLine({ ...thread, audit: thread.audit.slice(2, 3) }, ctx),  // proposed
 ].flatMap((l) => l.sentences);
 assert.ok(agentSentences.length >= 6, "the narration check has real sentences to examine");
-for (const sentence of agentSentences) {
-  assert.ok(!/was confirmed by .* at \d/.test(sentence),
-    `FAIL narration restates a posted card: ${sentence}`);
-  assert.ok(!/I have no way to do that/.test(sentence),
-    `FAIL a refusal that offers nothing is a dead end: ${sentence}`);
+for (const said of agentSentences) {
+  assert.ok(!/was confirmed by .* at \d/.test(said),
+    `FAIL narration restates a posted card: ${said}`);
+  assert.ok(!/I have no way to do that/.test(said),
+    `FAIL a refusal that offers nothing is a dead end: ${said}`);
 }
 
 // -- a posted card names who did it, and "System" is nobody -----------------

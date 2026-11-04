@@ -14,6 +14,16 @@
  *  Nothing here names a concept, a code system or a value set. The slug comes
  *  off the question.
  */
+/** An option is a standalone label a person picks from, so it is set to
+ *  start a line and the letters that are names rather than words are set in
+ *  capitals. "asha" and "mo" are a worker and a doctor; a menu offering them
+ *  in lower case is a menu nobody proofread. See words.ts: the spelling
+ *  table is there, once, and not in any screen. */
+import { sentence, spell } from "./words.ts";
+
+/** What a picker SHOWS. The stored value is always the code beside it. */
+const shown = (display: string) => sentence(spell(display));
+
 export type Concept = { display?: string };
 export type ValueSet = { slug: string; system: string; concepts: Record<string, Concept> };
 export type Option = { value: string; display: string };
@@ -34,13 +44,13 @@ export function optionsFrom(
   // was wrong. The fallback stays for a question that declares no display,
   // because an option with no word is still an option.
   if (q.answer_option?.length) {
-    return q.answer_option.map((o) => ({ value: o.value, display: o.display || o.value }));
+    return q.answer_option.map((o) => ({ value: o.value, display: shown(o.display || o.value) }));
   }
   const found = q.answer_value_set ? sets[q.answer_value_set] : undefined;
   if (!found) return [];
   // Sorted by what a person reads, not by the code. A code order is a random
   // order on screen.
   return Object.entries(found.concepts)
-    .map(([code, c]) => ({ value: code, display: c.display || code }))
+    .map(([code, c]) => ({ value: code, display: shown(c.display || code) }))
     .sort((a, b) => a.display.localeCompare(b.display));
 }
