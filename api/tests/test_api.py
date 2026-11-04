@@ -906,6 +906,28 @@ def test_no_subject_carries_the_kernels_own_bookkeeping():
         assert "operation" not in (row.get("subject") or {}), row
 
 
+def test_the_calendar_route_answers_a_day_and_refuses_a_caller_without_the_capability():
+    from datetime import date, timedelta
+    today = date.today()
+    main.store.db.execute(
+        "INSERT INTO episode_of_care (id, patient, type, status, anchor_date, anchor_basis,"
+        " outcome, created_date) VALUES ('ep-cal', ?, 'pregnancy', 'active', ?,"
+        " 'last_menstrual_period', '', ?)",
+        [main.store.select("patient", thread=None, where={}, fields=(), limit=1)[0]["id"],
+         (today - timedelta(days=100)).isoformat(), (today - timedelta(days=100)).isoformat()])
+    body = client.get("/api/views/phc.view.calendar?on=%s" % today.isoformat())
+    assert body.status_code == 200, body.text
+    assert body.json()["kind"] == "calendar" and body.json()["groups"]
+    assert client.get("/api/views/phc.view.calendar?on=soon").status_code == 400
+    real = main.caller
+    main.caller = lambda request: {"id": "user:none", "role": "none", "capabilities": [],
+                                   "scopes": []}
+    try:
+        assert client.get("/api/views/phc.view.calendar").status_code == 403
+    finally:
+        main.caller = real
+
+
 if __name__ == "__main__":
     ran = 0
     for name, fn in sorted(globals().items()):

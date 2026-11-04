@@ -87,6 +87,9 @@ python3 -m kernel.tests.test_schedule
 # pregnancy must owe nothing to any day: both fail if episodes are found
 # through recent visits or if anything is stored.
 python3 -m kernel.tests.test_cohort
+# The calendar view: a day as rows and its month as counts, which must agree
+# about a missed contact that is owed on every day after its window shuts.
+python3 -m kernel.tests.test_views
 # A view declaration whose kind, workflow or episode types name something
 # that does not exist: it would draw an empty screen and report nothing.
 python3 -m kernel.tests.test_declarations

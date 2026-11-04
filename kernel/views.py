@@ -10,9 +10,11 @@ numbers are computed on the machine that holds the records.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+import calendar as _cal
+from datetime import date, datetime, timedelta, timezone
 
 from kernel import clock
+from kernel import cohort
 from kernel import contracts as c
 from kernel.state import actions, count, flags, line, station
 
@@ -85,6 +87,31 @@ def _queue(bundle, view, store, at):
     return rows, groups
 
 
+def _covers(entry, day):
+    """Whether a contact is owed on this day. A missed contact stays owed on
+    every day after its window shuts, so its `on` list alone is not the
+    answer; one rule serves both the day's rows and the month's counts, so
+    they cannot disagree."""
+    iso = day.isoformat()
+    return iso in entry["on"] or (entry["state"] == "missed" and entry["closes"] < iso)
+
+
+def _calendar(bundle, view, store, on, at):
+    """The day's owed contacts as rows, and the day's month as counts."""
+    now = at or datetime.now(timezone.utc)
+    day = now.date() if on is None else date.fromisoformat(str(on))
+    first = day.replace(day=1)
+    last = day.replace(day=_cal.monthrange(day.year, day.month)[1])
+    owed = cohort.owed(bundle, store, bundle.workflows[view.workflow],
+                       types=view.episodes, since=first, until=last, at=now)
+    rows = [e for e in owed if _covers(e, day)]
+    groups = []
+    for n in range((last - first).days + 1):
+        d = first + timedelta(days=n)
+        groups.append({"key": d.isoformat(), "count": sum(1 for e in owed if _covers(e, d))})
+    return rows, groups
+
+
 def _as_list(v):
     if v is None:
         return []
@@ -150,10 +177,11 @@ def _summary(bundle, view, store, thread, caps):
     return out
 
 
-def resolve(bundle, view_id, store, *, thread=None, caps=frozenset(), at=None):
+def resolve(bundle, view_id, store, *, thread=None, caps=frozenset(), at=None, on=None):
     """Evaluate one view. `thread` is required for a summary and ignored
     otherwise. `caps` is the caller's; the capability to open the view is the
-    caller's check, at the route, not here."""
+    caller's check, at the route, not here. `on` is the day a calendar
+    answers for (ISO date; today when absent) and is ignored otherwise."""
     view = bundle.views[view_id]
     generated_at = (at or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -169,6 +197,8 @@ def resolve(bundle, view_id, store, *, thread=None, caps=frozenset(), at=None):
         groups = []
     elif view.kind == "tasklist":
         rows, groups = _tasklist(bundle, view, store, at), []
+    elif view.kind == "calendar":
+        rows, groups = _calendar(bundle, view, store, on, at)
     else:
         raise ValueError(f"unknown view kind '{view.kind}'")
 

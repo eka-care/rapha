@@ -646,7 +646,7 @@ def queue(request: Request, view: str = None):
 
 
 @router.get("/views/{view_id}")
-def get_view(view_id: str, request: Request, thread: str = None):
+def get_view(view_id: str, request: Request, thread: str = None, on: str = None):
     user = caller(request)
     declaration = BUNDLE.views.get(view_id)
     if not declaration:
@@ -655,7 +655,7 @@ def get_view(view_id: str, request: Request, thread: str = None):
         raise HTTPException(403, "missing capability %s" % declaration.capability)
     try:
         result = views.resolve(BUNDLE, view_id, store, thread=thread,
-                               caps=set(user["capabilities"]))
+                               caps=set(user["capabilities"]), on=on)
     except ValueError as e:
         raise HTTPException(400, str(e))
     return result.to_json()
