@@ -13,7 +13,7 @@
  */
 import { useState } from "react";
 import { Icon } from "../icons";
-import { months, type Scale } from "./arc-scale";
+import { bands, months, type Scale } from "./arc-scale";
 import type { Contact, Episode } from "../types";
 import { human, title } from "../words";
 
@@ -57,6 +57,8 @@ export function Arc({ episodes, onAct, scale: first = "day" }: {
 
 function OneArc({ episode, onAct, first }: { episode: Episode; onAct?: (op: string) => void; first: Scale }) {
   const [scale, setScale] = useState<Scale>(first);
+  const drawable = months(episode).length > 0;
+  const shown: Scale = drawable ? scale : "day";
   const over = episode.status === "ended";
   return (
     <section className="card arc">
@@ -90,16 +92,19 @@ function OneArc({ episode, onAct, first }: { episode: Episode; onAct?: (op: stri
         </p>
       ) : (
         <>
-        <div className="arc-scale" role="tablist" aria-label="Scale">
+        {!drawable && (
+          <p className="arc-basis">These dates cannot be drawn as months, so they are listed.</p>
+        )}
+        {drawable && <div className="arc-scale" role="tablist" aria-label="Scale">
           {(["day", "month", "year"] as Scale[]).map((k) => (
             <button key={k} type="button" role="tab" aria-selected={scale === k}
               className={scale === k ? "on" : ""} onClick={() => setScale(k)}>
               {title(k)}
             </button>
           ))}
-        </div>
-        {scale !== "day" && <Months episode={episode} dense={scale === "year"} />}
-        {scale === "day" && (
+        </div>}
+        {shown !== "day" && <Months episode={episode} dense={shown === "year"} />}
+        {shown === "day" && (
         <ol className="arc-list">
           {episode.contacts.map((c) => (
             <Step key={c.contact} contact={c} onAct={onAct} />
@@ -147,26 +152,41 @@ function Step({ contact, onAct }: { contact: Contact; onAct?: (op: string) => vo
 const monthName = (key: string) =>
   new Date(`${key}-01T00:00:00Z`).toLocaleString("en-IN", { month: "short", year: "numeric", timeZone: "UTC" });
 
-/** The arc as months, every month between the first contact and the last
- *  drawn even when nothing falls in it: the empty stretch is the point. */
+const today = () => new Date().toISOString().slice(0, 10);
+
+/** The arc as months. Months nobody is owed anything in run together into one
+ *  block, because the empty stretch is the point and four quiet rows are not
+ *  as loud as one large one. */
 function Months({ episode, dense }: { episode: Episode; dense: boolean }) {
-  const ms = months(episode);
+  const now = today();
   return (
     <div className={`arc-months${dense ? " dense" : ""}`}>
-      {ms.map((m) => (
-        <div key={m.month} className="arc-month">
-          <div className="arc-mn">{monthName(m.month)}</div>
-          <div className="arc-days">
-            {!m.days.some((d) => d.state) && <span className="arc-none">Nothing booked</span>}
-            {m.days.map((d) => (
-              <span key={d.day} title={d.state ? `${d.event}, ${d.state}, ${d.day}` : d.day}
-                className={`arc-d${d.state ? ` s-${d.state}` : ""}`}>
-                {!dense && Number(d.day.slice(8))}
-              </span>
-            ))}
+      {bands(months(episode)).map((b) => {
+        if (b.kind === "gap") {
+          const span = b.from === b.to ? monthName(b.from) : `${monthName(b.from)} to ${monthName(b.to)}`;
+          const past = b.to < now.slice(0, 7);
+          const here = b.from <= now.slice(0, 7) && now.slice(0, 7) <= b.to;
+          return (
+            <div key={b.from} className={`arc-gap${past ? " past" : ""}`}>
+              {span}: nothing booked{here && " · today is in this gap"}
+            </div>
+          );
+        }
+        const m = b.m;
+        return (
+          <div key={m.month} className="arc-month">
+            <div className="arc-mn">{monthName(m.month)}</div>
+            <div className="arc-days">
+              {m.days.map((d) => (
+                <span key={d.day} title={d.state ? `${d.event}, ${d.state}, ${d.day}` : d.day}
+                  className={`arc-d${d.owed ? " owed" : ""}${d.state ? ` s-${d.state}` : ""}${d.day === now ? " today" : ""}`}>
+                  {!dense && Number(d.day.slice(8))}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

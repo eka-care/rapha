@@ -340,15 +340,24 @@
 .arc-days { position: relative; flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 2px; }
 .arc-d {
   flex: 1 1 0; min-width: 4px; height: 14px; border-radius: 2px;
-  background: var(--color-bg-subtle); font-size: 10px; text-align: center; line-height: 14px;
+  background: transparent; box-shadow: inset 0 0 0 1px var(--color-border-subtle);
+  font-size: 10px; text-align: center; line-height: 14px;
   color: var(--color-text-tertiary);
 }
 .arc-months:not(.dense) .arc-d { flex: 0 0 26px; height: 26px; line-height: 26px; }
+.arc-d.owed { background: var(--color-accent-soft); box-shadow: none; }
 .arc-d.s-done { background: var(--color-success); color: var(--color-bg-surface); }
 .arc-d.s-due { background: var(--color-accent); color: var(--color-bg-surface); }
 .arc-d.s-missed { background: var(--color-critical); color: var(--color-bg-surface); }
 .arc-d.s-upcoming { background: var(--color-text-tertiary); color: var(--color-bg-surface); }
-.arc-none {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  font-size: 10.5px; color: var(--color-text-tertiary); pointer-events: none;
+.arc-d.today { outline: 2px solid var(--color-text-primary); outline-offset: 1px; position: relative; z-index: 1; }
+/* Months nobody is owed anything in, as one block. It is the loudest thing on
+   the card on purpose: a stretch with no care in it is what this card is for. */
+.arc-gap {
+  min-height: 56px; display: flex; align-items: center; justify-content: center; text-align: center;
+  border: 1.5px dashed var(--color-critical); border-radius: var(--radius-md, 8px);
+  background: var(--color-critical-soft); color: var(--color-critical);
+  font-size: 13px; font-weight: 600; padding: 8px 12px;
 }
+.arc-gap.past { border-style: solid; }
+.arc-gap:not(.past) { background: var(--color-bg-subtle); border-color: var(--color-border-subtle); color: var(--color-text-secondary); }

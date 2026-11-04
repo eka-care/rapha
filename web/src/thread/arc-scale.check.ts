@@ -1,6 +1,6 @@
 /** Run: node --experimental-strip-types src/thread/arc-scale.check.ts   (from web/) */
 import assert from "node:assert/strict";
-import { months } from "./arc-scale.ts";
+import { bands, months } from "./arc-scale.ts";
 import type { Episode } from "../types.ts";
 
 let checks = 0;
@@ -33,9 +33,11 @@ ok(marked[1].state === "missed" && marked[1].event === "Visit 2", "state and tit
 ok(m[1].days.every((d) => !d.state), "the empty month has no marks");
 ok(m[1].days.length === 31 && m[3].days.length === 31 && m[5].days.length === 28, "month lengths");
 
-// Two episodes are two arcs.
-ok(months(ep("b", [contact("1", "2026-01-01", "2026-01-05", "2026-01-31", "done")])).length === 1,
-   "one month alone");
+// Two overlapping episodes of one type stay two arcs, each with its own months.
+const e1 = ep("e1", [contact("1", "2026-03-01", "2026-03-10", "2026-03-31", "done")]);
+const e2 = ep("e2", [contact("1", "2026-04-01", "2026-04-10", "2026-05-31", "due")]);
+ok(months(e1).map((x) => x.month).join() === "2026-03" &&
+   months(e2).map((x) => x.month).join() === "2026-04,2026-05", "two episodes, two arcs");
 // No contacts: no months.
 ok(months(ep("c", [])).length === 0, "no contacts, no months");
 // Same day: the worse state wins.
@@ -44,4 +46,20 @@ const same = months(ep("d", [
   contact("2", "2026-05-01", "2026-05-09", "2026-05-30", "missed"),
 ]));
 ok(same[0].days[8].state === "missed", "missed shows over done on one day");
+// Bad dates cannot hang or draw: out of range month, far future, junk.
+ok(months(ep("x", [contact("1", "2026-13-01", "2026-13-05", "2026-13-30", "due")])).length === 0, "month 13 draws nothing");
+ok(months(ep("y", [contact("1", "2026-01-01", "2026-01-05", "9999-12-31", "due")])).length === 0, "absurd span draws nothing");
+ok(months(ep("z", [contact("1", "soon", "x", "later", "due")])).length === 0, "junk draws nothing");
+ok(months(ep("w", [contact("1", "2026-02-30", "2026-02-30", "2026-03-05", "due")])).length === 0, "30 February is not a date");
+// A leap February has 29 days.
+ok(months(ep("l", [contact("1", "2028-02-01", "2028-02-10", "2028-02-28", "due")]))[0].days.length === 29, "leap february");
+// A window is owed across months: March is not empty when a window runs through it.
+const w = months(ep("v", [contact("1", "2026-02-01", "2026-02-10", "2026-03-10", "missed")]));
+ok(w[1].days[0].owed && w[1].days[9].owed && !w[1].days[10].owed, "window covers 1 to 10 March");
+// Consecutive empty months become one band.
+const b = bands(months(ep("g", [
+  contact("1", "2026-01-01", "2026-01-05", "2026-01-31", "done"),
+  contact("2", "2026-06-01", "2026-06-05", "2026-06-30", "due"),
+])));
+ok(b.length === 3 && b[1].kind === "gap" && (b[1] as { count: number }).count === 4, "four empty months, one band");
 console.log(`ok   arc-scale: ${checks} checks`);
