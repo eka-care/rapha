@@ -96,10 +96,23 @@ def _covers(entry, day):
     return iso in entry["on"] or (entry["state"] == "missed" and entry["closes"] < iso)
 
 
+def _day(on):
+    """A calendar day is a date: exactly YYYY-MM-DD. A timestamp would raise
+    a timezone question (whose midnight?) the route cannot answer, and newer
+    Pythons also take compact and week forms; the Go twin takes one spelling
+    and so does this."""
+    text = str(on)
+    if len(text) != 10 or text[4] != "-" or text[7] != "-" \
+            or not (text[:4] + text[5:7] + text[8:]).isascii() \
+            or not (text[:4] + text[5:7] + text[8:]).isdigit():
+        raise ValueError("Invalid isoformat string: %r" % text)
+    return date.fromisoformat(text)
+
+
 def _calendar(bundle, view, store, on, at):
     """The day's owed contacts as rows, and the day's month as counts."""
     now = at or datetime.now(timezone.utc)
-    day = now.date() if on is None else date.fromisoformat(str(on))
+    day = now.date() if on is None else _day(on)
     first = day.replace(day=1)
     last = day.replace(day=_cal.monthrange(day.year, day.month)[1])
     owed = cohort.owed(bundle, store, bundle.workflows[view.workflow],

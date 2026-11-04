@@ -467,8 +467,10 @@ func calendar(b Bundle, view carephc.View, s Reader, on *string,
 	at time.Time) ([]cohort.Entry, []Group, error) {
 	day := at.UTC().Truncate(24 * time.Hour)
 	if on != nil {
+		// Exactly YYYY-MM-DD, as the Python's _day: a timestamp raises a
+		// timezone question the route cannot answer.
 		parsed, err := time.Parse("2006-01-02", *on)
-		if err != nil {
+		if err != nil || len(*on) != 10 {
 			// The Python's date.fromisoformat message, which the route
 			// turns into a 400.
 			return nil, nil, Declared{Reason: "Invalid isoformat string: " + pyval.Repr(*on)}

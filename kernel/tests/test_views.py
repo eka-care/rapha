@@ -51,11 +51,14 @@ def test_a_day_whose_episodes_have_all_ended_answers_no_rows():
 
 
 def test_a_bad_on_date_is_a_400_and_not_a_silent_today():
-    try:
-        views.resolve(BUNDLE, VIEW, pregnant(), on="31st October")
-    except ValueError:
-        return
-    raise AssertionError("an unparseable date was accepted")
+    # Only YYYY-MM-DD is a day: not a timestamp, not the compact form, not a
+    # week date. The Go engine refuses the same list (care_phc_mcp/views).
+    for bad in ("31st October", "2026-11-04T00:00:00", "20261104", "2026-W45-3", "2026-1-4", ""):
+        try:
+            views.resolve(BUNDLE, VIEW, pregnant(), on=bad)
+        except ValueError:
+            continue
+        raise AssertionError("%r was accepted as a day" % bad)
 
 
 def test_a_missed_contact_is_on_every_day_after_its_window_shuts():
