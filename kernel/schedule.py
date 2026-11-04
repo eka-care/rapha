@@ -159,6 +159,7 @@ def contacts(bundle, store, workflow, episode, *, at=None):
             "operation": contact.operation,
             "authority": contact.authority,
             "reports_as": contact.reports_as or "",
+            "programme_title": contact.programme_title or "",
             "done_at": done or "",
             # How the date this is all measured from was arrived at, carried
             # on every contact so a screen can say it. A contact "due in

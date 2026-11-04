@@ -315,6 +315,8 @@ type Contact struct {
 	Authority   string `json:"authority"`
 	EscalatesTo string `json:"escalates_to"`
 	ReportsAs   string `json:"reports_as"`
+	// ProgrammeTitle is the programme's own phrasing, shown on hover; optional.
+	ProgrammeTitle string `json:"programme_title"`
 }
 
 // Schedule is kernel/contracts.Schedule: what a centre owes somebody over

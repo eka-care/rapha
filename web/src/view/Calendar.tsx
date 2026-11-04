@@ -123,7 +123,7 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
                     <span className="cal-what">
                       <span className="cal-sentence">
                         <Icon name={(MARK[r.state] ?? "clock") as never} className="i sm" />
-                        {r.title} for {nameOf(r.subject_row)}
+                        <span title={r.programme_title || undefined}>{r.title}</span> for {nameOf(r.subject_row)}
                       </span>
                       <span className="cal-when">
                         {r.state === "done" && r.done_at ? <>Recorded {r.done_at}</> : <>Closes {r.closes}</>}

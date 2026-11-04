@@ -341,6 +341,8 @@ export type SubjectView = {
    *  starts, runs and ends. Empty for a bundle that declares no episode and
    *  for a person who has had none. */
   episodes: Episode[];
+  /** The kernel's clock when this was answered, the way a view answer has. */
+  generated_at: string;
 };
 
 /** One episode, and what it owes. `contacts` is DERIVED by the kernel from
@@ -379,6 +381,9 @@ export type Contact = {
   operation: string;
   authority: string;
   reports_as: string;
+  /** The programme's own phrasing for this contact, shown on hover while
+   *  `title` is the plain words. "" when the programme has none. */
+  programme_title?: string;
   done_at: string;
   basis: string;
 };

@@ -54,20 +54,21 @@ type Episode struct {
 
 // Contact is one computed contact, in the Python's own JSON field order.
 type Contact struct {
-	Contact   string `json:"contact"`
-	Title     string `json:"title"`
-	Schedule  string `json:"schedule"`
-	Episode   string `json:"episode"`
-	Opens     string `json:"opens"`
-	Due       string `json:"due"`
-	Closes    string `json:"closes"`
-	State     string `json:"state"`
-	Owner     string `json:"owner"`
-	Operation string `json:"operation"`
-	Authority string `json:"authority"`
-	ReportsAs string `json:"reports_as"`
-	DoneAt    string `json:"done_at"`
-	Basis     string `json:"basis"`
+	Contact        string `json:"contact"`
+	Title          string `json:"title"`
+	Schedule       string `json:"schedule"`
+	Episode        string `json:"episode"`
+	Opens          string `json:"opens"`
+	Due            string `json:"due"`
+	Closes         string `json:"closes"`
+	State          string `json:"state"`
+	Owner          string `json:"owner"`
+	Operation      string `json:"operation"`
+	Authority      string `json:"authority"`
+	ReportsAs      string `json:"reports_as"`
+	ProgrammeTitle string `json:"programme_title"`
+	DoneAt         string `json:"done_at"`
+	Basis          string `json:"basis"`
 }
 
 // committed are the audit outcome prefixes that mean the thing was done.
@@ -199,7 +200,8 @@ func Contacts(cat *carephc.Catalogue, s Reader, ep Episode, at time.Time) ([]Con
 			Closes:  shuts.Format("2006-01-02"),
 			State:   state, Owner: owner, Operation: contact.Operation,
 			Authority: contact.Authority, ReportsAs: contact.ReportsAs,
-			DoneAt: doneAt, Basis: ep.AnchorBasis,
+			ProgrammeTitle: contact.ProgrammeTitle,
+			DoneAt:         doneAt, Basis: ep.AnchorBasis,
 		})
 	}
 	return out, nil

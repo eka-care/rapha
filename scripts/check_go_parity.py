@@ -1777,6 +1777,27 @@ def properties(shape, scenario, walk):
     # is the half a diff cannot reach: two resolvers that both ignored a
     # view's window, or both let a declined visit onto "consent never asked",
     # would agree perfectly.
+    # Task 8's two additions, asserted on what BOTH engines answered rather
+    # than left to the diff alone: the diff would pass if both forgot them.
+    # A subject answer carries the kernel's clock, and every contact on her
+    # arc carries the programme's own phrasing exactly as the schedule
+    # declared it ("" where it declared none).
+    declared_names = {c["id"]: c.get("programme_title") or ""
+                      for sch in declared()["schedules"].values() for c in sch["contacts"]}
+    subjects = [(label, body) for label, status, body in walk.raw
+                if status == 200 and isinstance(body, dict)
+                and "encounters" in body and "episodes" in body]
+    for label, body in subjects:
+        assert "generated_at" in body, "%s: the subject answer has no generated_at" % label
+        for ep in body["episodes"]:
+            for c in ep.get("contacts", []):
+                assert c.get("programme_title") == declared_names.get(c["contact"], ""), \
+                    "%s: contact %s says %r for the programme's name" % (
+                        label, c["contact"], c.get("programme_title"))
+    if subjects:
+        ok("%d subject answers carry generated_at and each contact's programme name"
+           % len(subjects))
+
     seen = [(label, body) for label, status, body in walk.raw
             if status == 200 and isinstance(body, dict)
             and "view" in body and "generated_at" in body]

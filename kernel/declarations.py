@@ -52,6 +52,8 @@ REQUIRED = {
 }
 # What a contact must say. `escalates_to` and `reports_as` are optional: not
 # every contact escalates, and not every one fills a line in a register.
+# `programme_title` is optional for the same reason: only say it where the
+# programme's own wording differs from the plain `title`.
 CONTACT_REQUIRED = ("id", "title", "due", "opens", "closes", "owner",
                     "operation", "authority")
 AUTHORITY = ("statutory", "clinical", "centre")
@@ -652,6 +654,9 @@ def _lint_schedule(fm, manifest, ops, fail, drawn=frozenset()):
             fail(f"contact '{cid}': declared twice")
         seen.add(cid)
 
+        if contact.get("programme_title") is not None and not (
+                isinstance(contact["programme_title"], str) and contact["programme_title"].strip()):
+            fail(f"contact '{cid}': programme_title is words or absent, never empty")
         if contact.get("authority") not in AUTHORITY:
             fail(f"contact '{cid}': authority must be one of {AUTHORITY}")
         # THE WINDOW HAS TO CONTAIN THE DAY IT IS AIMED AT. A contact whose

@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cells, dayTone, ownRows, span, step, wasDue } from "./cells.ts";
+import { cells, dayTone, ownRows, span, step, tipOf, wasDue } from "./cells.ts";
 import type { CalendarRow, Episode } from "../types.ts";
 
 let checks = 0;
@@ -212,6 +212,18 @@ const DEC = "2026-12-09";
     assert.deepEqual(hit, [], `${f} names: ${hit.join(", ")}`);
   }
   ok("neither grid file spells a station, flag, capability, operation, state or column");
+}
+
+// ------------------------------------------- the programme's words, on hover
+{
+  // A chip shows the plain name and carries the programme's name as its tooltip.
+  const r = { ...row("a", "2026-11-04"), title: "Second check-up", programme_title: "Second antenatal contact" };
+  assert.equal(tipOf(r, "Second check-up"), "Second check-up (Second antenatal contact)");
+  // A contact with no programme name shows the plain name and no extra words.
+  const plain = { ...row("b", "2026-11-04"), title: "Third day visit", programme_title: "" };
+  assert.equal(tipOf(plain, "Third day visit"), "Third day visit");
+  assert.equal(tipOf(row("c", "2026-11-04"), "x"), "x", "a kernel that sends none is the same as an empty one");
+  ok("the programme's phrasing rides behind the plain name, and only when there is one");
 }
 
 // ------------------------------------------------- one woman's own episodes

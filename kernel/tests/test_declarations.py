@@ -56,6 +56,41 @@ def test_the_shipped_calendar_declaration_compiles():
     assert view["episodes"] == ["pregnancy", "postnatal"]
 
 
+def test_a_contact_carries_both_a_plain_name_and_the_programme_s():
+    anc = CAT["schedules"]["phc.sched.antenatal"]["contacts"]
+    assert [c["title"] for c in anc] == [
+        "First check-up", "Second check-up", "Third check-up", "Fourth check-up"]
+    assert [c["programme_title"] for c in anc] == [
+        "First antenatal contact", "Second antenatal contact",
+        "Third antenatal contact", "Fourth antenatal contact"]
+    # The statutory code is a third thing and stays as it was.
+    assert [c["reports_as"] for c in anc] == ["ANC1", "ANC2", "ANC3", "ANC4"]
+
+
+def test_a_schedule_declaring_no_programme_name_still_compiles():
+    decls = _decls()
+    for c in decls["phc.sched.postnatal"][0]["contacts"]:
+        c.pop("programme_title", None)
+    assert _lint(decls) == []
+    bundle = declarations.load("phc")
+    from kernel.contracts import Contact
+    assert Contact.__dataclass_fields__["programme_title"].default is None
+    assert bundle.schedules["phc.sched.postnatal"].contacts
+
+
+def test_the_subject_answer_carries_the_date_it_was_generated():
+    import re
+    from adapters.local.store import SqliteStore
+    from kernel import spine
+    b = declarations.load("phc")
+    store = SqliteStore(":memory:")
+    wf = b.workflow()
+    store.write("patient", {"id": "p-x", "name": "X"}, thread="e-x")
+    found = spine.of(b, store, wf, "p-x")
+    assert found is not None
+    assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", found["generated_at"])
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

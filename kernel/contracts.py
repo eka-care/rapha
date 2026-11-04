@@ -388,6 +388,11 @@ class Contact:
     # not the same as the contact: a centre following eight antenatal
     # contacts still reports four.
     reports_as: Optional[str] = None
+    # The programme's own phrasing for this contact ("Second antenatal
+    # contact"), shown on hover while `title` is the plain words shown on the
+    # screen. Absent when the programme has no wording of its own that
+    # differs; never invented. It is not `reports_as`, the statutory code.
+    programme_title: Optional[str] = None
 
 
 @dataclass(frozen=True)

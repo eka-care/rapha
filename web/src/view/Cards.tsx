@@ -35,7 +35,7 @@ export function Cards({ rows, now, nameOf, metaOf, roleName, onOpen }: {
               <span className="stk-when" data-late={r.state === "missed" ? "" : undefined}>{owedLine(r, now)}</span>
               <span className="stk-who">{nameOf(r.subject_row)}</span>
               {meta && <span className="stk-meta">{meta}</span>}
-              <span className="stk-what">{r.title}</span>
+              <span className="stk-what" title={r.programme_title || undefined}>{r.title}</span>
               {r.owner && <span className="stk-role">{roleName(r.owner)}</span>}
             </>
           );

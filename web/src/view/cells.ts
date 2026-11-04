@@ -133,6 +133,12 @@ export function wasDue(row: CalendarRow, cell: string): string {
   return day ? `${day} ${month}` : "";
 }
 
+/** The hover text for a contact: what is already said, with the programme's own
+ *  phrasing behind it in brackets. Unchanged when the programme has none. */
+export function tipOf(row: CalendarRow, said: string): string {
+  return row.programme_title ? `${said} (${row.programme_title})` : said;
+}
+
 /** One woman's own episodes as grid rows, for her record.
  *
  *  A DELIBERATE DIFFERENCE FROM THE FACILITY PAGE. The centre's range answer

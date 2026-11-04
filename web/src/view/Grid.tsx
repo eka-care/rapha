@@ -15,7 +15,7 @@ import { Icon } from "../icons";
 import { MARK, TONE } from "../thread/Arc";
 import type { CalendarRow } from "../types";
 import { dayLabel, dayOf } from "./day";
-import { cells, dayTone, step, wasDue, type Scale } from "./cells";
+import { cells, dayTone, step, tipOf, wasDue, type Scale } from "./cells";
 
 /** How many contacts a month cell lists before it says "+N more". */
 const MAX = 3;
@@ -76,7 +76,7 @@ function Chip({ row, cell, nameOf, onOpenPatient, own }: Pick<GridProps, "nameOf
   return (
     <button
       type="button" className="gr-chip" data-tone={TONE[row.state] ?? "b-mute"}
-      title={said} aria-label={said} onClick={() => onOpenPatient?.(row.subject)}
+      title={tipOf(row, said)} aria-label={said} onClick={() => onOpenPatient?.(row.subject)}
     >
       <Icon name={(MARK[row.state] ?? "clock") as never} className="i sm" />
       {!own && <span className="gr-chip-who">{who}</span>}

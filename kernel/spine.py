@@ -22,6 +22,8 @@ ordinary selects. The Store protocol stays at its nine methods.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from catalogue import vocab
 
 from kernel import schedule as sched
@@ -73,8 +75,11 @@ def of(bundle, store, workflow, subject_id, *, limit=200):
             "did": _did(store, thread, bundle),
         })
     visits.sort(key=lambda v: v["opened_at"], reverse=True)
+    # The kernel's own clock, so a screen drawing this person's dates takes
+    # "today" from the same place a view answer does.
     return {"subject": subject, "spine": link, "encounters": visits,
-            "episodes": episodes(bundle, store, workflow, subject_id, visits)}
+            "episodes": episodes(bundle, store, workflow, subject_id, visits),
+            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
 
 
 def episodes(bundle, store, workflow, subject_id, visits, *, at=None):

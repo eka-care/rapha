@@ -17,7 +17,8 @@ anchor:
   best_estimate: 0
 contacts:
   - id: anc1
-    title: First antenatal contact
+    title: First check-up
+    programme_title: First antenatal contact
     due: 84
     opens: 0
     closes: 90
@@ -27,7 +28,8 @@ contacts:
     authority: statutory
     reports_as: ANC1
   - id: anc2
-    title: Second antenatal contact
+    title: Second check-up
+    programme_title: Second antenatal contact
     due: 154
     opens: 98
     closes: 182
@@ -37,7 +39,8 @@ contacts:
     authority: statutory
     reports_as: ANC2
   - id: anc3
-    title: Third antenatal contact
+    title: Third check-up
+    programme_title: Third antenatal contact
     due: 210
     opens: 196
     closes: 238
@@ -47,7 +50,8 @@ contacts:
     authority: statutory
     reports_as: ANC3
   - id: anc4
-    title: Fourth antenatal contact
+    title: Fourth check-up
+    programme_title: Fourth antenatal contact
     due: 252
     opens: 245
     closes: 294

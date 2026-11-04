@@ -72,6 +72,8 @@ type Found struct {
 	Spine      string         `json:"spine"`
 	Encounters []Visit        `json:"encounters"`
 	Episodes   []Episode      `json:"episodes"`
+	// GeneratedAt is the kernel's clock when this was answered, as a view has.
+	GeneratedAt string `json:"generated_at"`
 }
 
 // Episode is the level between a person and a visit: one course of care that
@@ -154,7 +156,8 @@ func Of(s Reader, cat *carephc.Catalogue, wf *carephc.Workflow,
 	if err != nil {
 		return nil, err
 	}
-	return &Found{Subject: subject, Spine: link, Encounters: visits, Episodes: arcs}, nil
+	return &Found{Subject: subject, Spine: link, Encounters: visits, Episodes: arcs,
+		GeneratedAt: time.Now().UTC().Format("2006-01-02T15:04:05Z")}, nil
 }
 
 // Episodes is kernel/spine.episodes: this subject's episodes, newest first,
