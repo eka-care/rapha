@@ -1381,7 +1381,8 @@ def s_the_calendar_with_women_in_it(walk, codes):
                 assert r["cell"] == r["due"], (label, r["due"], r["cell"])
             else:
                 assert r["state"] not in ("done", "upcoming") \
-                    and r["cell"] == today.isoformat(), (label, r)
+                    and r["cell"] == today.isoformat() \
+                    and r["due"] < a.isoformat(), (label, r)
     # A missed contact due before the week is drawn on today.
     assert any(r["due"] < week_start.isoformat() and r["cell"] == today.isoformat()
                for r in ranges["a week around today"]["rows"]), "no late marker in the week"

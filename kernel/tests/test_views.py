@@ -194,6 +194,23 @@ def test_a_due_contact_past_its_due_day_lands_on_today_and_one_inside_stays_put(
     assert "anc2" not in [x["contact"] for x in r.rows]
 
 
+def test_a_due_contact_ahead_of_today_never_piles_onto_today():
+    anc2 = contact("anc2")
+    store = pregnant()
+    today = day(anc2.due - 5)                      # window open, so the state is `due`
+    count = lambda r: {g["key"]: g["count"] for g in r.groups}
+    # Due after the range, today inside it: not drawn anywhere, least of all today.
+    r = span(store, today.isoformat(), (today + timedelta(days=2)).isoformat(), at=today)
+    assert "anc2" not in [x["contact"] for x in r.rows], r.rows
+    assert count(r)[today.isoformat()] == len([x for x in r.rows if x["cell"] == today.isoformat()])
+    # Due inside the range, ahead of today: on its own day, once, not on today.
+    r = span(store, today.isoformat(), (today + timedelta(days=20)).isoformat(), at=today)
+    rows = [x for x in r.rows if x["contact"] == "anc2"]
+    assert len(rows) == 1 and rows[0]["state"] == "due", rows
+    assert rows[0]["cell"] == day(anc2.due).isoformat(), rows
+    assert count(r)[day(anc2.due).isoformat()] == 1
+
+
 def refused(**kw):
     try:
         views.resolve(BUNDLE, VIEW, pregnant(), **kw)

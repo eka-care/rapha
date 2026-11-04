@@ -336,6 +336,35 @@ func TestADayHasNoCellOnItsRows(t *testing.T) {
 	}
 }
 
+// The guard on the widening: a due visit ahead of today never lands on today.
+func TestADueContactAheadOfTodayStaysOnItsOwnDay(t *testing.T) {
+	g := gridCentre(t)
+	g.today = time.Date(2026, 6, 3, 12, 0, 0, 0, time.UTC) // ANC2 is due 2026-06-08, window open
+	cells := func(rows []CalendarRow) (n int, cell string) {
+		for _, r := range rows {
+			if r.Contact.Contact == "anc2" {
+				n++
+				cell = r.Cell
+				if r.State != schedule.Due {
+					t.Errorf("anc2 is %s, the fixture wanted due", r.State)
+				}
+			}
+		}
+		return
+	}
+	rows, _ := g.ask("2026-06-03", "2026-06-05") // due after the range
+	if n, cell := cells(rows); n != 0 {
+		t.Errorf("due after the range: drawn on %q, want absent", cell)
+	}
+	rows, groups := g.ask("2026-06-03", "2026-06-20")
+	if n, cell := cells(rows); n != 1 || cell != "2026-06-08" {
+		t.Errorf("due inside the range: drawn %d times on %q, want once on 2026-06-08", n, cell)
+	}
+	if countOn(groups, "2026-06-08") != 1 {
+		t.Errorf("not counted once on its own day: %d", countOn(groups, "2026-06-08"))
+	}
+}
+
 // A contact is `due` for as long as its window is open, so one past its due
 // day is still due. Asked about from a range that starts after that day, it is
 // late: a marker on today, once, and a due day inside the range keeps its own.
