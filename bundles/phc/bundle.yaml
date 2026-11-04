@@ -365,9 +365,19 @@ roles:
                    assessment.record, appointment.book]
   anm:
     title: ANM
+    # `encounter.document` is here BY THE OWNER'S DECISION, recorded on 4
+    # November 2026, and it is a scope of practice decision rather than a
+    # technical one. An ANM runs antenatal care at a sub-centre, so a
+    # schedule that assigns her an antenatal contact and a product that
+    # will not let her record it cannot both be right. The cost is that it
+    # also lets her document any consultation, because the antenatal visit
+    # is a template of the general one and shares its capability. Giving
+    # the antenatal visit a capability of its own is still the smaller,
+    # narrower change and remains available; see
+    # bundles/phc/phc.sched.antenatal.md.
     capabilities: [patient.find, patient.register, abha.link, visit.household,
                    assessment.record, appointment.book, vitals.record,
-                   episode.manage]
+                   encounter.document, episode.manage]
   cho:
     title: Community health officer
     capabilities: [patient.find, patient.register, abha.link, visit.household,

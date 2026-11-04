@@ -8,6 +8,7 @@
       "assessment.record",
       "appointment.book",
       "vitals.record",
+      "encounter.document",
       "episode.manage"
     ],
     "asha": [
@@ -3131,11 +3132,11 @@
           "authority": "statutory",
           "closes": 90,
           "due": 84,
-          "escalates_to": "mo",
+          "escalates_to": "cho",
           "id": "anc1",
           "opens": 0,
           "operation": "phc.op.antenatal-visit",
-          "owner": "cho",
+          "owner": "anm",
           "reports_as": "ANC1",
           "title": "First antenatal contact"
         },
@@ -3143,11 +3144,11 @@
           "authority": "statutory",
           "closes": 182,
           "due": 154,
-          "escalates_to": "mo",
+          "escalates_to": "cho",
           "id": "anc2",
           "opens": 98,
           "operation": "phc.op.antenatal-visit",
-          "owner": "cho",
+          "owner": "anm",
           "reports_as": "ANC2",
           "title": "Second antenatal contact"
         },
@@ -3155,11 +3156,11 @@
           "authority": "statutory",
           "closes": 238,
           "due": 210,
-          "escalates_to": "mo",
+          "escalates_to": "cho",
           "id": "anc3",
           "opens": 196,
           "operation": "phc.op.antenatal-visit",
-          "owner": "cho",
+          "owner": "anm",
           "reports_as": "ANC3",
           "title": "Third antenatal contact"
         },
@@ -3167,11 +3168,11 @@
           "authority": "statutory",
           "closes": 294,
           "due": 252,
-          "escalates_to": "mo",
+          "escalates_to": "cho",
           "id": "anc4",
           "opens": 245,
           "operation": "phc.op.antenatal-visit",
-          "owner": "cho",
+          "owner": "anm",
           "reports_as": "ANC4",
           "title": "Fourth antenatal contact"
         }
@@ -3652,6 +3653,7 @@
         "assessment.record",
         "appointment.book",
         "vitals.record",
+        "encounter.document",
         "episode.manage"
       ],
       "asha": [

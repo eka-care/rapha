@@ -21,8 +21,8 @@ contacts:
     due: 84
     opens: 0
     closes: 90
-    owner: cho
-    escalates_to: mo
+    owner: anm
+    escalates_to: cho
     operation: phc.op.antenatal-visit
     authority: statutory
     reports_as: ANC1
@@ -31,8 +31,8 @@ contacts:
     due: 154
     opens: 98
     closes: 182
-    owner: cho
-    escalates_to: mo
+    owner: anm
+    escalates_to: cho
     operation: phc.op.antenatal-visit
     authority: statutory
     reports_as: ANC2
@@ -41,8 +41,8 @@ contacts:
     due: 210
     opens: 196
     closes: 238
-    owner: cho
-    escalates_to: mo
+    owner: anm
+    escalates_to: cho
     operation: phc.op.antenatal-visit
     authority: statutory
     reports_as: ANC3
@@ -51,8 +51,8 @@ contacts:
     due: 252
     opens: 245
     closes: 294
-    owner: cho
-    escalates_to: mo
+    owner: anm
+    escalates_to: cho
     operation: phc.op.antenatal-visit
     authority: statutory
     reports_as: ANC4
@@ -132,37 +132,41 @@ not say "nothing due" without saying which of those two it means.
 
 ## Who owns one, and the thing that found out
 
-The community health officer, escalating to the medical officer when the
-window closes with the contact still open. The owner is a role and not a
-person, because a sub-centre's staff change and a schedule naming one of
-them would be wrong on the day they did.
+The ANM, escalating to the community health officer when the window closes
+with the contact still open. The owner is a role and not a person, because a
+sub-centre's staff change and a schedule naming one of them would be wrong
+on the day they did.
 
-It says `cho` and it should probably say `anm`, AND THE LINT IS WHAT FOUND
-THAT OUT. The first draft of this file assigned every contact to the ANM,
-which is who runs antenatal care at a sub-centre in India, and the build
-refused it in these words:
+IT SAYS `anm` BECAUSE THE LINT MADE SOMEBODY DECIDE. The first draft of this
+file assigned every contact to the ANM, which is who runs antenatal care at
+a sub-centre in India, and the build refused it in these words:
 
     contact 'anc1': owner 'anm' does not hold 'encounter.document', so the
     person this is assigned to could not perform it
 
-That is true and it is not a problem with this file. `phc.op.antenatal-visit`
-is a template of the general consultation, so it needs `encounter.document`,
-and in `bundle.yaml` only the medical officer and the community health
-officer hold it. **An ANM cannot record an antenatal visit in this product
-today.** Nobody decided that; it is what falls out of an antenatal visit
-being a kind of consultation and an ANM not being a doctor.
+That was true. `phc.op.antenatal-visit` is a template of the general
+consultation, so it needs `encounter.document`, and at that point only the
+medical officer and the community health officer held it. An ANM could not
+record an antenatal visit in this product. Nobody had decided that; it fell
+out of an antenatal visit being a kind of consultation and an ANM not being
+a doctor.
 
-There are two ways out and both are the owner's call. Give the ANM
-`encounter.document`, which also lets her document any consultation and is
-a scope of practice decision nobody here can make. Or give the antenatal
-visit a capability of its own, which is the smaller change and means
-deciding what that capability is. Until then `cho` is the honest answer,
-because the Health and Wellness Centre model does put a community health
-officer at this level and she does hold it.
+The owner decided on 4 November 2026: give the ANM `encounter.document`.
+That is recorded in `bundle.yaml` beside the capability, with what it costs.
+It also lets her document any consultation, which is the part that had to be
+decided rather than inferred. The narrower alternative, a capability of its
+own for the antenatal visit, is still open and is still smaller; it was not
+taken because it means naming a new capability and nothing is waiting on
+that.
 
-The check that refuses this is worth keeping whichever way it goes: a
-schedule assigned to somebody who could not possibly perform it fails the
-build instead of failing in a village.
+Escalation goes to the community health officer and not straight to the
+medical officer. She is the next person up the line who can also perform the
+contact, so the escalation hands the work to somebody who can finish it
+rather than to somebody who can only ask about it.
+
+The check that refused the first draft is worth keeping whichever way it
+goes: a schedule assigned to somebody who could not possibly perform it
+fails the build instead of failing in a village.
 
 ## What closes one
 
