@@ -82,6 +82,11 @@ python3 -m kernel.tests.test_clock
 # episode's own date. An episode that has ended owes nothing, with no
 # cancellation step anybody could forget to call.
 python3 -m kernel.tests.test_schedule
+# What a centre owes between two dates, swept across every open episode. A
+# woman nobody has seen for months must still be listed, and an ended
+# pregnancy must owe nothing to any day: both fail if episodes are found
+# through recent visits or if anything is stored.
+python3 -m kernel.tests.test_cohort
 # A view declaration whose kind, workflow or episode types name something
 # that does not exist: it would draw an empty screen and report nothing.
 python3 -m kernel.tests.test_declarations
@@ -254,6 +259,7 @@ if [ -d web/node_modules ]; then
   # never leaves one. Pure rules over a rectangle, so no browser.
   (cd web && node --experimental-strip-types src/app/guide.check.ts)
   (cd web && node --experimental-strip-types src/app/width.check.ts)
+  python3 -m api.vault
   (cd web && node --experimental-strip-types src/form/span.check.ts)
   (cd web && node --experimental-strip-types src/ui/pick.check.ts)
   # Speaking into whatever field has the cursor: where the words land, what

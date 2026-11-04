@@ -30,8 +30,12 @@ import type { Catalogue, Operation } from "../types";
 const LONG = 120;
 
 export function Background({
-  papers, add, adding, onAdd, thread, client, cat, flags, onDone,
+  papers, add, adding, onAdd, thread, client, cat, flags, patient, onDone,
 }: {
+  /** The patient's own Eka identifier, when this centre has published them.
+   *  Handed down so a photographed paper is filed under the person it
+   *  belongs to; see paper/Scan.tsx for what happens when there is none. */
+  patient: string | null;
   papers: Msg[];
   /** The ways to copy one in that THIS person is offered. Already filtered
    *  by the guard, so an empty list means their role does not hold it. */
@@ -54,6 +58,7 @@ export function Background({
           client={client}
           instruments={cat.instruments}
           flags={flags}
+          patient={patient}
           onDone={onDone}
           onCancel={() => onAdd(null)}
         />

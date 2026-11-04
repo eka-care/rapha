@@ -49,8 +49,15 @@ const FROM_ABHA = "From ABHA";
 
 export function OperationPanel({
   op, thread, client, proposal, draft, instruments, inline, mobile, seed, start, found,
-  amending, onDone, onCancel,
+  amending, patient, onDone, onCancel,
 }: {
+  /** The patient's own Eka identifier, when this centre has published them
+   *  to the patient directory. Only a document instrument reads it, to file
+   *  the photograph under the person it belongs to; every other instrument
+   *  and the form itself never see it. Undefined where the caller has no
+   *  patient in hand at all, which is the same as not published as far as
+   *  this screen is concerned. */
+  patient?: string | null;
   /** This is a CORRECTION to what this operation already recorded on this
    *  visit, not a new record. The form is the same form; what changes is
    *  that the kernel replaces the rows instead of adding a second set. */
@@ -421,8 +428,8 @@ export function OperationPanel({
         {/* The camera, above the fields it fills. A declaration decides
             whether it is there at all; see paper/Scan.tsx. */}
         {showForm && (
-          <Scan mounts={mounts} operation={op.id} disabled={busy}
-                onDraft={fromInstrument} />
+          <Scan mounts={mounts} operation={op.id} patient={patient ?? null}
+                disabled={busy} onDraft={fromInstrument} />
         )}
 
         <VoiceCapture

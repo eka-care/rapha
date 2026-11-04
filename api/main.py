@@ -32,13 +32,13 @@ import json
 import os
 from dataclasses import asdict
 
-from fastapi import APIRouter, Body, FastAPI, HTTPException, Request
+from fastapi import APIRouter, Body, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
 
 from adapters.local.store import SqliteStore, seed
 from agent import turn
-from api import fill, outbox, paper, scribe
+from api import fill, notes, outbox, paper, scribe, vault
 from catalogue import validate, vocab
 from kernel import (declarations, directory, plugins, queues, spine, proposals,
                     state, terminology, tokens, views)
@@ -937,6 +937,11 @@ def abha_config():
 # for what was taken out and what it would take to put back.
 
 
+# Notes a recording had written are kept beside the visit, so the next person
+# to open it reads one note with everybody's part in it. See api/notes.py.
+scribe.KEEP = lambda **kw: notes.keep(DB, **kw)
+
+
 def scribe_allowed(user):
     """{operation_id: {"schema": questionnaire}} a recording may fill for this caller:
     on a scribe instrument's list, and within the caller's capabilities."""
@@ -968,6 +973,29 @@ def scribe_pick(user, names):
     return {n: allowed[n] for n in wanted}, instrument
 
 
+def note_default(title):
+    """{id, title} of the library template a station declares, or None."""
+    want = str(title or "").strip().lower()
+    if not want:
+        return None
+    try:
+        for item in scribe.library():
+            if item["title"].strip().lower() == want:
+                return {"id": item["id"], "title": item["title"]}
+    except scribe.ScribeError:
+        pass
+    return None
+
+
+@router.get("/scribe/notes")
+def scribe_notes(request: Request, thread: str = ""):
+    """The notes this visit has had written, one per template, each with a
+    section per recording under the name of whoever made it. Words to read:
+    this lists, and writes nothing."""
+    caller(request)
+    return {"notes": notes.for_thread(DB, thread_of({"thread": thread}))}
+
+
 @router.get("/scribe/templates")
 def scribe_templates(request: Request, station: str = ""):
     """What a recording may fill at this station, for this caller: the
@@ -980,6 +1008,12 @@ def scribe_templates(request: Request, station: str = ""):
     default = cfg.get("default") if cfg.get("default") in choose else None
     return {"default": default,
             "choose": [{"operation": o, "title": BUNDLE.operations[o]["title"]} for o in choose],
+            # The note this station is written up in unless somebody says
+            # otherwise: the bundle names it by title and Eka's library says
+            # which template that is. Absent when the station declares none,
+            # when the library has no such template, or when Eka cannot be
+            # reached -- a recording does not need one.
+            "note": note_default(cfg.get("note")),
             # No language list. Nothing picks one: every recording goes up
             # as `auto`, which is every language this facility supports, and
             # the service decides what it heard. See api/scribe.LANGUAGES.
@@ -1061,7 +1095,13 @@ async def scribe_start(request: Request, thread: str = None, format: str = None,
     thread_id = thread_of({"thread": thread})
     if language not in scribe.LANGUAGES:
         raise HTTPException(400, "Unknown language %r." % language)
-    picked, instrument = scribe_pick(user, operations.split(","))
+    # NO FORM CHOSEN IS A TRANSCRIPT. Choosing a template is not mandatory:
+    # a recording with neither a form nor a note is still a recording, and
+    # what it produces is the words.
+    if any(n.strip() for n in operations.split(",")):
+        picked, instrument = scribe_pick(user, operations.split(","))
+    else:
+        picked, instrument = {}, ""
     # Library templates asked for beside the forms: a note in Eka's own shape
     # (a SOAP note, a discharge summary) written from the same recording.
     try:
@@ -1162,40 +1202,41 @@ def paper_allowed(user, operation):
 
 
 @router.post("/paper")
-async def paper_read(request: Request, operation: str = ""):
-    """The browser posts one photograph here, as the raw body.
+async def paper_read(request: Request, body: dict = Body(default={})):
+    """What the service read off a document the browser already uploaded.
+
+    The picture does not come through here. The browser uploads it with
+    @eka-care/medical-records-ts-sdk -- the SDK the claims portal uses --
+    which sends it to the presigned bucket the service hands back, and posts
+    the document id here. So a ten megabyte photograph never travels through
+    this process, and the credential never travels to the browser: the SDK is
+    pointed at this kernel and `/mr/api/v1/...` below attaches it.
 
     The answer is a Draft and never a write. This route has no Store, calls
     nothing that does, and the values it returns reach the record only the
     way every other drafted value does: drawn in editable fields, checked by
     a person, committed by a tap.
 
-    The picture is one temporary file inside api/paper.read, deleted in its
-    `finally`, and it is deleted from the service too in the same `finally`.
-    Nothing under this repository ever holds it.
-
-    A read that fills nothing answers 422 with a sentence, rather than an
-    empty draft. An empty draft looks like an answer, and the honest reading
-    of a handwritten camp note is that the parser made nothing of it.
+    The document stays on the patient's record. It is theirs, it was filed
+    under their own Eka oid, and it follows them.
     """
     user = caller(request)
+    operation = str(body.get("operation") or "")
     decl = paper_allowed(user, operation)
     if not decl:
         raise HTTPException(400, "Nothing here reads a document into %r." % operation)
-    picture = await request.body()
+    document = str(body.get("document_id") or "")
+    patient = str(body.get("patient") or "") or None
     try:
-        body = await run_in_threadpool(
-            paper.read, picture,
-            content_type=request.headers.get("content-type"),
-            filename=request.headers.get("x-filename"))
+        read = await run_in_threadpool(paper.describe, document, patient=patient)
     except paper.PaperError as broke:
         raise HTTPException(503, str(broke))
-    draft = paper.parse(body, operation=operation, instrument=decl.id,
+    draft = paper.parse(read, operation=operation, instrument=decl.id,
                         fills=decl.fills)
     if not draft:
         raise HTTPException(
-            422, "Nothing could be read off that picture. Type what the "
-                 "paper says.")
+            422, "Nothing could be read off that picture. It is saved on the "
+                 "patient's record; type what it says for this visit.")
     return draft
 
 
@@ -1313,6 +1354,46 @@ app.add_middleware(
 # what the MCP server already calls, and those paths do not move.
 app.include_router(router, prefix="/api")
 app.include_router(router, prefix="/api/v1/phc")
+
+
+@app.api_route("/mr/api/v1/{rest:path}",
+               methods=["GET", "POST", "PATCH", "DELETE"])
+async def medical_records(rest: str, request: Request):
+    """The medical records seam the browser's own SDK talks to.
+
+    NOT UNDER /api, and deliberately. These are the service's own paths,
+    spelled the service's way, because the thing calling them is
+    @eka-care/medical-records-ts-sdk with its `baseUrl` pointed here. A
+    kernel route would mean a fork of the SDK, and a fork of the SDK is the
+    thing the owner asked not to have: they wanted the claims portal's
+    implementation, and this is it, with the credential kept on this side.
+
+    api/vault.py decides what may be forwarded. It is a short list of
+    prefixes and one identifier segment, because a proxy that forwards
+    anything is a hole in a kernel that is otherwise careful about what
+    leaves it.
+    """
+    caller(request)                       # a signed-in role, like every route
+    path = "/mr/api/v1/" + rest
+    body = await request.body()
+    try:
+        status, out, headers = await run_in_threadpool(
+            vault.forward, request.method, path,
+            request.url.query, body, dict(request.headers))
+    except vault.VaultError as broke:
+        raise HTTPException(503, str(broke))
+    if status == 401:
+        # The facility's token went stale. One retry with a fresh one, which
+        # is what the SDK's own onUnauthorized would do if it held the token.
+        vault.forget()
+        try:
+            status, out, headers = await run_in_threadpool(
+                vault.forward, request.method, path,
+                request.url.query, body, dict(request.headers))
+        except vault.VaultError as broke:
+            raise HTTPException(503, str(broke))
+    return Response(content=out, status_code=status,
+                    media_type=headers.get("content-type"))
 
 
 @app.middleware("http")

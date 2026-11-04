@@ -1,9 +1,10 @@
 """Reading a photographed document, server side: a picture in, a draft out.
 
-The browser photographs the paper and posts it here. The Eka credentials
-never leave this process and the picture never reaches this repository: it is
-written to one temporary file, handed to the connector, and deleted in a
-`finally`, exactly as api/scribe.py does with a recording.
+The browser photographs the paper and uploads it with the medical records
+SDK -- the same @eka-care/medical-records-ts-sdk the claims portal uses --
+pointed at this kernel, which attaches the credential and passes the call on.
+So the picture never travels through this process and the credential never
+reaches the browser. What arrives here is a document id.
 
 What comes back is a Draft in the sense of kernel/contracts.py. Nothing in
 this module writes, proposes or commits. It has no Store, and api/main.py's
@@ -11,12 +12,15 @@ route hands it nothing that could reach one. A person reads the draft in
 editable fields and taps, which is the architecture's third rule and is not
 weakened here.
 
-THE PICTURE IS DELETED FROM THE SERVICE TOO. The upload exists to be read,
-and `delete_document` runs in a `finally` whether the read worked or not. So
-Eka holds the document for about half a minute, this repository never holds
-it, and what survives is the text a person checked. A centre that wants the
-photograph kept needs a store this kernel does not have; leaving the upload
-behind by accident would be the worst of both.
+THE PAPER IS KEPT, ON THE PATIENT'S OWN RECORD. The owner decided this on 4
+November 2026, once the patient directory's Eka `oid` turned out to be the
+identifier the medical records API scopes by: a document the patient brought
+to this centre is filed against them and follows them to the next one, which
+is the whole point of a health record that is theirs rather than ours.
+
+It is filed under their oid and nothing else, so a patient this centre has
+not published to the directory has nowhere for it to go. That case is not
+fudged: the form says so and offers to publish them first.
 
 What Eka actually answers, seen live against https://api.eka.care on
 2026-11-04 with a synthetic one page report (not read from a document):
@@ -47,34 +51,17 @@ from __future__ import annotations
 
 import datetime
 import os
-import tempfile
 import uuid
 
 from api.scribe import ScribeError, client, sdk
 from care_phc.connectors.scribe.eka import _scrub
 
-# What the service is told it is looking at. "lr" is its code for a
-# laboratory report, which is what the parser is good at and what a patient
-# most often carries. A discharge summary read as a lab report yields its
-# date and whatever table it holds, which is more than nothing and is never
-# presented as more than it is.
-DOCUMENT_TYPE = "lr"
-
-# How long to wait for the parse before giving up and telling the person to
-# type it. Thirty seconds is the measured time for one page; this is six
-# times that, because a four page discharge summary is a real thing and
-# giving up on it at forty seconds would be giving up on the common case.
-PATIENCE_SECONDS = 180
-EVERY = 5
-
-# The extensions the service accepts, and the only ones this will send.
-KINDS = {"image/jpeg": ".jpg", "image/png": ".png", "application/pdf": ".pdf",
-         "image/heic": ".heic", "image/webp": ".webp"}
-
-# Ten megabytes, which is the service's own documented ceiling. A photograph
-# from a modern phone can exceed it, and being told so here is better than a
-# refusal from somebody else's API relayed through two layers.
-MAX_BYTES = 10 * 1024 * 1024
+# WHAT MAY BE UPLOADED IS THE SDK'S RULE NOW, not this module's. It carries
+# UPLOAD_CONSTRAINTS -- the accepted content types, 25 MB for a PDF and 10 MB
+# for an image -- and it refuses in the browser, before anything is sent,
+# which is the only place a person can do something about it. A second copy
+# of those numbers here would be a second copy to keep in step with a
+# library that owns them.
 
 # Every value a read fills is unconfirmed, whatever the service thought. The
 # same cap the scribe uses, and for a stronger reason: a recording is of
@@ -94,88 +81,55 @@ class PaperError(ScribeError):
 
 
 # ------------------------------------------------------------------ connector
+#
+# THE PICTURE NO LONGER PASSES THROUGH HERE. The browser uploads it with
+# @eka-care/medical-records-ts-sdk, which is the SDK the claims portal uses,
+# straight to the presigned bucket the service hands back. What reaches this
+# module is a document id, and what this module does is wait for the service
+# to finish reading it and say what it read.
+#
+# Two things are better for that. A ten megabyte photograph no longer travels
+# through this process at all, and the paper is filed against the patient's
+# own Eka record instead of being thrown away, which is the owner's decision
+# of 4 November 2026: a document the patient brought follows the patient.
+#
+# The credential still never reaches the browser. The SDK is pointed at this
+# kernel, which proxies to the service and attaches the authorisation; see
+# `/mr/api/v1/...` in api/main.py.
 
-def _suffix(content_type, filename):
-    """The extension to write the temporary file under, or a refusal."""
-    kind = (content_type or "").split(";")[0].strip().lower()
-    if kind in KINDS:
-        return KINDS[kind]
-    ext = os.path.splitext(filename or "")[1].lower()
-    if ext in set(KINDS.values()):
-        return ext
-    raise PaperError(
-        "That file is not a photograph or a PDF, so it cannot be read. "
-        "Photograph the paper, or type what it says.")
 
+def describe(document_id, *, patient=None, sleep=None, now=None):
+    """Wait for the service to finish reading one uploaded document.
 
-def read(picture, *, content_type=None, filename=None, sleep=None, now=None):
-    """Upload one picture, wait for the parse, delete it, return what it said.
-
-    Returns the service's own document body. Pure of this kernel's shapes on
-    purpose: `parse` below turns it into a draft and is checked without a
-    network.
+    `patient` is the Eka oid the document was filed under, which the service
+    wants as `X-Pt-Id`. The Python SDK's own `get_document` does not send it,
+    so the header goes on by hand through the same client.
     """
-    if not picture:
-        raise PaperError("The picture was empty, so there is nothing to read.")
-    if len(picture) > MAX_BYTES:
-        raise PaperError(
-            "That picture is larger than the reader accepts (%d MB, and the "
-            "limit is %d MB). Photograph it again at a lower size, or type "
-            "what it says." % (len(picture) // (1024 * 1024), MAX_BYTES // (1024 * 1024)))
+    if not document_id:
+        raise PaperError("No document to read. Photograph the paper again.")
 
     import time
     nap = sleep or time.sleep
     clock = now or time.monotonic
 
-    suffix = _suffix(content_type, filename)
-    handle, path = tempfile.mkstemp(prefix="phc-paper-", suffix=suffix)
-    document = None
-    try:
-        with os.fdopen(handle, "wb") as out:
-            out.write(picture)
+    started = clock()
+    while True:
         try:
-            up = sdk(lambda: client().records.upload_document(
-                file_path=path, document_type=DOCUMENT_TYPE,
-                tags=["phc-" + uuid.uuid4().hex[:12]]))
+            body = sdk(lambda: client().request(
+                method="GET", endpoint="/mr/api/v1/docs/%s" % document_id,
+                headers={"X-Pt-Id": patient} if patient else None))
         except Exception as broke:
             raise PaperError(
-                "The reader refused the picture (%s). Nothing was read. Type "
-                "what the paper says." % _scrub(str(broke))[:300]) from None
-        document = (up or {}).get("document_id")
-        if not document:
+                "Could not reach the reader to collect what it read (%s). "
+                "Type what the paper says." % _scrub(str(broke))[:300]) from None
+        if (body or {}).get("smart_report"):
+            return body
+        if clock() - started > PATIENCE_SECONDS:
             raise PaperError(
-                "The reader accepted the picture and gave nothing back to "
-                "read it by. Type what the paper says.")
-
-        started = clock()
-        while True:
-            nap(EVERY)
-            try:
-                body = sdk(lambda: client().records.get_document(document))
-            except Exception as broke:
-                raise PaperError(
-                    "Could not reach the reader to collect what it read (%s). "
-                    "Type what the paper says." % _scrub(str(broke))[:300]) from None
-            if (body or {}).get("smart_report"):
-                return body
-            if clock() - started > PATIENCE_SECONDS:
-                raise PaperError(
-                    "The reader is still working after %d seconds, so it has "
-                    "been given up on. Type what the paper says."
-                    % PATIENCE_SECONDS)
-    finally:
-        # THE ONE COPY HERE, gone. Before anything propagates, not after.
-        if os.path.exists(path):
-            os.remove(path)
-        # AND THE COPY THERE. Best effort by necessity -- there is nothing
-        # useful to tell a clinician about a failed cleanup, and raising it
-        # would replace a good read with an error about housekeeping -- but
-        # it is never skipped, including on the error paths above.
-        if document:
-            try:
-                sdk(lambda: client().records.delete_document(document))
-            except Exception:
-                pass
+                "The reader is still working after %d seconds, so it has been "
+                "given up on. The paper is saved on the patient's record; type "
+                "what it says for this visit." % PATIENCE_SECONDS)
+        nap(EVERY)
 
 
 # ------------------------------------------------- reading the response
@@ -391,18 +345,6 @@ def demo():
     for bad, what in ((0, "no epoch"), ("nonsense", "a word"), (10 ** 20, "the far future")):
         assert _day(bad) is None, what
     ok("an unreadable date is no date, rather than a wrong one")
-
-    # The file gate, which is the one place a refusal happens before any
-    # network call at all.
-    assert _suffix("image/jpeg", None) == ".jpg"
-    assert _suffix(None, "report.PDF") == ".pdf"
-    for ct, name in ((None, "notes.docx"), ("text/plain", "x.txt"), (None, None)):
-        try:
-            _suffix(ct, name)
-            raise AssertionError("accepted %r %r" % (ct, name))
-        except PaperError as e:
-            assert "type what it says" in str(e).lower(), str(e)
-    ok("only a photograph or a PDF is sent, and a refusal says what to do instead")
 
     print("\n%d paper checks passed" % checks)
 

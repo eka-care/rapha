@@ -26,7 +26,7 @@
 import { useRef, useState } from "react";
 import { Icon } from "../icons";
 import { ApiError } from "../api";
-import { readPaper } from "./client";
+import { filePaper, readPaper } from "./client";
 import type { ScribeDraft } from "../scribe/session";
 import type { Mount } from "../voice/instruments";
 import "./paper.css";
@@ -36,12 +36,21 @@ import "./paper.css";
  *  person a spreadsheet they are about to be told off for choosing. */
 const TAKES = "image/jpeg,image/png,image/heic,image/webp,application/pdf";
 
-export function Scan({ mounts, operation, disabled, onDraft }: {
+export function Scan({ mounts, operation, patient, disabled, onDraft }: {
   /** Every document mount for this operation. Normally one; the loop is
    *  because a bundle may declare more than one way in and this file does
    *  not get to decide that. */
   mounts: Mount[];
   operation: string;
+  /** THE PATIENT'S OWN EKA IDENTIFIER, which the patient directory put on
+   *  their row when this centre published them. The paper is filed under
+   *  it, which is what makes the document follow the patient instead of
+   *  living on this visit alone.
+   *
+   *  Null for somebody this centre has not published. That is not an error
+   *  and is not fudged: there is nowhere to file the paper, so the control
+   *  says so rather than quietly doing something else. */
+  patient: string | null;
   disabled?: boolean;
   onDraft: (draft: ScribeDraft) => void;
 }) {
@@ -53,11 +62,16 @@ export function Scan({ mounts, operation, disabled, onDraft }: {
   if (!docs.length) return null;
 
   const take = async (file: File | undefined) => {
-    if (!file) return;
+    if (!file || !patient) return;
     setFailed(null);
     setBusy(true);
     try {
-      onDraft(await readPaper(operation, file));
+      // Up to the service's own bucket, then the kernel reads what it made
+      // of it. Two calls because they are two different things: one is a
+      // document being filed on a person's record and the other is this
+      // form asking what was in it.
+      const id = await filePaper(patient, file);
+      onDraft(await readPaper(operation, id, patient));
     } catch (e) {
       // The kernel's own sentence, which already ends by saying what to do
       // instead. Rewriting it here would be a second copy to keep in step
@@ -70,6 +84,22 @@ export function Scan({ mounts, operation, disabled, onDraft }: {
       if (box.current) box.current.value = "";
     }
   };
+
+  // NOWHERE TO FILE IT. Said plainly, with the reason, because the fix is
+  // one the person at the counter can actually carry out. A disabled button
+  // with no sentence beside it is how somebody learns a feature is broken.
+  if (!patient) {
+    return (
+      <div className="scan scan-cant">
+        <Icon name="clip" className="i sm" />
+        <span className="scan-say">
+          Photographing the paper needs this patient on the patient directory,
+          and they are not on it yet. Add them from the patient screen, or
+          type what the paper says below.
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="scan">
@@ -90,8 +120,9 @@ export function Scan({ mounts, operation, disabled, onDraft }: {
           distrust the fields it does fill. */}
       <span className="scan-say">
         {busy
-          ? "This takes about half a minute. Nothing is saved until you tap."
-          : "Fills what it reads, for you to check. Who wrote it is still yours to type."}
+          ? "Saving it to the patient's record and reading it. About half a minute."
+          : "Saved to the patient's record, and fills what it reads for you to "
+            + "check. Who wrote it is still yours to type."}
       </span>
       {failed && <div className="f-bad block">{failed}</div>}
     </div>

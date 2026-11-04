@@ -34,3 +34,9 @@
   .scan-go:disabled .i { animation: scanbreathe 2.4s ease-in-out infinite; }
   @keyframes scanbreathe { 50% { opacity: .45; } }
 }
+
+/* NOWHERE TO FILE IT, said in the same box the camera would have been in,
+   so the space does not simply go blank and leave a person wondering
+   whether the feature exists. */
+.scan-cant { color: var(--color-text-tertiary); }
+.scan-cant .scan-say { flex: 1 1 auto; }
