@@ -23,7 +23,7 @@ Binding, not advisory. The compiler's prose pass is given this file. CI enforces
 
 **Every code sample runs as written** once placeholders are filled. Placeholders are named for what they are and where they came from: `<ACCESS_TOKEN_FROM_SESSIONS_CALL>`, not `<TOKEN>`.
 
-**When we are not sure, we say so.** `unverified` in the frontmatter and in the prose. Never guess and never smooth over a gap with confident phrasing. "We have not run this against sandbox yet" is a complete and acceptable sentence.
+**When we are not sure, we say so, in the frontmatter.** `unverified` on the atom, never narrated at the reader. Never guess and never smooth over a gap with confident phrasing. The portal is published in NHA's voice, so a page cannot tell an integrator that NHA has not run its own endpoint: see `nha-voice` for the ladder that replaces that sentence. This supersedes the earlier rule that put "We have not run this against sandbox yet" in the prose.
 
 **Name the observable, not the feeling.** "You receive a callback with `status: SUCCESS` within 60 seconds", not "it should work".
 
@@ -88,6 +88,7 @@ Every atom is read by a person and parsed by a compiler. This does not mean writ
 
 ## Related
 
+- Voice and audience, which outrank every rule here: `nha-voice`
 - Structure and schema: `atom-authoring`
 - Review process: `atom-review`
 - Mechanised checks: `catalogue-linting`

@@ -28,6 +28,8 @@ The only skill an agent needs loaded to know what else exists. Read the decision
 2. **Writing or changing knowledge**
    - Creating a new atom: `atom-authoring`, then `/atom-new`
    - Getting the prose right, or a lint failure about style: `writing-guide`
+   - Getting the voice right, so a page reads as NHA documenting ABDM rather
+     than a third party reporting on NHA: `nha-voice`
    - Reviewing someone else's atom before merge: `atom-review`
    - A CI failure on the Catalogue: `catalogue-linting`
    - Pulling in NHA swagger, GitHub specs or callback definitions: `openapi-ingest`
@@ -68,6 +70,7 @@ Scope is phased. Say which phase something is in before promising anything.
 | `dpg-governance` | orient | Anything touching licence, dependencies, or Eka-specific content |
 | `atom-authoring` | build | Writing a new unit of knowledge |
 | `writing-guide` | build | Prose quality, style lint failures |
+| `nha-voice` | build | Voice and audience of any published page |
 | `atom-review` | test | Reviewing before merge |
 | `catalogue-linting` | debug | CI is red on the Catalogue |
 | `openapi-ingest` | build | Bringing an NHA source in |
