@@ -297,6 +297,122 @@ export function marked(
 
 export type Filter = { flag: string } | { station: string } | { column: string; value: string } | null;
 
+/** One group of narrowings and the word above it. The word is this
+ *  renderer's own -- a heading over a list of controls is the renderer's
+ *  verb, the way a tab and a microphone are -- and every option under it is
+ *  a declaration's. */
+export type Narrowing = {
+  /** Stable across renders, so a menu can key on it. */
+  key: string;
+  label: string;
+  filter: Filter;
+  /** How many of today's rows this would leave. A count that only appears on
+   *  hover does not exist on a phone, so it is always drawn. */
+  n: number;
+  /** Whether the view's own badge tone says this one means clinical risk.
+   *  Colour is allowed here and nowhere else. */
+  risk?: boolean;
+};
+
+export type NarrowGroup = { title: string; items: Narrowing[] };
+
+/** EVERY WAY TODAY'S LINE CAN BE NARROWED, in one list, from one
+ *  declaration, for one control.
+ *
+ *  This exists because there were two. The list screen drew a strip of chips
+ *  for the stations, the programmes and how somebody arrived, with the flags
+ *  behind a button; the second panel drew its own menu of the programmes and
+ *  the flags, counted off the same rows. Two controls over one question,
+ *  disagreeing about which narrowings were worth offering, and neither one
+ *  moved the other. The strip was also taller than the thing it filtered.
+ *
+ *  So the question has one home now -- the second panel, beside the people
+ *  it narrows -- and this is what that control is built from. Nothing here
+ *  is this renderer's judgement except the three headings, which are what a
+ *  person reads to tell a place from a programme from a problem:
+ *
+ *    - where they are: the stations today's rows are actually at
+ *    - what they are on: each declared label column's values, plus the
+ *      declared provenance mark if anybody wears it
+ *    - what is flagged: the view's own declared badges
+ *
+ *  A group with nothing in it is absent rather than empty. The "everybody"
+ *  option is first and carries the whole count, because the way back from a
+ *  narrowing has to be as easy to find as the narrowing was.
+ */
+export function narrowings(
+  decl: Pick<ViewDecl, "badges" | "columns" | "labels" | "provenance"> | undefined,
+  rows: QueueRow[],
+  /** How a declared value is shown to a person. Passed in rather than
+   *  imported so this module stays free of the value set reader, and so a
+   *  caller with no display map still gets the raw declared value rather
+   *  than nothing. */
+  display: (column: string, value: string) => string,
+  /** Turning a declared machine word -- a station, a state -- into one a
+   *  person reads. Same reason. */
+  humanise: (word: string) => string,
+): NarrowGroup[] {
+  const { flags, stations, labels, provenance } =
+    filterOptions(decl, rows, labelColumns(decl));
+  const groups: NarrowGroup[] = [];
+
+  const where = stations.map((station) => ({
+    key: `station:${station}`,
+    label: humanise(station),
+    filter: { station } as Filter,
+    n: rows.filter((r) => r.station === station).length,
+  }));
+  if (where.length) groups.push({ title: "Where they are", items: where });
+
+  const on: Narrowing[] = [];
+  for (const { column, values } of labels) {
+    for (const value of values) {
+      on.push({
+        key: `${column}:${value}`,
+        label: display(column, value),
+        filter: { column, value },
+        n: rows.filter((r) => String(r.subject?.[column] ?? "") === value).length,
+      });
+    }
+  }
+  if (provenance) {
+    on.push({
+      key: `${provenance.column}:${provenance.value}`,
+      label: provenance.label,
+      filter: { column: provenance.column, value: provenance.value },
+      n: rows.filter((r) =>
+        String(r.subject?.[provenance.column] ?? "") === provenance.value).length,
+    });
+  }
+  if (on.length) groups.push({ title: "What they are on", items: on });
+
+  // Only a flag anybody is actually wearing. A station chip that says nought
+  // is information -- "pharmacy is clear" is worth knowing -- but a flag
+  // nobody carries is not a fact about the day, it is a fact about the
+  // bundle, and this control is read while standing beside the line.
+  const flagged = flags
+    .map((flag) => ({
+      key: `flag:${flag}`,
+      label: humanise(flag),
+      filter: { flag } as Filter,
+      n: rows.filter((r) => r.flags.includes(flag)).length,
+      risk: decl?.badges?.[flag] === RISK_TONE,
+    }))
+    .filter((f) => f.n > 0);
+  if (flagged.length) groups.push({ title: "What is flagged", items: flagged });
+
+  return groups;
+}
+
+/** Whether two filters are the same narrowing. Both are plain declared
+ *  values, so this is a comparison and not a lookup. */
+export function sameFilter(a: Filter, b: Filter): boolean {
+  if (a === null || b === null) return a === b;
+  if ("flag" in a) return "flag" in b && a.flag === b.flag;
+  if ("station" in a) return "station" in b && a.station === b.station;
+  return "column" in b && a.column === b.column && a.value === b.value;
+}
+
 /** The filter chips this bundle's queue declaration earns: one per declared
  *  badge (a flag worth calling out), and one per station actually present in
  *  today's rows. A bundle that declares no badges offers no flag filter. */

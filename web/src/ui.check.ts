@@ -478,6 +478,12 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   const queueCss = readFileSync(join(SRC, "style", "queue.css"), "utf8");
   const view = code(readFileSync(join(SRC, "view", "View.tsx"), "utf8"));
   const list = code(readFileSync(join(SRC, "screens", "ListScreen.tsx"), "utf8"));
+  // THE NARROWING CONTROL MOVED, so these assertions follow it. It was a
+  // strip of chips above the list and a second menu in the panel beside it,
+  // over the same rows; it is one control now, in the panel, built in
+  // loops.narrowings and drawn by Sidebar.tsx. The list screen obeys it.
+  const sideCss = readFileSync(join(SRC, "style", "shell.css"), "utf8");
+  const side = code(readFileSync(join(SRC, "app", "Sidebar.tsx"), "utf8"));
   const loops = code(readFileSync(join(SRC, "loops.ts"), "utf8"));
   const sdk = code(readFileSync(join(SRC, "abha", "sdk.ts"), "utf8"));
   const lotus = readFileSync(join(SRC, "abha", "Lotus.tsx"), "utf8");
@@ -523,13 +529,15 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   // stylesheet may not paint the critical ink on anything that is not it.
   assert.match(loops, /export const RISK_TONE = "crit";/, "one tone means clinical risk");
   assert.match(view, /row\.badges\[f\] === RISK_TONE/, "a row's label asks the declared tone");
-  assert.match(list, /decl\?\.badges\?\.\[f\] === RISK_TONE/, "and so does its filter chip");
-  const coloured = rules(queueCss)
+  assert.match(loops, /decl\?\.badges\?\.\[flag\] === RISK_TONE/,
+    "and so does the narrowing the control offers for it");
+  const coloured = [...rules(queueCss), ...rules(sideCss)]
     .filter((r) => /--color-critical/.test(r.body))
     .filter((r) => !/\brisk\b/.test(r.selector))
     .map((r) => r.selector);
   assert.deepEqual(coloured, [],
-    "the queue paints clinical red on something that is not the risk tone: " + coloured.join(", "));
+    "the queue or the panel beside it paints clinical red on something that "
+    + "is not the risk tone: " + coloured.join(", "));
   // The stylesheet half of that rule is only half. `risk` is a class, and a
   // row can hand it to anything: painting the PROGRAMME pill red passes every
   // assertion above, because the only rule that mentions the critical ink is
@@ -572,10 +580,24 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   // the 44px target, and the row was a 268px card so a phone got one.
   const base = (selector: string) =>
     rules(queueCss).find((r) => r.selector === selector)?.body ?? "";
-  const chips = base(".qtabs");
-  assert.match(chips, /flex-wrap:\s*nowrap/, "the chips are one line on a phone");
-  assert.match(chips, /overflow-x:\s*auto/, "and that line scrolls, rather than clipping");
-  for (const [selector, floor] of [[".qtab", 44], [".qr", 44]] as const) {
+  // The strip of chips is gone, and with it the four-line block that pushed
+  // the queue off a 375px screen: every narrowing is one menu now, and what
+  // a menu owes a phone is that it scrolls rather than running off the
+  // bottom of the screen with its last options unreachable.
+  const sideBase = (selector: string) =>
+    rules(sideCss).find((r) => r.selector === selector)?.body ?? "";
+  const menu = sideBase(".sb-filter-menu");
+  assert.match(menu, /max-height:\s*\d+px/, "the narrowing menu has no ceiling, so a day with "
+    + "four programmes and three flags runs off the bottom of a phone");
+  assert.match(menu, /overflow-y:\s*auto/, "and what is past that ceiling cannot be reached");
+  const dead = [...rules(queueCss), ...rules(sideCss)]
+    .filter((r) => /\.qtab/.test(r.selector)).map((r) => r.selector);
+  assert.deepEqual(dead, [],
+    "the chip strip's stylesheet is still here after the control moved, so a "
+    + "second filter bar is one className away: " + dead.join(", "));
+  assert.ok(!/qtab/.test(list) && !/qtab/.test(side),
+    "a screen still draws the chip strip the narrowing control replaced");
+  for (const [selector, floor] of [[".qr", 44]] as const) {
     const px = /min-height:\s*(\d+)px/.exec(base(selector));
     assert.ok(px, `${selector} declares no min-height, so its tap target is whatever text it holds`);
     assert.ok(Number(px![1]) >= floor,
@@ -610,7 +632,16 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.ok(measure, ".qlist runs to the full width of whatever window it is in");
   assert.ok(Number(measure![1]) <= 1100,
     `.qlist is capped at ${measure![1]}px, which is wider than a row can be read across`);
-  ok("queue: chips scroll in one line, every target is 44px, nothing hides on hover, and the row keeps a measure");
+  // Every target in the narrowing menu is a tap target too, and these are
+  // in the OTHER stylesheet, so they are measured against the same floor.
+  for (const selector of [".sb-filter-go", ".sb-filter-item", ".sb-filter-x"]) {
+    const px = /min-height:\s*(\d+)px/.exec(sideBase(selector));
+    assert.ok(px, `${selector} declares no min-height, so its tap target is whatever text it holds`);
+    assert.ok(Number(px![1]) >= 44,
+      `${selector} is ${px![1]}px tall; a tap target is at least 44px`);
+  }
+  ok("queue: the narrowing menu scrolls instead of overflowing a phone, every "
+     + "target is 44px, nothing hides on hover, and the row keeps a measure");
 
   // -- the programme ------------------------------------------------------
   //
@@ -631,7 +662,11 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
     "loops.ts is still asking a questionnaire what a column means; the view says it now");
   assert.match(view, /labelColumns\(decl\)/,
     "the row asks the view, rather than deciding for itself which column is a label");
-  assert.match(list, /labelColumns\(decl\)/, "and so do the chips");
+  assert.match(loops, /filterOptions\(decl, rows, labelColumns\(decl\)\)/,
+    "the narrowings are built without asking the view which columns are labels");
+  assert.match(side, /narrowings\(/,
+    "the panel beside the line draws its own idea of what can be narrowed by, "
+    + "rather than the one list every surface reads");
 
   // The declaration this bundle actually ships has to survive the trip: a
   // label naming a column the view does not carry is refused by the
@@ -654,10 +689,17 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
 
   // And the pill carries no colour. Red means a clinician should look sooner;
   // a programme is not a risk.
-  const progChip = rules(queueCss).find((r) => r.selector === ".qtab.prog")?.body ?? "";
-  assert.ok(progChip, ".qtab.prog is not styled, so a programme chip is indistinguishable from a station");
-  assert.ok(!/--color-critical|--color-success|--color-warning/.test(progChip),
-    "a programme chip carries a status colour, and a programme is not a status");
+  // In the menu, a programme and a station are rows under their own heading
+  // and nothing paints them: only the row the view's own badge calls risk
+  // may carry a tone, which the `coloured` assertion above already holds for
+  // both stylesheets. What is checked here is that the headings exist, so a
+  // station, a programme and a flag are not one undifferentiated run.
+  assert.match(side, /\{g\.title\}/, "the narrowing menu draws no headings, so where "
+    + "somebody is standing, what programme they are on and what is wrong with "
+    + "them are one list of fifteen rows");
+  assert.match(loops, /title: "Where they are"/, "the groups are not named in one place");
+  assert.ok(rules(sideCss).some((r) => r.selector === ".sb-filter-h"),
+    ".sb-filter-h is unstyled, so a heading is indistinguishable from an option");
   ok("queue: the pills are the columns the view declared as labels, monochrome, once per row");
 
   // -- the counts ----------------------------------------------------------
@@ -666,17 +708,31 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   // halves: the number is rendered unconditionally, and it is counted off the
   // rows in hand rather than read from the groups the kernel happened to send
   // for a different grouping.
-  assert.match(list, /<span className="n">\{t\.n\}<\/span>/,
+  assert.match(side, /<span className="sb-filter-c">\{i\.n\}<\/span>/,
     "the count is rendered, never conditional on a state or a hover");
-  assert.match(list, /n: rows\.filter\(\(r\) => r\.flags\.includes\(f\)\)\.length/,
-    "a flag chip counts the rows actually loaded");
-  assert.match(list, /n: rows\.filter\(\(r\) => r\.station === s\)\.length/,
-    "and so does a station chip");
-  assert.match(list, /n: rows\.filter\(\(r\) => String\(r\.subject\?\.\[column\] \?\? ""\) === value\)\.length/,
-    "and so does a programme chip, off the rows in hand and not off a kernel grouping");
-  assert.ok(!/result\.groups/.test(list),
-    "the chips do not read the kernel's groups, which are one grouping and not these");
-  ok("queue: every chip carries a count, computed from the rows in hand");
+  assert.match(loops, /n: rows\.filter\(\(r\) => r\.flags\.includes\(flag\)\)\.length/,
+    "a flag narrowing counts the rows actually loaded");
+  assert.match(loops, /n: rows\.filter\(\(r\) => r\.station === station\)\.length/,
+    "and so does a station narrowing");
+  assert.match(loops, /n: rows\.filter\(\(r\) => String\(r\.subject\?\.\[column\] \?\? ""\) === value\)\.length/,
+    "and so does a programme narrowing, off the rows in hand and not off a kernel grouping");
+  assert.ok(!/result\.groups/.test(loops),
+    "the narrowings read the kernel's groups, which are one grouping and not these");
+  // ONE CONTROL, NOT TWO. The list screen is handed the narrowing; it does
+  // not keep one of its own, which is how the strip and the menu came to
+  // disagree about the same question on the same screen.
+  assert.match(list, /filter: Filter;/,
+    "the list screen holds its own filter again, so there are two controls "
+    + "over one question and neither moves the other");
+  assert.ok(!/setFilter|filter: null as Filter/.test(list),
+    "the list screen sets a narrowing of its own rather than obeying the shell's");
+  // And a list that is showing part of the day says so on the list, because
+  // on a phone the control that narrowed it is behind a drawer.
+  assert.match(list, /narrowedBy && \(/,
+    "a narrowed list draws nothing to say it is narrowed, so two thirds of "
+    + "the day are missing with no explanation on screen");
+  ok("queue: one narrowing control, every option counted off the rows in hand, "
+     + "and a narrowed list says so");
 
   // -- and the screen is actually asking -----------------------------------
   //

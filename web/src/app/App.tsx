@@ -9,7 +9,7 @@ import { ask } from "../ask";
 import { createLabel, firstOperation } from "../search";
 import { displayFor, load as loadDeclarations, questionnaire } from "../declarations";
 import { deskTitle } from "../desk";
-import { keep, type Recent } from "../loops";
+import { keep, type Filter, type Recent } from "../loops";
 import { header, queueViewFor, type Ctx, type Said } from "../messages";
 import { say } from "../announce";
 import { Announcer, Boundary, Failed, Loading, PageTitle } from "../parts";
@@ -294,6 +294,19 @@ export function App() {
   );
 
 
+  /** HOW TODAY'S LINE IS NARROWED, held once for the whole shell.
+   *
+   *  It lives here and not in either panel because both of them draw the
+   *  same people: the second panel is the line and the list screen is the
+   *  line, and a narrowing applied to one of those and not the other is two
+   *  answers to one question on one screen. The control that sets it is in
+   *  the second panel, beside the people; the list obeys it.
+   *
+   *  Null means everybody, which is the state a person has to be able to get
+   *  back to from anywhere.
+   */
+  const [narrow, setNarrow] = useState<Filter>(null);
+
   const remember = useCallback((r: Recent) => {
     setRecents((was) => {
       const next = [r, ...was.filter((x) => x.id !== r.id)].slice(0, 8);
@@ -430,6 +443,8 @@ export function App() {
           panel={panel}
           sections={PARTS}
           line={line}
+          narrow={narrow}
+          onNarrow={setNarrow}
           open={drawer}
           onGo={go}
           onCall={(token) => { setKhojOpen(false); go(`#/desk?q=${encodeURIComponent(token)}`); }}
@@ -498,7 +513,7 @@ export function App() {
                 )}
                 {route.kind === "view" && (
                   <ViewScreen
-                    id={route.id} nonce={nonce}
+                    id={route.id} nonce={nonce} narrow={narrow}
                     decl={catalogue.views?.[route.id]}
                     workflow={catalogue.workflows?.[catalogue.views?.[route.id]?.workflow ?? ""]}
                   />
@@ -595,15 +610,17 @@ function titleFor(route: Route, views: ViewDecl[]): string {
   return "Not found";
 }
 
-function ViewScreen({ id, decl, workflow, nonce }: {
+function ViewScreen({ id, decl, workflow, nonce, narrow }: {
   id: string; decl?: ViewDecl; workflow?: Workflow; nonce: number;
+  /** The shell's narrowing, set in the second panel. */
+  narrow: Filter;
 }) {
   const { data, error, loading, reload } = useAsync(() => api.view(id), [id, nonce]);
   if (loading) return <Loading what="this list" shape="rows" rows={5} />;
   if (error) return <Failed error={error} what="load this list" onRetry={reload} />;
   return (
     <ListScreen
-      result={data!} decl={decl} workflow={workflow}
+      result={data!} decl={decl} workflow={workflow} filter={narrow}
       onOpenThread={(t) => go(`#/threads/${t}`)}
     />
   );

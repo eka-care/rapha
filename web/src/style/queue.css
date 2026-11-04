@@ -20,68 +20,6 @@
  * means the same thing. The values themselves are style/tokens.css's.
  */
 
-/* ---------------------------------------------------------------- the chips */
-
-.qtabs {
-  display: flex; align-items: stretch; gap: 6px;
-  flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
-  margin-bottom: 12px; padding: 2px 0;
-  /* The strip is scrolled by thumb, so its own bar is noise on a phone and
-     reduces the chips' height on a desktop. The chips themselves say there is
-     more by being cut off at the edge. */
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;
-}
-.qtabs::-webkit-scrollbar { display: none; }
-
-.qtab {
-  flex: 0 0 auto; min-height: 44px; padding: 0 14px;
-  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-pill);
-  background: var(--color-bg-surface); color: var(--color-text-secondary);
-  font-size: 12.5px; font-weight: 500; white-space: nowrap; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 7px;
-  transition: var(--duration-fast) var(--ease-out);
-}
-.qtab .n {
-  font-family: var(--font-mono); font-size: 10.5px; font-weight: 500;
-  color: var(--color-text-tertiary);
-}
-/* Selected wears the prototype's violet tint. It is a control, not a fact
-   about a patient, which is why it may carry a hue at all. */
-.qtab.on {
-  border-color: var(--color-agent-line); background: var(--color-agent-soft);
-  color: var(--color-agent); font-weight: 600;
-}
-.qtab.on .n { color: var(--color-agent); }
-
-/* A programme chip wears the mono face of the pill it filters, so a value on
-   a row and the same value on a chip are plainly the same thing. It carries
-   no colour: a programme is not a risk.
-   It is no longer upper-cased. That was here because "the declaration gives
-   no word for these values today, only the stored code, and a code set in
-   sentence case reads as a misspelling rather than as a code" -- true of a
-   raw code, and the declaration carries the word now. Upper-casing a declared
-   display is this stylesheet overriding the declaration, which is the same
-   defect as the renderer picking the word itself: it is what turned a
-   programme called General into GENERAL. */
-.qtab.prog {
-  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .07em;
-}
-
-/* The one chip allowed to carry colour: the view's own tone for clinical
-   risk. Everything else, including a station and a programme, stays ink. */
-.qtab.risk.on {
-  border-color: var(--color-critical); background: var(--color-critical-soft);
-  color: var(--color-critical);
-}
-.qtab.risk.on .n { color: var(--color-critical); }
-
-/* Between the groups of chips. Decorative, and hidden from assistive tech. */
-.qtab-sep {
-  flex: 0 0 auto; width: 1px; margin: 8px 3px;
-  background: var(--color-border-subtle);
-}
 
 /* ----------------------------------------------------------------- the rows */
 
@@ -89,8 +27,7 @@
    The mockup pushes the labels to the right of the ROW, and its row is a
    column you can read across; on a 1440px screen the same rule put a name at
    the far left and its own programme pill most of a screen away, which is two
-   things on one line pretending to be one. The chips above stay full width,
-   because a strip of chips is scanned and not read. */
+   things on one line pretending to be one. */
 .qlist { display: grid; gap: 2px; max-width: 940px; }
 
 /* Phone first: the number and the time hold the top line with the name, and
@@ -219,8 +156,6 @@
 
 /* Room enough that the chips need not scroll. */
 @media (min-width: 900px) {
-  .qtabs { flex-wrap: wrap; overflow-x: visible; }
-  .qtab-sep { align-self: center; height: 24px; margin: 0 3px; }
 }
 
 /* ------------------------------------------------- kept for the other views */
@@ -235,29 +170,14 @@
   display: grid; place-items: center; font-weight: 700; font-size: 12.5px; flex-shrink: 0;
 }
 
-/* The flag filters, behind one control. Fifteen chips in two rows gave a
-   station and an exception the same weight; "at the lab" and "vitals
-   flagged" are not the same kind of question. */
-.qtab-wrap { position: relative; display: inline-flex; }
-.qtab.flags { display: inline-flex; align-items: center; gap: 7px; }
-.qtab.flags .i { flex-shrink: 0; }
-.qtab-menu {
-  list-style: none; margin: 0; padding: 5px; z-index: 30; min-width: 220px;
-  position: absolute; top: calc(100% + 5px); left: 0;
-  display: grid; gap: 1px;
-  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md);
-  background: var(--color-bg-surface); box-shadow: var(--shadow-md);
+
+/* WHY THIS LIST IS SHORT. The control that narrowed it is in the panel
+   beside this one, and on a phone that panel is a drawer -- so the list has
+   to say for itself that it is showing part of the day. Not a warning and
+   not a chip: one quiet line above the people, with the declared word the
+   control itself used. */
+.narrowed {
+  margin: 0 0 10px; padding: 7px 11px; border-radius: var(--radius-md);
+  background: var(--color-bg-subtle); color: var(--color-text-secondary);
+  font-size: 12.5px;
 }
-.qtab-item {
-  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
-  padding: 7px 10px; border-radius: var(--radius-sm); cursor: pointer;
-  border: none; background: transparent; color: var(--color-text-secondary);
-  font: inherit; font-size: 12.5px;
-}
-.qtab-item:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
-/* NOT clinical red. That ink is the declared risk tone and a selected
-   menu row is not a risk; ui.check.ts refuses it anywhere else. The row's
-   own badge in the list below still carries the tone the declaration
-   gave it. */
-.qtab-item.on { color: var(--color-agent); font-weight: 600; }
-.qtab-c { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--color-text-tertiary); }

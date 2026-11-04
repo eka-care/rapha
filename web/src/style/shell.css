@@ -310,7 +310,7 @@
   text-transform: uppercase; color: var(--color-text-tertiary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.th-flag {
+.th-risk {
   width: 6px; height: 6px; border-radius: 50%; background: var(--color-critical);
   flex: 0 0 auto;
 }
@@ -350,9 +350,11 @@
    buttons above the people waiting: a filter bar taller than the thing it
    filtered. */
 .sb-filter { position: relative; padding: 0 12px 10px; display: flex; gap: 6px; }
+/* 44px, because this is the only way to narrow the day now and the strip of
+   chips it replaced was held to the same floor. */
 .sb-filter-go {
   flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
-  padding: 6px 10px; border-radius: var(--radius-md); cursor: pointer;
+  min-height: 44px; padding: 6px 10px; border-radius: var(--radius-md); cursor: pointer;
   border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface);
   color: var(--color-text-secondary); font: inherit; font-size: 12px;
 }
@@ -369,7 +371,7 @@
 }
 .sb-filter-go.on .sb-filter-n { color: inherit; }
 .sb-filter-x {
-  flex-shrink: 0; display: grid; place-items: center; width: 29px;
+  flex-shrink: 0; display: grid; place-items: center; width: 44px; min-height: 44px;
   border-radius: var(--radius-md); cursor: pointer;
   border: 1px solid var(--color-border-subtle); background: transparent;
   color: var(--color-text-tertiary);
@@ -380,18 +382,32 @@
 .sb-filter-menu {
   list-style: none; margin: 0; padding: 5px; z-index: 30;
   position: absolute; top: calc(100% - 4px); left: 12px; right: 12px;
-  display: grid; gap: 1px; max-height: 300px; overflow-y: auto;
+  display: grid; gap: 1px; max-height: 420px; overflow-y: auto;
   border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md);
   background: var(--color-bg-surface); box-shadow: var(--shadow-md);
 }
 .sb-filter-item {
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
-  padding: 6px 9px; border-radius: var(--radius-sm); cursor: pointer;
+  min-height: 44px; padding: 6px 9px; border-radius: var(--radius-sm); cursor: pointer;
   border: none; background: transparent; color: var(--color-text-secondary);
   font: inherit; font-size: 12.5px;
 }
 .sb-filter-item:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
 .sb-filter-item.on { color: var(--color-agent); font-weight: 600; }
+/* The one tone allowed to mean something, and only where the view's own
+   badge says this narrowing is clinical risk. */
+.sb-filter-item.risk.on { color: var(--color-critical); }
+/* THREE QUESTIONS, NOT ONE LIST. Where somebody is standing, what programme
+   they are on and what is wrong with them are different questions, and a
+   single run of fifteen options made a person read all fifteen to find the
+   one they wanted. */
+.sb-filter-grp { display: grid; gap: 1px; padding-top: 4px; }
+.sb-filter-grp + .sb-filter-grp { border-top: 1px solid var(--color-border-subtle); margin-top: 4px; }
+.sb-filter-h {
+  padding: 5px 9px 3px; font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
 .sb-filter-c {
   margin-left: auto; font-variant-numeric: tabular-nums;
   color: var(--color-text-tertiary);

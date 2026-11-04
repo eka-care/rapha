@@ -15,48 +15,12 @@
 import { useState } from "react";
 
 import { Icon, type IconName } from "../icons";
+import { say } from "../announce";
+import { displayFor } from "../declarations";
+import { filterRows, narrowings, RISK_TONE, sameFilter, type Filter } from "../loops";
 import type { Facility, QueueRow, ViewDecl } from "../types";
 import { fields } from "../view/View";
 import { human, title } from "../words";
-
-/** The values a row wears as a label, which is the view's own `labels:`.
- *  The screen is told which columns those are and nothing about what they
- *  mean: a bundle that labels something else gets its own chips. */
-function labelValues(decl: ViewDecl, row: QueueRow): string[] {
-  return ((decl as { labels?: string[] }).labels ?? [])
-    .map((c) => String(row.subject?.[c] ?? "").trim())
-    .filter(Boolean);
-}
-
-/** EVERYTHING A ROW WEARS is something the line can be narrowed by: the
- *  declared label values AND the flags the rows are carrying today. It was
- *  the labels alone, so the rail could narrow to a programme but not to the
- *  three people whose vitals are flagged -- which is the narrowing somebody
- *  standing at the station actually wants.
- *
- *  Both come off the declaration. A label is a column the view names, a
- *  flag is the workflow's own state, and this file invents neither: a
- *  bundle with different states gets different chips with no change here. */
-const flagsOf = (row: QueueRow) => row.flags ?? [];
-
-function tags(line: { decl: ViewDecl; row: QueueRow }[], row: QueueRow, decl: ViewDecl) {
-  void line;
-  return [...labelValues(decl, row), ...flagsOf(row)];
-}
-
-/** One chip per thing the rows wear, commonest first, plus the one that
- *  clears them. A line where every row wears the same label has nothing to
- *  narrow, and `pills.length > 1` is what drops the row entirely. */
-function chips(line: { decl: ViewDecl; row: QueueRow }[]):
-    { value: string; label: string; count: number }[] {
-  const seen = new Map<string, number>();
-  for (const { decl, row } of line)
-    for (const v of tags(line, row, decl)) seen.set(v, (seen.get(v) ?? 0) + 1);
-  const out = [...seen.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([value, count]) => ({ value, label: title(human(value)), count }));
-  return out.length ? [{ value: "", label: "All", count: line.length }, ...out] : [];
-}
 
 /** How many of the line fit before the rail is a scroll rather than a
  *  glance. The rest is one tap away in the view the rows came from. */
@@ -79,7 +43,8 @@ export function panelFor(route: string): Panel {
 }
 
 export function Sidebar({
-  facility, route, line, open, panel, sections, onGo, onCall, onCloseDrawer,
+  facility, route, line, narrow, open, panel, sections,
+  onGo, onNarrow, onCall, onCloseDrawer,
 }: {
   facility?: Facility;
   route: string;
@@ -93,6 +58,10 @@ export function Sidebar({
    *  queue view draws, with the declaration they came from so the name and
    *  the number are read the same way here as there. */
   line: { decl: ViewDecl; row: QueueRow }[];
+  /** How the line is narrowed right now. Held by the shell, because the list
+   *  screen draws the same people and must obey the same narrowing. */
+  narrow: Filter;
+  onNarrow: (f: Filter) => void;
   open: boolean;
   onGo: (hash: string) => void;
   /** A number called at the counter. The desk already searches by it, so
@@ -105,7 +74,6 @@ export function Sidebar({
   // no queue view declared gets no section, not an empty one.
   const lineTitle = line[0]?.decl.title ?? "";
   const [call, setCall] = useState("");
-  const [filter, setFilter] = useState("");
   const [filters, setFilters] = useState(false);
   /** What this bundle calls the number on a row, off the declared columns,
    *  so the box is labelled in the centre's own word and this file types none
@@ -139,10 +107,27 @@ export function Sidebar({
     else onCall(call.trim());
   };
 
-  const pills = chips(line);
-  const shown = filter
-    ? line.filter(({ decl, row }) => tags(line, row, decl).includes(filter))
-    : line;
+  // THE ONE CONTROL OVER TODAY'S LINE. Where they are, what they are on and
+  // what is flagged, every option off the declaration, grouped under the
+  // three words a person reads to tell those apart. The chips that used to
+  // sit above the list screen are these; there is no second place to set it.
+  //
+  // The whole line is grouped, not the narrowed part, so the counts do not
+  // change as a person moves between narrowings -- a menu whose other
+  // options read nought once you have picked one cannot be used to pick
+  // again.
+  const groups = narrowings(
+    line[0]?.decl,
+    line.map(({ row }) => row),
+    displayFor,
+    (word) => title(human(word)),
+  );
+  const chosen = groups.flatMap((g) => g.items).find((i) => sameFilter(i.filter, narrow));
+  const shown = (() => {
+    const rows = filterRows(line.map(({ row }) => row), narrow);
+    const keepers = new Set(rows.map((r) => r.thread));
+    return line.filter(({ row }) => keepers.has(row.thread));
+  })();
 
   if (panel === "settings") {
     // `#/settings` with no section shows the first one, so that is the row
@@ -205,43 +190,69 @@ export function Sidebar({
       </form>
       )}
 
-      {/* ONE CONTROL, NOT TEN CHIPS. Every programme and every flag in the
-          line used to be a chip, so a day with four programmes and three
-          flags put eight buttons above the people -- a filter bar taller
-          than what it filtered. It is one icon now, and what it opens is
-          the same declared list: the view's own label column and the
-          workflow's own flags, counted. This file is told the column and
-          draws its values; it is told nothing about what a programme IS. */}
-      {pills.length > 1 && (
+      {/* ONE CONTROL OVER THE DAY, AND ONLY ONE.
+          There were two. A strip of chips above the list screen -- a chip
+          per station, per programme and for how somebody arrived, with the
+          flags behind a button -- and this menu, over the programmes and
+          the flags again. Two controls over one question, offering
+          different narrowings, neither of them moving the other, and the
+          strip taller than the list it filtered.
+          It is here, because this is where the people are, and what it
+          sets narrows the list screen too. Every option is a declaration's:
+          a station today's rows are at, a value in a column the view calls
+          a label, the mark the view calls provenance, a badge the view
+          declares. The three headings are this renderer's own, and they are
+          the only words in it. */}
+      {groups.length > 0 && (
         <div className="sb-filter">
-          <button type="button" className={`sb-filter-go${filter ? " on" : ""}`}
+          <button type="button" className={`sb-filter-go${narrow ? " on" : ""}`}
                   aria-expanded={filters} aria-haspopup="true"
                   onClick={() => setFilters((v) => !v)}>
             <Icon name="sliders" className="i sm" />
             <span className="sb-filter-t">
-              {filter ? (pills.find((p) => p.value === filter)?.label ?? "Filtered") : "Narrow the line"}
+              {chosen ? chosen.label : "Narrow the line"}
             </span>
             <span className="sb-filter-n">{shown.length}</span>
           </button>
-          {filter && (
+          {narrow && (
             <button type="button" className="sb-filter-x" aria-label="Show everybody"
-                    onClick={() => setFilter("")}>
+                    onClick={() => onNarrow(null)}>
               <Icon name="plus" className="i sm" />
             </button>
           )}
           {filters && (
-            <ul className="sb-filter-menu">
-              {pills.map((p) => (
-                <li key={p.value}>
-                  <button type="button"
-                          className={`sb-filter-item${filter === p.value ? " on" : ""}`}
-                          onClick={() => { setFilter(p.value); setFilters(false); }}>
-                    <span>{p.label}</span>
-                    <span className="sb-filter-c">{p.count}</span>
-                  </button>
-                </li>
+            <div className="sb-filter-menu">
+              {/* The way back to everybody is first and is not under a
+                  heading, because it is not one of the three questions --
+                  it is the answer to all of them. */}
+              <button type="button"
+                      className={`sb-filter-item${narrow === null ? " on" : ""}`}
+                      onClick={() => {
+                        onNarrow(null);
+                        setFilters(false);
+                        say(line.length === 1 ? "1 shown." : `${line.length} shown.`);
+                      }}>
+                <span>Everybody</span>
+                <span className="sb-filter-c">{line.length}</span>
+              </button>
+              {groups.map((g) => (
+                <div className="sb-filter-grp" key={g.title}>
+                  <div className="sb-filter-h">{g.title}</div>
+                  {g.items.map((i) => (
+                    <button type="button" key={i.key}
+                            className={`sb-filter-item${sameFilter(i.filter, narrow) ? " on" : ""}${i.risk ? " risk" : ""}`}
+                            onClick={() => {
+                        onNarrow(i.filter);
+                        setFilters(false);
+                        say(i.n === 1 ? "1 shown." : `${i.n} shown.`);
+                      }}>
+                      <span>{i.label}</span>
+                      <span className="sb-filter-c">{i.n}</span>
+                    </button>
+                  ))}
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </div>
       )}
@@ -262,8 +273,15 @@ export function Sidebar({
                 <span className={`th-n${f.named ? "" : " u-mute"}`}>{f.name}</span>
                 {row.station && <span className="th-s">{title(row.station)}</span>}
               </span>
-              {row.flags?.some((x) => row.badges?.[x] === "crit") && (
-                <span className="th-flag" aria-label="needs attention" />
+              {/* The one coloured mark in this column, and it asks the view
+                  which of its own tones means clinical risk rather than
+                  spelling that tone here. It was spelled here, which is
+                  exactly the defect RISK_TONE exists to prevent: a bundle
+                  that renames its tone would have left the dot red for
+                  something that is not a risk. The class says `risk` too,
+                  because ui.check allows the critical ink on nothing else. */}
+              {row.flags?.some((x) => row.badges?.[x] === RISK_TONE) && (
+                <span className="th-risk" aria-label="needs attention" />
               )}
             </button>
           );
