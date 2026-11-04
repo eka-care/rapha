@@ -233,3 +233,37 @@ which system holds the patient's record.
 
 A synthetic recording, transcript and document (`a17ed378-...`) now sit in the
 Eka workspace under txn `phc-a1e6c5605b06459b`. They hold an invented patient.
+
+### 9.1 How Eka's own app gets the structured note, and that we can too
+
+The structured state does not come from the recording call. It comes from a
+SECOND call, which Eka's app makes once the transcript exists:
+`POST /voice/v1/scribe/agent/runs/{template_id}` with `thread_id` = the session
+id, answered as a server-sent stream (AG-UI): `STATE_SNAPSHOT`, then a
+`STATE_DELTA` per change as the model writes each section through a tool.
+The same SDK credentials reach it. Probed 2026-11-04 against the synthetic
+recording: HTTP 200, 28 seconds, 12 sections, nothing published.
+
+What the final state holds (rebuilt from the snapshot and the deltas):
+
+- Twelve sections, each with a `kind`: LIST, PATIENT_MEDICAL_HISTORY,
+  VITAL_TABLE, EXAMINATION_FINDINGS, DIAGNOSIS, MEDICATION_TABLE,
+  LAB_INVESTIGATIONS, FOLLOW_UP.
+- Vitals as rows with a unit each: 130/85 mmHg, 84 /min, 98.6 F, 51 kg.
+- The medicine split into name, strength, form, dose, frequency and duration:
+  Nitrofurantoin / 100 mg / capsule / 1 capsule / twice daily / 5 days.
+- A follow-up with a computed date (2026-11-11) and a plain interval.
+- Allergies as a statement of absence (`status: no`), not an empty list.
+
+What to distrust, for the reason `kernel/codification.py` already states: the
+service attaches catalogue codes and they are suggestions. "Urine routine" came
+back as "Urine Protein (Dipstick)", LOINC 5804-0, `match_type: closest`, which
+is a plausible test and not the one asked for. The diagnosis and the medicine
+came back with no catalogue match (`locale-...` ids). A coded value from this
+is a candidate for a person to confirm, never a value.
+
+What it changes: the markdown note was the only thing we read, and
+`api/shaped.py` parses it back into form fields. This is the same information
+before it was flattened, so it fills our forms more exactly, and it is the
+input Eka's own converter takes. Running the agent also created a new, empty
+document on the session; nothing else was written.
