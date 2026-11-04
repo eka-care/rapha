@@ -39,6 +39,10 @@ LINE = (
     ("doctor", "consult.documented", None),
     ("lab", "lab.resulted", "lab.ordered"),
     ("pharmacy", "dispensed.complete", "rx.confirmed"),
+    # The house, and it is last because it is not a bench: see the comment on
+    # the same step in bundles/phc/phc.wf.outpatient.md, which is the
+    # declaration this tuple is held against.
+    ("community", "consult.documented", "postnatal.open"),
 )
 
 

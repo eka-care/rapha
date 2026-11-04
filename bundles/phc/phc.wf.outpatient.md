@@ -23,7 +23,8 @@ steps:
     # bench whose job is to take a reading.
     operations: [phc.op.vitals-record, phc.op.antenatal-measure,
                  phc.op.context-add,
-                 phc.op.pregnancy-open, phc.op.pregnancy-close]
+                 phc.op.pregnancy-open, phc.op.delivery-record,
+                 phc.op.pregnancy-close, phc.op.postnatal-close]
   - station: doctor
     done_when: consult.documented
     operations: [phc.op.consult-document, phc.op.ncd-review,
@@ -39,6 +40,26 @@ steps:
     done_when: dispensed.complete
     applies_when: rx.confirmed
     operations: [phc.op.pharmacy-dispense]
+  # THE HOUSE, AND IT IS LAST BECAUSE IT IS NOT A BENCH. Every other step is
+  # somewhere a patient waits; this one is a door somebody knocks on, and it
+  # is at the end so that it cannot park a woman at a station while she is
+  # still owed a prescription.
+  #
+  # It draws the POSTNATAL visit and not the general household visit, which
+  # is a finding rather than a preference: `phc.op.household-visit` is
+  # loaded, listed by the scribe, and drawn by no step, so nobody can perform
+  # it at all. Closing that gap means either a line of its own for outreach
+  # or a household round inside a clinic queue, and that is a decision for
+  # this facility's owner rather than one to make while building a schedule.
+  # catalogue/ops/phc.op.postnatal-visit.md carries the same note.
+  #
+  # `applies_when: postnatal.open` keeps the step out of an ordinary visit,
+  # and `done_when` is the flag the postnatal visit itself raises, so it
+  # parks nobody who is not owed a home visit.
+  - station: community
+    done_when: consult.documented
+    applies_when: postnatal.open
+    operations: [phc.op.postnatal-visit]
 states:
   registered:
     exists: {resource: patient}
@@ -92,6 +113,18 @@ states:
     all_of:
       - {exists: {resource: episode_of_care, where: {type: pregnancy, status: active}}}
       - "not pregnancy.ended"
+  # The six weeks after a delivery, the same pair over the same table. Note
+  # what is NOT here: no rule relates this to how the pregnancy ended. A
+  # postnatal episode exists because somebody recorded a delivery, and a
+  # pregnancy that ended any other way produced no row for this to find.
+  postnatal.ended:
+    gte:
+      - {resource: episode_of_care, where: {type: postnatal, status: ended}}
+      - {resource: episode_of_care, where: {type: postnatal, status: active}}
+  postnatal.open:
+    all_of:
+      - {exists: {resource: episode_of_care, where: {type: postnatal, status: active}}}
+      - "not postnatal.ended"
   # The same pair over the same table, for the other kind of episode this
   # bundle keeps. "Every referral closed" is this flag being false.
   referral.ended:

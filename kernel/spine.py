@@ -110,7 +110,16 @@ def episodes(bundle, store, workflow, subject_id, visits, *, at=None):
     rows = [dict(r) for r in store.select(kind, thread=None,
                                           where={"patient": subject_id},
                                           fields=(), limit=200)]
-    rows.sort(key=lambda r: r.get("created_date") or "")
+    # AN OPENING BEATS AN ENDING AT THE SAME INSTANT. Two rows can carry the
+    # same timestamp to the second, and one operation now writes both halves:
+    # `phc.op.delivery-record` ends the pregnancy and opens postnatal care in
+    # one commit, on purpose, so that there is no moment in which a woman is
+    # neither. Sorted by date alone the two tie and the row order decides,
+    # which left the pregnancy reading as still open and still owing antenatal
+    # contacts to a woman who had delivered. An episode cannot end before it
+    # starts, so the tie has only one correct answer.
+    rows.sort(key=lambda r: ((r.get("created_date") or ""),
+                             1 if r.get("status") == "ended" else 0))
 
     out, open_of_type = [], {}
     for row in rows:

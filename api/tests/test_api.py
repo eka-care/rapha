@@ -47,8 +47,10 @@ def test_a_thread_returns_flags_station_line_and_actions():
     body = client.get("/api/threads/enc-002").json()
     assert body["flags"] == ["abha.pending", "capture.consented", "registered"]
     assert body["station"] == "nurse"
+    # The sixth is the home visit step, skipped because she has not delivered.
     assert [s["status"] for s in body["line"]] == ["done", "now", "pending",
-                                                   "skipped", "skipped"]
+                                                   "skipped", "skipped",
+                                                   "skipped"]
     drawn = [op["id"] for op in body["actions"]]
     assert "phc.op.vitals-record" in drawn
     assert "phc.op.pharmacy-dispense" not in drawn, \

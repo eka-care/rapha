@@ -179,8 +179,22 @@ func Episodes(s Reader, cat *carephc.Catalogue, wf *carephc.Workflow,
 	if err != nil {
 		return nil, err
 	}
+	// An opening beats an ending at the same instant: one operation writes
+	// both halves (a delivery ends the pregnancy and opens postnatal care in
+	// one commit), and an episode cannot end before it starts. The Python
+	// carries the full reasoning.
+	ended := func(row map[string]any) int {
+		if text(row["status"]) == "ended" {
+			return 1
+		}
+		return 0
+	}
 	sort.SliceStable(rows, func(i, j int) bool {
-		return text(rows[i]["created_date"]) < text(rows[j]["created_date"])
+		a, b := text(rows[i]["created_date"]), text(rows[j]["created_date"])
+		if a != b {
+			return a < b
+		}
+		return ended(rows[i]) < ended(rows[j])
 	})
 
 	out := []Episode{}

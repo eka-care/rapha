@@ -93,6 +93,10 @@ python3 scripts/check_vitals.py
 # pregnancy open, and measuring somebody does not close a contact. The ANM's
 # own capability set drives it, so taking an ability off her fails here.
 python3 scripts/check_antenatal.py
+# The other end of the same arc: a delivery ends the pregnancy and opens
+# postnatal care in one commit, and a pregnancy that ended any other way
+# opens nothing. The second half is the one that matters.
+python3 scripts/check_postnatal.py
 # A laboratory value and its unit are one checked thing: the analyte is a coded
 # ANSWER (the third binding form) and the unit must be the one LOINC reports
 # that analyte in. scripts/seed_terminology.py generated the value set and is
@@ -245,6 +249,7 @@ if [ -d web/node_modules ]; then
   # The tour: it points at elements that are really on screen, and its card
   # never leaves one. Pure rules over a rectangle, so no browser.
   (cd web && node --experimental-strip-types src/app/guide.check.ts)
+  (cd web && node --experimental-strip-types src/app/width.check.ts)
   # The Eka session: which surface is asking, when a session is worth
   # refreshing, and the one origin where the gate cannot apply. Nectar's own
   # rules, so the claims product and this one behave the same way.

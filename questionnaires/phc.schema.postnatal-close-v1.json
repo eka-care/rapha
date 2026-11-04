@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "slug": "phc-postnatal-close-v1",
+  "title": "Close postnatal care",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.postnatal-close"
+    }
+  },
+  "questions": [
+    {
+      "link_id": "outcome",
+      "text": "Why is postnatal care ending?",
+      "type": "choice",
+      "required": true,
+      "answer_option": [
+        {"value": "completed"},
+        {"value": "moved_away"},
+        {"value": "mother_died"},
+        {"value": "declined"},
+        {"value": "unable_to_contact"}
+      ],
+      "styling_metadata": {
+        "phc": {
+          "short": "Outcome",
+          "help": "Every home visit still scheduled for her stops the moment you record this."
+        }
+      }
+    }
+  ]
+}

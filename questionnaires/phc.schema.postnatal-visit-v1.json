@@ -1,0 +1,55 @@
+{
+  "version": "1.0",
+  "slug": "phc-postnatal-visit-v1",
+  "title": "Postnatal home visit",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.postnatal-visit",
+      "scribe": true
+    }
+  },
+  "questions": [
+    {
+      "link_id": "seen",
+      "text": "Who did you see?",
+      "type": "choice",
+      "required": true,
+      "answer_option": [
+        {"value": "mother_and_baby"},
+        {"value": "mother_only"},
+        {"value": "baby_only"},
+        {"value": "nobody_at_home"}
+      ],
+      "styling_metadata": {
+        "phc": {
+          "short": "Saw",
+          "help": "A visit where nobody was at home still counts as a visit made, and still has to be recorded."
+        }
+      }
+    },
+    {
+      "link_id": "narrative",
+      "text": "What did you find?",
+      "type": "text",
+      "required": false,
+      "styling_metadata": {
+        "phc": {
+          "short": "Found"
+        }
+      }
+    },
+    {
+      "link_id": "followup_needed",
+      "text": "Does anything need following up?",
+      "type": "boolean",
+      "required": false,
+      "styling_metadata": {
+        "phc": {
+          "short": "Follow up"
+        }
+      }
+    }
+  ]
+}

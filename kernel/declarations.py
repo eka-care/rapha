@@ -513,7 +513,7 @@ def _documents(manifest):
     return out
 
 
-def _lint_schedule(fm, manifest, ops, fail):
+def _lint_schedule(fm, manifest, ops, fail, drawn=frozenset()):
     """One schedule. Everything here is a rule somebody can get wrong in a
     way that produces a plausible wrong answer rather than an error."""
     voc = vocab.from_manifest(manifest)
@@ -583,6 +583,17 @@ def _lint_schedule(fm, manifest, ops, fail):
                 fail(f"contact '{cid}': owner '{contact.get('owner')}' does not "
                      f"hold '{capability}', so the person this is assigned to "
                      "could not perform it")
+            # AND SOMEBODY HAS TO BE OFFERED IT. An operation this bundle
+            # loads but no workflow step draws cannot be reached at all: the
+            # guard refuses it with "no station in this line draws it". A
+            # schedule naming one is a contact that can be owed for ever and
+            # never closed, and it reads as a working schedule right up until
+            # somebody tries to do the visit. Caught here because the loaded
+            # check above passes, which is what makes it hard to see.
+            if drawn and op not in drawn:
+                fail(f"contact '{cid}': no step of any workflow draws "
+                     f"'{op}', so nobody is ever offered the thing that "
+                     "closes this and it could be owed for ever")
     del voc
     return None
 
@@ -748,6 +759,13 @@ def lint(manifest, decls, ops, seed=()):
                 bad.append(f"{oid}: emits '{flag}', which is not this bundle's "
                            f"vocabulary")
 
+    # Every operation some workflow step draws, gathered before the loop
+    # because a schedule is linted against it and the two are different
+    # declarations that may be read in either order.
+    drawn = {oid for fm, _ in decls.values() if fm.get("type") == "workflow"
+             for step in fm.get("steps") or []
+             for oid in step.get("operations") or []}
+
     for did, (fm, body) in sorted(decls.items()):
         def fail(msg, did=did):
             bad.append(f"{did}: {msg}")
@@ -775,7 +793,7 @@ def lint(manifest, decls, ops, seed=()):
         elif kind == "metric":
             _lint_metric(fm, fail)
         elif kind == "schedule":
-            _lint_schedule(fm, manifest, ops, fail)
+            _lint_schedule(fm, manifest, ops, fail, drawn)
 
     return bad
 

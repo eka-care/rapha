@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "slug": "phc-delivery-record-v1",
+  "title": "Record a delivery",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.delivery-record"
+    }
+  },
+  "questions": [
+    {
+      "link_id": "delivery_date",
+      "text": "When was she delivered?",
+      "type": "date",
+      "required": true,
+      "styling_metadata": {
+        "phc": {
+          "short": "Delivered",
+          "help": "Every postnatal visit after this one is counted from this date, so a guess here moves them all."
+        }
+      }
+    },
+    {
+      "link_id": "outcome",
+      "text": "How did the birth end?",
+      "type": "choice",
+      "required": true,
+      "answer_option": [
+        {"value": "live_birth"},
+        {"value": "stillbirth"}
+      ],
+      "styling_metadata": {
+        "phc": {
+          "short": "Birth",
+          "help": "Both answers open postnatal care for the mother. A pregnancy that ended any other way is recorded with End pregnancy instead, and opens nothing."
+        }
+      }
+    }
+  ]
+}

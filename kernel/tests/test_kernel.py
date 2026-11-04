@@ -222,7 +222,10 @@ def test_station_skips_steps_the_patient_was_never_sent_to():
     assert state.station(WF, state.flags(s, T, WF)) == "pharmacy", "never sent to the lab"
     statuses = {x.station: x.status for x in state.line(WF, state.flags(s, T, WF))}
     assert statuses == {"reception": "done", "nurse": "done", "doctor": "done",
-                        "lab": "skipped", "pharmacy": "now"}
+                        "lab": "skipped", "pharmacy": "now",
+                        # She has not delivered, so the home visit step does
+                        # not apply to her any more than the lab does.
+                        "community": "skipped"}
 
 
 def test_only_the_declared_stored_flags_survive_derivation():
@@ -425,8 +428,13 @@ def test_a_queue_groups_in_line_order_with_a_trailing_finished_group():
     s.add("observation", thread="enc-2", category="vital-signs")
     s.add("notes", thread="enc-2")
     res = views.resolve(BUNDLE, "phc.view.station-queue", s)
+    # "community" is the home visit step, last in the line and conditional on
+    # postnatal care being open. It is a group here because the queue groups
+    # by every station the line declares, and it is empty because nobody in
+    # this fixture has delivered.
     assert [g["key"] for g in res.groups] == ["reception", "nurse", "doctor",
-                                              "lab", "pharmacy", None]
+                                              "lab", "pharmacy", "community",
+                                              None]
     assert [(g["key"], g["count"]) for g in res.groups if g["count"]] == [("nurse", 1),
                                                                          (None, 1)]
     row = next(r for r in res.rows if r.thread == "enc-1")
@@ -450,7 +458,10 @@ def test_a_summary_draws_what_the_sections_declare():
     titles = [block["title"] for block in res.rows]
     assert titles[:2] == ["Visit", "Flags"]
     line_rows = res.rows[0]["rows"]
-    assert [r["status"] for r in line_rows] == ["done", "done", "done", "now", "skipped"]
+    # The sixth is the home visit step, which this patient skipped: she has
+    # no postnatal care open, so the step does not apply to her at all.
+    assert [r["status"] for r in line_rows] == ["done", "done", "done", "now",
+                                                "skipped", "skipped"]
     investigations = next(b for b in res.rows if b["title"] == "Investigations")
     assert investigations["rows"] == [{"code": "CBC", "status": "active",
                                       "created_date": None}]
@@ -862,13 +873,13 @@ def test_a_thread_view_is_the_shape_the_renderer_was_promised():
 
 def test_an_operation_no_step_draws_is_neither_a_button_nor_a_write():
     """phc.op.household-visit is in the PHC manifest and in no PHC step: it
-    stands at `community` and the outpatient line has no such station. It must
-    not be drawn on a clinic thread, and it must not be writable onto one from
-    any surface, or a household questionnaire lands on an encounter."""
+    stands at `community` and the outpatient line draws only the postnatal
+    visit there. It must not be drawn on a clinic thread, and it must not be
+    writable onto one from any surface, or a household questionnaire lands on
+    an encounter."""
     stray = "phc.op.household-visit"
     assert stray in OPS, "the fixture this asserts against has moved"
     assert not state.drawn_by(WF, stray)
-    assert all(state.drawn_by(WF, op_id) for op_id in OPS if op_id != stray)
 
     s = registered()
     every = set(vocab.CAPABILITIES)

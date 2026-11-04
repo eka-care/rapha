@@ -617,8 +617,10 @@ def main():
 
         panel = call(base, "/threads/enc-002/")
         assert panel["station"] == "nurse"
+        # The sixth is the home visit step, skipped: she has not delivered.
         assert [s["status"] for s in panel["line"]] == ["done", "now", "pending",
-                                                        "skipped", "skipped"]
+                                                        "skipped", "skipped",
+                                                        "skipped"]
         assert "phc.op.pharmacy-dispense" not in [a["id"] for a in panel["actions"]]
         ok("a thread opens with its line, its flags and only the actions it allows")
 

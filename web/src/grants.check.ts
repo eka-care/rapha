@@ -46,8 +46,26 @@ ok(inert("vitals.record", cat, WHOLE) === false, "vitals.record is drawn by the 
 ok(inert("patient.register", cat, WHOLE) === false, "patient.register is drawn at reception");
 ok(inert("rx.prescribe", cat, WHOLE) === false, "rx.prescribe is drawn at the doctor's step");
 
-// -- visit.household's operation stands at a station the line never visits --
-ok(inert("visit.household", cat, WHOLE) === true, "household-visit stands at community, which this line has no step for");
+// -- visit.household used to stand at a station the line never visited ------
+// It no longer does: the line gained a community step when the postnatal
+// schedule needed somewhere to draw the home visit from. The general
+// household visit is STILL undrawn, which is a real gap recorded in
+// catalogue/ops/phc.op.postnatal-visit.md, but the capability is live
+// because another operation that needs it is offered.
+ok(inert("visit.household", cat, WHOLE) === false,
+   "visit.household is drawn by the postnatal visit at the community step");
+
+// The sentence for a station the line does not have is still asserted, over
+// a line with that step taken out. Real declarations, one step removed, so
+// this exercises the function rather than agreeing with itself.
+const noHouse = {
+  ...cat,
+  workflows: Object.fromEntries(Object.entries(cat.workflows ?? {}).map(([id, wf]) => [
+    id, { ...wf, steps: (wf.steps ?? []).filter((s) => s.station !== "community") },
+  ])),
+} as typeof cat;
+ok(inert("visit.household", noHouse, WHOLE) === true,
+   "take the community step away and the capability is dead again");
 
 // -- both are proven true, so neither "always reachable" nor "always inert" -
 // makes every assertion above pass: one needs a false, the other needs a
@@ -56,12 +74,19 @@ const some = ["patient.register", "abha.link", "vitals.record", "encounter.docum
               "rx.prescribe", "lab.order", "lab.result.enter", "pharmacy.dispense"]
   .map((c) => inert(c, cat, WHOLE));
 ok(some.some((v) => v === false), "at least one capability with a drawn operation is grantable");
-ok(inert("visit.household", cat, WHOLE) !== inert("vitals.record", cat, WHOLE), "the two differ");
+ok(inert("visit.household", noHouse, WHOLE) !== inert("vitals.record", cat, WHOLE),
+   "the two differ");
 
 // -- the reason names the operation's own station and the workflow's own
 //    title, not a sentence written once for this one case -------------------
-const reason = inertReason("visit.household", cat, WHOLE);
+const reason = inertReason("visit.household", noHouse, WHOLE);
 ok(reason.includes("community"), "names the station the operation actually declares");
+// And with the step present, the sentence says the line does not offer it
+// THERE rather than claiming the line has no such station, which would be a
+// false explanation of a true refusal.
+const offered = inertReason("visit.household", cat, WHOLE);
+ok(offered.includes("does not offer") && offered.includes("community"),
+   `a station the line has gets its own sentence: ${offered}`);
 ok(reason.toLowerCase().includes(cat.workflows!["phc.wf.outpatient"].title.toLowerCase()),
    "names the workflow's own title, not a hard coded line name");
 

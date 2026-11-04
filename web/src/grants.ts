@@ -60,5 +60,12 @@ export function inertReason(cap: string, cat: Catalogue, facility: Withheld): st
   const wf = Object.values(cat.workflows ?? {})[0];
   const line = (wf?.title ?? "This line").toLowerCase();
   const station = op?.station ?? "that";
+  // A station the line HAS, which simply does not offer this, is a different
+  // sentence from one the line does not have. Both were the same until the
+  // line gained a community step that draws the postnatal visit and not the
+  // general household one, and "the outpatient line has no community
+  // station" would now be a false explanation of a true refusal.
+  const visits = (wf?.steps ?? []).some((s) => s.station === station);
+  if (op && visits) return `The ${line} does not offer this at its ${station} station.`;
   return `The ${line} has no ${station} station.`;
 }

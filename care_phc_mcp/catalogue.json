@@ -344,6 +344,9 @@
       "phc.op.handover-reply",
       "phc.op.pregnancy-open",
       "phc.op.pregnancy-close",
+      "phc.op.delivery-record",
+      "phc.op.postnatal-close",
+      "phc.op.postnatal-visit",
       "phc.op.referral-raise",
       "phc.op.referral-close",
       "phc.op.context-add",
@@ -354,6 +357,7 @@
     ],
     "schedules": [
       "phc.sched.antenatal",
+      "phc.sched.postnatal",
       "phc.sched.referral"
     ],
     "title": "Primary health centre",
@@ -610,6 +614,53 @@
         "per_row": null,
         "questions": {},
         "resource": "questionnaire_response"
+      }
+    ],
+    "phc.op.delivery-record": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "outcome": {
+            "answer": "outcome"
+          },
+          "status": {
+            "const": "ended"
+          },
+          "type": {
+            "const": "pregnancy"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "episode_of_care"
+      },
+      {
+        "fields": {
+          "anchor_basis": {
+            "const": "delivery"
+          },
+          "anchor_date": {
+            "answer": "delivery_date"
+          },
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "active"
+          },
+          "type": {
+            "const": "postnatal"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "episode_of_care"
       }
     ],
     "phc.op.followup": [
@@ -1066,6 +1117,64 @@
         "per_row": null,
         "questions": {},
         "resource": "inventory_item"
+      }
+    ],
+    "phc.op.postnatal-close": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "outcome": {
+            "answer": "outcome"
+          },
+          "status": {
+            "const": "ended"
+          },
+          "type": {
+            "const": "postnatal"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "episode_of_care"
+      }
+    ],
+    "phc.op.postnatal-visit": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "in_progress"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "encounter"
+      },
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "payload": {
+            "json": "payload"
+          },
+          "questionnaire": {
+            "const": "phc.schema.postnatal-visit-v1"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "questionnaire_response"
       }
     ],
     "phc.op.pregnancy-close": [
@@ -2176,6 +2285,54 @@
         "questionnaire_response"
       ]
     },
+    "phc.op.delivery-record": {
+      "capability": "episode.manage",
+      "description": "She has had the baby. This records it, and in the same act it ends the\npregnancy and starts the postnatal care she is owed.\n\nBoth answers to the second question -- a live birth and a stillbirth -- open\npostnatal care, because the mother needs the same checks either way. A\nmother whose baby was stillborn is at the same risk of bleeding, infection\nand depression as any other, and a product that stopped visiting her would\nbe making a judgement nobody asked it to make.",
+      "emits": [],
+      "fields": [
+        {
+          "link_id": "delivery_date",
+          "options": null,
+          "required": true,
+          "text": "When was she delivered?",
+          "type": "date"
+        },
+        {
+          "link_id": "outcome",
+          "options": [
+            "live_birth",
+            "stillbirth"
+          ],
+          "required": true,
+          "text": "How did the birth end?",
+          "type": "choice"
+        }
+      ],
+      "id": "phc.op.delivery-record",
+      "input": "phc.schema.delivery-record-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "pregnancy.open"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "Delivery",
+      "station": "nurse",
+      "summary": "The pregnancy ends and postnatal care for the mother begins, in one act.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Record a delivery",
+      "tool": "propose_delivery_record",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "episode_of_care"
+      ]
+    },
     "phc.op.followup": {
       "capability": "encounter.document",
       "description": "A return visit about something already recorded. It asks what has\nhappened since, your assessment, the conditions this visit is about and\nthe plan. It does not ask for an examination, on the view that a return\nvisit is usually about what changed rather than about a fresh set of\nfindings.\n\nNEEDS SIGN-OFF. Leaving the examination off this form is a product\nchoice made without a clinician, and a follow up that does need an\nexamination has nowhere to put it on this template. The general\nconsultation asks all five questions and is the answer until a named\nclinical officer confirms this narrowing or replaces it.",
@@ -2830,6 +2987,109 @@
         "inventory_item"
       ]
     },
+    "phc.op.postnatal-close": {
+      "capability": "episode.manage",
+      "description": "Her postnatal care is finished, or it is not going to happen, and this says\nso. The home visits still owed stop the moment it lands.",
+      "emits": [],
+      "fields": [
+        {
+          "link_id": "outcome",
+          "options": [
+            "completed",
+            "moved_away",
+            "mother_died",
+            "declined",
+            "unable_to_contact"
+          ],
+          "required": true,
+          "text": "Why is postnatal care ending?",
+          "type": "choice"
+        }
+      ],
+      "id": "phc.op.postnatal-close",
+      "input": "phc.schema.postnatal-close-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "postnatal.open"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "End postnatal",
+      "station": "nurse",
+      "summary": "Postnatal care is over, and every home visit still owed stops.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Close postnatal care",
+      "tool": "propose_postnatal_close",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "episode_of_care"
+      ]
+    },
+    "phc.op.postnatal-visit": {
+      "capability": "visit.household",
+      "description": "Somebody went to the house. This is what says so, and it is what closes one\nof the seven contacts in `bundles/phc/phc.sched.postnatal.md`.\n\nNobody at home is an answer. A visit that was made and found an empty house\nis not the same as a visit nobody made, and a schedule that cannot tell them\napart sends the same person back tomorrow and blames her for the gap.",
+      "emits": [],
+      "fields": [
+        {
+          "link_id": "seen",
+          "options": [
+            "mother_and_baby",
+            "mother_only",
+            "baby_only",
+            "nobody_at_home"
+          ],
+          "required": true,
+          "text": "Who did you see?",
+          "type": "choice"
+        },
+        {
+          "link_id": "narrative",
+          "options": null,
+          "required": false,
+          "text": "What did you find?",
+          "type": "text"
+        },
+        {
+          "link_id": "followup_needed",
+          "options": null,
+          "required": false,
+          "text": "Does anything need following up?",
+          "type": "boolean"
+        }
+      ],
+      "id": "phc.op.postnatal-visit",
+      "input": "phc.schema.postnatal-visit-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "registered",
+        "postnatal.open"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "PNC visit",
+      "station": "community",
+      "summary": "Somebody went to the house in the six weeks after she delivered.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Record a postnatal home visit",
+      "tool": "propose_postnatal_visit",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "encounter",
+        "questionnaire_response"
+      ]
+    },
     "phc.op.pregnancy-close": {
       "capability": "episode.manage",
       "description": "The pregnancy is over, however it ended, and this is what says so. It is\nthe most important operation in the maternal half of this product, and not\nbecause of what it records.\n\nIt is important because of what it STOPS.",
@@ -3300,6 +3560,103 @@
       "title": "Antenatal contacts",
       "type": "schedule"
     },
+    "phc.sched.postnatal": {
+      "anchor": {
+        "delivery": 0
+      },
+      "anchor_from": "recorded",
+      "contacts": [
+        {
+          "authority": "statutory",
+          "closes": 2,
+          "due": 1,
+          "escalates_to": "anm",
+          "id": "hbnc1",
+          "opens": 0,
+          "operation": "phc.op.postnatal-visit",
+          "owner": "asha",
+          "reports_as": "HBNC1",
+          "title": "First home visit"
+        },
+        {
+          "authority": "statutory",
+          "closes": 5,
+          "due": 3,
+          "escalates_to": "anm",
+          "id": "hbnc2",
+          "opens": 3,
+          "operation": "phc.op.postnatal-visit",
+          "owner": "asha",
+          "reports_as": "HBNC2",
+          "title": "Third day visit"
+        },
+        {
+          "authority": "statutory",
+          "closes": 9,
+          "due": 7,
+          "escalates_to": "anm",
+          "id": "hbnc3",
+          "opens": 6,
+          "operation": "phc.op.postnatal-visit",
+          "owner": "asha",
+          "reports_as": "HBNC3",
+          "title": "Seventh day visit"
+        },
+        {
+          "authority": "statutory",
+          "closes": 17,
+          "due": 14,
+          "escalates_to": "anm",
+          "id": "hbnc4",
+          "opens": 12,
+          "operation": "phc.op.postnatal-visit",
+          "owner": "asha",
+          "reports_as": "HBNC4",
+          "title": "Second week visit"
+        },
+        {
+          "authority": "statutory",
+          "closes": 24,
+          "due": 21,
+          "escalates_to": "anm",
+          "id": "hbnc5",
+          "opens": 19,
+          "operation": "phc.op.postnatal-visit",
+          "owner": "asha",
+          "reports_as": "HBNC5",
+          "title": "Third week visit"
+        },
+        {
+          "authority": "statutory",
+          "closes": 31,
+          "due": 28,
+          "escalates_to": "anm",
+          "id": "hbnc6",
+          "opens": 26,
+          "operation": "phc.op.postnatal-visit",
+          "owner": "asha",
+          "reports_as": "HBNC6",
+          "title": "Fourth week visit"
+        },
+        {
+          "authority": "statutory",
+          "closes": 45,
+          "due": 42,
+          "escalates_to": "anm",
+          "id": "hbnc7",
+          "opens": 40,
+          "operation": "phc.op.postnatal-visit",
+          "owner": "asha",
+          "reports_as": "HBNC7",
+          "title": "Six week check"
+        }
+      ],
+      "episode": "postnatal",
+      "id": "phc.sched.postnatal",
+      "summary": "What this centre owes a mother in the six weeks after she delivers.",
+      "title": "Postnatal home visits",
+      "type": "schedule"
+    },
     "phc.sched.referral": {
       "anchor": {
         "raised": 0
@@ -3461,6 +3818,8 @@
     "lab.resulted",
     "lab.validated",
     "order.accessioned",
+    "postnatal.ended",
+    "postnatal.open",
     "pregnancy.ended",
     "pregnancy.open",
     "referral.ended",
@@ -3855,6 +4214,8 @@
       "lab.ordered",
       "lab.resulted",
       "lab.validated",
+      "postnatal.ended",
+      "postnatal.open",
       "pregnancy.ended",
       "pregnancy.open",
       "referral.ended",
@@ -3886,6 +4247,8 @@
         "followup.booked",
         "pregnancy.ended",
         "pregnancy.open",
+        "postnatal.ended",
+        "postnatal.open",
         "referral.ended",
         "referral.open",
         "capture.agreed",
@@ -3989,6 +4352,38 @@
               "status": "final"
             }
           }
+        },
+        "postnatal.ended": {
+          "gte": [
+            {
+              "resource": "episode_of_care",
+              "where": {
+                "status": "ended",
+                "type": "postnatal"
+              }
+            },
+            {
+              "resource": "episode_of_care",
+              "where": {
+                "status": "active",
+                "type": "postnatal"
+              }
+            }
+          ]
+        },
+        "postnatal.open": {
+          "all_of": [
+            {
+              "exists": {
+                "resource": "episode_of_care",
+                "where": {
+                  "status": "active",
+                  "type": "postnatal"
+                }
+              }
+            },
+            "not postnatal.ended"
+          ]
         },
         "pregnancy.ended": {
           "gte": [
@@ -4097,7 +4492,9 @@
             "phc.op.antenatal-measure",
             "phc.op.context-add",
             "phc.op.pregnancy-open",
-            "phc.op.pregnancy-close"
+            "phc.op.delivery-record",
+            "phc.op.pregnancy-close",
+            "phc.op.postnatal-close"
           ],
           "station": "nurse"
         },
@@ -4134,6 +4531,14 @@
             "phc.op.pharmacy-dispense"
           ],
           "station": "pharmacy"
+        },
+        {
+          "applies_when": "postnatal.open",
+          "done_when": "consult.documented",
+          "operations": [
+            "phc.op.postnatal-visit"
+          ],
+          "station": "community"
         }
       ],
       "stored": [

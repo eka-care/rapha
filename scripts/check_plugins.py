@@ -221,8 +221,11 @@ def held(bundle):
 
 WITHHELD_OPS = sorted(oid for oid, op in WHOLE.operations.items()
                       if op["capability"] in LEAST.withheld)
+# The postnatal home visit joined the household visit here because it needs
+# the same capability: a centre that does not run outreach cannot do either.
 assert WITHHELD_OPS == ["phc.op.household-visit", "phc.op.lab-order",
-                        "phc.op.lab-result-enter"], WITHHELD_OPS
+                        "phc.op.lab-result-enter",
+                        "phc.op.postnatal-visit"], WITHHELD_OPS
 
 for bundle, expect in ((WHOLE, True), (LEAST, False)):
     # `expect` says whether this centre runs them. The positive direction is
