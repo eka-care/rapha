@@ -94,7 +94,143 @@ NRCES_EX = ("the NRCeS India FHIR R4 implementation guide's own OPConsultRecord 
 NEDL = ("ICMR National Essential Diagnostics List 2025, Table 3, "
         "List of diagnostic tests at Primary Health Centre (PHC)")
 
+# Where the antenatal measurements come from. The Ministry of Health and
+# Family Welfare's antenatal care is what says WHICH measurements a contact
+# takes; LOINC is what says what each code means. The two are cited
+# separately per concept, and where a measurement a contact takes has no code
+# this build can honestly store, it is left out and the reason is written
+# down rather than approximated.
+ANC_SOURCE = ("India's antenatal care programme, whose measurements are the "
+              "ones carried on the Mother and Child Protection card")
+
 SEEDS = {
+    "observation-code": {
+        "title": "Observation codes",
+        "system": LOINC,
+        "binding": "a questionnaire question's own `code`, when the question "
+                   "is the concept",
+        "generated": "2026-11-04",
+        # Every vital sign here is also confirmed to be in the FHIR R4 vital
+        # signs value set, because that is the list an ABDM consumer matches a
+        # vital sign on and existing in LOINC is not the same claim.
+        "member_of": "http://hl7.org/fhir/ValueSet/observation-vitalsignresult",
+        "member_of_optional": True,
+        # NO UNIT IN THIS FILE, and that is a rule rather than an omission.
+        # LOINC's example units are read by `unit_of`, which decides a
+        # laboratory ANSWER's unit from the concept it reports, and this
+        # binding is the other kind: the question IS the concept and declares
+        # its own unit, bound to the UCUM value set. Writing a second unit
+        # here would be a number that looks like a constraint with nothing
+        # enforcing it, and the two could then disagree about the same
+        # reading. terminology/lab-analyte.json is where the units belong.
+        "units": False,
+        "source": "Two kinds of concept, kept in one file because the binding "
+                  "is one binding. The vital signs are from the FHIR R4 vital "
+                  "signs value set, which fixes the code every ABDM consumer "
+                  "matches a vital sign on. The antenatal measurements are "
+                  "chosen from %s, and every code here is confirmed against "
+                  "LOINC through tx.fhir.org. TWO MEASUREMENTS AN ANTENATAL "
+                  "CONTACT TAKES ARE DELIBERATELY ABSENT. Urine protein by "
+                  "dipstick is reported as a grade rather than a number, and "
+                  "no value set for those grades has been confirmed, so it "
+                  "stays narrative. Mid upper arm circumference is measured "
+                  "on the LEFT arm by convention and the only concept the "
+                  "server resolved, 56072-2, is specific to the right, so "
+                  "storing it would claim the wrong arm. Step 1 "
+                  "implementation 2 replaces this file with a local index "
+                  "built from the NRCeS release files." % ANC_SOURCE,
+        "concepts": {
+            "8480-6": {"why": "Systolic blood pressure. A vital sign of the "
+                              "FHIR R4 vital signs value set."},
+            "8462-4": {"why": "Diastolic blood pressure. A vital sign of the "
+                              "FHIR R4 vital signs value set."},
+            "8867-4": {"why": "Heart rate. A vital sign of the FHIR R4 vital "
+                              "signs value set."},
+            "2708-6": {"why": "Oxygen saturation. A vital sign of the FHIR R4 "
+                              "vital signs value set.",
+                       "note": "The FHIR R4 oxygensat profile fixes "
+                               "Observation.code to this code and allows a "
+                               "more specific coding beside it. A health "
+                               "centre measures by pulse oximeter, which is "
+                               "LOINC 59408-5, but that code alone would not "
+                               "match a consumer looking for a vital sign. "
+                               "When Observation.code carries more than one "
+                               "coding, 59408-5 is the second one, never the "
+                               "first."},
+            "29463-7": {"why": "Body weight. A vital sign of the FHIR R4 vital "
+                               "signs value set, and the measurement an "
+                               "antenatal contact repeats most."},
+            "8310-5": {"why": "Body temperature. A vital sign of the FHIR R4 "
+                              "vital signs value set."},
+            "11881-0": {"why": "Fundal height, taken at every antenatal "
+                               "contact from the second trimester under %s. "
+                               "The distance from the symphysis to the top of "
+                               "the uterus, measured with a tape, which is "
+                               "what this code says was done: the ultrasound "
+                               "derived concepts would claim a scan nobody "
+                               "performed." % ANC_SOURCE},
+            "55283-6": {"why": "Fetal heart rate, listened for at every "
+                               "antenatal contact from the second trimester "
+                               "under %s. The unqualified concept on purpose: "
+                               "11948-7 is the rate by ultrasound, and a "
+                               "centre listening with a fetoscope or a hand "
+                               "held Doppler did not do an "
+                               "ultrasound." % ANC_SOURCE},
+            "718-7": {"why": "Haemoglobin, taken at every antenatal contact "
+                             "under %s, by digital haemoglobinometer on "
+                             "capillary blood. The same "
+                             "concept terminology/lab-analyte.json carries, "
+                             "and it is in both files because the two "
+                             "bindings are different questions: this one is a "
+                             "measurement taken on the form, that one is a "
+                             "result keyed from the laboratory. One code, so "
+                             "the two cannot disagree about what was "
+                             "measured." % ANC_SOURCE},
+        },
+    },
+    "ucum-units": {
+        "title": "Units of measure",
+        "system": UCUM,
+        "binding": "a questionnaire question's `unit`, read from "
+                   "styling_metadata.phc.unit",
+        "generated": "2026-11-04",
+        "resolve": "ucum",
+        "source": "Every unit symbol the shipped questionnaires declare, at "
+                  "bundles/*/ and questionnaires/*.json. A declared unit is a "
+                  "bound unit whether or not any mapping projects it today, "
+                  "which is what stops 'mmol per litre' reaching a column "
+                  "FHIR says is UCUM. UCUM is a grammar rather than a code "
+                  "list, so there is nothing to expand: each symbol is "
+                  "confirmed to parse, one at a time, and the plain words "
+                  "beside it are a picker label declared here. Until "
+                  "2026-11-04 this file was hand written and every symbol in "
+                  "it said 'unverified'.",
+        "concepts": {
+            "%": {"display": "percent", "why": "Oxygen saturation."},
+            "/min": {"display": "per minute",
+                     "why": "A rate per minute: a pulse, and a fetal heart "
+                            "rate. Written without an annotation on purpose, "
+                            "because what is being counted is the question's "
+                            "own concept and not the unit's business."},
+            "10*3/uL": {"display": "thousand per microlitre",
+                        "why": "Leucocyte and platelet counts."},
+            "Cel": {"display": "degree Celsius", "why": "Body temperature."},
+            "cm": {"display": "centimetre",
+                   "why": "Fundal height, taken with a tape measure. Added "
+                          "2026-11-04 with the antenatal measurements."},
+            "g/dL": {"display": "gram per decilitre",
+                     "why": "Haemoglobin, which is what both the laboratory "
+                            "analyser and the point of care "
+                            "haemoglobinometer report."},
+            "kg": {"display": "kilogram", "why": "Body weight."},
+            "mg/dL": {"display": "milligram per decilitre",
+                      "why": "Glucose, urea, creatinine."},
+            "mm[Hg]": {"display": "millimetre of mercury",
+                       "why": "Blood pressure."},
+            "mmol/L": {"display": "millimole per litre",
+                       "why": "Electrolytes."},
+        },
+    },
     "lab-analyte": {
         "title": "Laboratory analytes a primary health centre reports",
         "system": LOINC,
@@ -580,7 +716,7 @@ def _write(slug, spec, concepts, verified):
         "title": spec["title"],
         "system": spec["system"],
         "binding": spec["binding"],
-        "generated": "2026-10-31",
+        "generated": spec.get("generated", "2026-10-31"),
         "source": spec["source"],
         "verified": verified,
         "concepts": concepts,
@@ -595,7 +731,8 @@ def build_loinc(slug, spec):
     for code in sorted(spec["concepts"]):
         found = lookup(code, spec["system"])
         versions.add(found.get("version") or "?")
-        unit = found["properties"].get("EXAMPLE_UCUM_UNITS")
+        unit = (found["properties"].get("EXAMPLE_UCUM_UNITS")
+                if spec.get("units", True) else None)
         concept = {
             "display": found["display"],
             "verified": "confirmed against LOINC %s through tx.fhir.org"
@@ -610,8 +747,25 @@ def build_loinc(slug, spec):
             concept["unit_verified"] = (
                 "LOINC EXAMPLE_UCUM_UNITS for this code, LOINC %s through "
                 "tx.fhir.org" % (found.get("version") or "?"))
+        # An optional second confirmation: that the code is in a published
+        # value set, which is a different claim from existing in LOINC. A
+        # consumer matching on the vital signs value set will not find a code
+        # that is merely a real LOINC code, and the two failures look
+        # identical in a file.
+        inside = spec.get("member_of")
+        if inside:
+            ok, _ = member(inside, code, spec["system"])
+            if ok:
+                concept["verified"] += (" and confirmed to be in the published "
+                                        "value set %s" % inside)
+            elif not spec.get("member_of_optional"):
+                raise SystemExit("FAIL %s is not in %s" % (code, inside))
+        if spec["concepts"][code].get("note"):
+            concept["note"] = spec["concepts"][code]["note"]
         concepts[code] = concept
-        print("ok   %-9s %s  [%s]" % (code, found["display"], unit or "no unit"))
+        print("ok   %-9s %-55s [%s]%s"
+              % (code, found["display"], unit or "no unit",
+                 "  in value set" if inside and ok else ""))
     _write(slug, spec, concepts,
            "confirmed against LOINC %s through tx.fhir.org" % ", ".join(sorted(versions)))
 

@@ -21,7 +21,8 @@ steps:
     # Background from elsewhere is seated behind it on purpose -- copying
     # in somebody else's letter must never be the headline advice at a
     # bench whose job is to take a reading.
-    operations: [phc.op.vitals-record, phc.op.context-add,
+    operations: [phc.op.vitals-record, phc.op.antenatal-measure,
+                 phc.op.context-add,
                  phc.op.pregnancy-open, phc.op.pregnancy-close]
   - station: doctor
     done_when: consult.documented

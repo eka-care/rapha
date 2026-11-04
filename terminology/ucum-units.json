@@ -3,45 +3,69 @@
   "title": "Units of measure",
   "system": "http://unitsofmeasure.org",
   "binding": "a questionnaire question's `unit`, read from styling_metadata.phc.unit",
-  "generated": "2026-10-31",
-  "source": "Every unit symbol the shipped questionnaires declare, at bundles/*/ and questionnaires/*.json. A declared unit is a bound unit whether or not any mapping projects it today, which is what stops 'mmol per litre' reaching a column FHIR says is UCUM. UCUM is a small grammar rather than a code list, so a cache of the symbols in use is the honest shape until a real validator is behind the seam; see the ceiling in kernel/terminology.py.",
-  "verified": "unverified",
+  "generated": "2026-11-04",
+  "source": "Every unit symbol the shipped questionnaires declare, at bundles/*/ and questionnaires/*.json. A declared unit is a bound unit whether or not any mapping projects it today, which is what stops 'mmol per litre' reaching a column FHIR says is UCUM. UCUM is a grammar rather than a code list, so there is nothing to expand: each symbol is confirmed to parse, one at a time, and the plain words beside it are a picker label declared here. Until 2026-11-04 this file was hand written and every symbol in it said 'unverified'.",
+  "verified": "every symbol confirmed against UCUM 2.2 through tx.fhir.org",
   "concepts": {
     "%": {
       "display": "percent",
-      "verified": "unverified: UCUM case sensitive symbol"
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "Oxygen saturation."
     },
     "/min": {
       "display": "per minute",
-      "verified": "unverified: UCUM case sensitive symbol"
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "A rate per minute: a pulse, and a fetal heart rate. Written without an annotation on purpose, because what is being counted is the question's own concept and not the unit's business."
     },
     "10*3/uL": {
       "display": "thousand per microlitre",
-      "verified": "unverified: UCUM case sensitive symbol"
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "Leucocyte and platelet counts."
     },
     "Cel": {
       "display": "degree Celsius",
-      "verified": "unverified: UCUM case sensitive symbol"
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "Body temperature."
+    },
+    "cm": {
+      "display": "centimetre",
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "Fundal height, taken with a tape measure. Added 2026-11-04 with the antenatal measurements."
     },
     "g/dL": {
       "display": "gram per decilitre",
-      "verified": "unverified: UCUM case sensitive symbol"
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "Haemoglobin, which is what both the laboratory analyser and the point of care haemoglobinometer report."
     },
     "kg": {
       "display": "kilogram",
-      "verified": "unverified: UCUM case sensitive symbol"
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "Body weight."
     },
     "mg/dL": {
       "display": "milligram per decilitre",
-      "verified": "unverified: UCUM case sensitive symbol"
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "Glucose, urea, creatinine."
     },
     "mm[Hg]": {
       "display": "millimetre of mercury",
-      "verified": "unverified: UCUM case sensitive symbol"
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "Blood pressure."
     },
     "mmol/L": {
       "display": "millimole per litre",
-      "verified": "unverified: UCUM case sensitive symbol"
+      "display_source": "a label declared in scripts/seed_terminology.py; UCUM publishes no display, the symbol is the code",
+      "verified": "confirmed as a UCUM 2.2 symbol through tx.fhir.org CodeSystem/$validate-code",
+      "why": "Electrolytes."
     }
   }
 }

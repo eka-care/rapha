@@ -33,6 +33,7 @@ operations:
   # Generated from the `templates` declaration below.
   - phc.op.ncd-review
   - phc.op.antenatal-visit
+  - phc.op.antenatal-measure
   - phc.op.followup
 workflows:
   - phc.wf.outpatient

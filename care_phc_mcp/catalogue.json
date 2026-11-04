@@ -349,6 +349,7 @@
       "phc.op.context-add",
       "phc.op.ncd-review",
       "phc.op.antenatal-visit",
+      "phc.op.antenatal-measure",
       "phc.op.followup"
     ],
     "schedules": [
@@ -383,6 +384,69 @@
         "per_row": null,
         "questions": {},
         "resource": "patient"
+      }
+    ],
+    "phc.op.antenatal-measure": [
+      {
+        "fields": {
+          "category": {
+            "const": "vital-signs"
+          },
+          "code": {
+            "question": "code"
+          },
+          "code_display": {
+            "question": "code_display"
+          },
+          "code_system": {
+            "question": "code_system"
+          },
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "final"
+          },
+          "unit": {
+            "question": "unit"
+          },
+          "unit_system": {
+            "question": "unit_system"
+          },
+          "value": {
+            "question": "answer"
+          }
+        },
+        "per_item": null,
+        "per_question": [
+          {
+            "code": "11881-0",
+            "code_display": "Uterus Fundal height Tape measure",
+            "code_system": "http://loinc.org",
+            "link_id": "fundal_height",
+            "unit": "cm",
+            "unit_system": "http://unitsofmeasure.org"
+          },
+          {
+            "code": "55283-6",
+            "code_display": "Fetal Heart rate",
+            "code_system": "http://loinc.org",
+            "link_id": "fetal_heart_rate",
+            "unit": "/min",
+            "unit_system": "http://unitsofmeasure.org"
+          },
+          {
+            "code": "718-7",
+            "code_display": "Hemoglobin [Mass/volume] in Blood",
+            "code_system": "http://loinc.org",
+            "link_id": "haemoglobin",
+            "unit": "g/dL",
+            "unit_system": "http://unitsofmeasure.org"
+          }
+        ],
+        "per_row": null,
+        "questions": {},
+        "resource": "observation"
       }
     ],
     "phc.op.antenatal-visit": [
@@ -1803,6 +1867,61 @@
       "verified": "unverified",
       "writes": [
         "patient"
+      ]
+    },
+    "phc.op.antenatal-measure": {
+      "capability": "vitals.record",
+      "description": "The three numbers an antenatal contact turns on. How big the uterus is, what\nthe baby's heart is doing, and how anaemic she is.\n\nThey exist as a separate recording from the antenatal visit for one reason:\n**a number is not a sentence.** The antenatal visit is dictated and lands as\nnarrative, which is the right shape for a history and an assessment and the\nwrong shape for a measurement. A fundal height that arrives as the words\n\"fundus about thirty weeks\" cannot be put on an axis, cannot be compared with\nthe last one, and cannot reach a district return. The same reading taken here\nis a coded observation with a LOINC code and a UCUM unit, and it can do all\nthree.",
+      "emits": [
+        "vitals.flagged"
+      ],
+      "fields": [
+        {
+          "link_id": "fundal_height",
+          "options": null,
+          "required": false,
+          "text": "Fundal height",
+          "type": "decimal"
+        },
+        {
+          "link_id": "fetal_heart_rate",
+          "options": null,
+          "required": false,
+          "text": "Fetal heart rate",
+          "type": "integer"
+        },
+        {
+          "link_id": "haemoglobin",
+          "options": null,
+          "required": false,
+          "text": "Haemoglobin",
+          "type": "decimal"
+        }
+      ],
+      "id": "phc.op.antenatal-measure",
+      "input": "phc.schema.antenatal-measure-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "registered",
+        "pregnancy.open"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "ANC readings",
+      "station": "nurse",
+      "summary": "Fundal height, the fetal heart rate and haemoglobin, as coded numbers.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Record antenatal measurements",
+      "tool": "propose_antenatal_measure",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "observation"
       ]
     },
     "phc.op.antenatal-visit": {
@@ -3975,6 +4094,7 @@
           "done_when": "vitals.recorded",
           "operations": [
             "phc.op.vitals-record",
+            "phc.op.antenatal-measure",
             "phc.op.context-add",
             "phc.op.pregnancy-open",
             "phc.op.pregnancy-close"

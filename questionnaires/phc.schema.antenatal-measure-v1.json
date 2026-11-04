@@ -1,0 +1,75 @@
+{
+  "version": "1.0",
+  "slug": "phc-antenatal-measure-v1",
+  "title": "Antenatal measurements",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.antenatal-measure"
+    }
+  },
+  "questions": [
+    {
+      "link_id": "fundal_height",
+      "text": "Fundal height",
+      "type": "decimal",
+      "code": "11881-0",
+      "required": false,
+      "is_observation": true,
+      "styling_metadata": {
+        "phc": {
+          "unit": "cm",
+          "range": {
+            "low": 5,
+            "high": 50
+          }
+        }
+      }
+    },
+    {
+      "link_id": "fetal_heart_rate",
+      "text": "Fetal heart rate",
+      "type": "integer",
+      "code": "55283-6",
+      "required": false,
+      "is_observation": true,
+      "styling_metadata": {
+        "phc": {
+          "unit": "/min",
+          "range": {
+            "low": 60,
+            "high": 220
+          },
+          "critical": {
+            "low": 110,
+            "high": 160
+          },
+          "flags": "vitals.flagged"
+        }
+      }
+    },
+    {
+      "link_id": "haemoglobin",
+      "text": "Haemoglobin",
+      "type": "decimal",
+      "code": "718-7",
+      "required": false,
+      "is_observation": true,
+      "styling_metadata": {
+        "phc": {
+          "unit": "g/dL",
+          "range": {
+            "low": 2,
+            "high": 20
+          },
+          "critical": {
+            "low": 11,
+            "high": 20
+          },
+          "flags": "vitals.flagged"
+        }
+      }
+    }
+  ]
+}

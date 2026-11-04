@@ -88,6 +88,11 @@ python3 -m bundles.phc.check      # capture consent: raised, declined, scoped to
 # validates, it is coded, the guard allows it, the rows land, the thread
 # projects to an ABDM WellnessRecord. No socket.
 python3 scripts/check_vitals.py
+# The same slice for the three numbers an antenatal contact turns on, plus the
+# two properties only this operation has: it cannot be reached without a
+# pregnancy open, and measuring somebody does not close a contact. The ANM's
+# own capability set drives it, so taking an ability off her fails here.
+python3 scripts/check_antenatal.py
 # A laboratory value and its unit are one checked thing: the analyte is a coded
 # ANSWER (the third binding form) and the unit must be the one LOINC reports
 # that analyte in. scripts/seed_terminology.py generated the value set and is

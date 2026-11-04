@@ -3,34 +3,55 @@
   "title": "Observation codes",
   "system": "http://loinc.org",
   "binding": "a questionnaire question's own `code`, when the question is the concept",
-  "generated": "2026-10-31",
-  "source": "Confirmed against the FHIR R4 vital signs value set, which fixes the LOINC code every ABDM consumer matches a vital sign on. Step 1 implementation 2 replaces this file with a local index built from the NRCeS release files.",
-  "verified": "confirmed 2026-10-30",
+  "generated": "2026-11-04",
+  "source": "Two kinds of concept, kept in one file because the binding is one binding. The vital signs are from the FHIR R4 vital signs value set, which fixes the code every ABDM consumer matches a vital sign on. The antenatal measurements are chosen from India's antenatal care programme, whose measurements are the ones carried on the Mother and Child Protection card, and every code here is confirmed against LOINC through tx.fhir.org. TWO MEASUREMENTS AN ANTENATAL CONTACT TAKES ARE DELIBERATELY ABSENT. Urine protein by dipstick is reported as a grade rather than a number, and no value set for those grades has been confirmed, so it stays narrative. Mid upper arm circumference is measured on the LEFT arm by convention and the only concept the server resolved, 56072-2, is specific to the right, so storing it would claim the wrong arm. Step 1 implementation 2 replaces this file with a local index built from the NRCeS release files.",
+  "verified": "confirmed against LOINC 2.83 through tx.fhir.org",
   "concepts": {
-    "8480-6": {
-      "display": "Systolic blood pressure",
-      "verified": "confirmed 2026-10-30 against the FHIR R4 vital signs value set, hl7.org/fhir/R4/valueset-observation-vitalsignresult.html"
-    },
-    "8462-4": {
-      "display": "Diastolic blood pressure",
-      "verified": "confirmed 2026-10-30 against the FHIR R4 vital signs value set, hl7.org/fhir/R4/valueset-observation-vitalsignresult.html"
-    },
-    "8867-4": {
-      "display": "Heart rate",
-      "verified": "confirmed 2026-10-30 against the FHIR R4 vital signs value set, hl7.org/fhir/R4/valueset-observation-vitalsignresult.html"
+    "11881-0": {
+      "display": "Uterus Fundal height Tape measure",
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org",
+      "why": "Fundal height, taken at every antenatal contact from the second trimester under India's antenatal care programme, whose measurements are the ones carried on the Mother and Child Protection card. The distance from the symphysis to the top of the uterus, measured with a tape, which is what this code says was done: the ultrasound derived concepts would claim a scan nobody performed."
     },
     "2708-6": {
       "display": "Oxygen saturation in Arterial blood",
-      "verified": "confirmed 2026-10-30 against the FHIR R4 vital signs value set, hl7.org/fhir/R4/valueset-observation-vitalsignresult.html",
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org and confirmed to be in the published value set http://hl7.org/fhir/ValueSet/observation-vitalsignresult",
+      "why": "Oxygen saturation. A vital sign of the FHIR R4 vital signs value set.",
       "note": "The FHIR R4 oxygensat profile fixes Observation.code to this code and allows a more specific coding beside it. A health centre measures by pulse oximeter, which is LOINC 59408-5, but that code alone would not match a consumer looking for a vital sign. When Observation.code carries more than one coding, 59408-5 is the second one, never the first."
     },
     "29463-7": {
       "display": "Body weight",
-      "verified": "confirmed 2026-10-30 against the FHIR R4 vital signs value set, hl7.org/fhir/R4/valueset-observation-vitalsignresult.html"
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org and confirmed to be in the published value set http://hl7.org/fhir/ValueSet/observation-vitalsignresult",
+      "why": "Body weight. A vital sign of the FHIR R4 vital signs value set, and the measurement an antenatal contact repeats most."
+    },
+    "55283-6": {
+      "display": "Fetal Heart rate",
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org",
+      "why": "Fetal heart rate, listened for at every antenatal contact from the second trimester under India's antenatal care programme, whose measurements are the ones carried on the Mother and Child Protection card. The unqualified concept on purpose: 11948-7 is the rate by ultrasound, and a centre listening with a fetoscope or a hand held Doppler did not do an ultrasound."
+    },
+    "718-7": {
+      "display": "Hemoglobin [Mass/volume] in Blood",
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org",
+      "why": "Haemoglobin, taken at every antenatal contact under India's antenatal care programme, whose measurements are the ones carried on the Mother and Child Protection card, by digital haemoglobinometer on capillary blood. The same concept terminology/lab-analyte.json carries, and it is in both files because the two bindings are different questions: this one is a measurement taken on the form, that one is a result keyed from the laboratory. One code, so the two cannot disagree about what was measured."
     },
     "8310-5": {
       "display": "Body temperature",
-      "verified": "confirmed 2026-10-30 against the FHIR R4 vital signs value set, hl7.org/fhir/R4/valueset-observation-vitalsignresult.html"
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org and confirmed to be in the published value set http://hl7.org/fhir/ValueSet/observation-vitalsignresult",
+      "why": "Body temperature. A vital sign of the FHIR R4 vital signs value set."
+    },
+    "8462-4": {
+      "display": "Diastolic blood pressure",
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org and confirmed to be in the published value set http://hl7.org/fhir/ValueSet/observation-vitalsignresult",
+      "why": "Diastolic blood pressure. A vital sign of the FHIR R4 vital signs value set."
+    },
+    "8480-6": {
+      "display": "Systolic blood pressure",
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org and confirmed to be in the published value set http://hl7.org/fhir/ValueSet/observation-vitalsignresult",
+      "why": "Systolic blood pressure. A vital sign of the FHIR R4 vital signs value set."
+    },
+    "8867-4": {
+      "display": "Heart rate",
+      "verified": "confirmed against LOINC 2.83 through tx.fhir.org and confirmed to be in the published value set http://hl7.org/fhir/ValueSet/observation-vitalsignresult",
+      "why": "Heart rate. A vital sign of the FHIR R4 vital signs value set."
     }
   }
 }
