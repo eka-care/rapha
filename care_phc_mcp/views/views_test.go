@@ -1,7 +1,9 @@
 package views
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -169,7 +171,7 @@ func gridCentre(t *testing.T) *grid {
 	return g
 }
 
-func (g *grid) ask(from, to string) ([]cohort.Entry, []Group) {
+func (g *grid) ask(from, to string) ([]CalendarRow, []Group) {
 	g.t.Helper()
 	rows, groups, err := calendar(g.b, g.view, g.s, nil, &from, &to, g.today)
 	if err != nil {
@@ -201,7 +203,7 @@ func TestAMissedContactIsPlacedOnItsDueDayOrTodayOrNowhere(t *testing.T) {
 	g := gridCentre(t)
 	due := g.missed.Due
 	id := g.missed.Contact.Contact
-	cellOf := func(rows []cohort.Entry, groups []Group) (drawn bool, cells []string) {
+	cellOf := func(rows []CalendarRow, groups []Group) (drawn bool, cells []string) {
 		for _, r := range rows {
 			if r.Contact.Contact == id {
 				drawn = true
@@ -269,5 +271,67 @@ func TestRowsAndCountsOfARangeAgree(t *testing.T) {
 		if sum != len(rows) {
 			t.Errorf("%v: %d counted for %d rows", c, sum, len(rows))
 		}
+	}
+}
+
+func TestEveryRangeRowSaysItsCell(t *testing.T) {
+	g := gridCentre(t)
+	from, to := "2026-08-30", "2026-09-05"
+	rows, groups := g.ask(from, to)
+	keys := map[string]int{}
+	for _, grp := range groups {
+		keys[grp.Key.(string)] = grp.Count
+	}
+	seen := map[string]int{}
+	for _, r := range rows {
+		if _, in := keys[r.Cell]; !in {
+			t.Errorf("%s has cell %q outside the span", r.Contact.Contact, r.Cell)
+		}
+		seen[r.Cell]++
+	}
+	for k, n := range keys {
+		if seen[k] != n {
+			t.Errorf("%s: %d rows say it, %d counted", k, seen[k], n)
+		}
+	}
+	// A missed contact due before the span carries today.
+	for _, r := range rows {
+		if r.State == schedule.Missed && r.Due < from && r.Cell != "2026-09-01" {
+			t.Errorf("%s due %s carries %s, not today", r.Contact.Contact, r.Due, r.Cell)
+		}
+	}
+	var late int
+	for _, r := range rows {
+		if r.Due < from {
+			late++
+		}
+	}
+	if late == 0 {
+		t.Fatal("the fixture has no late contact in the span")
+	}
+	// A due day inside the span is its own cell.
+	inside, _ := g.ask("2026-01-01", "2026-12-31")
+	for _, r := range inside {
+		if r.Cell != r.Due {
+			t.Errorf("%s due %s carries %s", r.Contact.Contact, r.Due, r.Cell)
+		}
+	}
+}
+
+func TestADayHasNoCellOnItsRows(t *testing.T) {
+	g := gridCentre(t)
+	on := "2026-09-01"
+	rows, _, err := calendar(g.b, g.view, g.s, &on, nil, nil, g.today)
+	if err != nil || len(rows) == 0 {
+		t.Fatalf("rows %d err %v", len(rows), err)
+	}
+	for _, r := range rows {
+		if r.Cell != "" {
+			t.Errorf("%s carries cell %q on ?on=", r.Contact.Contact, r.Cell)
+		}
+	}
+	raw, _ := json.Marshal(rows[0])
+	if strings.Contains(string(raw), `"cell"`) {
+		t.Errorf("cell on the wire: %s", raw)
 	}
 }

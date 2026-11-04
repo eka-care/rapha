@@ -506,6 +506,15 @@ func span(on, since, until *string) (first, last time.Time, ok bool, err error) 
 	return first, last, true, nil
 }
 
+// CalendarRow is one drawn contact. Cell is where a range puts it: the due
+// day when that is inside the range, or today for a missed contact due before
+// it. The renderer draws what it is told. A day (`?on=`) has one cell and it
+// is the day, so its rows carry none and the key is absent from the wire.
+type CalendarRow struct {
+	cohort.Entry
+	Cell string `json:"cell,omitempty"`
+}
+
 // calendar is kernel/views._calendar. Two different questions, answered by two
 // different rules on purpose.
 //
@@ -517,7 +526,7 @@ func span(on, since, until *string) (first, last time.Time, ok bool, err error) 
 // the one cell function, so they cannot disagree. Do not tidy one into the
 // other.
 func calendar(b Bundle, view carephc.View, s Reader, on, since, until *string,
-	at time.Time) ([]cohort.Entry, []Group, error) {
+	at time.Time) ([]CalendarRow, []Group, error) {
 	now := at.UTC()
 	first, last, ranged, err := span(on, since, until)
 	if err != nil {
@@ -542,17 +551,17 @@ func calendar(b Bundle, view carephc.View, s Reader, on, since, until *string,
 			}
 			return ""
 		}
-		rows := []cohort.Entry{}
+		rows := []CalendarRow{}
 		for _, e := range owed {
-			if cell(e) != "" {
-				rows = append(rows, e)
+			if placed := cell(e); placed != "" {
+				rows = append(rows, CalendarRow{Entry: e, Cell: placed})
 			}
 		}
 		groups := []Group{}
 		for d := first; !d.After(last); d = d.AddDate(0, 0, 1) {
 			iso, n := d.Format(dateLayout), 0
-			for _, e := range rows {
-				if cell(e) == iso {
+			for _, r := range rows {
+				if r.Cell == iso {
 					n++
 				}
 			}
@@ -572,10 +581,10 @@ func calendar(b Bundle, view carephc.View, s Reader, on, since, until *string,
 	if err != nil {
 		return nil, nil, err
 	}
-	rows := []cohort.Entry{}
+	rows := []CalendarRow{}
 	for _, e := range owed {
 		if covers(e, day.Format(dateLayout)) {
-			rows = append(rows, e)
+			rows = append(rows, CalendarRow{Entry: e})
 		}
 	}
 	groups := []Group{}

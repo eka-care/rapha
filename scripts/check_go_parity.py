@@ -1361,6 +1361,22 @@ def s_the_calendar_with_women_in_it(walk, codes):
         assert counted == len(body["rows"]), \
             "%s: %d counted for %d drawn" % (label, counted, len(body["rows"]))
         ranges[label] = body
+        # Where each row is drawn is the kernel's word, not the renderer's:
+        # every row says a cell inside the span, and the counts are those.
+        span_days = {g["key"] for g in body["groups"]}
+        assert all(r.get("cell") in span_days for r in body["rows"]), (label, body["rows"])
+        for g in body["groups"]:
+            assert g["count"] == sum(1 for r in body["rows"] if r["cell"] == g["key"]), (label, g)
+        for r in body["rows"]:
+            if r["due"] in span_days:
+                assert r["cell"] == r["due"], (label, r["due"], r["cell"])
+            else:
+                assert r["state"] == "missed" and r["cell"] == today.isoformat(), (label, r)
+    # A missed contact due before the week is drawn on today.
+    assert any(r["due"] < week_start.isoformat() and r["cell"] == today.isoformat()
+               for r in ranges["a week around today"]["rows"]), "no late marker in the week"
+    # A day has one cell, and it is the day: its rows carry none.
+    assert all("cell" not in r for r in answers["today, by saying nothing"][1]["rows"])
     # Not one day's answer wearing a range's name.
     assert len(ranges["a week around today"]["groups"]) == 7
     assert len(ranges["a month with its spill days"]["groups"]) >= 28
