@@ -1,8 +1,11 @@
 /** Where each contact sits on a calendar, kept apart from how it is drawn so
  *  it can be checked under plain node.
  *
- *  THE PLACEMENT RULE: a contact sits on its DUE day and on no other, however
- *  wide its window is. Drawn across its window, one woman would fill twenty
+ *  THE PLACEMENT RULE: a contact sits in ONE cell, the one the kernel names
+ *  in the row's `cell`: its due day, or today when it is missed and its due
+ *  day is before the range. The counts the kernel sends come from the same
+ *  field, so grid and counts agree. A row with no `cell` (the single-day
+ *  answer's shape) is placed nowhere. Never across its window, however wide. Drawn across its window, one woman would fill twenty
  *  squares and a missed contact would fill every day after it for ever, and a
  *  month would become a wall of colour nobody reads. The day list answers a
  *  different question, "what is owed today", by window, and is right too.
@@ -30,8 +33,8 @@ const iso = (t: number) => {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 };
 
-/** The Monday on or before `t`. Weeks start on Monday. */
-const weekStart = (t: number) => t - ((new Date(t).getUTCDay() + 6) % 7) * DAY;
+/** The Sunday on or before `t`. Weeks start on Sunday, as Google's do. */
+const weekStart = (t: number) => t - new Date(t).getUTCDay() * DAY;
 
 /** The days a scale shows, first to last, for an anchor. A month always shows
  *  six whole weeks, so the grid does not change height as months change, and
@@ -60,7 +63,8 @@ export function span(scale: Scale, anchor: string): { from: string; to: string }
   return { from: all[0] ?? "", to: all[all.length - 1] ?? "" };
 }
 
-/** One cell per day of the scale, in order, each holding the rows DUE that day.
+/** One cell per day of the scale, in order, each holding the rows whose
+ *  `cell` is that day.
  *  A cell over `max` keeps the first `max` in the order given and reports the
  *  rest in `more`, so nothing is dropped without being counted.
  *
@@ -74,8 +78,9 @@ export function cells(scale: Scale, anchor: string, rows: CalendarRow[], max: nu
   { key: string; inMonth: boolean; isToday: boolean; rows: CalendarRow[]; more: number }[] {
   const on = new Map<string, CalendarRow[]>();
   for (const r of rows) {
-    const list = on.get(r.due);
-    if (list) list.push(r); else on.set(r.due, [r]);
+    if (!r.cell) continue;
+    const list = on.get(r.cell);
+    if (list) list.push(r); else on.set(r.cell, [r]);
   }
   const month = anchor.slice(0, 7);
   return days(scale, anchor).map((key) => {

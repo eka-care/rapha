@@ -311,6 +311,9 @@ export type TaskRow = {
 export type CalendarRow = Contact & {
   subject: string;
   subject_row: Record<string, unknown>;
+  /** The day this row is drawn on in a range answer: its due day, or today
+   *  for a missed contact due before the range. Absent on a single-day answer. */
+  cell?: string;
 };
 
 export type ViewResult = {

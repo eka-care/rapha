@@ -11,14 +11,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cells, span, step } from "./grid.ts";
+import { cells, span, step } from "./cells.ts";
 import type { CalendarRow } from "../types.ts";
 
 let checks = 0;
 const ok = (what: string) => { checks++; console.log("ok   " + what); };
 
-const row = (contact: string, due: string, state = "due"): CalendarRow => ({
-  contact, title: contact, schedule: "s", episode: "e", opens: due, due, closes: due, state,
+const row = (contact: string, due: string, state = "due", cell = due): CalendarRow => ({
+  contact, cell, title: contact, schedule: "s", episode: "e", opens: due, due, closes: due, state,
   owner: "r", operation: "", authority: "", reports_as: "", done_at: "",
   subject: "p-" + contact, subject_row: {},
 } as unknown as CalendarRow);
@@ -29,6 +29,9 @@ const days = (from: string, to: string) =>
 
 // 4 Nov 2026 is a Wednesday; 1 Nov 2026 is a Sunday.
 const ANCHOR = "2026-11-04";
+// Weeks start on Sunday. 1 Dec 2026 is a Tuesday, so December's grid has spill
+// days on both sides (29 Nov to 9 Jan); November's starts exactly on the 1st.
+const DEC = "2026-12-09";
 
 // ---------------------------------------------------------------- spans
 {
@@ -37,11 +40,16 @@ const ANCHOR = "2026-11-04";
   assert.ok(w.from <= ANCHOR && ANCHOR <= w.to, "the week holds its anchor");
   ok("a week's span is seven days and holds the anchor");
 
-  const m = span("month", ANCHOR);
-  assert.ok(m.from < "2026-11-01", "the span starts before the 1st");
-  assert.ok(m.to > "2026-11-30", "and ends after the last");
+  assert.equal(w.from, "2026-11-01", "a week starts on Sunday");
+  assert.equal(w.to, "2026-11-07");
+  const m = span("month", DEC);
+  assert.deepEqual(m, { from: "2026-11-29", to: "2027-01-09" });
+  assert.ok(m.from < "2026-12-01" && m.to > "2026-12-31", "starts before the 1st, ends after the last");
   assert.equal(days(m.from, m.to), 42, "six whole rows");
-  ok("a month's span covers the visible grid, spill days and all");
+  assert.equal(cells("month", DEC, [], 5)[0].inMonth, false);
+  assert.equal(cells("month", DEC, [], 5).filter((c) => c.inMonth).length, 31);
+  assert.equal(new Date(m.from + "T00:00:00Z").getUTCDay(), 0, "the first column is Sunday");
+  ok("a month's span covers the visible grid, spill days and all, from a Sunday");
 
   const y = span("year", ANCHOR);
   assert.deepEqual(y, { from: "2026-01-01", to: "2026-12-31" });
@@ -72,7 +80,7 @@ const ANCHOR = "2026-11-04";
   assert.equal(holding("a")[0].key, "2026-11-10");
   assert.equal(holding("c")[0].key, "2026-11-12");
   assert.equal(grid.reduce((n, g) => n + g.rows.length, 0), 3, "each drawn once, none twice");
-  ok("a contact draws in the cell of its due day and in no other");
+  ok("a contact draws in one cell and in no other");
 
   // Its WINDOW is wide and it must not matter: a missed contact whose window
   // closed three weeks on is still only on its due day.
@@ -81,10 +89,26 @@ const ANCHOR = "2026-11-04";
   assert.deepEqual(g2.map((g) => g.key), ["2026-11-03"]);
   ok("a wide window does not spread a contact over the days inside it");
 
-  const spill = cells("month", ANCHOR, [row("before", "2026-10-28"), row("after", "2026-12-02")], 5)
+  const spill = cells("month", DEC, [row("before", "2026-11-30"), row("after", "2027-01-05")], 5)
     .filter((g) => g.rows.length);
-  assert.deepEqual(spill.map((g) => [g.key, g.inMonth]), [["2026-10-28", false], ["2026-12-02", false]]);
-  ok("a contact due on a spill day draws there, marked as not in the month");
+  assert.deepEqual(spill.map((g) => [g.key, g.inMonth]), [["2026-11-30", false], ["2027-01-05", false]]);
+  ok("a contact in a spill day draws there, marked as not in the month");
+
+  // THE CASE THAT WAS BROKEN: a missed contact due before the range is placed
+  // by the kernel on today. It draws in today's square and not in its due
+  // day's, which here is not even on the screen.
+  const late = row("late", "2026-09-09", "missed", "2026-11-04");
+  const lg = cells("month", ANCHOR, [late], 5, "2026-11-04");
+  assert.deepEqual(lg.filter((g) => g.rows.length).map((g) => g.key), ["2026-11-04"]);
+  assert.equal(lg.find((g) => g.key === "2026-11-04")!.isToday, true);
+  // And the reverse: a cell that differs from a due day on screen wins.
+  const moved = cells("week", ANCHOR, [row("m", "2026-11-02", "missed", "2026-11-04")], 5)
+    .filter((g) => g.rows.length).map((g) => g.key);
+  assert.deepEqual(moved, ["2026-11-04"]);
+  // No cell (the single-day answer's shape): placed nowhere, however its due day falls.
+  const bare = { ...row("bare", "2026-11-04"), cell: undefined } as CalendarRow;
+  assert.equal(cells("month", ANCHOR, [bare], 5).reduce((n, g) => n + g.rows.length, 0), 0);
+  ok("a row draws in the cell the kernel names, not its due day; a row with no cell draws nowhere");
 
   assert.equal(cells("month", ANCHOR, [row("far", "2027-03-01"), row("bad", "")], 5)
     .reduce((n, g) => n + g.rows.length, 0), 0);
@@ -94,8 +118,9 @@ const ANCHOR = "2026-11-04";
     [...cells("month", ANCHOR, [], 5).map((g) => g.key)].sort());
   assert.equal(cells("month", ANCHOR, [], 5).length, 42);
   assert.equal(cells("month", ANCHOR, [], 5).filter((g) => g.inMonth).length, 30);
+  assert.equal(cells("month", ANCHOR, [], 5)[0].key, "2026-11-01");
   assert.equal(cells("week", ANCHOR, [], 5).length, 7);
-  ok("a month is 42 cells in order, 30 of them in November; a week is 7");
+  ok("a month is 42 cells in order, 30 of them in November, which starts on its first Sunday; a week is 7");
 }
 
 // ---------------------------------------------------------------- overflow
@@ -144,7 +169,7 @@ const ANCHOR = "2026-11-04";
   // to as well: tone and mark come from the arc's own tables by lookup.
   for (const s of ["upcoming", "done", "missed"]) words.add(s);
   const prose = (s: string) => s.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
-  for (const f of ["grid.ts", "Grid.tsx"]) {
+  for (const f of ["cells.ts", "Grid.tsx"]) {
     const body = prose(readFileSync(join(here, f), "utf8"));
     const hit = [...words].filter((w) => new RegExp(`["'\`]${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'\`]`).test(body));
     assert.deepEqual(hit, [], `${f} names: ${hit.join(", ")}`);

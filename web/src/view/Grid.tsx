@@ -1,6 +1,6 @@
 /** A week, a month or a year, in the shape of a calendar.
  *
- *  A contact is drawn on its DUE day and nowhere else (see grid.ts). Contacts
+ *  A contact is drawn in the one cell the kernel names for it, and nowhere else (see cells.ts). Contacts
  *  have no time of day, so in the week they sit in the all-day band; the hour
  *  rows below are empty on purpose until appointments can be booked, and they
  *  open at clinic hours so the empty night does not take the screen.
@@ -15,11 +15,11 @@ import { Icon } from "../icons";
 import { MARK, TONE } from "../thread/Arc";
 import type { CalendarRow } from "../types";
 import { dayLabel, dayOf } from "./day";
-import { cells, step, type Scale } from "./grid";
+import { cells, step, type Scale } from "./cells";
 
 /** How many contacts a month cell lists before it says "+N more". */
 const MAX = 3;
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July",
   "August", "September", "October", "November", "December"];
 /** The hour grid opens here, not at midnight. */
