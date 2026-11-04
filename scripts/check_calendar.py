@@ -223,8 +223,8 @@ for n in range(-45, 46, 1):
     for r in result.rows:
         piles.setdefault(r["state"], []).append(r)
     month = {g["key"]: g["count"] for g in result.groups}
-    # The month's count is a number the engine computed on its own, not from
-    # these rows, so the piles' total is held to it.
+    # The piles partition the rows, so this restates claim 6: the day's rows
+    # against the month's count. The half with its own teeth is the next one.
     assert sum(len(p) for p in piles.values()) == month[d.isoformat()], \
         "%s: piles hold %d and the month counts %d" % (
             d, sum(len(p) for p in piles.values()), month[d.isoformat()])
@@ -235,7 +235,7 @@ for n in range(-45, 46, 1):
     assert len(month) == (date(d.year + (d.month == 12), d.month % 12 + 1, 1)
                           - date(d.year, d.month, 1)).days, d
 assert any(day(store, TODAY + timedelta(days=n)).rows for n in range(-45, 46)), "empty fixture"
-ok("4. every day's piles add up to the month's own count for it, and no contact is listed twice")
+ok("4. every day's rows match the month's count for that date, and no (subject, contact) appears twice")
 ok("6. the month's count for a date equals the length of that date's list, 91 days running")
 
 
