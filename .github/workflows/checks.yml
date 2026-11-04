@@ -1,47 +1,48 @@
+#  What has to hold before anything merges.
+#
+#  This file used to belong to the ABDM Developer Portal, which this
+#  repository started life as. Two of its three jobs checked a plan and a
+#  plugin that are no longer here, and the one that mattered built a web
+#  directory that has since been renamed. What is left is the one job worth
+#  keeping, pointed at the right places.
+#
+#  `scripts/check.sh` is the whole gate: it compiles the declarations, lints
+#  them, runs both engines against each other, and ends with an end-to-end
+#  pass over a real socket. It skips the browser-free web checks when
+#  web/node_modules is absent, which is why node is installed first.
 name: checks
 on:
   push:
     branches: [main]
   pull_request:
+
 jobs:
-  plan-check:
+  gate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: plan and plugin are in sync
-        run: ./scripts/plan-check.sh
-  catalogue:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm ci --prefix care_phc_fe || npm install --prefix care_phc_fe
+      #  The web checks run under plain node with type stripping, and
+      #  check.sh skips them silently if the modules are missing — so a
+      #  failure to install here would quietly shrink the gate rather than
+      #  break it. Install before anything else runs.
+      - run: npm ci --prefix web || npm install --prefix web
+
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26'
+
       - run: pip install pyyaml
-      - name: catalogue, guard, validator, thread state, MCP server
-        run: ./scripts/check.sh
-      - name: the committed catalogue is the compiled form of the atoms
+
+      - name: the gate
+        run: sh scripts/check.sh
+
+      #  The catalogue is compiled from the declarations, and both copies are
+      #  committed. If either differs after the gate has rebuilt them, the
+      #  declarations and the committed form have drifted apart and one of
+      #  them is a lie.
+      - name: the committed catalogue is the compiled form of the declarations
         run: git diff --exit-code catalogue/catalogue.json care_phc_mcp/catalogue.json
-  plugin-validate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: npm install -g @anthropic-ai/claude-code
-      - name: manifests and components are valid
-        run: |
-          claude plugin validate .claude-plugin/marketplace.json --strict
-          claude plugin validate ./plugin --strict
-      - name: agent frontmatter parses
-        run: python3 scripts/check-agent-frontmatter.py
-      - name: no skill shares a name with a command
-        run: |
-          dupes=$(comm -12 <(ls plugin/skills | sort) <(ls plugin/commands | sed 's/\.md$//' | sort))
-          if [ -n "$dupes" ]; then echo "name collision: $dupes"; exit 1; fi
-          echo "ok no collisions"

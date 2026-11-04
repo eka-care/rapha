@@ -21,7 +21,6 @@ care_phc/           backend plug: thread state, community layer, connectors
 web/                the renderer: a chat workspace drawn from the declarations
 care_phc_mcp/       MCP server, tools generated from catalogue.json
 questionnaires/     Phase 0 forms, authored not coded
-plan-archive/       the ABDM Developer Portal plan this repo used to hold
 ```
 
 ## Why the atoms are the specification
@@ -33,11 +32,11 @@ into the guard's operation table and the MCP tool list. Its body is the human
 half and compiles into the tool description an agent reads and the page a
 developer reads.
 
-The format is borrowed from the ABDM Catalogue in `plan-archive/`, with a
-stricter linter. There, a wrong frontmatter field produces a bad document.
-Here it produces a permission hole, so `catalogue/vocab.py` is closed: an atom
-naming a capability, state or CARE resource that is not already in those lists
-is a failure, never a new entry.
+The format came from the ABDM Catalogue, whose plan this repository used to
+hold, with a stricter linter. There, a wrong frontmatter field produces a bad
+document. Here it produces a permission hole, so `catalogue/vocab.py` is
+closed: an atom naming a capability, state or CARE resource that is not
+already in those lists is a failure, never a new entry.
 
 ## What we do not build
 
@@ -50,7 +49,7 @@ between stations, the operations that read it, and the community layer.
 ## Checks
 
 ```sh
+sh scripts/check.sh                 # everything; must end "all checks passed"
 python3 -m catalogue.build          # lint the atoms, compile catalogue.json
 python3 -m catalogue.tests.test_guard
-./scripts/plan-check.sh             # the archived portal plan's own gate
 ```
