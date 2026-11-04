@@ -160,9 +160,15 @@ before choosing, because it changes what an ordinary woman is chased for.
    instinct is no: the programme treats the category as sticky for the
    pregnancy, and stopping her extra care because one reading improved is
    the kind of decision a system should not make on its own.
-4. **Who may mark her?** My proposal is the nurse and the MO, not the ASHA —
-   she reports what she finds and the centre decides. That matches how the
-   pregnancy itself is opened today.
+4. **Who may mark her?** Not the ASHA — she reports what she finds and the
+   centre decides. **Corrected during the build:** the kernel allows an
+   operation one station, and refuses to draw it anywhere else, so this
+   happens at the nurse's bench. The medical officer holds the capability
+   but would have to be at that bench to use it; from the doctor's bench he
+   hands over. That is exactly how opening the pregnancy already works, and
+   letting an operation declare two stations is a kernel change this does
+   not justify. It does mean an MO who diagnoses hypertension at his own
+   bench cannot mark her there, which is friction worth knowing about.
 
 ## 7. What proves it works
 
