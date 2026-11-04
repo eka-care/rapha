@@ -35,7 +35,7 @@
 import assert from "node:assert/strict";
 import { WROTE } from "./types.ts";
 import type { CalendarRow } from "./types.ts";
-import { cardDays, monthAfter, wantsNextMonth, comingUp, dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView, atOf, stack, pageBy, cardHash, owedLine } from "./view/day.ts";
+import { dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView, atOf, stack, pageBy, cardHash, owedLine } from "./view/day.ts";
 import { span, cells } from "./view/cells.ts";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -1367,14 +1367,6 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
 // ------------------------------------------------------ the home page's card
 
 {
-  const g = (key: string, count: number) => ({ key, count });
-  const groups = [g("2026-11-02", 3), g("2026-11-04", 2), g("2026-11-05", 0), g("2026-11-06", 4), g("2026-11-07", 1),
-    g("2026-11-08", 1), g("2026-11-09", 1), g("2026-11-10", 1), g("2026-11-11", 1)];
-  // From today on, days with something owed, at most five; a past day is not "coming up".
-  const next = comingUp(groups, "2026-11-04");
-  assert.deepEqual(next.map((d) => d.key), ["2026-11-04", "2026-11-06", "2026-11-07", "2026-11-08", "2026-11-09"]);
-  assert.deepEqual(comingUp([], "2026-11-04"), []);
-  assert.deepEqual(comingUp(undefined, "2026-11-04"), [], "a view that sent no groups gives no days");
   // Today and tomorrow are named; the rest by weekday, read without a time zone.
   assert.equal(dayLabel("2026-11-04", "2026-11-04"), "Today");
   assert.equal(dayLabel("2026-11-05", "2026-11-04"), "Tomorrow");
@@ -1388,51 +1380,14 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
 
   const today = code(readFileSync(join(SRC, "screens", "Today.tsx"), "utf8"));
   assert.match(today, /decl\.kind === "calendar"/, "the card is found by the declared kind of view");
-  assert.ok(!/cardDays\(|wantsNextMonth\(/.test(today), "the home page no longer lists day counts; the stack replaced them");
+  assert.ok(!/cardDays\(|wantsNextMonth\(|comingUp\(/.test(today), "the count-based card is gone");
 
-  // The span does not depend on the date. Month-end: this month's groups run
-  // out, the next month's are asked for and the dates carry on.
-  const month = (y: number, m: number, n: number) =>
-    Array.from({ length: n }, (_, i) => g(`${y}-${String(m).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`, 1));
-  const nov = month(2026, 11, 30), dec = month(2026, 12, 31), jan = month(2027, 1, 31);
-  assert.equal(wantsNextMonth(nov, "2026-11-04"), "", "mid-month needs no second request");
-  assert.equal(wantsNextMonth(nov, "2026-11-28"), "2026-12-01");
-  assert.deepEqual(comingUp([...nov, ...dec], "2026-11-28").map((d) => d.key),
-    ["2026-11-28", "2026-11-29", "2026-11-30", "2026-12-01", "2026-12-02"]);
-  // December into January: the year rolls over.
-  assert.equal(monthAfter("2026-12-31"), "2027-01-01");
-  assert.equal(wantsNextMonth(dec, "2026-12-31"), "2027-01-01");
-  assert.deepEqual(comingUp([...dec, ...jan], "2026-12-31").map((d) => d.key),
-    ["2026-12-31", "2027-01-01", "2027-01-02", "2027-01-03", "2027-01-04"]);
-  assert.equal(comingUp(dec, "2026-12-31").length, 1, "without the next month the card would be short");
-  assert.equal(monthAfter("junk"), "");
-  // Other month shapes: February (plain and leap), and a 30-day month that is not November.
-  assert.equal(monthAfter("2027-02-28"), "2027-03-01");
-  assert.equal(monthAfter("2028-02-29"), "2028-03-01");
-  assert.equal(monthAfter("2026-04-30"), "2026-05-01");
-  const feb = month(2027, 2, 28), mar = month(2027, 3, 31), apr = month(2026, 4, 30), may = month(2026, 5, 31);
-  assert.deepEqual(cardDays(feb, mar, "2027-02-27").days.map((d) => d.key),
-    ["2027-02-27", "2027-02-28", "2027-03-01", "2027-03-02", "2027-03-03"]);
-  assert.deepEqual(cardDays(apr, may, "2026-04-30").days.map((d) => d.key),
-    ["2026-04-30", "2026-05-01", "2026-05-02", "2026-05-03", "2026-05-04"]);
-  // The merge: order is by date whatever order the pieces arrive in; a day in both is not doubled by position.
-  assert.deepEqual(cardDays(dec, jan, "2026-12-30").days.map((d) => d.key),
-    ["2026-12-30", "2026-12-31", "2027-01-01", "2027-01-02", "2027-01-03"]);
-  assert.deepEqual(cardDays([...dec].reverse(), [...jan].reverse(), "2026-12-30").days.map((d) => d.key),
-    ["2026-12-30", "2026-12-31", "2027-01-01", "2027-01-02", "2027-01-03"]);
-  // Not yet read: the days there are, nothing claimed unread. Failed: the good days are kept and it says so.
-  assert.deepEqual(cardDays(dec, null, "2026-12-30"), { days: [g("2026-12-30", 1), g("2026-12-31", 1)], unread: false });
-  assert.deepEqual(cardDays(dec, "failed", "2026-12-30"), { days: [g("2026-12-30", 1), g("2026-12-31", 1)], unread: true });
-  assert.equal(cardDays(dec, jan, "2026-12-30").unread, false);
-  assert.equal(cardDays(undefined, "failed", "2026-12-30").unread, true);
-  assert.deepEqual(cardDays([g("2026-12-30", 0)], "failed", "2026-12-30"), { days: [], unread: true },
-    "empty first month plus a failed second: unread is set, which suppresses the reassuring line");
   const cal2 = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
   assert.match(cal2, /fetched\.data\.on === other/, "an answer is used only for the day it was asked for");
   assert.ok(!/waiting \? \[\]/.test(cal2));
   const cal = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
   assert.match(cal, /dayOn\(/, "the day screen opens on the date a link carries");
-  ok("the day helpers still hold: month roll-over, merging, and the card is found by the declared kind of view");
+  ok("the day helpers: labels, dates in a link, and the card is found by the declared kind of view");
 }
 
 // ------------------------------------------------------- the calendar page
@@ -1517,10 +1472,10 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.equal(pageBy(9, 0, 3), 2, "a stale position is pulled back inside the stack");
 
   // A card opens the calendar on the date the visit is owed.
-  assert.equal(cardHash("phc.view.calendar", late), "/views/phc.view.calendar?on=2026-09-09&at=2026-09-09&scale=month");
-  assert.equal(atOf("#" + cardHash("v", soon)), "2026-11-06");
-  assert.equal(dayOn(cardHash("v", soon)), "2026-11-06");
-  assert.equal(scaleOf(cardHash("v", soon)), "month");
+  assert.equal(cardHash(late), "/patients/p1?at=2026-09-09", "her own page, carrying the date");
+  assert.equal(atOf("#" + cardHash(soon)), "2026-11-06", "the date is in the shape the calendar reads");
+  assert.ok(!/\/views\//.test(cardHash(soon)), "not the facility's calendar");
+  assert.equal(cardHash(row({ subject: "a b/c" })), "/patients/a%20b%2Fc?at=2026-11-10", "an id is encoded");
   // When it is owed, in words.
   assert.equal(owedLine(late, NOW), "Late since Wed 9 Sep");
   assert.equal(owedLine(today, NOW), "Due today");
@@ -1552,7 +1507,8 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   // The home page: the stack replaces the day counts, and opens her calendar.
   assert.match(home, /stack\(/, "the home page builds the stack through day.ts");
   assert.match(home, /<Cards\b/, "the home page draws the cards");
-  assert.match(home, /cardHash\(/, "a card goes to the calendar through day.ts");
+  assert.match(home, /cardHash\(r\)/, "a card goes to her page through day.ts");
+  assert.ok(!/views\/\$\{cal\.decl\.id\}/.test(home), "a card does not open the facility view");
   assert.match(home, /currentRole\(\)/, "the stack opens on the viewer's own role");
   assert.ok(!/Coming up<\/div>[\s\S]*contacts? owed/.test(home) && !/contacts owed/.test(home), "the count table is gone");
   // The renderer never names a station, flag, capability, operation or column.

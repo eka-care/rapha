@@ -92,55 +92,6 @@ export function dayLabel(iso: string, today: string): string {
   return `${wd} ${day} ${month}`;
 }
 
-/** The days the home page's card lists: from today on, only days with
- *  something owed, the first `limit`. The kernel's groups are the whole
- *  month, so earlier days and empty ones are cut here. */
-export function comingUp(
-  groups: { key: string | null; count: number }[] | undefined,
-  today: string,
-  limit = 5,
-): { key: string; count: number }[] {
-  return (groups ?? [])
-    .filter((g): g is { key: string; count: number } => !!g.key && g.key >= today && g.count > 0)
-    .sort((a, b) => (a.key < b.key ? -1 : 1))
-    .slice(0, limit);
-}
-
-/** The first day of the month after `iso`, or "" when `iso` is not a date.
- *  Read by position, so the year rolls over without a time zone in sight. */
-export function monthAfter(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-\d{2}$/.exec(iso ?? "");
-  if (!m) return "";
-  const y = Number(m[1]), mo = Number(m[2]);
-  return mo === 12 ? `${y + 1}-01-01` : `${y}-${String(mo + 1).padStart(2, "0")}-01`;
-}
-
-/** The day to ask the kernel about for the rest of the span, or "" when this
- *  month's groups already fill it. The kernel scopes groups to one month on
- *  purpose; the card carries on into the next itself. */
-export function wantsNextMonth(
-  groups: { key: string | null; count: number }[] | undefined,
-  today: string,
-  limit = 5,
-): string {
-  return comingUp(groups, today, limit).length >= limit ? "" : monthAfter(today);
-}
-
-/** What the home card lists, and whether it knows that is all there is.
- *  `later` is the next month's groups once read, "failed" when that read
- *  failed, and null when none was asked for. The days already read are always
- *  kept; a failure is said, never swallowed, so a short card is not mistaken
- *  for a quiet fortnight. */
-export function cardDays(
-  groups: { key: string | null; count: number }[] | undefined,
-  later: { key: string | null; count: number }[] | "failed" | null,
-  today: string,
-  limit = 5,
-): { days: { key: string; count: number }[]; unread: boolean } {
-  const more = Array.isArray(later) ? later : [];
-  return { days: comingUp([...(groups ?? []), ...more], today, limit), unread: later === "failed" };
-}
-
 /** The scale a link to the calendar carries (`scale=week|month|year`). A month
  *  when it carries none or one this screen does not draw. */
 export function scaleOf(hash: string): Scale {
@@ -190,9 +141,10 @@ export function pageBy(at: number, by: number, count: number): number {
   return Math.max(0, Math.min(count - 1, at + by));
 }
 
-/** The address of the calendar, opened on the date a contact is owed. */
-export function cardHash(view: string, row: CalendarRow): string {
-  return `/views/${view}?on=${row.due}&at=${row.due}&scale=month`;
+/** The address of her own page, anchored on the date the contact is owed.
+ *  `at` is the shape the calendar already reads. */
+export function cardHash(row: CalendarRow): string {
+  return `/patients/${encodeURIComponent(row.subject)}?at=${row.due}`;
 }
 
 /** When a contact is owed, in words. A late one says since when. */

@@ -277,8 +277,10 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
           ) : (
             <Cards rows={cards} now={today} roleName={(r) => cat.vocabulary?.role_titles?.[r] ?? r}
                    nameOf={(s) => fields(cal.decl, { subject: s } as unknown as QueueRow).name}
+                   /* The register's own declared columns, first two values: the renderer may not
+                      name a column (age, village), so it takes what the declaration offers. */
                    metaOf={(s) => fields(cal.decl, { subject: s } as unknown as QueueRow).meta.split(" · ").slice(0, 2).join(" · ")}
-                   onOpen={(r) => { location.hash = cardHash(cal.decl.id, r); }} />
+                   onOpen={(r) => { location.hash = cardHash(r); }} />
           )}
         </div>
       )}
