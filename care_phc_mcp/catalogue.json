@@ -3930,7 +3930,7 @@
       "summary": "Visits, ABHA coverage and flagged vitals.",
       "target_minutes": null,
       "tasks": [],
-      "title": "Facility today",
+      "title": "Numbers",
       "type": "view",
       "window": "week",
       "workflow": null
