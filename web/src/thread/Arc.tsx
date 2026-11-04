@@ -13,7 +13,7 @@
  */
 import { useState } from "react";
 import { Icon } from "../icons";
-import { bands, months, type Scale } from "./arc-scale";
+import { bands, months, unplaced, type Scale } from "./arc-scale";
 import type { Contact, Episode } from "../types";
 import { human, title } from "../words";
 
@@ -103,6 +103,12 @@ function OneArc({ episode, onAct, first }: { episode: Episode; onAct?: (op: stri
             </button>
           ))}
         </div>}
+        {drawable && shown !== "day" && unplaced(episode) > 0 && (
+          <p className="arc-basis">
+            {unplaced(episode)} {unplaced(episode) === 1 ? "contact" : "contacts"} could
+            not be placed on the months, so the empty stretches may not be empty. See Day.
+          </p>
+        )}
         {shown !== "day" && <Months episode={episode} dense={shown === "year"} />}
         {shown === "day" && (
         <ol className="arc-list">

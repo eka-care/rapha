@@ -1,6 +1,6 @@
 /** Run: node --experimental-strip-types src/thread/arc-scale.check.ts   (from web/) */
 import assert from "node:assert/strict";
-import { bands, months } from "./arc-scale.ts";
+import { bands, months, unplaced } from "./arc-scale.ts";
 import type { Episode } from "../types.ts";
 
 let checks = 0;
@@ -62,4 +62,11 @@ const b = bands(months(ep("g", [
   contact("2", "2026-06-01", "2026-06-05", "2026-06-30", "due"),
 ])));
 ok(b.length === 3 && b[1].kind === "gap" && (b[1] as { count: number }).count === 4, "four empty months, one band");
+// One good contact and one unreadable: months are drawn AND the loss is counted.
+const half = ep("h", [
+  contact("1", "2026-03-01", "2026-03-10", "2026-03-31", "done"),
+  contact("2", "soon", "later", "never", "due"),
+]);
+ok(months(half).length === 1 && unplaced(half) === 1, "months drawn and one contact reported unplaced");
+ok(unplaced(a) === 0, "nothing unplaced when every date reads");
 console.log(`ok   arc-scale: ${checks} checks`);

@@ -29,6 +29,13 @@ function real(iso: string): boolean {
 }
 const ym = (iso: string) => iso.slice(0, 7);
 
+/** How many contacts could not be placed on a month because their window
+ *  would not read. The screen says so, so a month they would have covered is
+ *  never presented as empty when it is only unreadable. */
+export function unplaced(episode: Episode): number {
+  return episode.contacts.filter((c) => !(real(c.opens) && real(c.closes))).length;
+}
+
 export function months(episode: Episode): Month[] {
   const cs = episode.contacts.filter((c) => real(c.opens) && real(c.closes));
   if (!cs.length) return [];
