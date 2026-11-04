@@ -8,6 +8,7 @@ import (
 	carephc "github.com/eka-care/care_phc_mcp"
 	"github.com/eka-care/care_phc_mcp/cohort"
 	"github.com/eka-care/care_phc_mcp/schedule"
+	"github.com/eka-care/care_phc_mcp/store"
 )
 
 // A calendar day is exactly YYYY-MM-DD; kernel/views._day refuses the rest.
@@ -108,5 +109,165 @@ func TestTheCapCountsBothEndsOfARange(t *testing.T) {
 	}
 	if _, _, _, err := span(nil, p("2026-01-01"), p("2027-02-05")); err == nil {
 		t.Error("401 days accepted")
+	}
+}
+
+// ---- the ranged branch, through a real read -------------------------------
+//
+// The refusal tests above return before any read. These reach the grid itself:
+// one open pregnancy nobody has visited, long enough ago that its early
+// contacts are missed, read through an in-memory store.
+
+type grid struct {
+	t      *testing.T
+	b      Bundle
+	view   carephc.View
+	s      Reader
+	today  time.Time
+	missed cohort.Entry
+}
+
+func gridCentre(t *testing.T) *grid {
+	t.Helper()
+	cat, err := carephc.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cat.LoadDeclarations(); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	if _, err := s.Write("patient", map[string]any{"id": "p-g", "name": "G", "age": "30"}, "t-g"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB().Exec("INSERT INTO episode_of_care (id, patient, type, status, anchor_date," +
+		" anchor_basis, outcome, created_date) VALUES ('ep-g','p-g','pregnancy','active'," +
+		"'2026-01-05','last_menstrual_period','','2026-02-01T09:00:00+00:00')"); err != nil {
+		t.Fatal(err)
+	}
+	g := &grid{t: t, b: Bundle{Catalogue: cat, Workflow: cat.Workflow}, s: s,
+		view:  carephc.View{Episodes: []string{"pregnancy"}},
+		today: time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)}
+	wide, err := cohort.Owed(cat, s, cat.Workflow, g.view.Episodes,
+		time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC), g.today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range wide {
+		if e.State == schedule.Missed && e.Due < "2026-08-01" {
+			g.missed = e
+			break
+		}
+	}
+	if g.missed.Due == "" {
+		t.Fatal("the fixture has no missed contact to place")
+	}
+	return g
+}
+
+func (g *grid) ask(from, to string) ([]cohort.Entry, []Group) {
+	g.t.Helper()
+	rows, groups, err := calendar(g.b, g.view, g.s, nil, &from, &to, g.today)
+	if err != nil {
+		g.t.Fatal(err)
+	}
+	return rows, groups
+}
+
+// A range answers the span it was asked, not one day.
+func TestARangeAnswersTheSpanAndNotOneDay(t *testing.T) {
+	g := gridCentre(t)
+	for _, c := range []struct {
+		from, to string
+		days     int
+	}{{"2026-08-30", "2026-09-05", 7}, {"2026-08-01", "2026-08-31", 31},
+		{"2026-12-28", "2027-01-03", 7}, {"2026-09-01", "2026-09-01", 1}} {
+		_, groups := g.ask(c.from, c.to)
+		if len(groups) != c.days {
+			t.Errorf("%s..%s: %d groups, want %d", c.from, c.to, len(groups), c.days)
+		}
+		if groups[0].Key != c.from {
+			t.Errorf("%s..%s starts at %v", c.from, c.to, groups[0].Key)
+		}
+	}
+}
+
+// The three places a missed contact can land.
+func TestAMissedContactIsPlacedOnItsDueDayOrTodayOrNowhere(t *testing.T) {
+	g := gridCentre(t)
+	due := g.missed.Due
+	id := g.missed.Contact.Contact
+	cellOf := func(rows []cohort.Entry, groups []Group) (drawn bool, cells []string) {
+		for _, r := range rows {
+			if r.Contact.Contact == id {
+				drawn = true
+			}
+		}
+		return
+	}
+	// Due inside the range (today is inside too): counted on its due day.
+	day := func(plus int) string {
+		d, _ := time.Parse(dateLayout, due)
+		return d.AddDate(0, 0, plus).Format(dateLayout)
+	}
+	rows, groups := g.ask(day(-1), "2026-09-02")
+	if drawn, _ := cellOf(rows, groups); !drawn {
+		t.Fatal("a missed contact due inside the range was not drawn")
+	}
+	for _, grp := range groups {
+		if grp.Key == due && grp.Count < 1 {
+			t.Errorf("not counted on its due day %s", due)
+		}
+	}
+	todayInside := countOn(groups, "2026-09-01")
+	// Due before the range, today inside: a marker on today, once.
+	rows2, groups2 := g.ask(day(1), "2026-09-02")
+	if drawn, _ := cellOf(rows2, groups2); !drawn {
+		t.Fatal("a missed contact due before the range lost its marker on today")
+	}
+	if countOn(groups2, "2026-09-01") < 1 {
+		t.Error("the marker was not counted on today")
+	}
+	if todayInside >= countOn(groups2, "2026-09-01") && due != "2026-09-01" {
+		t.Error("the due-day case also counted it on today")
+	}
+	// Due before the range, today outside too: absent from both.
+	rows3, groups3 := g.ask("2026-09-05", "2026-09-11")
+	if drawn, _ := cellOf(rows3, groups3); drawn {
+		t.Error("a missed contact with no cell was drawn")
+	}
+	for _, e := range rows3 {
+		if e.State == schedule.Missed {
+			t.Errorf("missed %s drawn with today outside the range", e.Contact.Contact)
+		}
+	}
+}
+
+func countOn(groups []Group, key string) int {
+	for _, g := range groups {
+		if g.Key == key {
+			return g.Count
+		}
+	}
+	return -1
+}
+
+// Every row has a counted cell and the counts sum to the rows drawn.
+func TestRowsAndCountsOfARangeAgree(t *testing.T) {
+	g := gridCentre(t)
+	for _, c := range [][2]string{{"2026-08-30", "2026-09-05"}, {"2026-01-01", "2026-12-31"},
+		{"2026-09-05", "2026-09-11"}, {"2026-09-01", "2026-09-01"}} {
+		rows, groups := g.ask(c[0], c[1])
+		sum := 0
+		for _, grp := range groups {
+			sum += grp.Count
+		}
+		if sum != len(rows) {
+			t.Errorf("%v: %d counted for %d rows", c, sum, len(rows))
+		}
 	}
 }

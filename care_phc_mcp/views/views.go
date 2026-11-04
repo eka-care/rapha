@@ -74,6 +74,9 @@ type Bundle struct {
 // epoch is kernel/views._EPOCH: how far back "all" reaches.
 const epoch = "0001-01-01T00:00:00Z"
 
+// dateLayout is how kernel/views.py spells a calendar day, YYYY-MM-DD.
+const dateLayout = "2006-01-02"
+
 // stamp is the one spelling kernel/views.py writes a timestamp in.
 const stamp = "2006-01-02T15:04:05Z"
 
@@ -461,14 +464,14 @@ func covers(e cohort.Entry, iso string) bool {
 	return e.State == schedule.Missed && e.Closes < iso
 }
 
-// MaxRangeDays is kernel/views.MAX_RANGE_DAYS.
-const MaxRangeDays = 400
+// maxRangeDays is kernel/views.MAX_RANGE_DAYS.
+const maxRangeDays = 400
 
 // parseDay is kernel/views._day: a calendar day is exactly YYYY-MM-DD. A
 // timestamp would raise a timezone question the route cannot answer. One
 // sentence for every refusal, naming the parameter that was wrong.
 func parseDay(text, name string) (time.Time, error) {
-	parsed, err := time.Parse("2006-01-02", text)
+	parsed, err := time.Parse(dateLayout, text)
 	// Year 0000 parses here and is refused by Python's date (MINYEAR 1).
 	if err != nil || len(text) != 10 || parsed.Year() < 1 {
 		return time.Time{}, Declared{Reason: name + " must be a real calendar day written YYYY-MM-DD, not " + pyval.Repr(text)}
@@ -497,8 +500,8 @@ func span(on, since, until *string) (first, last time.Time, ok bool, err error) 
 	if first.After(last) {
 		return first, last, false, Declared{Reason: "from must not be after to"}
 	}
-	if int(last.Sub(first).Hours()/24)+1 > MaxRangeDays {
-		return first, last, false, Declared{Reason: fmt.Sprintf("a range may span at most %d days", MaxRangeDays)}
+	if int(last.Sub(first).Hours()/24)+1 > maxRangeDays {
+		return first, last, false, Declared{Reason: fmt.Sprintf("a range may span at most %d days", maxRangeDays)}
 	}
 	return first, last, true, nil
 }
@@ -528,7 +531,7 @@ func calendar(b Bundle, view carephc.View, s Reader, on, since, until *string,
 		// A missed contact due before the range is a marker on today
 		// instead, when today is in the range; if it is not, it has no cell
 		// and is left out.
-		lo, hi, today := first.Format("2006-01-02"), last.Format("2006-01-02"), now.Format("2006-01-02")
+		lo, hi, today := first.Format(dateLayout), last.Format(dateLayout), now.Format(dateLayout)
 		marker := today >= lo && today <= hi
 		cell := func(e cohort.Entry) string {
 			if e.Due >= lo && e.Due <= hi {
@@ -547,7 +550,7 @@ func calendar(b Bundle, view carephc.View, s Reader, on, since, until *string,
 		}
 		groups := []Group{}
 		for d := first; !d.After(last); d = d.AddDate(0, 0, 1) {
-			iso, n := d.Format("2006-01-02"), 0
+			iso, n := d.Format(dateLayout), 0
 			for _, e := range rows {
 				if cell(e) == iso {
 					n++
@@ -571,13 +574,13 @@ func calendar(b Bundle, view carephc.View, s Reader, on, since, until *string,
 	}
 	rows := []cohort.Entry{}
 	for _, e := range owed {
-		if covers(e, day.Format("2006-01-02")) {
+		if covers(e, day.Format(dateLayout)) {
 			rows = append(rows, e)
 		}
 	}
 	groups := []Group{}
 	for d := first; !d.After(last); d = d.AddDate(0, 0, 1) {
-		iso, n := d.Format("2006-01-02"), 0
+		iso, n := d.Format(dateLayout), 0
 		for _, e := range owed {
 			if covers(e, iso) {
 				n++
