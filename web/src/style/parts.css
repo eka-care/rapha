@@ -495,3 +495,24 @@
 .rail-slot .rail-drop:focus-visible { opacity: 1; }
 .rail-slot.bare:empty { display: none; }
 .rail-none { margin: 0; font-size: 12.5px; color: var(--color-text-tertiary); }
+
+/* ---- the garland --------------------------------------------------------
+   The sign in screen's flowers, rearranged and still, behind a working
+   column. Behind is literal: the column isolates itself and this sits at
+   -1, so every row, menu and card paints over it and nothing here can be
+   clicked. Each drawing is anchored at the corner it grows from, at its
+   own size, so a shorter column crops it rather than shrinking it. */
+.garland {
+  position: absolute; inset: 0; pointer-events: none; z-index: -1;
+  color: var(--color-agent); overflow: hidden;
+}
+.garland-plot { position: absolute; bottom: 0; opacity: .14; }
+.garland.vine .garland-plot { left: 0; }
+.garland.spray .garland-plot { right: 0; bottom: 64px; }
+.garland-plot path {
+  fill: none; stroke: currentColor; stroke-width: .9;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+/* On a full width screen there is no composer to sit above. */
+.main > .garland.spray .garland-plot { bottom: 0; }
+.sb, .chatcard, .main { position: relative; isolation: isolate; }

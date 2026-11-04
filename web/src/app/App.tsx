@@ -31,6 +31,7 @@ import { Bell } from "./Bell";
 import { Grip } from "./Grip";
 import { clampWidth, readWidth, saveWidth } from "./width";
 import { Sidebar, panelFor } from "./Sidebar";
+import { Garland } from "../auth/Bloom";
 import { Rail } from "./Rail";
 import { PARTS } from "../screens/Control";
 import { NAME } from "../brand";
@@ -514,6 +515,12 @@ export function App() {
       {tour && <Tour onClose={() => setTour(false)} />}
       {drawer && <div className="drawer-scrim" onClick={() => setDrawer(false)} />}
       <div className="main">
+        {/* The screens with no second panel carry the spray instead, so the
+            flowers are not only on the screens a person moves between
+            people from. Home is busy enough with its own day; the desk and
+            the settings are forms. */}
+        {!panel && (route.kind === "view" || route.kind === "patients" || route.kind === "patient")
+          && <Garland kind="spray" />}
         {/* NO BAR INSIDE A VISIT. It carried one word, "Encounter", above a
             card already headed with the patient's name: two headings, one of
             which said nothing. Its three controls each went somewhere else

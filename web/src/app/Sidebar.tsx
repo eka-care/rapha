@@ -14,6 +14,7 @@
  */
 import { useState } from "react";
 
+import { Garland } from "../auth/Bloom";
 import { Icon, type IconName } from "../icons";
 import { say } from "../announce";
 import { displayFor } from "../declarations";
@@ -136,6 +137,7 @@ export function Sidebar({
     const part = route.split("/")[1] || sections[0]?.id;
     return (
       <nav className="sb" data-open={open} aria-label="Settings sections">
+        <Garland kind="vine" />
         <div className="sb-head">
           <div className="sb-head-t">Settings</div>
           <div className="sb-head-s">{facility?.bundle.title ?? "This centre"}</div>
@@ -160,6 +162,7 @@ export function Sidebar({
 
   return (
     <nav className="sb" data-open={open} aria-label="The line">
+      <Garland kind="vine" />
       {/* The brand moved to the icon rail, where it is the one mark at the
           top of the one column that is always there. It was repeated here
           over a list of patients, which is the second place a person looks
