@@ -208,8 +208,24 @@ export function App() {
   // palette, so the one that reads a single visit was asked for with no
   // visit, and the kernel rightly answered 400 on every page load. The
   // filter reads the declared kind, never an id this file may not know.
+  //
+  // AND NOT A PLACE THIS SEAT MAY NOT GO. Every view declares the capability
+  // it takes to open, and the kernel refuses one the caller does not hold --
+  // but the rail was offering all of them anyway, so a clerk had a row for
+  // this centre's numbers that answered 403 when pressed. A nav row that
+  // fails is worse than one that is absent: it teaches a person the product
+  // is broken rather than that the door is not theirs.
+  //
+  // Both halves of the comparison were handed to this file by `/facility`:
+  // the view's own `capability` and the caller's own list. It names neither,
+  // so a bundle that moves a view behind a different capability needs no
+  // edit here. A view that declares none is open to everybody.
+  const held = useMemo(
+    () => new Set(facility.data?.user.capabilities ?? []), [facility.data]);
   const navViews = useMemo<ViewDecl[]>(
-    () => allViews.filter((v) => v.kind !== "summary"), [allViews]);
+    () => allViews.filter((v) => v.kind !== "summary"
+                              && (!v.capability || held.has(v.capability))),
+    [allViews, held]);
 
   // Every declared view, loaded once, because the sidebar's counts, Today and
   // the command bar all read the same rows and loading them three times would

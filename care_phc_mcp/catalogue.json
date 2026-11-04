@@ -36,9 +36,7 @@
       "patient.find",
       "patient.register",
       "abha.link",
-      "appointment.book",
-      "context.record",
-      "handover"
+      "appointment.book"
     ],
     "lab": [
       "patient.find",
@@ -3681,9 +3679,7 @@
         "patient.find",
         "patient.register",
         "abha.link",
-        "appointment.book",
-        "context.record",
-        "handover"
+        "appointment.book"
       ],
       "lab": [
         "patient.find",

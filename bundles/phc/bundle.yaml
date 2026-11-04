@@ -337,9 +337,23 @@ capabilities:
 # writes, and a bundle that writes it declares no name.
 roles:
   frontdesk:
+    # THE REGISTER AND NOTHING ELSE, by the owner's decision of 4 November
+    # 2026. A clerk at the counter finds a person, registers one, links an
+    # ABHA and books a return: that is the whole of the module this seat is
+    # for, and every capability beyond it was a door nobody at this desk is
+    # meant to open. Two were removed to get here.
+    #
+    # `context.record` went because copying another facility's discharge
+    # summary into a patient's record is filing clinical paper, and the
+    # person who decides what that paper means is the one who should file
+    # it. The nurse and the medical officer still hold it.
+    #
+    # `handover` went because it is the narrower loss of the two and is the
+    # one to put back first if the counter turns out to need a way to say
+    # "this one looks very unwell" to the bench. Today it would be the only
+    # thing a clerk could do that is not registration.
     title: Front desk
-    capabilities: [patient.find, patient.register, abha.link, appointment.book,
-                   context.record, handover]
+    capabilities: [patient.find, patient.register, abha.link, appointment.book]
   nurse:
     title: Staff nurse
     capabilities: [patient.find, patient.register, abha.link, appointment.book,

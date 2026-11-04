@@ -788,6 +788,31 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   ok("a11y: every screen has exactly one h1, and the sign-in screen replaces "
      + "the shell rather than joining it");
 
+  // -- a nav row this seat may not open is absent, not broken ---------------
+  //
+  // The kernel refuses a view whose declared capability the caller does not
+  // hold. So offering every declared view in the rail gives a front desk
+  // clerk a row for this centre's numbers that answers 403 when pressed. The
+  // rail must compare the two facts /facility already sent it.
+  assert.match(appSrc, /!v\.capability \|\| held\.has\(v\.capability\)/,
+    "the rail offers every declared view, including ones the caller's role "
+    + "cannot open: that row answers 403 and reads as a broken product");
+  assert.match(appSrc, /facility\.data\?\.user\.capabilities/,
+    "the held set is built from something other than the caller's own "
+    + "capabilities, so the comparison is against a list this file invented");
+  // And it compares, rather than naming. A capability id typed into the
+  // renderer is the rule ui.check exists to hold, and the whole point of
+  // this filter is that a bundle may move a view behind another capability
+  // with no edit to any screen.
+  const frontdesk = (catalogue.bundles?.frontdesk ?? []) as string[];
+  assert.ok(frontdesk.length > 0, "the bundle declares no front desk role");
+  for (const cap of frontdesk) {
+    assert.ok(!appSrc.includes(`"${cap}"`),
+      `App.tsx names the capability ${cap}, which the renderer may never do`);
+  }
+  ok("nav: a view the caller's role cannot open is absent from the rail, and "
+     + "the rail names no capability to work that out");
+
   // -- the live region is in the document BEFORE it has anything to say -----
   //
   // This is the half of SC 4.1.3 that is easy to get wrong: a region that
