@@ -43,7 +43,10 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
   const fetched = useAsync(
     () => (other ? api.view(result.view, undefined, other) : Promise.resolve(null)), [other, result.view]);
   const answer = other ? fetched.data : result;
-  const rows = (answer?.rows ?? []) as CalendarRow[];
+  // While another day is being read the last day's rows are NOT shown: the
+  // reader would see them under the new day's heading.
+  const waiting = !!other && fetched.loading;
+  const rows = (waiting ? [] : (answer?.rows ?? [])) as CalendarRow[];
   const { roles, initial } = roleChips(rows, role, roleName);
     const [picked, setPicked] = useState<string | null>(null);
   const selected = picked ?? initial;
@@ -66,10 +69,10 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
       </div>
 
       {other && <h2 className="cal-h">{dayLabel(other, today)}</h2>}
-      {other && fetched.loading && !fetched.data && <Loading what="this day" shape="rows" rows={3} />}
+      {waiting && <Loading what="this day" shape="rows" rows={3} />}
       {other && fetched.error && <div className="state-empty">This day could not be opened.</div>}
 
-      {empty && !(other && !fetched.data) && <div className="state-empty">{empty}</div>}
+      {empty && !waiting && !(other && !fetched.data) && <div className="state-empty">{empty}</div>}
 
       {piles.map((g) => (
         <section key={g.pile} className="cal-pile" aria-label={g.label}>

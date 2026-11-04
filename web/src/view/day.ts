@@ -122,3 +122,18 @@ export function wantsNextMonth(
 ): string {
   return comingUp(groups, today, limit).length >= limit ? "" : monthAfter(today);
 }
+
+/** What the home card lists, and whether it knows that is all there is.
+ *  `later` is the next month's groups once read, "failed" when that read
+ *  failed, and null when none was asked for. The days already read are always
+ *  kept; a failure is said, never swallowed, so a short card is not mistaken
+ *  for a quiet fortnight. */
+export function cardDays(
+  groups: { key: string | null; count: number }[] | undefined,
+  later: { key: string | null; count: number }[] | "failed" | null,
+  today: string,
+  limit = 5,
+): { days: { key: string; count: number }[]; unread: boolean } {
+  const more = Array.isArray(later) ? later : [];
+  return { days: comingUp([...(groups ?? []), ...more], today, limit), unread: later === "failed" };
+}

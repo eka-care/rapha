@@ -16,7 +16,7 @@ import { Icon } from "../icons";
 import type { Recent } from "../loops";
 import { Loading } from "../parts";
 import type { Catalogue, QueueRow, TaskRow } from "../types";
-import { comingUp, dateOf, dayLabel, wantsNextMonth } from "../view/day";
+import { cardDays, dateOf, dayLabel, wantsNextMonth } from "../view/day";
 import { human, title } from "../words";
 
 /** How many names a flow column shows before it says how many more. */
@@ -96,14 +96,14 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
   // next month too, so it is as long on the 30th as on the 1st.
   const more = cal ? wantsNextMonth(cal.result.groups, today) : "";
   const calId = cal?.decl.id;
-  const [spill, setSpill] = useState<{ key: string | null; count: number }[]>([]);
+  const [spill, setSpill] = useState<{ key: string | null; count: number }[] | "failed" | null>(null);
   useEffect(() => {
     let live = true;
-    setSpill([]);
-    if (calId && more) api.view(calId, undefined, more).then((r) => live && setSpill(r.groups ?? []), () => {});
+    setSpill(null);
+    if (calId && more) api.view(calId, undefined, more).then((r) => live && setSpill(r.groups ?? []), () => live && setSpill("failed"));
     return () => { live = false; };
   }, [calId, more]);
-  const days = cal ? comingUp([...(cal.result.groups ?? []), ...spill], today) : [];
+  const { days, unread } = cardDays(cal?.result.groups, spill, today);
 
   if (loading && !loaded.length) return <Loading what="the facility" shape="blocks" rows={4} />;
   // The greeting and the centre's own name were a line above the heading --
@@ -281,6 +281,7 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
                 <span className="at-go">Open</span>
               </button>
             ))}
+            {unread && <div className="state-empty">Could not load the days after this.</div>}
           </div>
         </div>
       )}

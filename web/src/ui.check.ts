@@ -1382,7 +1382,7 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
 
   const today = code(readFileSync(join(SRC, "screens", "Today.tsx"), "utf8"));
   assert.match(today, /decl\.kind === "calendar"/, "the card is found by the declared kind of view");
-  assert.match(today, /comingUp\(/, "the card draws from the groups through day.ts");
+  assert.match(today, /cardDays\(/, "the card draws from the groups through day.ts");
   assert.match(today, /\?on=/, "opening a day goes to the calendar on that date");
   assert.match(today, /wantsNextMonth\(/, "the card carries on into the next month itself");
 
