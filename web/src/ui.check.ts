@@ -1520,15 +1520,23 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.ok(stackPart.length > 400, "the scan found the stack's parts of Today.tsx");
   const dayLogic = code(readFileSync(join(SRC, "view", "day.ts"), "utf8"));
   for (const [name, text] of [["Cards.tsx", src], ["the stack's part of Today.tsx", stackPart], ["day.ts", dayLogic]] as const) {
-    assert.ok(!/\.(flags|operation|reports_as|authority)\b/.test(text) && !/\.station\b/.test(text.replace(/\bQueueRow\b[^\n]*/g, "").replace(/r\.station\b/g, "")),
+    assert.ok(!/\.(flags|operation|reports_as|authority)\b/.test(text) && !/\.station\b/.test(text),
       `${name} reads a field it should not know`);
   }
   // A failed read of the visits is said, never swallowed into a quiet card.
   assert.match(home, /setOwed\("failed"\)/, "a failed read of the visits is recorded, not swallowed");
-  assert.ok(!/,\s*\(\)\s*=>\s*\{\s*\}\)/.test(home), "an empty catch hides a failed read");
+  assert.ok(!/(,|\.catch\()\s*\(\)\s*=>\s*\{\s*\}\s*\)/.test(home), "an empty catch hides a failed read, however it is written");
   assert.match(home, /Could not load the visits coming up/, "the failure is shown");
   // The stack opens on the viewer's role and says what else exists.
   assert.match(home, /more owed to others/, "the stack says how much belongs to others");
+  // A viewer who owns nothing while others are owed: told so, shown the others' cards, never "nobody".
+  const stk = home.slice(home.indexOf("const all ="), home.indexOf("if (loading"));
+  assert.match(stk, /noneMine = all\.length > 0 && mine\.length === 0/, "owning nothing while others are owed is its own case");
+  assert.match(stk, /everyone \|\| noneMine \? all/, "that viewer is shown the others' cards");
+  assert.match(home, /Nothing is owed to you\. Showing the \$\{others\} owed to others/, "and told how many");
+  assert.match(home, /cards\.length === 0 \? \(\s*owed && <div[^>]*>Nobody is owed/, '"nobody is owed" is only for an empty stack');
+  assert.ok(home.indexOf("</>\n          )}") < home.indexOf('className="stk-more"'), "the control sits outside the empty-or-cards branch");
+  assert.deepEqual(stack([soon, later], NOW, "pharmacist").map((r) => r.contact), ["c", "d"], "owning nothing shows everyone's, never none");
   assert.match(home, /setEveryone\(/, "and offers a way to see it");
   assert.ok(!/split\(" · "\)/.test(home), "a value containing the separator is not cut: facts are taken before they are joined");
   assert.ok(!/as unknown as QueueRow/.test(home.split("<Cards")[1] ?? ""), "no cast to get a subject through the types");

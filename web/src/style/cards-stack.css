@@ -45,3 +45,4 @@ button.stk-card:hover { background: var(--color-bg-hover); box-shadow: var(--sha
   display: block; width: 100%; text-align: center; min-height: 44px; margin-bottom: var(--space-2); padding: 0 var(--space-4); border: 0; background: none;
   font: inherit; font-size: 13px; color: var(--color-accent); cursor: pointer;
 }
+.stk-note { padding: var(--space-3) var(--space-5) 0; font-size: 13px; color: var(--color-text-secondary); }
