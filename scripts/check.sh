@@ -259,6 +259,7 @@ if [ -d web/node_modules ]; then
   # never leaves one. Pure rules over a rectangle, so no browser.
   (cd web && node --experimental-strip-types src/app/guide.check.ts)
   (cd web && node --experimental-strip-types src/app/width.check.ts)
+  python3 -m api.paper
   python3 -m api.vault
   (cd web && node --experimental-strip-types src/form/span.check.ts)
   (cd web && node --experimental-strip-types src/ui/pick.check.ts)
