@@ -167,10 +167,10 @@ def _calendar(bundle, view, store, on, at, since=None, until=None):
                 return e["due"]
             return today.isoformat() if e["state"] == "missed" and marker else None
 
-        rows = [e for e in owed if cell(e)]
+        rows = [dict(e, cell=cell(e)) for e in owed if cell(e)]
         days = [first + timedelta(days=n) for n in range((last - first).days + 1)]
         groups = [{"key": d.isoformat(),
-                   "count": sum(1 for e in rows if cell(e) == d.isoformat())} for d in days]
+                   "count": sum(1 for e in rows if e["cell"] == d.isoformat())} for d in days]
         return rows, groups
     day = now.date() if on is None else _day(on)
     first = day.replace(day=1)

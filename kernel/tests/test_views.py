@@ -132,6 +132,7 @@ def test_a_window_covers_a_day_for_on_but_a_one_day_range_wants_the_due_date():
     assert "anc2" in [r["contact"] for r in on.rows]
     one = span(pregnant(), inside, inside, at=day(anc2.opens))
     assert "anc2" not in [r["contact"] for r in one.rows], one.rows
+    assert all("cell" not in r for r in on.rows)
 
 
 def test_a_range_counts_each_day_by_the_rows_due_on_it():
@@ -141,6 +142,10 @@ def test_a_range_counts_each_day_by_the_rows_due_on_it():
                   at=day(anc2.opens))
     # anc1 is missed by then and stays owed; anc2 is due inside the range.
     assert [r["contact"] for r in result.rows] == ["anc1", "anc2"], result.rows
+    keys = [g["key"] for g in result.groups]
+    assert all(r["cell"] in keys for r in result.rows), result.rows
+    by_cell = {k: sum(1 for r in result.rows if r["cell"] == k) for k in keys}
+    assert by_cell == {g["key"]: g["count"] for g in result.groups}
     counts = {g["key"]: g["count"] for g in result.groups if g["count"]}
     assert counts == {day(anc2.opens).isoformat(): 1, day(anc2.due).isoformat(): 1}, counts
 
@@ -154,9 +159,11 @@ def test_a_missed_contact_counts_once_on_its_due_day_or_on_today_or_nowhere():
     r = span(store, day(anc1.due - 2).isoformat(), day(anc1.due + 40).isoformat(), at=today)
     assert count(r)[day(anc1.due).isoformat()] == 1 and count(r)[today.isoformat()] == 0
     assert sum(count(r).values()) == 1
+    assert [x["cell"] for x in r.rows] == [day(anc1.due).isoformat()]
     # Due before the range, today inside it: a marker on today.
     r = span(store, day(anc1.due + 10).isoformat(), day(anc1.due + 40).isoformat(), at=today)
     assert [x["contact"] for x in r.rows] == ["anc1"] and count(r)[today.isoformat()] == 1
+    assert [x["cell"] for x in r.rows] == [today.isoformat()]
     assert sum(count(r).values()) == 1
     # Due before the range, today outside it: no row and no count.
     r = span(store, day(anc1.due + 50).isoformat(), day(anc1.due + 60).isoformat(), at=today)
