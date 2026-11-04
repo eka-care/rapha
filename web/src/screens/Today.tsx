@@ -268,9 +268,9 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
         <div className="card">
           <div className="card-h"><div className="card-t">Coming up</div></div>
           <div className="att">
-            {days.length === 0 ? (
+            {days.length === 0 ? (unread ? null : (
               <div className="state-empty">Nobody is owed a contact in the coming days.</div>
-            ) : days.map((d) => (
+            )) : days.map((d) => (
               <button className="at" key={d.key}
                       onClick={() => { location.hash = `/views/${cal.decl.id}?on=${d.key}`; }}>
                 <span className="at-b">

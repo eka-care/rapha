@@ -1421,12 +1421,17 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.deepEqual(cardDays(dec, "failed", "2026-12-30"), { days: [g("2026-12-30", 1), g("2026-12-31", 1)], unread: true });
   assert.equal(cardDays(dec, jan, "2026-12-30").unread, false);
   assert.equal(cardDays(undefined, "failed", "2026-12-30").unread, true);
+  assert.deepEqual(cardDays([g("2026-12-30", 0)], "failed", "2026-12-30"), { days: [], unread: true },
+    "empty first month plus a failed second: unread is set, which suppresses the reassuring line");
+  // Nothing read this month and the next failed: the card cannot say nobody is owed.
+  assert.match(code(readFileSync(join(SRC, "screens", "Today.tsx"), "utf8")), /unread \? null/, "the reassuring line is suppressed when the later read failed");
   const t2 = code(readFileSync(join(SRC, "screens", "Today.tsx"), "utf8"));
   assert.match(t2, /setSpill\("failed"\)/, "a failed read of the next month is recorded, not swallowed");
   assert.ok(!/,\s*\(\)\s*=>\s*\{\s*\}\)/.test(t2), "an empty catch hides a failed read");
   assert.match(t2, /Could not load the days after this/);
   const cal2 = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
-  assert.match(cal2, /waiting \? \[\]/, "the last day's rows are not shown under the next day's heading");
+  assert.match(cal2, /fetched\.data\.on === other/, "an answer is used only for the day it was asked for");
+  assert.ok(!/waiting \? \[\]/.test(cal2));
   const cal = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
   assert.match(cal, /dayOn\(/, "the day screen opens on the date a link carries");
   ok("the home card: the next days with their counts, absent without the capability, a day opens the calendar on it");

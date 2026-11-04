@@ -40,13 +40,18 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
   const today = dateOf(result.generated_at);
   const asked = dayOn(hash);
   const other = asked && asked !== today ? asked : "";
+  // The answer carries the day it was asked for. useAsync sets `loading` in an
+  // effect, after the render in which the day changed, and keeps the last
+  // answer while the next is in flight; so "is this answer for THIS day" is
+  // decided here, by the tag, never by `loading`.
   const fetched = useAsync(
-    () => (other ? api.view(result.view, undefined, other) : Promise.resolve(null)), [other, result.view]);
-  const answer = other ? fetched.data : result;
-  // While another day is being read the last day's rows are NOT shown: the
-  // reader would see them under the new day's heading.
-  const waiting = !!other && fetched.loading;
-  const rows = (waiting ? [] : (answer?.rows ?? [])) as CalendarRow[];
+    () => (other ? api.view(result.view, undefined, other).then((r) => ({ on: other, r })) : Promise.resolve(null)),
+    [other, result.view]);
+  const have = fetched.data && fetched.data.on === other ? fetched.data.r : null;
+  const failed = !!other && !have && !!fetched.error && !fetched.loading;
+  const waiting = !!other && !have && !failed;
+  const answer = other ? have : result;
+  const rows = (answer?.rows ?? []) as CalendarRow[];
   const { roles, initial } = roleChips(rows, role, roleName);
     const [picked, setPicked] = useState<string | null>(null);
   const selected = picked ?? initial;
@@ -70,9 +75,9 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
 
       {other && <h2 className="cal-h">{dayLabel(other, today)}</h2>}
       {waiting && <Loading what="this day" shape="rows" rows={3} />}
-      {other && fetched.error && <div className="state-empty">This day could not be opened.</div>}
+      {failed && <div className="state-empty">This day could not be opened.</div>}
 
-      {empty && !waiting && !(other && !fetched.data) && <div className="state-empty">{empty}</div>}
+      {empty && !waiting && !failed && <div className="state-empty">{empty}</div>}
 
       {piles.map((g) => (
         <section key={g.pile} className="cal-pile" aria-label={g.label}>
