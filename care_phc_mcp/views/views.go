@@ -461,25 +461,110 @@ func covers(e cohort.Entry, iso string) bool {
 	return e.State == schedule.Missed && e.Closes < iso
 }
 
-// calendar is kernel/views._calendar: the day's owed contacts as rows, and the
-// day's month as counts.
-func calendar(b Bundle, view carephc.View, s Reader, on *string,
-	at time.Time) ([]cohort.Entry, []Group, error) {
-	day := at.UTC().Truncate(24 * time.Hour)
-	if on != nil {
-		// Exactly YYYY-MM-DD, as the Python's _day: a timestamp raises a
-		// timezone question the route cannot answer.
-		parsed, err := time.Parse("2006-01-02", *on)
-		// Year 0000 parses here and is refused by Python's date (MINYEAR 1).
-		if err != nil || len(*on) != 10 || parsed.Year() < 1 {
-			// kernel/views._day's one sentence for every refusal, which the
-			// route turns into a 400.
-			return nil, nil, Declared{Reason: "on must be a real calendar day written YYYY-MM-DD, not " + pyval.Repr(*on)}
-		}
-		day = parsed
+// MaxRangeDays is kernel/views.MAX_RANGE_DAYS.
+const MaxRangeDays = 400
+
+// parseDay is kernel/views._day: a calendar day is exactly YYYY-MM-DD. A
+// timestamp would raise a timezone question the route cannot answer. One
+// sentence for every refusal, naming the parameter that was wrong.
+func parseDay(text, name string) (time.Time, error) {
+	parsed, err := time.Parse("2006-01-02", text)
+	// Year 0000 parses here and is refused by Python's date (MINYEAR 1).
+	if err != nil || len(text) != 10 || parsed.Year() < 1 {
+		return time.Time{}, Declared{Reason: name + " must be a real calendar day written YYYY-MM-DD, not " + pyval.Repr(text)}
 	}
-	first := time.Date(day.Year(), day.Month(), 1, 0, 0, 0, 0, time.UTC)
-	last := first.AddDate(0, 1, -1)
+	return parsed, nil
+}
+
+// span is kernel/views._span: the days a range names, or ok=false when none
+// was given. One sentence per refusal, written here once.
+func span(on, since, until *string) (first, last time.Time, ok bool, err error) {
+	if since == nil && until == nil {
+		return first, last, false, nil
+	}
+	if on != nil {
+		return first, last, false, Declared{Reason: "on and from/to answer different questions and must not be combined"}
+	}
+	if since == nil || until == nil {
+		return first, last, false, Declared{Reason: "from and to go together: give both or neither"}
+	}
+	if first, err = parseDay(*since, "from"); err != nil {
+		return first, last, false, err
+	}
+	if last, err = parseDay(*until, "to"); err != nil {
+		return first, last, false, err
+	}
+	if first.After(last) {
+		return first, last, false, Declared{Reason: "from must not be after to"}
+	}
+	if int(last.Sub(first).Hours()/24)+1 > MaxRangeDays {
+		return first, last, false, Declared{Reason: fmt.Sprintf("a range may span at most %d days", MaxRangeDays)}
+	}
+	return first, last, true, nil
+}
+
+// calendar is kernel/views._calendar. Two different questions, answered by two
+// different rules on purpose.
+//
+// `on` asks "what is owed on this day": selected by window (covers), the day's
+// rows and the month's counts alike.
+//
+// A range asks "what falls due in this span": selected by due date, and a grid
+// draws a visit once, on its due day. Rows and per-day counts both come from
+// the one cell function, so they cannot disagree. Do not tidy one into the
+// other.
+func calendar(b Bundle, view carephc.View, s Reader, on, since, until *string,
+	at time.Time) ([]cohort.Entry, []Group, error) {
+	now := at.UTC()
+	first, last, ranged, err := span(on, since, until)
+	if err != nil {
+		return nil, nil, err
+	}
+	if ranged {
+		owed, err := cohort.Owed(b.Catalogue, s, b.Workflow, view.Episodes, first, last, at)
+		if err != nil {
+			return nil, nil, err
+		}
+		// A missed contact due before the range is a marker on today
+		// instead, when today is in the range; if it is not, it has no cell
+		// and is left out.
+		lo, hi, today := first.Format("2006-01-02"), last.Format("2006-01-02"), now.Format("2006-01-02")
+		marker := today >= lo && today <= hi
+		cell := func(e cohort.Entry) string {
+			if e.Due >= lo && e.Due <= hi {
+				return e.Due
+			}
+			if e.State == schedule.Missed && marker {
+				return today
+			}
+			return ""
+		}
+		rows := []cohort.Entry{}
+		for _, e := range owed {
+			if cell(e) != "" {
+				rows = append(rows, e)
+			}
+		}
+		groups := []Group{}
+		for d := first; !d.After(last); d = d.AddDate(0, 0, 1) {
+			iso, n := d.Format("2006-01-02"), 0
+			for _, e := range rows {
+				if cell(e) == iso {
+					n++
+				}
+			}
+			groups = append(groups, Group{Key: iso, Count: n})
+		}
+		return rows, groups, nil
+	}
+	day := now.Truncate(24 * time.Hour)
+	if on != nil {
+		if day, err = parseDay(*on, "on"); err != nil {
+			return nil, nil, err
+		}
+	}
+	first = time.Date(day.Year(), day.Month(), 1, 0, 0, 0, 0, time.UTC)
+	last = first.AddDate(0, 1, -1)
 	owed, err := cohort.Owed(b.Catalogue, s, b.Workflow, view.Episodes, first, last, at)
 	if err != nil {
 		return nil, nil, err
@@ -522,9 +607,10 @@ func (e Declared) Error() string { return e.Reason }
 // Resolve evaluates one view. `thread` is required for a summary and ignored
 // otherwise. `caps` is the caller's; the capability to OPEN the view is the
 // caller's check, at the route, not here. `on` is the day a calendar answers
-// for (ISO date; today when nil) and is ignored otherwise.
+// for (ISO date; today when nil) and is ignored otherwise. `since` and `until`
+// are a range of days instead: both or neither, never with `on`.
 func Resolve(b Bundle, viewID string, s Reader, thread *string,
-	caps map[string]bool, at time.Time, on *string) (*ViewResult, error) {
+	caps map[string]bool, at time.Time, on, since, until *string) (*ViewResult, error) {
 	view, declared := b.Views[viewID]
 	if !declared {
 		return nil, Declared{Reason: fmt.Sprintf("unknown view '%s'", viewID)}
@@ -577,7 +663,7 @@ func Resolve(b Bundle, viewID string, s Reader, thread *string,
 		}
 		result.Rows = rows
 	case "calendar":
-		rows, groups, err := calendar(b, view, s, on, at)
+		rows, groups, err := calendar(b, view, s, on, since, until, at)
 		if err != nil {
 			return nil, err
 		}

@@ -76,7 +76,7 @@ func (k *kernel) queue(w http.ResponseWriter, r *http.Request) {
 		sort.Strings(queues)
 		want = queues[0]
 	}
-	k.resolveView(w, r, want)
+	k.resolveView(w, r, want, false)
 }
 
 // view is api/main.py's /views/{view_id}.
@@ -86,10 +86,13 @@ func (k *kernel) view(w http.ResponseWriter, r *http.Request) {
 		detail(w, http.StatusNotFound, "Not Found")
 		return
 	}
-	k.resolveView(w, r, id)
+	k.resolveView(w, r, id, true)
 }
 
-func (k *kernel) resolveView(w http.ResponseWriter, r *http.Request, viewID string) {
+// `asked` is whether the URL's on/from/to are the caller's to give. The queue
+// route passes false: the Python calls get_view as a plain function there and
+// hands it None for each, so a calendar named through /queue is never ranged.
+func (k *kernel) resolveView(w http.ResponseWriter, r *http.Request, viewID string, asked bool) {
 	person, ok := k.who(w, r)
 	if !ok {
 		return
@@ -114,13 +117,16 @@ func (k *kernel) resolveView(w http.ResponseWriter, r *http.Request, viewID stri
 	}
 	// `on` is the day a calendar answers for. Present-but-empty is a value
 	// (and a 400), as it is for FastAPI's `on: str = None`.
-	var on *string
-	if r.URL.Query().Has("on") {
-		given := r.URL.Query().Get("on")
-		on = &given
+	present := func(name string) *string {
+		if !asked || !r.URL.Query().Has(name) {
+			return nil
+		}
+		given := r.URL.Query().Get(name)
+		return &given
 	}
+	on := present("on")
 	result, err := views.Resolve(k.viewBundle(), viewID, k.store, thread, caps,
-		time.Now().UTC(), on)
+		time.Now().UTC(), on, present("from"), present("to"))
 	if err != nil {
 		// api/main.py catches ValueError around resolve() and turns it into a
 		// 400; anything else is a 500. views.Declared is that ValueError.

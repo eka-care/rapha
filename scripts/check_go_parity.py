@@ -1327,6 +1327,64 @@ def s_the_calendar_with_women_in_it(walk, codes):
         # day come out in the order of ids each engine minted for itself.
         status, body = walk.read("the calendar on %s" % label, path, ordered=False)
         answers[label] = (status, body)
+    # A RANGE is a different question from `?on=` (what falls due in a span,
+    # chosen by due date, not what is owed on a day), and an engine that
+    # ignored `from` and `to` would answer one day and return 200. So the
+    # spans are walked here, over the same women, and each is also checked
+    # for the property that makes a grid honest: every count is the number of
+    # rows drawn on that cell.
+    week_start = today - datetime.timedelta(days=3)
+    spill_first = first - datetime.timedelta(days=first.weekday())
+    spill_last = last + datetime.timedelta(days=6 - last.weekday())
+    new_year = datetime.date(today.year, 12, 28)
+    ranges = {}
+    for label, query in (
+            ("a week around today", (week_start, week_start + datetime.timedelta(days=6))),
+            ("a month with its spill days", (spill_first, spill_last)),
+            ("a year boundary", (new_year, datetime.date(today.year + 1, 1, 3))),
+            ("a single day, today", (today, today)),
+            ("a single day long ago", (datetime.date(2026, 1, 5), datetime.date(2026, 1, 5))),
+            ("a week wholly in the past", (datetime.date(2026, 1, 5), datetime.date(2026, 1, 11))),
+            ("a week wholly ahead", (today + datetime.timedelta(days=60),
+                                     today + datetime.timedelta(days=66))),
+            ("a range ending yesterday", (today - datetime.timedelta(days=9),
+                                          today - datetime.timedelta(days=1))),
+            ("a range of exactly 400 days", (today - datetime.timedelta(days=199),
+                                             today + datetime.timedelta(days=200))),
+            ("a leap year's February", (datetime.date(2028, 2, 1), datetime.date(2028, 2, 29)))):
+        a, b = query
+        path = "/views/phc.view.calendar?from=%s&to=%s" % (a.isoformat(), b.isoformat())
+        status, body = walk.read("the calendar over %s" % label, path, ordered=False)
+        assert status == 200, (label, status, body)
+        assert len(body["groups"]) == (b - a).days + 1, (label, len(body["groups"]))
+        counted = sum(g["count"] for g in body["groups"])
+        assert counted == len(body["rows"]), \
+            "%s: %d counted for %d drawn" % (label, counted, len(body["rows"]))
+        ranges[label] = body
+    # Not one day's answer wearing a range's name.
+    assert len(ranges["a week around today"]["groups"]) == 7
+    assert len(ranges["a month with its spill days"]["groups"]) >= 28
+    # Today is in the week: the missed contacts are drawn, as markers.
+    assert any(r["state"] == "missed" for r in ranges["a week around today"]["rows"])
+    # Today is outside this one, so nothing missed is anywhere in it.
+    assert not any(r["state"] == "missed" for r in ranges["a week wholly ahead"]["rows"])
+    for label, query in (
+            ("on with a range", "on=2026-11-04&from=2026-11-01&to=2026-11-07"),
+            ("on with only from", "on=2026-11-04&from=2026-11-01"),
+            ("from without to", "from=2026-11-01"),
+            ("to without from", "to=2026-11-01"),
+            ("from after to", "from=2026-11-07&to=2026-11-01"),
+            ("401 days", "from=2026-01-01&to=2027-02-05"),
+            ("a malformed from", "from=20261101&to=2026-11-07"),
+            ("a malformed to", "from=2026-11-01&to=2026-02-30"),
+            ("an empty from", "from=&to=2026-11-07"),
+            ("a timestamp as to", "from=2026-11-01&to=2026-11-04T10:00:00Z")):
+        status, body = walk.read("the calendar refuses %s" % label,
+                                 "/views/phc.view.calendar?" + query, ordered=False)
+        assert status == 400, (label, status, body)
+    # /queue hands a view no range, whatever its URL says.
+    walk.read("the queue route ignores a range", "/queue?from=2026-11-01", ordered=False)
+
     # And the answers are the ones worth agreeing on: women are owed, nothing
     # is owed to the miscarriage, and a date that is not one is refused.
     status, body = answers["today, by saying nothing"]
@@ -1343,7 +1401,8 @@ def s_the_calendar_with_women_in_it(walk, codes):
                   "29 February in a year that has none", "a compact date"):
         assert answers[label][0] == 400, (label, answers[label])
     return ("the calendar over open, unseen, delivered and miscarried women, "
-            "on month ends, leap days and impossible dates")
+            "on month ends, leap days and impossible dates, and over weeks, a month with "
+            "its spill days, a year boundary, a single day and each refusal of a range")
 
 
 def s_the_planner_hears_and_proposes(walk, codes):

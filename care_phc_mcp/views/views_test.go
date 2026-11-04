@@ -15,7 +15,7 @@ func TestACalendarDayIsOnlyYYYYMMDD(t *testing.T) {
 	for _, bad := range []string{"31st October", "2026-11-04T00:00:00", "20261104",
 		"2026-W45-3", "2026-1-4", "", "2026-02-30", "2026-13-01", "0000-01-01", "2026-02-29"} {
 		on := bad
-		_, _, err := calendar(Bundle{}, carephc.View{}, nil, &on, time.Now())
+		_, _, err := calendar(Bundle{}, carephc.View{}, nil, &on, nil, nil, time.Now())
 		var declared Declared
 		if !errors.As(err, &declared) {
 			t.Errorf("%q was accepted as a day (err %v)", bad, err)
@@ -34,7 +34,7 @@ func TestALeapDayIsADayInALeapYearOnly(t *testing.T) {
 				ok = true
 			}
 		}()
-		_, _, err := calendar(Bundle{}, carephc.View{}, nil, &on, time.Now())
+		_, _, err := calendar(Bundle{}, carephc.View{}, nil, &on, nil, nil, time.Now())
 		var declared Declared
 		return !errors.As(err, &declared)
 	}
@@ -63,5 +63,50 @@ func TestAMissedContactIsOwedEveryDayAfterItsWindowShuts(t *testing.T) {
 	due := cohort.Entry{Contact: schedule.Contact{State: schedule.Due, Closes: "2026-04-05"}, On: []string{"2026-04-05"}}
 	if !covers(due, "2026-04-05") {
 		t.Error("a day in On was not covered")
+	}
+}
+
+// Each refusal of a range, with the sentence kernel/views._span raises.
+func TestARangeIsRefusedInTheSentencesThePythonUses(t *testing.T) {
+	p := func(v string) *string { return &v }
+	cases := []struct {
+		label            string
+		on, since, until *string
+		want             string
+	}{
+		{"on with a range", p("2026-11-04"), p("2026-11-01"), p("2026-11-07"),
+			"on and from/to answer different questions and must not be combined"},
+		{"on with only from", p("2026-11-04"), p("2026-11-01"), nil,
+			"on and from/to answer different questions and must not be combined"},
+		{"from alone", nil, p("2026-11-01"), nil, "from and to go together: give both or neither"},
+		{"to alone", nil, nil, p("2026-11-01"), "from and to go together: give both or neither"},
+		{"inverted", nil, p("2026-11-07"), p("2026-11-01"), "from must not be after to"},
+		{"over the cap", nil, p("2026-01-01"), p("2027-02-05"), "a range may span at most 400 days"},
+		{"malformed from", nil, p("20261101"), p("2026-11-07"),
+			"from must be a real calendar day written YYYY-MM-DD, not '20261101'"},
+		{"malformed to", nil, p("2026-11-01"), p("2026-02-30"),
+			"to must be a real calendar day written YYYY-MM-DD, not '2026-02-30'"},
+		{"empty from", nil, p(""), p("2026-11-07"),
+			"from must be a real calendar day written YYYY-MM-DD, not ''"},
+	}
+	for _, c := range cases {
+		_, _, err := calendar(Bundle{}, carephc.View{}, nil, c.on, c.since, c.until, time.Now())
+		var declared Declared
+		if !errors.As(err, &declared) {
+			t.Errorf("%s: not refused (err %v)", c.label, err)
+		} else if declared.Reason != c.want {
+			t.Errorf("%s: reason %q, want %q", c.label, declared.Reason, c.want)
+		}
+	}
+}
+
+// 400 days exactly is allowed and 401 is not: the cap counts both ends.
+func TestTheCapCountsBothEndsOfARange(t *testing.T) {
+	p := func(v string) *string { return &v }
+	if _, _, ok, err := span(nil, p("2026-01-01"), p("2027-02-04")); err != nil || !ok {
+		t.Errorf("400 days refused: %v", err)
+	}
+	if _, _, _, err := span(nil, p("2026-01-01"), p("2027-02-05")); err == nil {
+		t.Error("401 days accepted")
 	}
 }
