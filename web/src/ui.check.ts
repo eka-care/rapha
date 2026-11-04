@@ -757,9 +757,10 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   // place now, under the line that asked for it, and the state it sets is
   // `form` -- but the rule this counts is unchanged and has to stay
   // countable: a NEW form is seeded, and only a correction is not, because a
-  // correction arrives holding the answers it is correcting.
+  // correction arrives holding the answers it is correcting -- and neither is
+  // a PROPOSAL under review, which arrives holding the agent's.
   const opens = [...enc.matchAll(/setForm\(\{\s*op\b/g)].length;
-  const seeded = [...enc.matchAll(/setForm\(\{ op, seed: carry\(op\) \}\)|setForm\(\{ op, start: [^}]*amending: true \}\)/g)].length;
+  const seeded = [...enc.matchAll(/setForm\(\{ op, seed: carry\(op\) \}\)|setForm\(\{ op, start: [^}]*amending: true \}\)|setForm\(\{ op: operationFor\([^}]*proposal: m\.proposal \}\)/g)].length;
   // ONE CALL SITE SINCE 2026-11-02, the stronger version of the same rule:
   // `openPanel` is now the only thing that opens one, so a screen added
   // later cannot forget the seed without deleting the helper. The two counts

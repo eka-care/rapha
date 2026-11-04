@@ -18,13 +18,13 @@ import { walk } from "../validate";
 import { Icon } from "../icons";
 import { carriedInto, weigh } from "../loops";
 import { agentLine, header, messages, queueViewFor, type Ctx, type Said } from "../messages";
-import type { Catalogue, Facility, Operation, Payload, ThreadView } from "../types";
+import type { Catalogue, Facility, Operation, Payload, Proposal, ThreadView } from "../types";
 import { Composer } from "../thread/Composer";
 import { commands } from "../thread/commands";
 import { ScribeBar } from "../scribe/ScribeBar";
 import { ScribeStart } from "../scribe/Start";
 import { mergeDrafts, type Opened } from "../scribe/session";
-import { Stream } from "../thread/Thread";
+import { Stream, operationFor } from "../thread/Thread";
 import { Carry, PastVisits, Team, Trend, usePast, visitOf } from "../thread/Past";
 import { AssistantPanel } from "../assistant/Lazy";
 import { Background } from "../thread/Background";
@@ -62,7 +62,7 @@ const tabsFor = (past: number, papers: number): Tab[] => [
   { id: "scribe", title: "Scribe", icon: "mic" },
   /* Next to the recording, because both are ways something gets INTO this
      visit, and before the history, because this is what you read first. */
-  { id: "context", title: "Background", icon: "clip", count: papers },
+  { id: "context", title: "Outside records", icon: "clip", count: papers },
   { id: "past", title: "Earlier visits", icon: "clock", count: past },
   { id: "ask", title: "Ask", icon: "spark" },
 ];
@@ -83,6 +83,8 @@ const MIC_WHY = "This visit is not ready to be recorded";
 
 const TAG: Record<string, string> = {
   scribe: "mic", form: "doc", device: "vitals", "constrained-voice": "mic",
+  // A paperclip, because what this operation takes is the paper itself.
+  document: "clip",
 };
 
 export function Encounter({
@@ -117,7 +119,7 @@ export function Encounter({
    *  `start` is a correction's existing answers, `seed` is what an earlier
    *  commit on this visit already learned; the two never arrive together. */
   const [form, setForm] = useState<
-    { op: Operation; seed?: Payload; start?: Payload; amending?: boolean } | null>(null);
+    { op: Operation; seed?: Payload; start?: Payload; amending?: boolean; proposal?: Proposal } | null>(null);
   /** What a commit on this screen learned that a LATER panel will be asked
    *  for again.
    *
@@ -264,15 +266,15 @@ export function Encounter({
    *  the seed, and a fourth without it would have cost a patient a second
    *  one time password in silence. */
   const openPanel = (op: Operation) => {
-    // THE FORM IS AT THE FOOT OF THE CONVERSATION, so an action taken from
-    // the scribe tab or the assistant must bring the conversation with it.
-    // Opening a form into a tab nobody is looking at is a tap that does
-    // nothing.
-    setTab("messages");
+    // A FORM IS NOTE STRUCTURING, AND NOTE STRUCTURING IS THE SCRIBE TAB'S.
+    // Whichever tab the tap came from, the form opens where the recorder and
+    // the drafts already are; the thread keeps the conversation.
+    setTab("scribe");
     setForm({ op, seed: carry(op) });
   };
   const take = (op: Operation) => {
-    if (speakable.has(op.id)) setStarting(op);
+    // The way in is chosen on the Scribe tab, the same as the form behind it.
+    if (speakable.has(op.id)) { setTab("scribe"); setStarting(op); }
     else openPanel(op);
   };
 
@@ -409,11 +411,48 @@ export function Encounter({
                   onCancel={() => setDrafts((all) => all.filter((x) => x.draft.operation !== d.operation))} />
               ) : null;
             })}
+            {/* AFTER THE CHOICE, NEVER BEFORE IT. A person picks what they are
+                about to record on the thread; this is what that tap opens, and
+                from here speaking is the way in and the form is the way round.
+                The examples are the bundle's, never typed here. */}
+            {starting && !scribing && (
+              <ScribeStart
+                title={starting.title}
+                nudges={nudges}
+                reason={consented ? undefined : MIC_WHY}
+                onStart={() => { setScribing(starting.id); setStarting(null); }}
+                onType={() => { openPanel(starting); setStarting(null); }}
+                onCancel={() => setStarting(null)}
+              />
+            )}
+
+            {/* THE FORM, ON THE SCRIBE TAB. Note structuring has one home:
+                the recorder, the drafts it produced and a form somebody
+                opened by hand are all the same thing -- an operation being
+                filled in -- and they are all here. The thread only says that
+                one is waiting. Owner, 2026-11-04. */}
+            {form && (
+              <div className="vform" ref={formBox}>
+                <OperationPanel
+                  key={`${form.op.id}:${form.amending ? "amend" : form.proposal?.id ?? "new"}`}
+                  op={form.op} thread={thread.id} client={client} inline
+                  amending={form.amending} proposal={form.proposal}
+                  instruments={cat.instruments} flags={thread.flags}
+                  seed={form.seed} start={form.start}
+                  onDone={(got) => {
+                    if (got && !form.amending) setCarried({ thread: thread.id, payload: got });
+                    setForm(null);
+                    onChanged();
+                  }}
+                  onCancel={() => setForm(null)}
+                />
+              </div>
+            )}
             {/* ONE BUTTON, IN THE MIDDLE, AND NOTHING ELSE. What was here
                 was two sentences explaining where the microphone lives,
                 which is a screen apologising for itself. The tab a person
                 opened to record in should let them record. */}
-            {scribing === null && drafts.length === 0 && (
+            {scribing === null && drafts.length === 0 && !form && !starting && (
               <div className="scribe-off">
                 <button
                   type="button"
@@ -438,12 +477,15 @@ export function Encounter({
         <Carry now={todayVisit} visits={past} />
 
         <Stream
-          msgs={msgs} thread={thread} client={client} ctx={ctx}
-          instruments={cat.instruments} onDone={onChanged}
+          msgs={msgs}
           editable={editable}
           onEdit={(m) => {
             const op = cat.operations[m.operation];
-            if (op) { setTab("messages"); setForm({ op, start: m.payload as Payload, amending: true }); }
+            if (op) { setTab("scribe"); setForm({ op, start: m.payload as Payload, amending: true }); }
+          }}
+          onReview={(m) => {
+            setTab("scribe");
+            setForm({ op: operationFor(m.proposal, cat.operations), proposal: m.proposal });
           }}
         >
           {/* §21: the agent's own message, and the actions it is offering. */}
@@ -491,50 +533,7 @@ export function Encounter({
             </div>
           )}
 
-        {/* THE FORM, IN PLACE. At the foot of the conversation, under the
-            line that asked for it, with the record it is correcting still
-            on screen above it. Nothing is stacked over the thread and
-            nothing is dimmed behind a scrim.
-
-            The composer goes while it is open: a person filling in a form
-            is not also typing a message, and two text surfaces one above
-            the other is a choice nobody wants to make. Cancel brings it
-            back. */}
-        {form && (
-          <div className="vform" ref={formBox}>
-            <OperationPanel
-              key={`${form.op.id}:${form.amending ? "amend" : "new"}`}
-              op={form.op} thread={thread.id} client={client} inline
-              amending={form.amending}
-              instruments={cat.instruments} flags={thread.flags}
-              seed={form.seed} start={form.start}
-              onDone={(got) => {
-                if (got && !form.amending) setCarried({ thread: thread.id, payload: got });
-                setForm(null);
-                onChanged();
-              }}
-              onCancel={() => setForm(null)}
-            />
-          </div>
-        )}
         </Stream>
-
-        {/* The station comes off the thread view, the same field the header
-            badge draws; a thread past its last station has none. */}
-        {/* AFTER THE CHOICE, NEVER BEFORE IT. A person picks what they are
-            about to record on the thread; this is what that tap opens, and
-            from here speaking is the way in and the form is the way round.
-            The examples are the bundle's, never typed here. */}
-        {starting && !scribing && (
-          <ScribeStart
-            title={starting.title}
-            nudges={nudges}
-            reason={consented ? undefined : MIC_WHY}
-            onStart={() => { setScribing(starting.id); setStarting(null); }}
-            onType={() => { openPanel(starting); setStarting(null); }}
-            onCancel={() => setStarting(null)}
-          />
-        )}
 
         {/* WHAT USED TO BE HERE: the recording bar and every draft it
             produced, stacked at the foot of the thread inside a 42vh
@@ -544,7 +543,7 @@ export function Encounter({
             came from. Both moved into the view beside the thread, which has
             the width, and the thread went back to being a thread. */}
 
-        {!form && <Composer
+        <Composer
           about={head.name}
           actions={ranked}
           roles={Object.keys(cat.bundles ?? {})}
@@ -565,7 +564,7 @@ export function Encounter({
               ))}
             </>
           }
-        />}
+        />
         </>}
       </div>
 

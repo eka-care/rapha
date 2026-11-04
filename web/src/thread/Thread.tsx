@@ -9,28 +9,24 @@
  *  §10 lists eight object types. Task and Comment are not here: the kernel has
  *  no row behind either, and drawing one would be a picture of a product.
  */
-import { Icon } from "../icons";
 import { useState } from "react";
-import type { Client } from "../api";
-import { OperationPanel } from "../form/Panel";
-import { clock, type Ctx, type Msg, type Said } from "../messages";
-import type { Operation, Proposal, ThreadView } from "../types";
+import { Icon } from "../icons";
+import { clock, type Msg, type Said } from "../messages";
+import type { Operation, Proposal } from "../types";
 import { human, title } from "../words";
 import { Message, Turn, withMentions } from "./Message";
 import { blocks, split, type Block } from "./fold";
 
-export function Stream({ msgs, thread, client, ctx, instruments, editable, onEdit, onDone, children }: {
+export function Stream({ msgs, editable, onEdit, onReview, children }: {
   msgs: Msg[];
-  thread: ThreadView;
-  client: Client;
-  ctx: Ctx;
-  instruments?: Record<string, unknown>;
   /** The ids of the records this person may still correct. Decided by the
    *  screen above, from the visit's state and the operation's own
    *  reversibility, never here: this file draws what it is given. */
   editable?: Set<string>;
   onEdit?: (m: Extract<Msg, { kind: "posted" }>) => void;
-  onDone: () => void;
+  /** A proposal is reviewed on the Scribe tab, never drawn here: the thread
+   *  holds a line saying one is waiting, and the form is the Scribe tab's. */
+  onReview?: (m: Extract<Msg, { kind: "proposal" }>) => void;
   children?: React.ReactNode;
 }) {
   // EVERY STATION BEHIND THIS ONE IS A LINE. Not the last record open and
@@ -44,6 +40,7 @@ export function Stream({ msgs, thread, client, ctx, instruments, editable, onEdi
   // it in, and the card is one tap under it.
   return (
     <div className="thread">
+      <span className="tether-seed" aria-hidden="true"><Icon name="mark" className="i" /></span>
       <div className="tether" aria-hidden="true" />
       {msgs.length === 0 && (
         <div className="state-empty">
@@ -51,20 +48,17 @@ export function Stream({ msgs, thread, client, ctx, instruments, editable, onEdi
           Type a message, @mention someone, use / for an action, or dictate.
         </div>
       )}
-      <Body msgs={msgs} thread={thread} client={client} ctx={ctx}
-            editable={editable} onEdit={onEdit}
-            instruments={instruments} onDone={onDone} />
+      <Body msgs={msgs} editable={editable} onEdit={onEdit} onReview={onReview} />
       {children}
     </div>
   );
 }
 
-function Entry({ m, thread, client, ctx, instruments, editable, onEdit, onDone }: {
-  m: Msg; thread: ThreadView; client: Client; ctx: Ctx;
-  instruments?: Record<string, unknown>;
+function Entry({ m, editable, onEdit, onReview }: {
+  m: Msg;
   editable?: Set<string>;
   onEdit?: (m: Extract<Msg, { kind: "posted" }>) => void;
-  onDone: () => void;
+  onReview?: (m: Extract<Msg, { kind: "proposal" }>) => void;
 }) {
   if (m.kind === "said") {
     return <Message who={m.who} actor={m.actor} at={clock(m.at)} text={m.text} />;
@@ -89,8 +83,7 @@ function Entry({ m, thread, client, ctx, instruments, editable, onEdit, onDone }
     );
   }
 
-  return <ProposalCard m={m} thread={thread} client={client} ctx={ctx}
-                       instruments={instruments} onDone={onDone} />;
+  return <ProposalCard m={m} onReview={onReview} />;
 }
 
 /** A value on one folded line. A consultation's history runs to a sentence
@@ -197,12 +190,11 @@ const TAG: Record<string, string> = { crit: "b-crit", warn: "b-warn", ok: "b-ok"
  *  the answer. The older part sits behind one control, because the thing
  *  being read on a long visit is the bottom of the list.
  */
-function Body({ msgs, thread, client, ctx, instruments, editable, onEdit, onDone }: {
-  msgs: Msg[]; thread: ThreadView; client: Client; ctx: Ctx;
-  instruments?: Record<string, unknown>;
+function Body({ msgs, editable, onEdit, onReview }: {
+  msgs: Msg[];
   editable?: Set<string>;
   onEdit?: (m: Extract<Msg, { kind: "posted" }>) => void;
-  onDone: () => void;
+  onReview?: (m: Extract<Msg, { kind: "proposal" }>) => void;
 }) {
   const [all, setAll] = useState(false);
   const { earlier, recent } = split(blocks(msgs));
@@ -213,9 +205,7 @@ function Body({ msgs, thread, client, ctx, instruments, editable, onEdit, onDone
       return <Turn key={b.id} who={first.who} actor={first.actor} at={clock(first.at)}
                    texts={b.msgs.map((m) => m.text)} />;
     }
-    return <Entry key={b.id} m={b.msg} thread={thread} client={client} ctx={ctx}
-                  editable={editable} onEdit={onEdit}
-                  instruments={instruments} onDone={onDone} />;
+    return <Entry key={b.id} m={b.msg} editable={editable} onEdit={onEdit} onReview={onReview} />;
   };
   return (
     <>
@@ -303,10 +293,16 @@ const STATE: Record<string, string> = {
   in_progress: "b-mute", resolved: "b-ok",
 };
 
-function ProposalCard({ m, thread, client, ctx, instruments, onDone }: {
+/** A PROPOSAL IS A LINE IN THE THREAD, AND ITS FORM IS ON THE SCRIBE TAB.
+ *
+ *  The review panel used to be drawn here, whole, between two messages: a
+ *  six-field form inside a conversation. Owner, 2026-11-04: "all of the note
+ *  structuring should happen on the scribe tab, not on the thread". The
+ *  thread says that something is waiting and who asked; one tap takes the
+ *  reader to where it is structured. */
+function ProposalCard({ m, onReview }: {
   m: Extract<Msg, { kind: "proposal" }>;
-  thread: ThreadView; client: Client; ctx: Ctx;
-  instruments?: Record<string, unknown>; onDone: () => void;
+  onReview?: (m: Extract<Msg, { kind: "proposal" }>) => void;
 }) {
   if (m.stale) {
     return (
@@ -323,20 +319,23 @@ function ProposalCard({ m, thread, client, ctx, instruments, onDone }: {
     );
   }
   return (
-    <OperationPanel
-      op={operationFor(m.proposal, ctx.operations)}
-      thread={thread.id}
-      client={client}
-      proposal={m.proposal}
-      instruments={instruments}
-      flags={thread.flags}
-      inline
-      onDone={onDone}
-    />
+    <div className="msg">
+      <div className="m-av agent" aria-hidden="true"><Icon name="spark" className="i sm" /></div>
+      <div className="m-b">
+        <div className="m-meta">Proposed by {m.by} · {clock(m.at)}</div>
+        <div className="props">
+          <button type="button" className="prop primary" onClick={() => onReview?.(m)}>
+            <span className="p-b"><span className="p-l">Review {m.title}</span></span>
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function operationFor(p: Proposal, ops: Record<string, Operation>): Operation {
+/** The operation a proposal names, or a stand in for one this facility no
+ *  longer declares, so the Scribe tab can still say it refuses. */
+export function operationFor(p: Proposal, ops: Record<string, Operation>): Operation {
   return ops[p.operation] ?? ({
     id: p.operation, kind: "write", short: p.operation, title: p.operation,
     summary: "", capability: "", station: "", instrument: "form",

@@ -60,6 +60,12 @@ const sized = (q: Question, alone: boolean): CSSProperties => {
     : ({ "--w": w, "--cap": `${cap}ch` } as CSSProperties);
 };
 
+/** The columns of a table of rows: each sub question's declared weight is its
+ *  share of the width, and the last column is the way out of the row. */
+const cols = (subs: Question[]): CSSProperties => ({
+  gridTemplateColumns: `${subs.map((q) => `minmax(0, ${weight(q)}fr)`).join(" ")} 28px`,
+});
+
 function outsideCritical(q: Question, v: unknown): boolean {
   const crit = phcOf(q).critical;
   if (!crit || v === undefined || v === null || v === "") return false;
@@ -294,49 +300,65 @@ export function Form({
     const mine = problems.filter((p) => p.link_id === q.link_id);
     return (
       <fieldset className="f-group" key={q.link_id}>
-        <legend>{q.text}</legend>
-        {q.description && <div className="f-hint">{q.description}</div>}
-        {phcOf(q).help && <div className="f-hint">{phcOf(q).help}</div>}
-        {drawn.map((row, i) => {
-          const given = (row ?? {}) as Record<string, unknown>;
-          return (
-            <div className="f-item" key={i}>
-              {/* A row number on a form with one row names nothing: there is
-                  no second row to tell it from. It arrives with the second
-                  medicine, which is when a person needs to know which one
-                  they are reading. The way out of a row comes with it. */}
-              {drawn.length > 1 && (
-                <div className="f-item-h">
-                  <span className="f-item-n">{i + 1}</span>
-                  {stored.length > 1 && (
-                    <button type="button" className="cq f-item-x" disabled={disabled}
-                            onClick={() => dropRow(q.link_id, i)}>Remove</button>
-                  )}
-                </div>
-              )}
-              {subs.map((sub) => {
-                const id = `${q.link_id}[${i}].${sub.link_id}`;
-                const bad = mine.filter((p) => p.message.startsWith(`${id} `));
-                const heard = evidence?.[id];
-                const score = confidence?.[id];
-                const unsure = score !== undefined && score < SURE;
-                return (
-                  <label className={`f-sub${bad.length ? " bad" : ""}${unsure ? " unsure" : ""}`}
-                         style={sized(sub, false)} key={sub.link_id}>
-                    <span>{labelOf(sub)}{phcOf(sub).unit ? ` (${phcOf(sub).unit})` : ""}</span>
-                    <Widget q={sub} op={op} ids={`${ids}-${q.link_id}-${i}`}
-                            value={given[sub.link_id]}
-                            onChange={(v) => setRow(q.link_id, i, sub.link_id, v)}
-                            disabled={disabled} />
-                    {unsure && <span className="f-hint unsure">{unsureHint(score ?? 0)}</span>}
-                    {heard && <span className="f-hint heard">“{heard}”</span>}
-                    {bad.map((b) => <span className="f-bad" key={b.message}>{b.message}</span>)}
-                  </label>
-                );
-              })}
-            </div>
-          );
-        })}
+        {/* The declared help says "one row per medicine, each row needs all
+            six answers", which a header of six columns now says by being
+            there. It stays reachable -- on the title, for a pointer and a
+            screen reader -- and off the screen. */}
+        <legend title={phcOf(q).help}>{q.text}</legend>
+        {/* A TABLE, NOT A STACK OF CARDS. A prescription is a list of lines
+            that all say the same six things, and six labelled boxes per
+            medicine repeated three times is a form; a header once and a row
+            per medicine is a table, which is how a prescription has always
+            been read. The columns divide the width by the same declared
+            weights the cards used, so a drug name still gets more room than
+            a dose.
+
+            The header is for the eye. Each cell is still a label of its own
+            for a screen reader, so a row read aloud says what each box is. */}
+        <div className="f-tbl">
+          <div className="f-tr f-th" aria-hidden="true" style={cols(subs)}>
+            {subs.map((sub) => (
+              <span key={sub.link_id}>
+                {labelOf(sub)}{phcOf(sub).unit ? ` (${phcOf(sub).unit})` : ""}
+              </span>
+            ))}
+            <span />
+          </div>
+          {drawn.map((row, i) => {
+            const given = (row ?? {}) as Record<string, unknown>;
+            return (
+              <div className="f-tr" key={i} style={cols(subs)}>
+                {subs.map((sub) => {
+                  const id = `${q.link_id}[${i}].${sub.link_id}`;
+                  const bad = mine.filter((p) => p.message.startsWith(`${id} `));
+                  const heard = evidence?.[id];
+                  const score = confidence?.[id];
+                  const unsure = score !== undefined && score < SURE;
+                  return (
+                    <label className={`f-td${bad.length ? " bad" : ""}${unsure ? " unsure" : ""}`}
+                           key={sub.link_id}>
+                      <span className="u-sr">
+                        {labelOf(sub)}{phcOf(sub).unit ? ` (${phcOf(sub).unit})` : ""}
+                      </span>
+                      <Widget q={sub} op={op} ids={`${ids}-${q.link_id}-${i}`}
+                              value={given[sub.link_id]}
+                              onChange={(v) => setRow(q.link_id, i, sub.link_id, v)}
+                              disabled={disabled} />
+                      {unsure && <span className="f-hint unsure">{unsureHint(score ?? 0)}</span>}
+                      {heard && <span className="f-hint heard">“{heard}”</span>}
+                      {bad.map((b) => <span className="f-bad" key={b.message}>{b.message}</span>)}
+                    </label>
+                  );
+                })}
+                {stored.length > 1 ? (
+                  <button type="button" className="f-x" disabled={disabled}
+                          aria-label={`Remove ${phcOf(q).row ?? "row"} ${i + 1}`}
+                          onClick={() => dropRow(q.link_id, i)}>×</button>
+                ) : <span />}
+              </div>
+            );
+          })}
+        </div>
         <Add disabled={disabled} what={phcOf(q).row ?? "row"}
              onClick={() => onChange(prune(schema, { ...value, [q.link_id]: [...drawn, {}] }))} />
         {mine.filter((p) => p.message === `${q.link_id} is required`)
