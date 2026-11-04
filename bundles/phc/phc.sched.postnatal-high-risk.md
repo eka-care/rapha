@@ -95,19 +95,21 @@ contacts:
 
 ## Why this differs from the ordinary schedule
 
-Same seven home visits, plus one. The programme follows a high-risk woman to
+The same visits as the ordinary schedule, plus one. The programme follows a high-risk woman to
 day 45 and wants a verified outcome recorded. An ordinary woman's care still
 ends at day 42. The day-45 check is the ANM's, not the ASHA's, because it
 confirms an outcome rather than checking on a newborn at home. The six week check
 closes a day earlier here (44, against 45 for an ordinary woman) and the
 day-45 check opens on 45, so a visit on day 45 belongs to exactly one contact.
-The window and owner need clinical sign-off.
+That is why this copy's six week window is a day shorter. The window and
+owner need clinical sign-off.
 
 ## In plain words
 
-Seven home visits in the six weeks after a woman delivers. Somebody goes to
-the house on the first day, the third, the seventh, then once a week for
-three weeks, and once more at six weeks.
+Eight contacts in the 45 days after a high-risk woman delivers. Somebody goes
+to the house on the first day, the third, the seventh, then once a week for
+three weeks, and once more at six weeks. Then the ANM makes a day-45 check
+that records a verified outcome.
 
 They are home visits rather than appointments, and that is the point of
 them: a woman who has just given birth does not come to the centre, so
@@ -118,12 +120,14 @@ anybody waiting for her at the centre will not see her.
 The same banner `bundles/phc/phc.sched.antenatal.md` carries, for the same
 reason and with one addition.
 
-Seven visits in six weeks, on the days below, is the shape of India's home
+Seven home visits in six weeks, on the days below, plus the day-45 check, is the shape of India's home
 based newborn care. The DAYS were taken from that programme. The WINDOWS
 around each day -- how early a visit may count and how late it may still
 count -- were not: no published source gives them, and they are a product
 choice made here so that a visit a day early is not a visit that did not
-happen. A named clinical officer has to confirm both before anybody is asked
+happen. The day-45 check is the programme's number for a high-risk woman;
+its owner and its window are also this bundle's choice, and so is the
+six week check closing on day 44 to make room for it. A named clinical officer has to confirm both before anybody is asked
 to act on a missed one.
 
 The addition is this: **the visits in the real programme are for the mother
@@ -182,7 +186,8 @@ she gets back to the centre closes them in the order she made them.
 ## And what stops it
 
 Closing the episode, with `phc.op.postnatal-close`, or never opening it. A
-postnatal episode is opened by one operation only, `phc.op.delivery-record`,
-which cannot be reached except on an open pregnancy and has no outcome that
-means a loss. A woman who miscarried never acquires one of these, so there is
+postnatal episode is opened only by a delivery: `phc.op.delivery-record`
+opens an ordinary one and `phc.op.delivery-record-high-risk` opens this
+kind. Neither can be reached except on an open pregnancy, and neither has an
+outcome that means a loss. A woman who miscarried never acquires one of these, so there is
 no visit to cancel, because there was never a visit to begin with.

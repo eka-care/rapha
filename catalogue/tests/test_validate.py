@@ -63,6 +63,24 @@ def test_every_operation_resolves_to_a_questionnaire():
         assert oid in (back if isinstance(back, list) else [back])
 
 
+def test_a_questionnaire_naming_an_operation_that_is_not_an_atom_fails_the_build():
+    from catalogue import build
+    atoms = build.load()
+    real = validate._phc
+    def fake(schema):
+        d = dict(real(schema))
+        if d.get("operation") == ["phc.op.delivery-record", "phc.op.delivery-record-high-risk"]:
+            d["operation"] = list(d["operation"]) + ["phc.op.nonesuch"]
+        return d
+    validate._phc = fake
+    try:
+        bad = build.lint(atoms)
+    finally:
+        validate._phc = real
+    assert any("phc.op.nonesuch" in b and "not an atom" in b for b in bad), bad
+    assert build.lint(atoms) == []
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

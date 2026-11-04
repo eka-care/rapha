@@ -18,7 +18,8 @@ mapping:
   records:
     # THREE ROWS, AND THE ORDER OF THEM IS THE WHOLE POINT. The first ends the
     # pregnancy, which stops every antenatal contact instantly, because a
-    # contact is derived and there is nothing to cancel. The second opens
+    # contact is derived and there is nothing to cancel. The second ends the
+    # high-risk episode, which stops her three extra visits. The third opens
     # postnatal care, which starts the home visits owed to the mother. One
     # commit, so there is no window in which she is neither pregnant nor
     # postnatal and nobody owes her anything.

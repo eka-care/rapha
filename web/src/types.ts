@@ -15,7 +15,9 @@ export type Phc = {
   range_from?: string;
   critical?: Range;
   flags?: string;
-  operation?: string;
+  /** The operation(s) this form serves: one id, or a list when several
+   *  operations share one form. Nothing reads it. */
+  operation?: string | string[];
 };
 
 export type Question = {
