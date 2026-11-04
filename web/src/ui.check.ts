@@ -35,7 +35,7 @@
 import assert from "node:assert/strict";
 import { WROTE } from "./types.ts";
 import type { CalendarRow } from "./types.ts";
-import { comingUp, dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips } from "./view/day.ts";
+import { monthAfter, wantsNextMonth, comingUp, dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips } from "./view/day.ts";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1368,7 +1368,24 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.match(today, /decl\.kind === "calendar"/, "the card is found by the declared kind of view");
   assert.match(today, /comingUp\(/, "the card draws from the groups through day.ts");
   assert.match(today, /\?on=/, "opening a day goes to the calendar on that date");
-  assert.ok(!/api\.view/.test(today), "the card asks for nothing: the calendar was already loaded for this caller");
+  assert.match(today, /wantsNextMonth\(/, "the card carries on into the next month itself");
+
+  // The span does not depend on the date. Month-end: this month's groups run
+  // out, the next month's are asked for and the dates carry on.
+  const month = (y: number, m: number, n: number) =>
+    Array.from({ length: n }, (_, i) => g(`${y}-${String(m).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`, 1));
+  const nov = month(2026, 11, 30), dec = month(2026, 12, 31), jan = month(2027, 1, 31);
+  assert.equal(wantsNextMonth(nov, "2026-11-04"), "", "mid-month needs no second request");
+  assert.equal(wantsNextMonth(nov, "2026-11-28"), "2026-12-01");
+  assert.deepEqual(comingUp([...nov, ...dec], "2026-11-28").map((d) => d.key),
+    ["2026-11-28", "2026-11-29", "2026-11-30", "2026-12-01", "2026-12-02"]);
+  // December into January: the year rolls over.
+  assert.equal(monthAfter("2026-12-31"), "2027-01-01");
+  assert.equal(wantsNextMonth(dec, "2026-12-31"), "2027-01-01");
+  assert.deepEqual(comingUp([...dec, ...jan], "2026-12-31").map((d) => d.key),
+    ["2026-12-31", "2027-01-01", "2027-01-02", "2027-01-03", "2027-01-04"]);
+  assert.equal(comingUp(dec, "2026-12-31").length, 1, "without the next month the card would be short");
+  assert.equal(monthAfter("junk"), "");
   const cal = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
   assert.match(cal, /dayOn\(/, "the day screen opens on the date a link carries");
   ok("the home card: the next days with their counts, absent without the capability, a day opens the calendar on it");

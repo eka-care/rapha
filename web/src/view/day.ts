@@ -102,3 +102,23 @@ export function comingUp(
     .sort((a, b) => (a.key < b.key ? -1 : 1))
     .slice(0, limit);
 }
+
+/** The first day of the month after `iso`, or "" when `iso` is not a date.
+ *  Read by position, so the year rolls over without a time zone in sight. */
+export function monthAfter(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-\d{2}$/.exec(iso ?? "");
+  if (!m) return "";
+  const y = Number(m[1]), mo = Number(m[2]);
+  return mo === 12 ? `${y + 1}-01-01` : `${y}-${String(mo + 1).padStart(2, "0")}-01`;
+}
+
+/** The day to ask the kernel about for the rest of the span, or "" when this
+ *  month's groups already fill it. The kernel scopes groups to one month on
+ *  purpose; the card carries on into the next itself. */
+export function wantsNextMonth(
+  groups: { key: string | null; count: number }[] | undefined,
+  today: string,
+  limit = 5,
+): string {
+  return comingUp(groups, today, limit).length >= limit ? "" : monthAfter(today);
+}

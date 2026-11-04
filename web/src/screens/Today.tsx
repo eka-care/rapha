@@ -9,13 +9,14 @@
  *  composes the prose; this file lays it out.
  */
 import { useEffect, useState, type CSSProperties } from "react";
+import { api } from "../api";
 import { brief, facilityAsks, initialsOf, line, type Loaded } from "../agent";
 import { NAME } from "../brand";
 import { Icon } from "../icons";
 import type { Recent } from "../loops";
 import { Loading } from "../parts";
 import type { Catalogue, QueueRow, TaskRow } from "../types";
-import { comingUp, dateOf, dayLabel } from "../view/day";
+import { comingUp, dateOf, dayLabel, wantsNextMonth } from "../view/day";
 import { human, title } from "../words";
 
 /** How many names a flow column shows before it says how many more. */
@@ -87,6 +88,23 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
   onGoView: (view: string) => void;
   onAsk: (question: string) => void;
 }) {
+  // The calendar is in `loaded` only if this caller holds its capability and
+  // the kernel answered, so a caller without it has no card and no empty frame.
+  const cal = loaded.find((l) => l.decl.kind === "calendar");
+  const today = cal ? dateOf(cal.result.generated_at) : "";
+  // The kernel's groups cover one month. Near its end the card asks for the
+  // next month too, so it is as long on the 30th as on the 1st.
+  const more = cal ? wantsNextMonth(cal.result.groups, today) : "";
+  const calId = cal?.decl.id;
+  const [spill, setSpill] = useState<{ key: string | null; count: number }[]>([]);
+  useEffect(() => {
+    let live = true;
+    setSpill([]);
+    if (calId && more) api.view(calId, undefined, more).then((r) => live && setSpill(r.groups ?? []), () => {});
+    return () => { live = false; };
+  }, [calId, more]);
+  const days = cal ? comingUp([...(cal.result.groups ?? []), ...spill], today) : [];
+
   if (loading && !loaded.length) return <Loading what="the facility" shape="blocks" rows={4} />;
   // The greeting and the centre's own name were a line above the heading --
   // "Primary health centre · Monday 2 November · good afternoon". A person
@@ -111,12 +129,6 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
   const badges = queues[0]?.decl.badges ?? {};
   const columns = line(loaded, stations, badges);
   const busiest = columns.reduce((m, c) => Math.max(m, c.people.length), 0);
-
-  // The calendar is in `loaded` only if this caller holds its capability and
-  // the kernel answered, so a caller without it has no card and no empty frame.
-  const cal = loaded.find((l) => l.decl.kind === "calendar");
-  const today = cal ? dateOf(cal.result.generated_at) : "";
-  const days = cal ? comingUp(cal.result.groups, today) : [];
 
   return (
     <div className="home">
