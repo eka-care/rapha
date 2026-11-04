@@ -108,6 +108,10 @@ python3 scripts/check_antenatal.py
 # postnatal care in one commit, and a pregnancy that ended any other way
 # opens nothing. The second half is the one that matters.
 python3 scripts/check_postnatal.py
+# The facility calendar over women whose pregnancies ended, were lost or were
+# never seen: an ended episode owed on any day, or a miscarriage given a
+# home visit, fails here, as does a window off by a day or an ungated route.
+python3 scripts/check_calendar.py
 # A laboratory value and its unit are one checked thing: the analyte is a coded
 # ANSWER (the third binding form) and the unit must be the one LOINC reports
 # that analyte in. scripts/seed_terminology.py generated the value set and is

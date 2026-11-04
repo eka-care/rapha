@@ -1269,6 +1269,81 @@ def s_the_views_see_what_the_write_did(walk, codes):
             "before and after a thread, the dashboard, the tasklist and the spine")
 
 
+def s_the_calendar_with_women_in_it(walk, codes):
+    """The facility calendar over a centre that has episodes, which the seeded
+    day has none of.
+
+    Without this the calendar was compared over an empty centre: every month
+    the same nothing, so two engines that disagreed about every date rule would
+    have agreed. Here are an open pregnancy, one whose first contact nobody
+    made, a delivery (which ends the pregnancy and opens postnatal care in ONE
+    commit, so an opening and an ending share an instant), and a miscarriage
+    (which must leave no row at all). Then `?on=` is walked over the dates
+    where the two engines' calendars are most likely to differ.
+    """
+    today = datetime.date.today()
+    day = lambda n: (today - datetime.timedelta(days=n)).isoformat()
+
+    def woman(label, lmp_days_ago):
+        registered(walk, codes)
+        walk.commit("%s: open a pregnancy" % label, "phc.op.pregnancy-open",
+                    {"dating_basis": "last_menstrual_period",
+                     "dating_date": day(lmp_days_ago)}, "anm")
+
+    woman("an open pregnancy", 100)
+    woman("a pregnancy nobody has seen for months", 190)
+    woman("a delivery", 270)
+    walk.commit("the delivery is recorded", "phc.op.delivery-record",
+                {"delivery_date": day(3), "outcome": "live_birth"}, "anm")
+    woman("a miscarriage", 100)
+    walk.commit("the miscarriage is recorded", "phc.op.pregnancy-close",
+                {"outcome": "miscarriage"}, "anm")
+    walk.panel("the panel once the miscarriage is recorded")
+    # An agreement between two refusals would prove nothing, so every write
+    # above must have landed.
+    writes = [status for label, status, _ in walk.raw if "pregnancy" in label
+              or "recorded" in label]
+    assert writes and all(status == 200 for status in writes), writes
+
+    answers = {}
+    first = today.replace(day=1)
+    last = (first.replace(day=28) + datetime.timedelta(days=4))
+    last = last - datetime.timedelta(days=last.day)
+    for label, on in (("today, by saying nothing", None),
+                      ("the first of this month", first.isoformat()),
+                      ("the last of this month", last.isoformat()),
+                      ("31 December", "2026-12-31"),
+                      ("29 February in a leap year", "2028-02-29"),
+                      ("29 February in a year that has none", "2027-02-29"),
+                      ("a day that does not exist", "2026-02-30"),
+                      ("a month that does not exist", "2026-13-01"),
+                      ("an empty value", ""),
+                      ("a timestamp", "2026-11-04T10:00:00Z"),
+                      ("a compact date", "20261104")):
+        path = "/views/phc.view.calendar"
+        if on is not None:
+            path += "?on=" + urllib.parse.quote(on)
+        # Unordered, for the reason Walk.read gives: two contacts due on one
+        # day come out in the order of ids each engine minted for itself.
+        status, body = walk.read("the calendar on %s" % label, path, ordered=False)
+        answers[label] = (status, body)
+    # And the answers are the ones worth agreeing on: women are owed, nothing
+    # is owed to the miscarriage, and a date that is not one is refused.
+    status, body = answers["today, by saying nothing"]
+    assert status == 200 and body["rows"], (status, body)
+    assert {r["state"] for r in body["rows"]} >= {"missed"}, body["rows"]
+    # The seeded day has a pregnant woman of its own; the women this walk
+    # registered are the ones it named "parity".
+    ours = {r["subject"] for r in body["rows"]
+            if r["subject_row"].get("name") == "parity"}
+    assert len(ours) == 3, \
+        "three of this walk's women are owed and the fourth miscarried: %d" % len(ours)
+    for label in ("a day that does not exist", "an empty value", "a timestamp"):
+        assert answers[label][0] == 400, (label, answers[label])
+    return ("the calendar over open, unseen, delivered and miscarried women, "
+            "on month ends, leap days and impossible dates")
+
+
 def s_the_planner_hears_and_proposes(walk, codes):
     """The ask-and-search turn: a sentence in, cards out, and no clinical row.
 
@@ -1380,6 +1455,7 @@ SCENARIOS = (
     s_a_bound_choice_is_constrained_per_row,
     s_the_state_emit,
     s_the_views_see_what_the_write_did,
+    s_the_calendar_with_women_in_it,
     s_the_planner_hears_and_proposes,
     s_the_planner_cannot_commit,
 )
@@ -1732,13 +1808,16 @@ def properties(shape, scenario, walk):
             assert status in (200, 403), (shape, vid, status)
             if status == 200:
                 assert decls[vid]["kind"] in kinds, (shape, vid)
-        assert set(walk.asked) == set(decls), (
-            "%s: this walk asked for %s and the bundle declares %s"
-            % (shape, sorted(walk.asked), sorted(decls)))
-        openable = {d["kind"] for vid, d in decls.items() if walk.asked[vid] != 403}
-        assert kinds == openable, (
-            "%s: this walk read %s and this caller may open %s"
-            % (shape, sorted(kinds), sorted(openable)))
+        # Only the scenario that sweeps every view sets `asked`; the calendar's
+        # own scenario reads one view and is held to the checks above.
+        if walk.asked:
+            assert set(walk.asked) == set(decls), (
+                "%s: this walk asked for %s and the bundle declares %s"
+                % (shape, sorted(walk.asked), sorted(decls)))
+            openable = {d["kind"] for vid, d in decls.items() if walk.asked[vid] != 403}
+            assert kinds == openable, (
+                "%s: this walk read %s and this caller may open %s"
+                % (shape, sorted(kinds), sorted(openable)))
 
         # ---- the spine, when this walk read one
         timelines = [body for _, status, body in walk.raw
