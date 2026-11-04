@@ -1293,6 +1293,18 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.deepEqual(inPiles([row("x", "done", "r.anm")]).map((p) => p.pile), ["done"],
     "an empty pile is not drawn");
 
+  // THE PILES PARTITION THE ROWS: a state nobody expected still appears, once.
+  const odd = [...rows, row("e", "paused", "r.mo"), row("f", "paused", "r.anm"), row("g", "zzz", "r.anm")];
+  const all = inPiles(odd);
+  assert.equal(all.reduce((n, p) => n + p.rows.length, 0), odd.length, "a row vanished from the day");
+  assert.deepEqual(all.map((p) => p.pile).slice(-2), ["paused", "zzz"], "unexpected states come last, named by themselves");
+  assert.equal(inPiles(rows).reduce((n, p) => n + p.rows.length, 0), rows.length);
+  // Emptiness is read from what the piles hold: a role whose rows are all
+  // unexpected is not an empty day.
+  assert.ok(inPiles(forRole([row("u", "upcoming", "r.x")], "r.x")).length > 0);
+  // Chips are ordered by what is displayed, not by id.
+  assert.deepEqual(roleChips(rows, "", (r) => (r === "r.anm" ? "Zed" : "Alpha")).roles, ["r.mo", "r.anm"]);
+
   // A row's owner is the role the kernel sent; the chips are those roles and
   // nothing else, so no worker name can appear.
   const { roles, initial } = roleChips(rows, "r.anm");
@@ -1313,12 +1325,15 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.deepEqual(dayOf("2026-11-04"), { day: "4", month: "Nov" });
 
   // The screen names no state, flag, station or operation of its own. The
-  // portability scan above already covers every file; this holds the two day
-  // files to the narrower rule that no column of a contact is read by a typed
-  // name other than the ones the kernel's answer is documented to carry.
+  // portability scan above already covers every file; this holds both day
+  // files (Calendar.tsx and day.ts) to a narrower rule: none of them reads an
+  // operation, station, flag or reports_as field.
   const screen = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
-  assert.ok(!/\.operation\b|\.station\b|\.flags\b|\.reports_as\b/.test(screen),
-    "the day screen reads a field it should not know");
+  const logic = code(readFileSync(join(SRC, "view", "day.ts"), "utf8"));
+  for (const [name, src] of [["Calendar.tsx", screen], ["day.ts", logic]]) {
+    assert.ok(!/\.operation\b|\.station\b|\.flags\b|\.reports_as\b/.test(src),
+      `${name} reads a field it should not know`);
+  }
   assert.ok(!/\btitle\(|\bhuman\(/.test(screen), "the day screen cases a role id instead of reading its declared title");
   assert.match(screen, /role_titles/, "a role is named by the catalogue's role_titles");
   assert.ok(!/from "\.\/View"/.test(screen), "the day screen imports View, which imports it");

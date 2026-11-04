@@ -5,29 +5,38 @@
  */
 import type { CalendarRow } from "../types";
 
-export type Pile = "late" | "owed" | "done";
-
 /** Late first, because it is the only pile where somebody must act now. */
-export const PILES: { pile: Pile; label: string; state: string }[] = [
+export const PILES: { pile: string; label: string; state: string }[] = [
   { pile: "late", label: "Late", state: "missed" },
   { pile: "owed", label: "Owed today", state: "due" },
   { pile: "done", label: "Done", state: "done" },
 ];
 
-export function inPiles(rows: CalendarRow[]): { pile: Pile; label: string; rows: CalendarRow[] }[] {
-  return PILES
-    .map((p) => ({ pile: p.pile, label: p.label, rows: rows.filter((r) => r.state === p.state) }))
-    .filter((p) => p.rows.length > 0);
+/** THE PILES PARTITION THE ROWS: every row the kernel sent is in exactly one
+ *  pile, always. A state this file does not know is not dropped, because a
+ *  contact the kernel says is owed vanishing from the day with no sign is the
+ *  worst thing this screen could do. It gets a pile of its own, last, named by
+ *  the state value itself, which is the kernel's word and not ours. */
+export function inPiles(rows: CalendarRow[]): { pile: string; label: string; rows: CalendarRow[] }[] {
+  const known = new Set(PILES.map((p) => p.state));
+  const piles = PILES.map((p) => ({ pile: p.pile, label: p.label, rows: rows.filter((r) => r.state === p.state) }));
+  const strange = [...new Set(rows.map((r) => r.state).filter((s) => !known.has(s)))].sort();
+  for (const s of strange) piles.push({ pile: s, label: s, rows: rows.filter((r) => r.state === s) });
+  return piles.filter((p) => p.rows.length > 0);
 }
 
 /** "Everyone" is the empty string, so a role can never collide with it. */
 export const EVERYONE = "";
 
-/** One chip per role that owns something in this answer, and which one is
- *  selected on open: the caller's own, or everyone when the caller owns
- *  nothing here (a chip that would show an empty day is a trap). */
-export function roleChips(rows: CalendarRow[], caller: string): { roles: string[]; initial: string } {
-  const roles = [...new Set(rows.map((r) => r.owner).filter(Boolean))].sort();
+/** One chip per role that owns something in this answer, in the order the
+ *  person reads them (by displayed name). Because the piles partition the rows,
+ *  every chip here draws at least one row. The caller's own is selected on
+ *  open, or everyone when the caller owns nothing here. */
+export function roleChips(
+  rows: CalendarRow[], caller: string, label: (role: string) => string = (r) => r,
+): { roles: string[]; initial: string } {
+  const roles = [...new Set(rows.map((r) => r.owner).filter(Boolean))]
+    .sort((a, b) => label(a).localeCompare(label(b)));
   return { roles, initial: roles.includes(caller) ? caller : EVERYONE };
 }
 

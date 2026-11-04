@@ -29,11 +29,13 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
   const cat = useAsync(() => api.catalogue(), []);
   const roleName = (r: string) => cat.data?.vocabulary?.role_titles?.[r] ?? r;
   const rows = (result.rows ?? []) as CalendarRow[];
-  const { roles, initial } = roleChips(rows, role);
-  const [picked, setPicked] = useState<string | null>(null);
+  const { roles, initial } = roleChips(rows, role, roleName);
+    const [picked, setPicked] = useState<string | null>(null);
   const selected = picked ?? initial;
   const shown = forRole(rows, selected);
-  const empty = emptyLine(rows.length, shown.length);
+  const piles = inPiles(shown);
+  // Emptiness is what the piles actually hold, not a count taken before them.
+  const empty = emptyLine(rows.length, piles.reduce((n, p) => n + p.rows.length, 0));
 
   return (
     <div className="cal">
@@ -50,7 +52,7 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
 
       {empty && <div className="state-empty">{empty}</div>}
 
-      {inPiles(shown).map((g) => (
+      {piles.map((g) => (
         <section key={g.pile} className="cal-pile" aria-label={g.label}>
           <h2 className="cal-h">{g.label} <span className="cal-n">{g.rows.length}</span></h2>
           <ul className="cal-list">
