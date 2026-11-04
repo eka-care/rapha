@@ -1319,6 +1319,9 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   const screen = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
   assert.ok(!/\.operation\b|\.station\b|\.flags\b|\.reports_as\b/.test(screen),
     "the day screen reads a field it should not know");
+  assert.ok(!/\btitle\(|\bhuman\(/.test(screen), "the day screen cases a role id instead of reading its declared title");
+  assert.match(screen, /role_titles/, "a role is named by the catalogue's role_titles");
+  assert.ok(!/from "\.\/View"/.test(screen), "the day screen imports View, which imports it");
   assert.match(screen, /from "\.\.\/thread\/Arc"/, "tones and marks come from Arc, not a second copy");
   assert.ok(!/\b(TONE|MARK)\s*[:=]/.test(screen), "the day screen redefines the arc's tones");
   ok("the day screen: late, owed, done; the caller's role first; an empty day says so");

@@ -42,7 +42,8 @@ export function View({ result, decl, workflow, onOpenThread }: {
   if (result.kind === "calendar") {
     return (
       <Calendar
-        result={result} decl={decl} role={currentRole()}
+        result={result} role={currentRole()}
+        nameOf={(subject) => fields(decl, { subject } as unknown as QueueRow).name}
         onOpenPatient={(id) => { location.hash = `/patients/${id}`; }}
       />
     );

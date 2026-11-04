@@ -8,20 +8,26 @@
  *  here, on what the kernel already sent; nothing is stored.
  */
 import { useState } from "react";
+import { api, useAsync } from "../api";
 import { Icon } from "../icons";
 import { MARK, TONE } from "../thread/Arc";
-import type { CalendarRow, QueueRow, ViewDecl, ViewResult } from "../types";
-import { title } from "../words";
+import type { CalendarRow, ViewResult } from "../types";
 import { dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips } from "./day";
-import { fields } from "./View";
 
-export function Calendar({ result, decl, role, onOpenPatient }: {
+export function Calendar({ result, nameOf, role, onOpenPatient }: {
   result: ViewResult;
-  decl?: ViewDecl;
+  /** What a patient's record is called, decided by the view's own columns.
+   *  Handed in rather than imported, so this file and View.tsx do not import
+   *  each other. */
+  nameOf: (subjectRow: Record<string, unknown>) => string;
   /** The caller's own role. Its chip is the one selected on open. */
   role: string;
   onOpenPatient?: (subject: string) => void;
 }) {
+  // A role's name is the bundle's to give. Until the catalogue arrives the
+  // raw id shows, which is plain, where a cased id would be a word we made up.
+  const cat = useAsync(() => api.catalogue(), []);
+  const roleName = (r: string) => cat.data?.vocabulary?.role_titles?.[r] ?? r;
   const rows = (result.rows ?? []) as CalendarRow[];
   const { roles, initial } = roleChips(rows, role);
   const [picked, setPicked] = useState<string | null>(null);
@@ -37,7 +43,7 @@ export function Calendar({ result, decl, role, onOpenPatient }: {
             key={r || "everyone"} type="button" className="cal-chip"
             aria-pressed={selected === r} onClick={() => setPicked(r)}
           >
-            {r === EVERYONE ? "Everyone" : title(r)}
+            {r === EVERYONE ? "Everyone" : roleName(r)}
           </button>
         ))}
       </div>
@@ -50,7 +56,6 @@ export function Calendar({ result, decl, role, onOpenPatient }: {
           <ul className="cal-list">
             {g.rows.map((r) => {
               const { day, month } = dayOf(r.due);
-              const who = fields(decl, { subject: r.subject_row } as unknown as QueueRow);
               return (
                 <li key={`${r.contact}-${r.subject}`}>
                   <button type="button" className="cal-row" onClick={() => onOpenPatient?.(r.subject)}>
@@ -62,13 +67,13 @@ export function Calendar({ result, decl, role, onOpenPatient }: {
                     <span className="cal-what">
                       <span className="cal-sentence">
                         <Icon name={(MARK[r.state] ?? "clock") as never} className="i sm" />
-                        {r.title} for {who.name}
+                        {r.title} for {nameOf(r.subject_row)}
                       </span>
                       <span className="cal-when">
                         {r.state === "done" && r.done_at ? <>Recorded {r.done_at}</> : <>Closes {r.closes}</>}
                       </span>
                     </span>
-                    <span className="cal-role">{title(r.owner)}</span>
+                    <span className="cal-role">{roleName(r.owner)}</span>
                   </button>
                 </li>
               );
