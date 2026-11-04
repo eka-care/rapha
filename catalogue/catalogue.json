@@ -3729,7 +3729,7 @@
           "operation": "phc.op.antenatal-visit",
           "owner": "mo",
           "programme_title": "First follow-up ANC for a high-risk pregnancy",
-          "reports_as": "HRP1",
+          "reports_as": null,
           "title": "First extra check-up"
         },
         {
@@ -3742,7 +3742,7 @@
           "operation": "phc.op.antenatal-visit",
           "owner": "mo",
           "programme_title": "Second follow-up ANC for a high-risk pregnancy",
-          "reports_as": "HRP2",
+          "reports_as": null,
           "title": "Second extra check-up"
         },
         {
@@ -3755,7 +3755,7 @@
           "operation": "phc.op.antenatal-visit",
           "owner": "mo",
           "programme_title": "Third follow-up ANC for a high-risk pregnancy",
-          "reports_as": "HRP3",
+          "reports_as": null,
           "title": "Third extra check-up"
         }
       ],

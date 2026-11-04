@@ -102,10 +102,11 @@ def test_a_high_risk_pregnancy_has_its_own_schedule_of_three_visits():
     cs = s["contacts"]
     assert [c["id"] for c in cs] == ["hrp1", "hrp2", "hrp3"]
     assert [c["due"] for c in cs] == [30, 60, 90]
-    assert [c["reports_as"] for c in cs] == ["HRP1", "HRP2", "HRP3"]
     assert [c["title"] for c in cs] == [
         "First extra check-up", "Second extra check-up", "Third extra check-up"]
     assert all(c["programme_title"] for c in cs)
+    # The programme counts these; it gives them no code. None may be invented.
+    assert all(not c.get("reports_as") for c in cs)
     # Additional to the ordinary four, which stay on the pregnancy episode.
     assert len(CAT["schedules"]["phc.sched.antenatal"]["contacts"]) == 4
 
@@ -139,10 +140,13 @@ def test_marking_needs_an_open_pregnancy_and_refuses_a_second_mark():
     assert f["anchor_basis"] == {"const": "marked"}
     assert "anchor_date" in f
     # She cannot be unmarked: no operation closes it.
-    assert not [k for k in CAT["operations"] if "risk" in k and k != "phc.op.risk-mark"]
+    assert "phc.op.risk-unmark" not in CAT["operations"]
     wf = CAT["workflows"]["phc.wf.outpatient"]
     nurse = [s for s in wf["steps"] if s["station"] == "nurse"][0]
     assert "phc.op.risk-mark" in nurse["operations"]
+    # Offered at the nurse's bench only: the build refuses it elsewhere.
+    others = [s for s in wf["steps"] if s["station"] != "nurse"]
+    assert not any("phc.op.risk-mark" in s["operations"] for s in others)
     for st in ("open", "ended"):
         assert f"pregnancy_high_risk.{st}" in wf["states"]
 

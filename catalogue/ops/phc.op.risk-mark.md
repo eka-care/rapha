@@ -48,7 +48,10 @@ with a doctor, over and above her ordinary four.
 She has an open pregnancy and has not already been marked. A second mark
 is refused. You hold `episode.manage`. The ASHA reports what she finds and
 the centre decides, so she cannot mark; the nurse and the medical officer
-can.
+can. The operation is offered at the nurse's bench only, whoever decides:
+the build refuses an operation drawn at a station other than its own.
+The medical officer holds the capability but marks her at that bench.
+The design says he may mark her; that needs the owner's correction.
 
 ## What happens
 
@@ -63,7 +66,10 @@ doctor.
 
 ## When it goes wrong
 
-- **The date was wrong.** Correct it while the visit is open; the visits move.
+- **The date or factor was wrong.** While this same visit is still open,
+  amend it and the three extra check-ups move with the date, because they
+  are worked out when asked. After the visit closes, no correction path has
+  been built for this operation. NEEDS DECISION from the owner.
 - **She cannot be unmarked.** There is no operation for it, by decision.
 
 ## Verification

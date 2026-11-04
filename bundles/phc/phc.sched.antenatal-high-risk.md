@@ -19,7 +19,6 @@ contacts:
     escalates_to: cho
     operation: phc.op.antenatal-visit
     authority: statutory
-    reports_as: HRP1
   - id: hrp2
     title: Second extra check-up
     programme_title: Second follow-up ANC for a high-risk pregnancy
@@ -30,7 +29,6 @@ contacts:
     escalates_to: cho
     operation: phc.op.antenatal-visit
     authority: statutory
-    reports_as: HRP2
   - id: hrp3
     title: Third extra check-up
     programme_title: Third follow-up ANC for a high-risk pregnancy
@@ -41,7 +39,6 @@ contacts:
     escalates_to: cho
     operation: phc.op.antenatal-visit
     authority: statutory
-    reports_as: HRP3
 ---
 
 ## In plain words
@@ -56,6 +53,15 @@ Her four ordinary check-ups stay on her pregnancy and are untouched. This
 is a second episode, opened the day she is marked. Ending the pregnancy and
 opening a high-risk one would split her history into two pregnancies where
 there was one.
+
+## No register codes, on purpose
+
+The programme calls these "three additional ANC visits" and counts them. It
+does not give each one a code the way ANC1 to ANC4 have. An earlier draft
+invented HRP1 to HRP3; they are removed so nothing invented can reach a
+report. `authority: statutory` stays because the visits are required.
+NEEDS SIGN-OFF: confirm against the current national guideline whether a
+register code exists, and whether statutory is the right word.
 
 ## Who owns them
 

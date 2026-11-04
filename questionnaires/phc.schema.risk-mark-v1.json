@@ -89,7 +89,7 @@
             "styling_metadata": {
                 "phc": {
                     "short": "Risk factor",
-                    "help": "Name the main one. The system never infers risk; you do."
+                    "help": "Name the main one. The system never infers risk; you do. NEEDS SIGN-OFF: this list of factors is clinical content no clinician has confirmed."
                 }
             }
         },
