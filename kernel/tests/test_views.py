@@ -125,13 +125,24 @@ def test_a_range_crossing_a_year_boundary_is_whole():
                     "2027-01-01", "2027-01-02", "2027-01-03"], keys
 
 
-def test_a_range_of_one_day_equals_the_same_day_asked_with_on():
-    due = day(contact("anc1").due).isoformat()
-    one = span(pregnant(), due, due, at=date.fromisoformat(due))
-    same = ask(pregnant(), due)
-    key = lambda rs: [(r["contact"], r["subject"], r["due"]) for r in rs]
-    assert key(one.rows) == key(same.rows) != []
-    assert one.groups == [g for g in same.groups if g["key"] == due]
+def test_a_window_covers_a_day_for_on_but_a_one_day_range_wants_the_due_date():
+    anc2 = contact("anc2")
+    inside = day(anc2.opens + 5).isoformat()           # in the window, not the due day
+    on = ask(pregnant(), inside, at=day(anc2.opens))
+    assert "anc2" in [r["contact"] for r in on.rows]
+    one = span(pregnant(), inside, inside, at=day(anc2.opens))
+    assert "anc2" not in [r["contact"] for r in one.rows], one.rows
+
+
+def test_a_range_counts_each_day_by_the_rows_due_on_it():
+    store = pregnant()
+    anc2 = contact("anc2")
+    result = span(store, day(anc2.opens).isoformat(), day(anc2.closes).isoformat(),
+                  at=day(anc2.opens))
+    assert [r["contact"] for r in result.rows] == ["anc2"]
+    for g in result.groups:
+        assert g["count"] == sum(1 for r in result.rows if r["due"] == g["key"]), g
+    assert sum(g["count"] for g in result.groups) == 1
 
 
 def refused(**kw):

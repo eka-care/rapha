@@ -136,8 +136,19 @@ def _span(on, since, until):
 
 
 def _calendar(bundle, view, store, on, at, since=None, until=None):
-    """The day's owed contacts as rows, and the day's month as counts. Given a
-    range instead: the contacts drawn in it, and a count for each of its days."""
+    """Two different questions, answered by two different rules on purpose.
+
+    `on` asks "what is owed on this day": a contact is owed on every day its
+    window covers (and a missed one on every day after), so the day screen
+    and the home card list it for as long as it can be acted on. The rows and
+    the month's counts both use `_covers`.
+
+    A range asks "what falls due in this span": a week, month or year grid
+    draws a visit once, on its due day, so rows and per-day counts are both
+    chosen by due date. A count of 3 above a cell must show 3 visits.
+
+    The two are not the same query over different spans, and the difference
+    is deliberate: do not tidy one into the other."""
     now = at or datetime.now(timezone.utc)
     span = _span(on, since, until)
     if span:
@@ -151,8 +162,8 @@ def _calendar(bundle, view, store, on, at, since=None, until=None):
                 if first.isoformat() <= e["due"] <= last.isoformat() or e["state"] == "missed"]
         days = [first + timedelta(days=n) for n in range((last - first).days + 1)]
         rows = [e for e in rows if any(_covers(e, d) for d in days)]
-        groups = [{"key": d.isoformat(), "count": sum(1 for e in rows if _covers(e, d))}
-                  for d in days]
+        groups = [{"key": d.isoformat(),
+                   "count": sum(1 for e in rows if e["due"] == d.isoformat())} for d in days]
         return rows, groups
     day = now.date() if on is None else _day(on)
     first = day.replace(day=1)
