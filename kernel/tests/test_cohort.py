@@ -137,8 +137,7 @@ def test_a_missed_contact_stays_owed_after_its_window_shuts():
     assert rows[0]["owner"] == anc1.escalates_to
     # but a done one whose window shut is not owed
     visit(store, "e-a1", "p-amina", day(anc1.due))
-    store2 = store
-    rows = [r for r in owed(store2, later, later, at=later) if r["contact"] == "anc1"]
+    rows = [r for r in owed(store, later, later, at=later) if r["contact"] == "anc1"]
     assert rows == [], rows
 
 
@@ -172,6 +171,33 @@ def test_only_the_named_episode_types_are_swept():
     rows = owed(store, LMP, day(anc1.closes))
     assert {r["subject"] for r in rows} == {"p-amina"}, rows
     assert {r["schedule"] for r in rows} == {"phc.sched.antenatal"}
+
+
+def test_reaching_the_read_limit_raises_rather_than_truncating():
+    store = centre()
+    episode_row(store, "ep-1", "p-amina", "pregnancy", "active", "2026-02-01T09:00:00+00:00")
+    episode_row(store, "ep-2", "p-bilal", "pregnancy", "active", "2026-02-01T09:00:00+00:00")
+    saved = cohort._ALL
+    cohort._ALL = 2          # the episode read comes back full: somebody may be missing
+    try:
+        owed(store, LMP, day(300))
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("a full read must raise, not return a short list")
+    finally:
+        cohort._ALL = saved
+
+
+def test_an_episode_with_no_subject_is_skipped_and_its_neighbours_are_not():
+    store = centre()
+    episode_row(store, "ep-1", "p-amina", "pregnancy", "active", "2026-02-01T09:00:00+00:00")
+    episode_row(store, "ep-x", None, "pregnancy", "active", "2026-02-01T09:00:00+00:00")
+    episode_row(store, "ep-2", "p-bilal", "pregnancy", "active", "2026-02-01T09:00:00+00:00")
+    anc1 = contact("anc1")
+    rows = owed(store, day(anc1.due), day(anc1.due))
+    assert {r["subject"] for r in rows} == {"p-amina", "p-bilal"}, rows
+    assert all(r["subject_row"] for r in rows)
 
 
 if __name__ == "__main__":

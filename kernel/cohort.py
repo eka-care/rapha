@@ -3,24 +3,25 @@
 THIS IS `kernel/spine.py`'s EPISODE PAIRING WIDENED FROM ONE SUBJECT TO ALL
 OF THEM. `schedule.contacts()` answers for one episode; a facility wants one
 day's work. The episode rows are read directly rather than found through
-recent visits, because the woman this screen exists to surface is the one
-nobody has seen for months, and she has no recent visit to be found by.
+recent visits, because the subject this screen exists to surface is the one
+nobody has seen for months, and that subject has no recent visit to be found by.
 
 NOTHING HERE IS STORED. No table, no cache, no queue. Every call re-derives
 the answer from the episode rows and the audit, through
 `schedule.contacts()`, which returns nothing for an episode that has ended.
-So there is nothing to cancel when a pregnancy ends badly, and a woman whose
-pregnancy has ended cannot appear here on any day, past or future. This
+So there is nothing to cancel when an episode ends badly, and a subject
+whose episode has ended cannot appear here on any day, past or future. This
 module reimplements none of the date or state logic; it only asks.
 
-WHAT THIS COSTS. One audit read per visit of each open episode, on top of
-one read per episode type and a few per patient. That is right for a centre
-and wrong for a district. The fix when it bites is a store method that
-answers for many threads at once -- a bulk read -- and never a stored
-contact, because a stored contact is what has to be cancelled.
+WHAT THIS COSTS. Here: one read per episode type, and two per subject with
+an open episode (the subject, and their visits). In `schedule.contacts()`,
+which this calls: one audit read per visit of each open episode. That is
+right for a centre and wrong for a district. The fix when it bites is a
+store method that answers for many threads at once -- a bulk read -- and
+never a stored contact, because a stored contact is what has to be cancelled.
 
-Pure: takes a Store and returns values. No clinical word appears here;
-`pregnancy` and `postnatal` arrive as data in `types`.
+Pure: takes a Store and returns values. No clinical word appears here; the
+episode types arrive as data in `types`.
 """
 from __future__ import annotations
 
@@ -28,7 +29,9 @@ from datetime import date, timedelta
 
 from kernel import schedule, spine
 
-#: A centre's episodes of one type, more than any one centre holds.
+#: The most rows one read may return. Reaching it raises rather than
+#: truncating: a screen whose purpose is that nobody is missed must not drop
+#: rows without saying so.
 _ALL = 100000
 
 
@@ -49,11 +52,17 @@ def owed(bundle, store, workflow, *, types, since, until, at=None):
 
     rows = []
     for of in types:
-        rows.extend(dict(r) for r in store.select(kind, thread=None, where={"type": of},
-                                                  fields=(), limit=_ALL))
+        got = store.select(kind, thread=None, where={"type": of}, fields=(), limit=_ALL)
+        if len(got) >= _ALL:
+            raise RuntimeError("more than %d %r episodes: the sweep needs a bulk read" % (_ALL, of))
+        rows.extend(dict(r) for r in got)
     by_patient = {}
     for row in rows:
-        by_patient.setdefault(row.get("patient") or "", []).append(row)
+        # An episode with no subject cannot be drawn: there is nobody to
+        # name on the screen. It is dropped rather than shown as a blank.
+        if not row.get("patient"):
+            continue
+        by_patient.setdefault(row["patient"], []).append(row)
 
     out = []
     for patient, theirs in by_patient.items():
@@ -73,9 +82,11 @@ def owed(bundle, store, workflow, *, types, since, until, at=None):
 
         subject = store.select(link, thread=None, where={"id": patient}, fields=(), limit=1)
         subject_row = dict(subject[0]) if subject else {}
-        visits = [dict(r) for r in store.select(workflow.subject, thread=None,
-                                                where={link: patient}, fields=(),
-                                                limit=_ALL)]
+        got = store.select(workflow.subject, thread=None, where={link: patient},
+                           fields=(), limit=_ALL)
+        if len(got) >= _ALL:
+            raise RuntimeError("more than %d visits for %r: the sweep needs a bulk read" % (_ALL, patient))
+        visits = [dict(r) for r in got]
         for row in open_of_type.values():
             opened = row.get("created_date") or ""
             episode = {
