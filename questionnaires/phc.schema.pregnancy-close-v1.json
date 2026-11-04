@@ -6,7 +6,7 @@
     "subject_type": "encounter",
     "styling_metadata": {
         "phc": {
-            "operation": "phc.op.pregnancy-close"
+            "operation": ["phc.op.pregnancy-close", "phc.op.pregnancy-close-high-risk"]
         }
     },
     "questions": [

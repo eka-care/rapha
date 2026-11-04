@@ -28,6 +28,8 @@ operations:
   - phc.op.pregnancy-close
   - phc.op.risk-mark
   - phc.op.delivery-record
+  - phc.op.delivery-record-high-risk
+  - phc.op.pregnancy-close-high-risk
   - phc.op.postnatal-close
   - phc.op.postnatal-visit
   - phc.op.referral-raise
@@ -59,6 +61,7 @@ schedules:
   - phc.sched.antenatal
   - phc.sched.antenatal-high-risk
   - phc.sched.postnatal
+  - phc.sched.postnatal-high-risk
   - phc.sched.referral
 metrics:
   - phc.metric.visits
@@ -288,6 +291,7 @@ states:
   - pregnancy.ended
   - pregnancy_high_risk.open
   - pregnancy_high_risk.ended
+  - pregnancy.ordinary
   # The six weeks after a delivery. Derived from the same pair of episode
   # rows a pregnancy is, and opened by one operation only: recording a
   # delivery. A pregnancy that ended any other way never acquires one.

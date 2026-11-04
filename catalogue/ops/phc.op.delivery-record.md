@@ -10,7 +10,7 @@ scope_qualifier: null
 station: nurse
 instrument: form
 preconditions:
-  - pregnancy.open
+  - pregnancy.ordinary
 irreversibility: correctable
 input: phc.schema.delivery-record-v1
 writes: [episode_of_care]

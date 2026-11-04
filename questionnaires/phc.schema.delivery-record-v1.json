@@ -6,7 +6,7 @@
   "subject_type": "encounter",
   "styling_metadata": {
     "phc": {
-      "operation": "phc.op.delivery-record"
+      "operation": ["phc.op.delivery-record", "phc.op.delivery-record-high-risk"]
     }
   },
   "questions": [

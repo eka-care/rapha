@@ -122,7 +122,14 @@ def lint(atoms):
                 if q["type"] == "group" and not q.get("questions"):
                     fail(f"group question '{q['link_id']}' has no sub-questions")
             back = validate._phc(schema).get("operation")
-            if back != fm["id"]:
+            # One form may serve several operations that differ only in which
+            # episodes they close; the pointer is then a list. Every named
+            # operation must exist, so the pointer cannot drift.
+            named = back if isinstance(back, list) else [back]
+            for n in named:
+                if n not in ids:
+                    fail(f"questionnaire '{fm['input']}' names '{n}', which is not an atom")
+            if fm["id"] not in named:
                 fail(f"questionnaire '{fm['input']}' points at '{back}', not this atom")
 
         if "—" in body or "—" in str(fm.get("summary", "")):

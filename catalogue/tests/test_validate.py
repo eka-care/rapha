@@ -59,7 +59,8 @@ def test_guard_denies_an_invalid_payload_end_to_end():
 def test_every_operation_resolves_to_a_questionnaire():
     for oid, op in OPS.items():
         schema = validate.load(op["input"])
-        assert validate._phc(schema)["operation"] == oid
+        back = validate._phc(schema)["operation"]
+        assert oid in (back if isinstance(back, list) else [back])
 
 
 if __name__ == "__main__":

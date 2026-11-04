@@ -24,8 +24,9 @@ steps:
     operations: [phc.op.vitals-record, phc.op.antenatal-measure,
                  phc.op.context-add,
                  phc.op.pregnancy-open, phc.op.risk-mark,
-                 phc.op.delivery-record,
-                 phc.op.pregnancy-close, phc.op.postnatal-close]
+                 phc.op.delivery-record, phc.op.delivery-record-high-risk,
+                 phc.op.pregnancy-close, phc.op.pregnancy-close-high-risk,
+                 phc.op.postnatal-close]
   - station: doctor
     done_when: consult.documented
     operations: [phc.op.consult-document, phc.op.ncd-review,
@@ -123,6 +124,9 @@ states:
     all_of:
       - {exists: {resource: episode_of_care, where: {type: pregnancy_high_risk, status: active}}}
       - "not pregnancy_high_risk.ended"
+  # An open pregnancy with no high-risk episode: the ordinary forms apply.
+  pregnancy.ordinary:
+    all_of: [pregnancy.open, "not pregnancy_high_risk.open"]
   # The six weeks after a delivery, the same pair over the same table. Note
   # what is NOT here: no rule relates this to how the pregnancy ended. A
   # postnatal episode exists because somebody recorded a delivery, and a

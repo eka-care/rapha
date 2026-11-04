@@ -53,7 +53,8 @@ def test_a_calendar_naming_an_unknown_workflow_is_refused():
 def test_the_shipped_calendar_declaration_compiles():
     view = CAT["views"]["phc.view.calendar"]
     assert view["kind"] == "calendar"
-    assert view["episodes"] == ["pregnancy", "pregnancy_high_risk", "postnatal"]
+    assert view["episodes"] == ["pregnancy", "pregnancy_high_risk", "postnatal",
+                              "postnatal_high_risk"]
 
 
 def test_a_contact_carries_both_a_plain_name_and_the_programme_s():
@@ -153,6 +154,95 @@ def test_marking_needs_an_open_pregnancy_and_refuses_a_second_mark():
 
 def test_the_calendar_sweeps_the_high_risk_type_too():
     assert "pregnancy_high_risk" in CAT["views"]["phc.view.calendar"]["episodes"]
+
+
+def _ops():
+    return CAT["operations"], CAT["mapping"]
+
+
+def _types(op):
+    return [(r["fields"]["type"]["const"], r["fields"]["status"]["const"])
+            for r in CAT["mapping"][op]]
+
+
+def test_an_ordinary_delivery_cannot_be_recorded_for_a_high_risk_woman():
+    ops, _ = _ops()
+    assert ops["phc.op.delivery-record"]["preconditions"] == ["pregnancy.ordinary"]
+    assert ops["phc.op.pregnancy-close"]["preconditions"] == ["pregnancy.ordinary"]
+    st = CAT["workflows"]["phc.wf.outpatient"]["states"]["pregnancy.ordinary"]
+    assert st == {"all_of": ["pregnancy.open", "not pregnancy_high_risk.open"]}
+    for op in ("phc.op.delivery-record-high-risk", "phc.op.pregnancy-close-high-risk"):
+        assert ops[op]["preconditions"] == ["pregnancy_high_risk.open"]
+
+
+def test_a_high_risk_delivery_opens_the_tail_that_runs_to_day_45():
+    assert _types("phc.op.delivery-record-high-risk") == [
+        ("pregnancy", "ended"), ("pregnancy_high_risk", "ended"),
+        ("postnatal_high_risk", "active")]
+    s = CAT["schedules"]["phc.sched.postnatal-high-risk"]
+    assert s["episode"] == "postnatal_high_risk" and s["anchor"] == {"delivery": 0}
+    last = s["contacts"][-1]
+    assert last["id"] == "hbnc45" and last["due"] == 45 and last["owner"] == "anm"
+    assert CAT["schedules"]["phc.sched.postnatal"]["contacts"][-1]["due"] == 42
+
+
+def test_the_high_risk_postnatal_schedule_keeps_the_seven_home_visits():
+    hr = CAT["schedules"]["phc.sched.postnatal-high-risk"]["contacts"]
+    ord_ = CAT["schedules"]["phc.sched.postnatal"]["contacts"]
+    assert len(hr) == 8 and hr[:6] == ord_[:6]
+    # Identical but for the six week window, a day shorter so that day 45
+    # belongs to exactly one contact.
+    assert ({k: v for k, v in hr[6].items() if k != "closes"}
+            == {k: v for k, v in ord_[6].items() if k != "closes"})
+    assert (hr[6]["closes"], ord_[6]["closes"]) == (44, 45)
+    assert (hr[7]["opens"], hr[7]["due"], hr[7]["closes"]) == (45, 45, 52)
+    cs = sorted(hr, key=lambda c: c["due"])
+    for a, b in zip(cs, cs[1:]):
+        assert a["closes"] < b["opens"], (a["id"], b["id"])
+
+
+def test_both_delivery_paths_reuse_one_questionnaire():
+    ops, _ = _ops()
+    assert ops["phc.op.delivery-record"]["input"] == ops["phc.op.delivery-record-high-risk"]["input"]
+    assert ops["phc.op.pregnancy-close"]["input"] == ops["phc.op.pregnancy-close-high-risk"]["input"]
+
+
+def test_a_high_risk_loss_ends_both_episodes():
+    assert _types("phc.op.pregnancy-close-high-risk") == [
+        ("pregnancy", "ended"), ("pregnancy_high_risk", "ended")]
+
+
+def test_a_high_risk_loss_opens_no_postnatal_care_of_either_kind():
+    for op in ("phc.op.pregnancy-close", "phc.op.pregnancy-close-high-risk"):
+        assert not any(t.startswith("postnatal") for t, _ in _types(op)), op
+        assert all(s == "ended" for _, s in _types(op)), op
+
+
+def test_the_nurse_is_offered_every_way_a_pregnancy_ends():
+    nurse = [s for s in CAT["workflows"]["phc.wf.outpatient"]["steps"]
+             if s["station"] == "nurse"][0]["operations"]
+    for op in ("phc.op.delivery-record-high-risk", "phc.op.pregnancy-close-high-risk"):
+        assert op in nurse
+    assert "postnatal_high_risk" in CAT["views"]["phc.view.calendar"]["episodes"]
+
+
+def test_every_operation_that_ends_a_pregnancy_ends_the_high_risk_episode_too():
+    # The safety property: no path ends a pregnancy and leaves her owed visits.
+    # The only legitimate leaver is an ordinary form guarded to a woman with no
+    # high-risk episode open.
+    for op, rows in CAT["mapping"].items():
+        if ("pregnancy", "ended") not in _types_of(rows):
+            continue
+        pre = CAT["operations"][op]["preconditions"]
+        if ("pregnancy_high_risk", "ended") in _types_of(rows):
+            continue
+        assert pre == ["pregnancy.ordinary"], (op, pre)
+
+
+def _types_of(rows):
+    return [(r["fields"]["type"]["const"], r["fields"]["status"]["const"])
+            for r in rows if r["resource"] == "episode_of_care"
+            and "const" in r["fields"].get("type", {}) and "const" in r["fields"].get("status", {})]
 
 
 if __name__ == "__main__":
