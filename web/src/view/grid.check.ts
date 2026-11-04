@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cells, dayTone, ownRows, span, step, tipOf, wasDue } from "./cells.ts";
+import { cells, dayTone, ownRows, span, step, tipOf, todayOf, wasDue } from "./cells.ts";
 import type { CalendarRow, Episode } from "../types.ts";
 
 let checks = 0;
@@ -218,11 +218,19 @@ const DEC = "2026-12-09";
 {
   // A chip shows the plain name and carries the programme's name as its tooltip.
   const r = { ...row("a", "2026-11-04"), title: "Second check-up", programme_title: "Second antenatal contact" };
-  assert.equal(tipOf(r, "Second check-up"), "Second check-up (Second antenatal contact)");
+  assert.equal(tipOf(r), "Second check-up (Second antenatal contact)");
   // A contact with no programme name shows the plain name and no extra words.
   const plain = { ...row("b", "2026-11-04"), title: "Third day visit", programme_title: "" };
-  assert.equal(tipOf(plain, "Third day visit"), "Third day visit");
-  assert.equal(tipOf(row("c", "2026-11-04"), "x"), "x", "a kernel that sends none is the same as an empty one");
+  assert.equal(tipOf(plain), "Third day visit");
+  assert.equal(tipOf(row("c", "2026-11-04")), "c", "a kernel that sends none is the same as an empty one");
+  // The programme's words sit next to the visit's name, not after the date.
+  const chipTip = `${tipOf(r)} for Lakshmi, due 9 Sep`;
+  assert.equal(chipTip, "Second check-up (Second antenatal contact) for Lakshmi, due 9 Sep");
+  // Her page's today: the kernel's when it looks like a date, else the browser's.
+  assert.equal(todayOf("2026-11-04T15:42:34Z", "2026-01-01"), "2026-11-04");
+  for (const bad of [undefined, null, "", "soon", 20261104, "04/11/2026"]) {
+    assert.equal(todayOf(bad, "2026-01-01"), "2026-01-01", `junk ${String(bad)} falls back`);
+  }
   ok("the programme's phrasing rides behind the plain name, and only when there is one");
 }
 

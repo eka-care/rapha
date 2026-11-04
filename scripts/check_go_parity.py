@@ -1787,14 +1787,22 @@ def properties(shape, scenario, walk):
     subjects = [(label, body) for label, status, body in walk.raw
                 if status == 200 and isinstance(body, dict)
                 and "encounters" in body and "episodes" in body]
+    contacts_seen = named_seen = 0
     for label, body in subjects:
         assert "generated_at" in body, "%s: the subject answer has no generated_at" % label
         for ep in body["episodes"]:
             for c in ep.get("contacts", []):
+                contacts_seen += 1
+                named_seen += bool(c.get("programme_title"))
                 assert c.get("programme_title") == declared_names.get(c["contact"], ""), \
                     "%s: contact %s says %r for the programme's name" % (
                         label, c["contact"], c.get("programme_title"))
     if subjects:
+        # A walk that saw no contact, or none with a programme name, proved
+        # nothing: fail rather than pass green on an empty comparison.
+        assert contacts_seen and named_seen, (
+            "the walk read %d contacts, %d with a programme name: nothing was tested"
+            % (contacts_seen, named_seen))
         ok("%d subject answers carry generated_at and each contact's programme name"
            % len(subjects))
 

@@ -76,7 +76,7 @@ function Chip({ row, cell, nameOf, onOpenPatient, own }: Pick<GridProps, "nameOf
   return (
     <button
       type="button" className="gr-chip" data-tone={TONE[row.state] ?? "b-mute"}
-      title={tipOf(row, said)} aria-label={said} onClick={() => onOpenPatient?.(row.subject)}
+      title={tipOf(row) + said.slice(row.title.length)} aria-label={said} onClick={() => onOpenPatient?.(row.subject)}
     >
       <Icon name={(MARK[row.state] ?? "clock") as never} className="i sm" />
       {!own && <span className="gr-chip-who">{who}</span>}

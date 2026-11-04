@@ -133,10 +133,16 @@ export function wasDue(row: CalendarRow, cell: string): string {
   return day ? `${day} ${month}` : "";
 }
 
-/** The hover text for a contact: what is already said, with the programme's own
- *  phrasing behind it in brackets. Unchanged when the programme has none. */
-export function tipOf(row: CalendarRow, said: string): string {
-  return row.programme_title ? `${said} (${row.programme_title})` : said;
+/** The hover text for a contact: its plain name, with the programme's own
+ *  phrasing beside it in brackets. Unchanged when the programme has none. */
+export function tipOf(row: CalendarRow): string {
+  return row.programme_title ? `${row.title} (${row.programme_title})` : row.title;
+}
+
+/** The day her page treats as today: the kernel's, when what arrived looks like
+ *  a date, and the browser's otherwise, so an answer without it still draws. */
+export function todayOf(stamp: unknown, browser: string): string {
+  return typeof stamp === "string" && /^\d{4}-\d\d-\d\d/.test(stamp) ? stamp.slice(0, 10) : browser;
 }
 
 /** One woman's own episodes as grid rows, for her record.

@@ -69,8 +69,8 @@ def test_a_contact_carries_both_a_plain_name_and_the_programme_s():
 
 def test_a_schedule_declaring_no_programme_name_still_compiles():
     decls = _decls()
-    for c in decls["phc.sched.postnatal"][0]["contacts"]:
-        c.pop("programme_title", None)
+    for c in decls["phc.sched.antenatal"][0]["contacts"]:
+        assert c.pop("programme_title", None), "the antenatal contacts do declare one"
     assert _lint(decls) == []
     bundle = declarations.load("phc")
     from kernel.contracts import Contact

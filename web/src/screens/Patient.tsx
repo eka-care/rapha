@@ -18,7 +18,7 @@ import { Failed, Loading } from "../parts";
 import { Arc } from "../thread/Arc";
 import { atOf, scaleOf, withView } from "../view/day";
 import { Grid } from "../view/Grid";
-import { ownRows, spanTitle, step, type Scale } from "../view/cells";
+import { ownRows, spanTitle, step, todayOf, type Scale } from "../view/cells";
 import type { Catalogue, SubjectView, ThreadView } from "../types";
 import { wrote } from "../types";
 import { human, title } from "../words";
@@ -125,7 +125,7 @@ function Care({ view, id, name }: { view: SubjectView; id: string; name: string 
   }
   // The kernel's date, the same source the facility calendar takes, so the
   // two screens cannot disagree about what day it is.
-  const today = view.generated_at.slice(0, 10);
+  const today = todayOf(view.generated_at, new Date().toISOString().slice(0, 10));
   const scale = scaleOf(hash);
   const anchor = atOf(hash) || today;
   const goTo = (change: Parameters<typeof withView>[1]) => { location.hash = withView(location.hash, change).replace(/^#/, ""); };

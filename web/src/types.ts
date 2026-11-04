@@ -342,7 +342,7 @@ export type SubjectView = {
    *  for a person who has had none. */
   episodes: Episode[];
   /** The kernel's clock when this was answered, the way a view answer has. */
-  generated_at: string;
+  generated_at?: string;
 };
 
 /** One episode, and what it owes. `contacts` is DERIVED by the kernel from
