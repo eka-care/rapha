@@ -30,6 +30,7 @@ import { Stream, operationFor } from "../thread/Thread";
 import { Carry, PastVisits, Team, Trend, usePast, visitOf } from "../thread/Past";
 import { Background } from "../thread/Background";
 import { Tabs, type Tab, type TabId } from "../thread/Tabs";
+import { withPatient } from "../thread/mention";
 import { Line } from "../view/View";
 import { RAIL, railFolded, railShown, setRailFolded, setRailShown, type RailId } from "./rail";
 import { human, sentence, spell, title } from "../words";
@@ -583,7 +584,7 @@ export function Encounter({
              somebody who already knows what they are doing: it opens on
              whatever this station recorded last. */
           onStartScribe={() => setScribing("")}
-          onAskRapha={onAskRapha}
+          onAskRapha={onAskRapha && ((q) => onAskRapha(withPatient(q, head.meta, todayVisit.values)))}
           micReason={consented ? undefined : MIC_WHY}
           quick={
             <>
