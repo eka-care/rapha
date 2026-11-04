@@ -136,7 +136,7 @@ export type MappingRecord = {
 export type Display = (column: string, value: string) => string;
 
 export type ViewDecl = {
-  id: string; kind: "queue" | "summary" | "dashboard" | "tasklist"; title: string; summary?: string;
+  id: string; kind: "queue" | "summary" | "dashboard" | "tasklist" | "calendar"; title: string; summary?: string;
   /** A queue view says which subject fields matter and how a flag is styled.
    *  The thread header and the palette read both, so that neither has to
    *  guess at a subject's shape. `/facility` sends a short form of a view
@@ -305,8 +305,16 @@ export type TaskRow = {
   title: string; count: number; threads: string[]; operation?: string | null;
 };
 
+/** A calendar row: one contact owed on the day asked about. `owner` is a ROLE,
+ *  never a person; there is no staff register to name one from. `subject_row`
+ *  is that patient's record, drawn the way a queue draws a subject. */
+export type CalendarRow = Contact & {
+  subject: string;
+  subject_row: Record<string, unknown>;
+};
+
 export type ViewResult = {
-  view: string; kind: "queue" | "summary" | "dashboard" | "tasklist";
+  view: string; kind: "queue" | "summary" | "dashboard" | "tasklist" | "calendar";
   rows: unknown[]; generated_at: string; groups?: { key: string | null; count: number }[];
   /** Not on contracts.ViewResult. Nav needs a human title; if the API omits it
    *  we fall back to the view id. */

@@ -22,14 +22,14 @@ import { human, title } from "../words";
  *  deliberately NOT red: a screen that is red for everybody who is simply
  *  expected this fortnight is a screen nobody reads.
  */
-const TONE: Record<string, string> = {
+export const TONE: Record<string, string> = {
   done: "b-ok",
   due: "b-ink",
   missed: "b-crit",
   upcoming: "b-mute",
 };
 
-const MARK: Record<string, string> = {
+export const MARK: Record<string, string> = {
   done: "check",
   due: "clock",
   missed: "alert",

@@ -30,17 +30,7 @@ export function withPatient(
   question: string,
   about: string[],
   readings: { label: string; value: string; crit: boolean }[],
-  /** Words that identify the person (their name), kept out of every value. */
-  hide: string[] = [],
 ): string {
-  // A visit's values include what the front desk typed to register the person:
-  // their name and phone number sit beside the pulse. Identity is judged by
-  // what a label SAYS it is and by whether a value repeats the name, so it
-  // holds for any centre's own wording.
-  const identity = /\b(name|mobile|phone|abha|aadhaar|email|address)\b/i;
-  const names = hide.map((h) => h.trim().toLowerCase()).filter(Boolean);
-  readings = readings.filter((r) => !identity.test(r.label)
-    && !names.some((n) => r.value.toLowerCase().includes(n)));
   const lines: string[] = [];
   const who = about.filter(Boolean).join(", ");
   if (who) lines.push(`Patient: ${who}.`);

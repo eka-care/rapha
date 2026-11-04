@@ -1,0 +1,40 @@
+/* The day screen. It lives in the main column and assumes nothing about the
+   visit's right rail, which is absent whenever the assistant is docked. */
+.cal { display: grid; gap: var(--space-6); max-width: 760px; margin: 0 auto; padding: var(--space-4); }
+.cal-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.cal-chip {
+  min-height: 36px; padding: 0 var(--space-4); border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-strong); background: var(--color-bg-surface);
+  color: var(--color-text-secondary); font: inherit; font-size: 13px; cursor: pointer;
+}
+.cal-chip:hover { background: var(--color-bg-hover); }
+.cal-chip[aria-pressed="true"] {
+  background: var(--color-cta); border-color: var(--color-cta); color: var(--color-cta-ink);
+}
+.cal-pile { display: grid; gap: var(--space-2); }
+.cal-h { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-eyebrow); }
+.cal-n { color: var(--color-text-tertiary); font-weight: 500; margin-left: var(--space-1); }
+.cal-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.cal-row {
+  display: grid; grid-template-columns: 52px 4px minmax(0, 1fr) auto; align-items: stretch;
+  gap: var(--space-3); width: 100%; min-height: 56px; padding: var(--space-3) var(--space-4);
+  text-align: left; font: inherit; color: var(--color-text-primary); cursor: pointer;
+  background: var(--color-bg-surface); border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+}
+.cal-row:hover { background: var(--color-bg-hover); }
+.cal-date { display: grid; align-content: center; justify-items: center; line-height: 1; }
+.cal-day { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cal-mon { margin-top: 2px; font-size: 11px; color: var(--color-text-tertiary); text-transform: uppercase; }
+.cal-bar { border-radius: 2px; background: var(--color-border-strong); }
+.cal-bar[data-tone="b-crit"] { background: var(--color-critical); }
+.cal-bar[data-tone="b-ok"] { background: var(--color-success); }
+.cal-bar[data-tone="b-ink"] { background: var(--color-text-primary); }
+.cal-what { display: grid; gap: 2px; align-content: center; min-width: 0; }
+.cal-sentence { display: flex; align-items: center; gap: var(--space-2); font-size: 14px; overflow-wrap: anywhere; }
+.cal-when { font-size: 12px; color: var(--color-text-tertiary); }
+.cal-role { align-self: center; font-size: 12px; color: var(--color-text-secondary); }
+@media (max-width: 520px) {
+  .cal-row { grid-template-columns: 44px 4px minmax(0, 1fr); }
+  .cal-role { grid-column: 3; justify-self: start; }
+}

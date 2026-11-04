@@ -584,7 +584,7 @@ export function Encounter({
              somebody who already knows what they are doing: it opens on
              whatever this station recorded last. */
           onStartScribe={() => setScribing("")}
-          onAskRapha={onAskRapha && ((q) => onAskRapha(withPatient(q, head.meta, todayVisit.values, [head.name])))}
+          onAskRapha={onAskRapha && ((q) => onAskRapha(withPatient(q, head.meta, todayVisit.values)))}
           micReason={consented ? undefined : MIC_WHY}
           quick={
             <>

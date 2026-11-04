@@ -34,6 +34,8 @@
  */
 import assert from "node:assert/strict";
 import { WROTE } from "./types.ts";
+import type { CalendarRow } from "./types.ts";
+import { dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips } from "./view/day.ts";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1276,6 +1278,50 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.deepEqual(stale, [],
     "an outcome list is spelled out again instead of calling wrote()");
   ok(`${kernel.length} written outcomes, one list, shared with the kernel`);
+}
+
+// ------------------------------------------------------------ the day screen
+
+{
+  const row = (contact: string, state: string, owner: string, due = "2026-11-04") =>
+    ({ contact, title: contact, state, owner, due, closes: due, done_at: "", subject: "p1", subject_row: {} }) as unknown as CalendarRow;
+  const rows = [row("a", "done", "r.anm"), row("b", "due", "r.mo"), row("c", "missed", "r.anm"), row("d", "due", "r.anm")];
+
+  // Rows group late, then owed, then done, in that order.
+  assert.deepEqual(inPiles(rows).map((p) => [p.pile, p.rows.map((r) => r.contact)]),
+    [["late", ["c"]], ["owed", ["b", "d"]], ["done", ["a"]]]);
+  assert.deepEqual(inPiles([row("x", "done", "r.anm")]).map((p) => p.pile), ["done"],
+    "an empty pile is not drawn");
+
+  // A row's owner is the role the kernel sent; the chips are those roles and
+  // nothing else, so no worker name can appear.
+  const { roles, initial } = roleChips(rows, "r.anm");
+  assert.deepEqual(roles, ["r.anm", "r.mo"]);
+  // The chip the screen opens on is the caller's own role, and everyone when
+  // the caller owns nothing in this answer.
+  assert.equal(initial, "r.anm");
+  assert.equal(roleChips(rows, "r.other").initial, EVERYONE);
+  assert.deepEqual(forRole(rows, "r.mo").map((r) => r.contact), ["b"]);
+  assert.equal(forRole(rows, EVERYONE).length, 4);
+
+  // An empty day says so, and a filtered-empty day says it was the filter.
+  assert.match(emptyLine(0, 0) ?? "", /Nobody is owed/);
+  assert.match(emptyLine(4, 0) ?? "", /Choose everyone/);
+  assert.equal(emptyLine(4, 2), null);
+
+  // A date is read by position: no time zone can move it.
+  assert.deepEqual(dayOf("2026-11-04"), { day: "4", month: "Nov" });
+
+  // The screen names no state, flag, station or operation of its own. The
+  // portability scan above already covers every file; this holds the two day
+  // files to the narrower rule that no column of a contact is read by a typed
+  // name other than the ones the kernel's answer is documented to carry.
+  const screen = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
+  assert.ok(!/\.operation\b|\.station\b|\.flags\b|\.reports_as\b/.test(screen),
+    "the day screen reads a field it should not know");
+  assert.match(screen, /from "\.\.\/thread\/Arc"/, "tones and marks come from Arc, not a second copy");
+  assert.ok(!/\b(TONE|MARK)\s*[:=]/.test(screen), "the day screen redefines the arc's tones");
+  ok("the day screen: late, owed, done; the caller's role first; an empty day says so");
 }
 
 console.log(`\n${checks} checks passed`);

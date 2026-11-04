@@ -16,17 +16,6 @@
  *  way nectar's host hands one to a microfrontend), and that is not decided.
  */
 
-/** The pills the widget opens with, as `label|prompt` lines (its own format,
- *  five at most). Its built-in ones are the developer docs'. These are
- *  questions any clinician asks about any patient, so none names a condition,
- *  a drug or a station. The wording is a first draft for the owner. */
-export const STARTERS = [
-  "Dose and cautions|What is the usual adult dose, and what are the cautions?",
-  "Red flags|What red flags should make me refer this patient?",
-  "What to consider|What else should I consider for this presentation?",
-  "What to tell them|What should I tell the patient to watch for?",
-].join("\n");
-
 export type AssistantEnvironment = "development" | "staging" | "production";
 
 const ENVIRONMENTS: readonly string[] = ["development", "staging", "production"];

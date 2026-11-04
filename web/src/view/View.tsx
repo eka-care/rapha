@@ -7,6 +7,7 @@
  */
 import { Lotus } from "../abha/Lotus";
 import { ABHA_LINKED } from "../abha/sdk";
+import { currentRole } from "../api";
 import { Icon } from "../icons";
 import { displayFor } from "../declarations";
 import { derivedStates, labelColumns, marked, provenanceOf, RISK_TONE } from "../loops";
@@ -15,6 +16,7 @@ import type {
   MetricValue, QueueRow, SectionResult, StepStatus, TaskRow, ViewDecl, ViewResult,
 } from "../types";
 import { human, title } from "../words";
+import { Calendar } from "./Calendar";
 
 export function View({ result, decl, workflow, onOpenThread }: {
   result: ViewResult;
@@ -34,6 +36,14 @@ export function View({ result, decl, workflow, onOpenThread }: {
         labelCols={labelColumns(decl)}
         provenance={provenanceOf(decl)}
         onOpenThread={onOpenThread}
+      />
+    );
+  }
+  if (result.kind === "calendar") {
+    return (
+      <Calendar
+        result={result} decl={decl} role={currentRole()}
+        onOpenPatient={(id) => { location.hash = `/patients/${id}`; }}
       />
     );
   }
