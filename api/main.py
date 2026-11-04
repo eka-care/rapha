@@ -1212,10 +1212,15 @@ async def paper_read(request: Request, body: dict = Body(default={})):
     this process, and the credential never travels to the browser: the SDK is
     pointed at this kernel and `/mr/api/v1/...` below attaches it.
 
-    The answer is a Draft and never a write. This route has no Store, calls
-    nothing that does, and the values it returns reach the record only the
-    way every other drafted value does: drawn in editable fields, checked by
-    a person, committed by a tap.
+    The answer is a Draft or nothing, and never a write. This route has no
+    Store, calls nothing that does, and the values it returns reach the
+    record only the way every other drafted value does: drawn in editable
+    fields, checked by a person, committed by a tap.
+
+    `{"draft": null}` is a success. Attaching the paper is what somebody
+    asked for and the browser already did it; a reading is a convenience on
+    top, and a handwritten camp note that reads as nothing is the normal
+    case rather than the broken one.
 
     The document stays on the patient's record. It is theirs, it was filed
     under their own Eka oid, and it follows them.
@@ -1232,12 +1237,13 @@ async def paper_read(request: Request, body: dict = Body(default={})):
     except paper.PaperError as broke:
         raise HTTPException(503, str(broke))
     draft = paper.parse(read, operation=operation, instrument=decl.id,
-                        fills=decl.fills)
-    if not draft:
-        raise HTTPException(
-            422, "Nothing could be read off that picture. It is saved on the "
-                 "patient's record; type what it says for this visit.")
-    return draft
+                        fills=decl.fills) if read else None
+    # NOTHING READ IS AN ORDINARY ANSWER, not a refusal. The document is
+    # already on the patient's record -- the browser's own SDK put it there
+    # before this route was called -- and whether a machine could also read
+    # it is a convenience. This used to answer 422, which told a clerk their
+    # upload had failed when it had not.
+    return {"draft": draft}
 
 
 @router.get("/scribe/sessions/{session_id}")

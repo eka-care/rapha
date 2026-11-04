@@ -79,7 +79,7 @@ export async function filePaper(patientId: string, file: File): Promise<string> 
   return id;
 }
 
-/** What the service read off a document, as a draft for the form.
+/** What the service read off a document, as a draft for the form, or null.
  *
  *  The reading is the kernel's, not this file's, and that is on purpose:
  *  which question each part of the paper lands in is the instrument
@@ -107,5 +107,60 @@ export async function readPaper(operation: string, documentId: string,
     throw new ApiError(detail || `The kernel answered ${res.status}.`,
                        "Type what the paper says.", res.status);
   }
-  return JSON.parse(body);
+  // `{draft: null}` is a success and means nothing was read off it. The
+  // document is on the patient's record either way, which is what somebody
+  // asked for; a prefill is a convenience on top of that.
+  return (JSON.parse(body) as { draft: unknown }).draft;
+}
+
+/** One paper on the patient's record, in the few facts a list needs. */
+export type FiledPaper = {
+  id: string;
+  title: string;
+  /** The day it was put on the record, written the way a person reads it. */
+  on: string;
+  /** Whether the service managed to read it. Not whether it is useful: a
+   *  photograph nobody could parse is still the paper the patient brought. */
+  read: boolean;
+  url: string | null;
+};
+
+/** Everything on this patient's record, newest first.
+ *
+ *  The SDK's own listing, which is what the claims portal shows. It reaches
+ *  the service through this kernel like every other call, so the credential
+ *  stays on that side.
+ */
+export async function listPapers(patientId: string): Promise<FiledPaper[]> {
+  const items = await records().listDocuments({ bid: BID, patientId });
+  return items
+    .slice()
+    .sort((a, b) => (b.upload_date ?? 0) - (a.upload_date ?? 0))
+    .map((d) => ({
+      id: d.document_id,
+      // The title somebody gave it, else what kind of document the service
+      // thinks it is, else the plainest true thing there is.
+      title: d.metadata?.title?.trim() || KINDS[d.document_type] || "A document",
+      on: when(d.metadata?.document_date ?? d.upload_date),
+      read: d.is_smart === true,
+      url: d.metadata?.thumbnail ?? null,
+    }));
+}
+
+/** The service's codes for what a document is, in words. Short because the
+ *  only ones this product creates are laboratory reports; anything else on
+ *  the record came from elsewhere and is named rather than guessed at. */
+const KINDS: Record<string, string> = {
+  lr: "Laboratory report",
+  ps: "Prescription",
+  dc: "Discharge summary",
+  op: "Consultation note",
+  in: "Insurance",
+  iv: "Invoice",
+};
+
+function when(epoch: number | undefined): string {
+  if (!epoch) return "";
+  return new Date(epoch * 1000).toLocaleDateString(undefined,
+    { day: "numeric", month: "short", year: "numeric" });
 }

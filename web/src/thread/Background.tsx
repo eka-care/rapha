@@ -17,6 +17,11 @@
  *  paper's being somebody else's, because the one way this feature does harm
  *  is by letting an outside claim read, a week later, as our own finding.
  */
+import { useState } from "react";
+import { Filed } from "../paper/Filed";
+import { Scan } from "../paper/Scan";
+import { mountsFor } from "../voice/instruments";
+import { questionnaire } from "../declarations";
 import type { Kv, Msg } from "../messages";
 import { clock } from "../messages";
 import { Icon } from "../icons";
@@ -48,8 +53,38 @@ export function Background({
   flags: string[];
   onDone: () => void;
 }) {
+  // Bumped when a paper lands on the record, so the list beside it refetches.
+  const [filed, setFiled] = useState(0);
+
+  // THE UPLOAD DOES NOT NEED THE FORM. Attaching a document to the patient's
+  // record is a complete act on its own -- the owner's point on 4 November
+  // 2026, and obviously right: a discharge summary is useful on the record
+  // whether or not a machine could read it and whether or not anybody types
+  // a summary of it afterwards. So the control sits on the tab, above the
+  // papers it adds to, and the form below stays what it always was: the way
+  // to write down what a paper SAYS, for people who want that too.
+  //
+  // Which operation it belongs to is still the declaration's answer, not
+  // this file's: `add` is what the guard offered this person, and the mount
+  // is only drawn if a document instrument names it.
+  const op = add[0];
+  const schema = op ? questionnaire(op.input) : null;
+  const scan = op && schema
+    ? mountsFor(cat.instruments, op, schema).filter((m) => m.kind === "document")
+    : [];
+
   return (
     <div className="bgtab">
+      {!adding && op && scan.length > 0 && (
+        <Scan mounts={scan} operation={op.id} patient={patient}
+              onSaved={() => setFiled((n) => n + 1)}
+              /* A reading on this path has no form open to fill, so it is
+                 dropped rather than held: the paper is on the record, which
+                 is what was asked for. Somebody who wants the numbers typed
+                 up opens the form below, where a reading does fill it. */
+              onDraft={() => { /* nothing to fill from here */ }} />
+      )}
+      {!adding && <Filed patient={patient} reload={filed} />}
       {adding ? (
         <OperationPanel
           inline

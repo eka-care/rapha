@@ -70,6 +70,17 @@ from care_phc.connectors.scribe.eka import _scrub
 # harder to notice and easier to believe.
 CAP = 0.0
 
+# How long to wait for a reading before saying nothing came of it.
+#
+# ATTACHING THE PAPER IS THE POINT, and by the time this runs that has
+# already happened. The reading is a convenience on top, so the wait is
+# sized for the common case -- about thirty seconds for one page, measured
+# -- and a long discharge summary simply arrives without a prefill, which
+# costs a person nothing they had before. It was three minutes when the
+# reading was mistaken for the point of the exercise.
+PATIENCE_SECONDS = 75
+EVERY = 5
+
 
 class PaperError(ScribeError):
     """Anything the read could not do, in words that say what to do instead.
@@ -99,7 +110,12 @@ class PaperError(ScribeError):
 
 
 def describe(document_id, *, patient=None, sleep=None, now=None):
-    """Wait for the service to finish reading one uploaded document.
+    """What the service read off one uploaded document, or None.
+
+    None is an ordinary answer and not a failure. The document is already
+    filed on the patient's record by the time this runs; a reading is a
+    convenience on top, and a handwritten note the parser makes nothing of
+    is the normal case rather than the broken one.
 
     `patient` is the Eka oid the document was filed under, which the service
     wants as `X-Pt-Id`. The Python SDK's own `get_document` does not send it,
@@ -125,10 +141,12 @@ def describe(document_id, *, patient=None, sleep=None, now=None):
         if (body or {}).get("smart_report"):
             return body
         if clock() - started > PATIENCE_SECONDS:
-            raise PaperError(
-                "The reader is still working after %d seconds, so it has been "
-                "given up on. The paper is saved on the patient's record; type "
-                "what it says for this visit." % PATIENCE_SECONDS)
+            # NOT AN ERROR. The upload already did the thing somebody asked
+            # for: the paper is on the patient's record. Whether a machine
+            # also managed to read it is a convenience on top, and one that
+            # did not arrive is not a failure to report. None means nothing
+            # was read, and the caller says exactly that.
+            return None
         nap(EVERY)
 
 

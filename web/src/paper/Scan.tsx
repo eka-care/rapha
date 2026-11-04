@@ -36,7 +36,7 @@ import "./paper.css";
  *  person a spreadsheet they are about to be told off for choosing. */
 const TAKES = "image/jpeg,image/png,image/heic,image/webp,application/pdf";
 
-export function Scan({ mounts, operation, patient, disabled, onDraft }: {
+export function Scan({ mounts, operation, patient, disabled, onDraft, onSaved }: {
   /** Every document mount for this operation. Normally one; the loop is
    *  because a bundle may declare more than one way in and this file does
    *  not get to decide that. */
@@ -53,9 +53,18 @@ export function Scan({ mounts, operation, patient, disabled, onDraft }: {
   patient: string | null;
   disabled?: boolean;
   onDraft: (draft: ScribeDraft) => void;
+  /** Called the moment the paper is on the patient's record, before any
+   *  reading is attempted, so a screen that lists their papers can show it
+   *  without waiting for a parse that may never come. */
+  onSaved?: () => void;
 }) {
-  const [busy, setBusy] = useState(false);
+  /** Where the act has got to. `saved` is the one that matters: the paper
+   *  is on the patient's record from that moment and everything after it is
+   *  a convenience. */
+  const [phase, setPhase] = useState<"idle" | "saving" | "reading" | "saved">("idle");
+  const [note, setNote] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const busy = phase === "saving" || phase === "reading";
   const box = useRef<HTMLInputElement>(null);
 
   const docs = mounts.filter((m) => m.kind === "document");
@@ -64,24 +73,45 @@ export function Scan({ mounts, operation, patient, disabled, onDraft }: {
   const take = async (file: File | undefined) => {
     if (!file || !patient) return;
     setFailed(null);
-    setBusy(true);
+    setNote(null);
+    setPhase("saving");
+
+    // STEP ONE IS THE WHOLE JOB. The paper goes onto the patient's record
+    // and that is what somebody came here to do. If this fails, it failed;
+    // if it works, nothing after it can take it away.
+    let id: string;
     try {
-      // Up to the service's own bucket, then the kernel reads what it made
-      // of it. Two calls because they are two different things: one is a
-      // document being filed on a person's record and the other is this
-      // form asking what was in it.
-      const id = await filePaper(patient, file);
-      onDraft(await readPaper(operation, id, patient));
+      id = await filePaper(patient, file);
     } catch (e) {
-      // The kernel's own sentence, which already ends by saying what to do
-      // instead. Rewriting it here would be a second copy to keep in step
-      // with a service this file knows nothing about.
       setFailed(e instanceof ApiError ? e.message : String(e));
-    } finally {
-      setBusy(false);
-      // So the same picture can be chosen again after a failure. Without
-      // this the input holds the file and the change event never fires.
+      setPhase("idle");
       if (box.current) box.current.value = "";
+      return;
+    }
+    setPhase("reading");
+    if (box.current) box.current.value = "";
+    onSaved?.();
+
+    // STEP TWO IS A CONVENIENCE. The service may be able to read the paper
+    // and fill the fields. It may not: a handwritten note from a camp is a
+    // document and is not a table. Either way the paper is filed, so
+    // nothing here is reported as a failure -- saying "it did not work"
+    // about an upload that worked is how a person learns to distrust it.
+    try {
+      const draft = await readPaper(operation, id, patient);
+      if (draft) {
+        onDraft(draft as Parameters<typeof onDraft>[0]);
+        setNote("Saved to the patient's record, and the fields below are "
+                + "what it read. Check them against the paper.");
+      } else {
+        setNote("Saved to the patient's record. Nothing could be read off "
+                + "it, so type what it says below.");
+      }
+    } catch {
+      setNote("Saved to the patient's record. It could not be read just "
+              + "now, so type what it says below.");
+    } finally {
+      setPhase("saved");
     }
   };
 
@@ -113,16 +143,19 @@ export function Scan({ mounts, operation, patient, disabled, onDraft }: {
         onClick={() => box.current?.click()}
       >
         <Icon name={busy ? "spark" : "clip"} className="i sm" />
-        {busy ? "Reading the paper…" : "Photograph the paper"}
+        {phase === "saving" ? "Saving…"
+          : phase === "reading" ? "Reading…"
+          : phase === "saved" ? "Add another" : "Add the paper"}
       </button>
       {/* WHAT IT WILL AND WILL NOT DO, before anybody photographs anything.
           A reader that silently leaves a field empty teaches a person to
           distrust the fields it does fill. */}
       <span className="scan-say">
-        {busy
-          ? "Saving it to the patient's record and reading it. About half a minute."
-          : "Saved to the patient's record, and fills what it reads for you to "
-            + "check. Who wrote it is still yours to type."}
+        {phase === "saving" ? "Putting it on the patient's record…"
+          : phase === "reading" ? "Saved. Seeing whether it can be read, which "
+                                  + "takes about half a minute."
+          : note ?? "Saved to the patient's record, and fills what it reads "
+                    + "for you to check. Who wrote it is still yours to type."}
       </span>
       {failed && <div className="f-bad block">{failed}</div>}
     </div>
