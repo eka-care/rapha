@@ -112,6 +112,11 @@ python3 scripts/check_postnatal.py
 # never seen: an ended episode owed on any day, or a miscarriage given a
 # home visit, fails here, as does a window off by a day or an ungated route.
 python3 scripts/check_calendar.py
+# A range of days against the same days asked one at a time (they differ by
+# design: due date against window), the 400 day cap, and 300 open episodes
+# timed under two seconds. A range that slides back to windows, a cap that
+# refuses a year or admits a decade, or a sweep that has become slow fails here.
+python3 scripts/check_calendar_scale.py
 # A laboratory value and its unit are one checked thing: the analyte is a coded
 # ANSWER (the third binding form) and the unit must be the one LOINC reports
 # that analyte in. scripts/seed_terminology.py generated the value set and is
