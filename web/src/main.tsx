@@ -16,6 +16,7 @@ import "./style/form.css";
 import "./style/assistant.css";
 import "./style/calendar.css";
 import "./style/grid.css";
+import "./style/cards-stack.css";
 
 const el = document.getElementById("root")! as HTMLElement & { _root?: ReturnType<typeof createRoot> };
 el._root ??= createRoot(el);

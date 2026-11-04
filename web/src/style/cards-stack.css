@@ -1,0 +1,43 @@
+/* The home page's stack of visits owed. The front card is full size; each one
+   behind sits lower and smaller, so the nearest visit is the largest. */
+.stk { display: grid; gap: var(--space-3); padding: var(--space-4); }
+.stk-deck {
+  position: relative; display: grid;
+  /* room under the front card for the edges of the ones behind it */
+  padding-bottom: calc((var(--n, 1) - 1) * 14px);
+}
+.stk-card {
+  grid-area: 1 / 1; display: grid; gap: var(--space-1); align-content: start; text-align: left;
+  min-height: 132px; padding: var(--space-4) var(--space-5);
+  font: inherit; color: var(--color-text-primary);
+  background: var(--color-bg-surface); border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl); box-shadow: var(--shadow-sm);
+  transform-origin: bottom center;
+  transform: translateY(calc(var(--depth, 0) * 14px)) scale(calc(1 - var(--depth, 0) * 0.07));
+  z-index: calc(10 - var(--depth, 0));
+  transition: transform var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out);
+}
+button.stk-card { cursor: pointer; }
+button.stk-card:hover { background: var(--color-bg-hover); box-shadow: var(--shadow-md); }
+.stk-behind { pointer-events: none; box-shadow: none; background: var(--color-bg-subtle); border-color: var(--color-border-strong); }
+.stk-behind > * { opacity: .55; }
+.stk-when { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-eyebrow); }
+.stk-when[data-late] { color: var(--color-critical); }
+.stk-who { font-size: 22px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.stk-meta { font-size: 13px; color: var(--color-text-secondary); }
+.stk-what { font-size: 14px; color: var(--color-text-primary); }
+.stk-role { font-size: 12px; color: var(--color-text-tertiary); }
+.stk-go { margin-top: var(--space-2); font-size: 13px; color: var(--color-accent); }
+.stk-nav { display: flex; align-items: center; justify-content: center; gap: var(--space-4); }
+.stk-count { font-size: 13px; color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; min-width: 6ch; text-align: center; }
+.stk-arrow {
+  display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-strong); background: var(--color-bg-surface);
+  color: var(--color-text-primary); cursor: pointer;
+}
+.stk-arrow:hover:not(:disabled) { background: var(--color-bg-hover); }
+.stk-arrow:disabled { color: var(--color-text-disabled); cursor: default; }
+/* the sheet's chevron points down */
+.stk-arrow .i { transform: rotate(-90deg); }
+.stk-arrow .stk-flip { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .stk-card { transition: none; } }

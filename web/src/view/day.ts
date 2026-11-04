@@ -167,3 +167,37 @@ export function atOf(hash: string): string {
   const m = /[?&]at=(\d{4}-\d{2}-\d{2})(?:&|$)/.exec(hash ?? "");
   return m ? m[1] : "";
 }
+
+/** The cards on the home page, in the order they stack. One per contact, so a
+ *  woman owed two visits has two cards: each is a separate piece of work.
+ *  Late leads (longest-late first), then the soonest owed; the day screen's
+ *  rule. Work already done is not coming up. The stack is the viewer's own
+ *  role's, or everyone's when they own nothing. A new array; `rows` is not
+ *  touched, and nothing is kept. */
+export function stack(rows: CalendarRow[], now: string, role: string): CalendarRow[] {
+  const open = rows.filter((r) => r.state !== "done");
+  const mine = forRole(open, role);
+  const late = (r: CalendarRow) => r.state === "missed" || (!!r.due && r.due < now);
+  return (mine.length ? mine : open).slice().sort((a, b) => {
+    const la = late(a), lb = late(b);
+    if (la !== lb) return la ? -1 : 1;
+    return a.due === b.due ? 0 : a.due < b.due ? -1 : 1;
+  });
+}
+
+/** The card to show after paging `by` from `at`, never outside the stack. */
+export function pageBy(at: number, by: number, count: number): number {
+  return Math.max(0, Math.min(count - 1, at + by));
+}
+
+/** The address of the calendar, opened on the date a contact is owed. */
+export function cardHash(view: string, row: CalendarRow): string {
+  return `/views/${view}?on=${row.due}&at=${row.due}&scale=month`;
+}
+
+/** When a contact is owed, in words. A late one says since when. */
+export function owedLine(row: CalendarRow, now: string): string {
+  if (row.state === "missed" || (row.due && row.due < now)) return `Late since ${dayLabel(row.due, now)}`;
+  const d = dayLabel(row.due, now);
+  return d === "Today" || d === "Tomorrow" ? `Due ${d.toLowerCase()}` : `Due ${d}`;
+}

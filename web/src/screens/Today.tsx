@@ -9,14 +9,17 @@
  *  composes the prose; this file lays it out.
  */
 import { useEffect, useState, type CSSProperties } from "react";
-import { api } from "../api";
+import { api, currentRole } from "../api";
 import { brief, facilityAsks, initialsOf, line, type Loaded } from "../agent";
 import { NAME } from "../brand";
 import { Icon } from "../icons";
 import type { Recent } from "../loops";
 import { Loading } from "../parts";
-import type { Catalogue, QueueRow, TaskRow } from "../types";
-import { cardDays, dateOf, dayLabel, wantsNextMonth } from "../view/day";
+import type { CalendarRow, Catalogue, QueueRow, TaskRow } from "../types";
+import { Cards } from "../view/Cards";
+import { step } from "../view/cells";
+import { cardHash, dateOf, stack } from "../view/day";
+import { fields } from "../view/View";
 import { human, title } from "../words";
 
 /** How many names a flow column shows before it says how many more. */
@@ -92,18 +95,18 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
   // the kernel answered, so a caller without it has no card and no empty frame.
   const cal = loaded.find((l) => l.decl.kind === "calendar");
   const today = cal ? dateOf(cal.result.generated_at) : "";
-  // The kernel's groups cover one month. Near its end the card asks for the
-  // next month too, so it is as long on the 30th as on the 1st.
-  const more = cal ? wantsNextMonth(cal.result.groups, today) : "";
+  // The visits falling due in the coming year, read as a range; late ones the
+  // kernel draws on today. Nothing is kept past this render.
   const calId = cal?.decl.id;
-  const [spill, setSpill] = useState<{ key: string | null; count: number }[] | "failed" | null>(null);
+  const [owed, setOwed] = useState<CalendarRow[] | "failed" | null>(null);
   useEffect(() => {
     let live = true;
-    setSpill(null);
-    if (calId && more) api.view(calId, undefined, more).then((r) => live && setSpill(r.groups ?? []), () => live && setSpill("failed"));
+    setOwed(null);
+    if (calId && today) api.view(calId, undefined, undefined, { from: today, to: step("day", today, 365) })
+      .then((r) => live && setOwed((r.rows ?? []) as CalendarRow[]), () => live && setOwed("failed"));
     return () => { live = false; };
-  }, [calId, more]);
-  const { days, unread } = cardDays(cal?.result.groups, spill, today);
+  }, [calId, today]);
+  const cards = Array.isArray(owed) ? stack(owed, today, currentRole()) : [];
 
   if (loading && !loaded.length) return <Loading what="the facility" shape="blocks" rows={4} />;
   // The greeting and the centre's own name were a line above the heading --
@@ -267,22 +270,16 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
       {cal && (
         <div className="card">
           <div className="card-h"><div className="card-t">Coming up</div></div>
-          <div className="att">
-            {days.length === 0 ? (unread ? null : (
-              <div className="state-empty">Nobody is owed a contact in the coming days.</div>
-            )) : days.map((d) => (
-              <button className="at" key={d.key}
-                      onClick={() => { location.hash = `/views/${cal.decl.id}?on=${d.key}`; }}>
-                <span className="at-b">
-                  <span className="at-t">{dayLabel(d.key, today)}</span>
-                  <span className="at-s">{d.count === 1 ? "1 contact owed" : `${d.count} contacts owed`}</span>
-                </span>
-                <span className="badge b-mute">{d.count}</span>
-                <span className="at-go">Open</span>
-              </button>
-            ))}
-            {unread && <div className="state-empty">Could not load the days after this.</div>}
-          </div>
+          {owed === "failed" ? (
+            <div className="state-empty">Could not load the visits coming up.</div>
+          ) : cards.length === 0 ? (
+            owed && <div className="state-empty">Nobody is owed a contact in the coming year.</div>
+          ) : (
+            <Cards rows={cards} now={today} roleName={(r) => cat.vocabulary?.role_titles?.[r] ?? r}
+                   nameOf={(s) => fields(cal.decl, { subject: s } as unknown as QueueRow).name}
+                   metaOf={(s) => fields(cal.decl, { subject: s } as unknown as QueueRow).meta.split(" · ").slice(0, 2).join(" · ")}
+                   onOpen={(r) => { location.hash = cardHash(cal.decl.id, r); }} />
+          )}
         </div>
       )}
 

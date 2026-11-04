@@ -35,7 +35,7 @@
 import assert from "node:assert/strict";
 import { WROTE } from "./types.ts";
 import type { CalendarRow } from "./types.ts";
-import { cardDays, monthAfter, wantsNextMonth, comingUp, dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView, atOf } from "./view/day.ts";
+import { cardDays, monthAfter, wantsNextMonth, comingUp, dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView, atOf, stack, pageBy, cardHash, owedLine } from "./view/day.ts";
 import { span, cells } from "./view/cells.ts";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -1388,9 +1388,7 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
 
   const today = code(readFileSync(join(SRC, "screens", "Today.tsx"), "utf8"));
   assert.match(today, /decl\.kind === "calendar"/, "the card is found by the declared kind of view");
-  assert.match(today, /cardDays\(/, "the card draws from the groups through day.ts");
-  assert.match(today, /\?on=/, "opening a day goes to the calendar on that date");
-  assert.match(today, /wantsNextMonth\(/, "the card carries on into the next month itself");
+  assert.ok(!/cardDays\(|wantsNextMonth\(/.test(today), "the home page no longer lists day counts; the stack replaced them");
 
   // The span does not depend on the date. Month-end: this month's groups run
   // out, the next month's are asked for and the dates carry on.
@@ -1429,18 +1427,12 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.equal(cardDays(undefined, "failed", "2026-12-30").unread, true);
   assert.deepEqual(cardDays([g("2026-12-30", 0)], "failed", "2026-12-30"), { days: [], unread: true },
     "empty first month plus a failed second: unread is set, which suppresses the reassuring line");
-  // Nothing read this month and the next failed: the card cannot say nobody is owed.
-  assert.match(code(readFileSync(join(SRC, "screens", "Today.tsx"), "utf8")), /unread \? null/, "the reassuring line is suppressed when the later read failed");
-  const t2 = code(readFileSync(join(SRC, "screens", "Today.tsx"), "utf8"));
-  assert.match(t2, /setSpill\("failed"\)/, "a failed read of the next month is recorded, not swallowed");
-  assert.ok(!/,\s*\(\)\s*=>\s*\{\s*\}\)/.test(t2), "an empty catch hides a failed read");
-  assert.match(t2, /Could not load the days after this/);
   const cal2 = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
   assert.match(cal2, /fetched\.data\.on === other/, "an answer is used only for the day it was asked for");
   assert.ok(!/waiting \? \[\]/.test(cal2));
   const cal = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
   assert.match(cal, /dayOn\(/, "the day screen opens on the date a link carries");
-  ok("the home card: the next days with their counts, absent without the capability, a day opens the calendar on it");
+  ok("the day helpers still hold: month roll-over, merging, and the card is found by the declared kind of view");
 }
 
 // ------------------------------------------------------- the calendar page
@@ -1489,6 +1481,85 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   const r = { contact: "c", title: "c", state: "missed", owner: "r", due: "2026-09-09", cell: "2026-11-04", subject: "p", subject_row: {} } as unknown as CalendarRow;
   assert.equal(cells("month", "2026-11-04", [r], 3, "2026-11-04").find((c) => c.key === "2026-11-04")?.rows.length, 1);
   ok("the calendar page: scale and date in the address, the new span on a switch, chips filter the grid, an empty day still speaks");
+}
+
+// ------------------------------------------------------- the card stack
+
+{
+  const row = (o: Record<string, unknown>) => ({ contact: "c", title: "Visit", state: "upcoming", owner: "nurse", due: "2026-11-10", cell: "2026-11-10", subject: "p1", subject_row: {}, ...o }) as unknown as CalendarRow;
+  const NOW = "2026-11-04";
+  const late = row({ contact: "a", state: "missed", due: "2026-09-09", cell: NOW });
+  const today = row({ contact: "b", state: "due", due: NOW, cell: NOW });
+  const soon = row({ contact: "c", due: "2026-11-06" });
+  const later = row({ contact: "d", due: "2027-01-02", owner: "doctor" });
+  const gone = row({ contact: "e", state: "done", due: "2026-10-01" });
+
+  // Late contacts lead, then the soonest owed, whatever order the kernel sent.
+  assert.deepEqual(stack([later, soon, today, late], NOW, "").map((r) => r.contact), ["a", "b", "c", "d"]);
+  assert.deepEqual(stack([soon, late, row({ contact: "z", state: "missed", due: "2026-08-01" })], NOW, "").map((r) => r.contact), ["z", "a", "c"],
+    "the longest-late leads the late ones");
+  // One card per contact: a woman owed two appears twice.
+  assert.equal(stack([late, today], NOW, "").filter((r) => r.subject === "p1").length, 2);
+  // Work already done is not coming up.
+  assert.ok(!stack([gone, soon], NOW, "").some((r) => r.contact === "e"));
+  // The stack opens on the viewer's role, and on everyone's when they own nothing.
+  assert.deepEqual(stack([later, soon, late], NOW, "doctor").map((r) => r.contact), ["d"]);
+  assert.deepEqual(stack([later, soon, late], NOW, "pharmacist").map((r) => r.contact), ["a", "c", "d"], "owning nothing falls back to everyone");
+  assert.deepEqual(stack([], NOW, "nurse"), []);
+  // The input is not reordered in place.
+  const input = [later, late]; stack(input, NOW, ""); assert.equal(input[0], later);
+
+  // The arrows page to later cards and cannot page past the end.
+  assert.equal(pageBy(0, 1, 2), 1);
+  assert.equal(pageBy(1, 1, 2), 1, "no paging past the last card");
+  assert.equal(pageBy(0, -1, 2), 0, "no paging before the first");
+  assert.equal(pageBy(5, 0, 0), 0, "an empty stack has only a first");
+  assert.equal(pageBy(9, 0, 3), 2, "a stale position is pulled back inside the stack");
+
+  // A card opens the calendar on the date the visit is owed.
+  assert.equal(cardHash("phc.view.calendar", late), "/views/phc.view.calendar?on=2026-09-09&at=2026-09-09&scale=month");
+  assert.equal(atOf("#" + cardHash("v", soon)), "2026-11-06");
+  assert.equal(dayOn(cardHash("v", soon)), "2026-11-06");
+  assert.equal(scaleOf(cardHash("v", soon)), "month");
+  // When it is owed, in words.
+  assert.equal(owedLine(late, NOW), "Late since Wed 9 Sep");
+  assert.equal(owedLine(today, NOW), "Due today");
+  assert.equal(owedLine(soon, NOW), "Due Fri 6 Nov");
+  assert.equal(owedLine(row({ due: "2026-11-05" }), NOW), "Due tomorrow");
+
+  const src = code(readFileSync(join(SRC, "view", "Cards.tsx"), "utf8"));
+  const home = code(readFileSync(join(SRC, "screens", "Today.tsx"), "utf8"));
+  // Name, which contact, when, and the role that owns it.
+  assert.match(src, /nameOf\(/, "a card carries her name");
+  assert.match(src, /\.title/, "a card says which contact it is");
+  assert.match(src, /owedLine\(/, "a card says when it is owed");
+  assert.match(src, /roleName\(/, "a card names the owning role");
+  assert.ok((src.match(/\.owner\b/g) ?? []).length === 2 && /roleName\(r\.owner\)/.test(src) && !/assignee|worker|staff/i.test(src), "a card names a role, never a person");
+  // A register field she does not carry is omitted, not drawn as a blank label.
+  assert.match(src, /meta && /, "the register line only draws when there is something in it");
+  assert.ok(!/weeks|gestation|pregnan/i.test(src), "no dating is derived on the card");
+  // Paging: the arrows are disabled at the ends and the page goes through pageBy.
+  assert.match(src, /pageBy\(/, "paging goes through the pure function");
+  assert.match(src, /disabled=\{/, "an arrow at the end of the stack is disabled");
+  assert.match(src, /aria-label="(Earlier|Previous)/, "the arrows are named");
+  assert.match(src, /aria-label="Later/, "the arrows are named");
+  // The nearest is the largest; each one behind is smaller.
+  const css = readFileSync(join(SRC, "style", "cards-stack.css"), "utf8");
+  assert.match(css, /--depth/, "size is a function of how far back a card sits");
+  assert.match(css, /scale\(calc\(1 - /, "each card behind is scaled smaller");
+  assert.match(css, /prefers-reduced-motion/, "the shuffle respects reduced motion");
+  assert.match(readFileSync(join(SRC, "main.tsx"), "utf8"), /cards-stack\.css/, "the stylesheet is loaded");
+  // The home page: the stack replaces the day counts, and opens her calendar.
+  assert.match(home, /stack\(/, "the home page builds the stack through day.ts");
+  assert.match(home, /<Cards\b/, "the home page draws the cards");
+  assert.match(home, /cardHash\(/, "a card goes to the calendar through day.ts");
+  assert.match(home, /currentRole\(\)/, "the stack opens on the viewer's own role");
+  assert.ok(!/Coming up<\/div>[\s\S]*contacts? owed/.test(home) && !/contacts owed/.test(home), "the count table is gone");
+  // The renderer never names a station, flag, capability, operation or column.
+  assert.ok(!/\.(station|flags|operation|reports_as|authority)\b/.test(src), "a card reads a field it should not know");
+  // Nothing derived is kept.
+  assert.ok(!/useMemo|localStorage|sessionStorage|new Map\(/.test(src), "no cache of derived rows");
+  ok("the card stack: late first, one per contact, role first, paged without overshoot, opens her calendar on the due date");
 }
 
 console.log(`\n${checks} checks passed`);
