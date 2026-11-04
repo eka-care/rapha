@@ -165,3 +165,109 @@ needs a registration, a station and a capability.
 5. **Audio input choice**, alongside the waveform already planned.
 
 Items 1 and 3 are product decisions, not work I should start unasked.
+
+---
+
+# Addendum, 2026-11-04: the parts I had not measured
+
+The owner opened their own signed-in Heidi after telling me, fairly, that I
+had designed from a description three times and got it wrong each time.
+Read only: nothing was created, saved, recorded or deleted in their account.
+This section is the reference for rebuilding Rapha's forms, and it exists
+because section 3 above described WHAT Heidi has and never wrote down HOW
+any of it is put together.
+
+## 6.1 Context is not a form. It is a surface.
+
+This is the finding that matters most, because Rapha shipped the opposite.
+
+Heidi's Context tab is one empty writing surface. The whole of its chrome
+is a row of five controls above it and a prompt where the text will go:
+
+    [scan] [paperclip]              [mic ▾] [undo] [redo] [Copy ▾]
+
+    Add any additional context about the patient or paste files here
+
+That is it. No labels, no fields, no asterisks, no Commit button. You
+scan a document into it, attach a file to it, dictate into it, paste into
+it, or type into it, and what lands is yours to edit. The surface saves
+itself.
+
+Rapha's equivalent asks three questions in three boxes -- Who wrote it,
+Date on it, What it says -- with no microphone anywhere on it. A clerk
+holding a discharge summary has to read somebody else's letter and retype
+it into our form. That is the product asking a person to do the work it
+exists to do for them, and the owner was right to call it out.
+
+**What follows for us.** Background becomes a surface, not a form: upload
+or photograph the paper, or dictate it, and the text lands in one editable
+body. Who wrote it and the date are derived where they can be and asked
+for only when they cannot be -- and never as the first thing a person
+meets.
+
+## 6.2 Dictation has two modes, and a key
+
+Under the microphone's own chevron, exactly two choices:
+
+- **Start word-for-word dictation** -- literal, what was said.
+- **Start smart dictation** -- cleaned up.
+
+That distinction is doing real work. A clinician dictating a plan wants it
+tidied; somebody copying another facility's letter wants it verbatim,
+because correcting somebody else's document is falsification. Rapha's
+context atom already says this in prose ("do not summarise it and do not
+correct it") and should now say it with the mode.
+
+The shortcut, from Heidi's own Shortcuts panel, under a group called
+**Dictate**:
+
+| What | How |
+| --- | --- |
+| Dictate into text field | **Hold** the key |
+| Hands-free | **Double press** it |
+| End hands-free | **Press** it |
+
+The key is the rupee sign, U+20B9. Confirmed by the owner, and read off
+the panel rather than guessed. Hold to talk into whatever field has
+focus; double press to keep going without holding.
+
+**The one risk, flagged rather than designed around.** There is no rupee
+key on a plain US or UK Mac keyboard. If the centres run an Indian layout
+this is a good key and a nice piece of local identity. If some do not, the
+shortcut is unreachable for them. So in Rapha the key is a setting with
+the rupee as its default, which costs nothing and removes the gamble.
+
+## 6.3 The three columns, measured
+
+At a 1440 by 900 viewport:
+
+- **Icon rail**, about 40px, labels under the glyphs. A bell near the
+  foot, with help, connectors and the account. Patients is a people glyph.
+- **Session list**, about 320px, and the divider between it and the work
+  surface is draggable.
+- **The work surface**, one card, with the tab row INSIDE its own top bar
+  rather than above it: patient, Context, Note, +. Everything in that
+  column shares one left edge and one right edge.
+- **The control panel** is an overlay, not a fourth column: 312px wide,
+  inset 19px from the right, its top edge level with the top of the work
+  surface, and it closes to nothing.
+
+Rapha's right-hand rail is three separately bordered cards that begin
+56px lower than the centre card they sit beside, which is the
+misalignment the owner saw. Heidi's panel is one quiet column of grouped
+rows -- Session, Note, Tools -- with no card borders at all, each group
+collapsible.
+
+## 6.4 What this changes, in order
+
+1. **Forms become surfaces wherever the content is prose**, with a
+   microphone on every one of them. Nothing that collects text ships
+   without dictation into it; see the memory note of the same date.
+2. **One dictation shortcut, global**, targeting the focused field, with
+   both modes, and the key configurable.
+3. **Background takes a document**, scanned or attached, before it ever
+   offers a box to type in.
+4. **The right rail becomes one aligned column**, top edge level with the
+   centre card, groups instead of cards.
+5. **The session list divider becomes draggable**, and the bell moves to
+   the rail's foot in place of a nav row called "Needs you".
