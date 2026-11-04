@@ -139,10 +139,11 @@ def test_a_range_counts_each_day_by_the_rows_due_on_it():
     anc2 = contact("anc2")
     result = span(store, day(anc2.opens).isoformat(), day(anc2.closes).isoformat(),
                   at=day(anc2.opens))
-    assert [r["contact"] for r in result.rows] == ["anc2"]
+    # anc1 is missed by then and stays owed; anc2 is due inside the range.
+    assert [r["contact"] for r in result.rows] == ["anc1", "anc2"], result.rows
     for g in result.groups:
         assert g["count"] == sum(1 for r in result.rows if r["due"] == g["key"]), g
-    assert sum(g["count"] for g in result.groups) == 1
+    assert sum(g["count"] for g in result.groups) == 1       # only anc2 is due in it
 
 
 def refused(**kw):
