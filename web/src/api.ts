@@ -125,8 +125,9 @@ export const api = {
    *  broke when half of it worked. */
   patients: (q: string, limit = 8) =>
     req<Resolution>(`/patients/search/?q=${encodeURIComponent(q)}&limit=${limit}`),
-  view: (id: string, thread?: string, on?: string) => {
-    const q = [thread && `thread=${encodeURIComponent(thread)}`, on && `on=${encodeURIComponent(on)}`].filter(Boolean);
+  view: (id: string, thread?: string, on?: string, range?: { from: string; to: string }) => {
+    const q = [thread && `thread=${encodeURIComponent(thread)}`, on && `on=${encodeURIComponent(on)}`,
+      range && `from=${encodeURIComponent(range.from)}`, range && `to=${encodeURIComponent(range.to)}`].filter(Boolean);
     return req<ViewResult>(`/views/${id}/${q.length ? `?${q.join("&")}` : ""}`);
   },
   thread: (id: string) => req<ThreadView>(`/threads/${id}/`),

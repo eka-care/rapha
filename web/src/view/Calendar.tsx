@@ -13,7 +13,28 @@ import { Icon } from "../icons";
 import { Loading } from "../parts";
 import { MARK, TONE } from "../thread/Arc";
 import type { CalendarRow, ViewResult } from "../types";
-import { dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips } from "./day";
+import { dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView } from "./day";
+import { Grid } from "./Grid";
+import { span, step, type Scale } from "./cells";
+
+const SCALES: { scale: Scale; label: string }[] = [
+  { scale: "week", label: "Week" }, { scale: "month", label: "Month" }, { scale: "year", label: "Year" },
+];
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July",
+  "August", "September", "October", "November", "December"];
+
+/** What the toolbar calls the span on screen. */
+function spanTitle(scale: Scale, anchor: string): string {
+  const [y, m] = anchor.split("-");
+  if (scale === "year") return y;
+  if (scale === "month") return `${MONTH_NAMES[Number(m) - 1] ?? ""} ${y}`;
+  const { from, to } = span("week", anchor);
+  const a = dayOf(from), b = dayOf(to);
+  return a.month === b.month ? `${a.day} to ${b.day} ${b.month} ${y}` : `${a.day} ${a.month} to ${b.day} ${b.month} ${y}`;
+}
+
+/** Move the address; the hashchange listener below does the rest. */
+const goTo = (change: Parameters<typeof withView>[1]) => { location.hash = withView(location.hash, change).replace(/^#/, ""); };
 
 export function Calendar({ result, nameOf, role, onOpenPatient }: {
   result: ViewResult;
@@ -40,6 +61,19 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
   const today = dateOf(result.generated_at);
   const asked = dayOn(hash);
   const other = asked && asked !== today ? asked : "";
+  // The grid: the scale and the date are in the address, and the range asked
+  // for follows the scale. The answer is tagged with the range it was asked
+  // for, so a month is never drawn from a week's rows while the next read is
+  // in flight.
+  const scale = scaleOf(hash);
+  const anchor = asked || today;
+  const { from, to } = span(scale, anchor);
+  const grid = useAsync(
+    () => (from ? api.view(result.view, undefined, undefined, { from, to }).then((r) => ({ key: `${from}|${to}`, r })) : Promise.resolve(null)),
+    [from, to, result.view]);
+  const gridHave = grid.data && grid.data.key === `${from}|${to}` ? grid.data.r : null;
+  const gridFailed = !gridHave && !!grid.error && !grid.loading;
+  const gridRows = (gridHave?.rows ?? []) as CalendarRow[];
   // The answer carries the day it was asked for. useAsync sets `loading` in an
   // effect, after the render in which the day changed, and keeps the last
   // answer while the next is in flight; so "is this answer for THIS day" is
@@ -52,7 +86,8 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
   const waiting = !!other && !have && !failed;
   const answer = other ? have : result;
   const rows = (answer?.rows ?? []) as CalendarRow[];
-  const { roles, initial } = roleChips(rows, role, roleName);
+  // A chip for every role that owns something on the day or in the grid.
+  const { roles, initial } = roleChips([...rows, ...gridRows], role, roleName);
   const [picked, setPicked] = useState<string | null>(null);
   // A picked role that owns nothing on THIS day is not honoured: the screen
   // falls back to everyone, so the chip shown pressed is always one that
@@ -60,11 +95,13 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
   const selected = picked !== null && (picked === EVERYONE || roles.includes(picked)) ? picked : initial;
   const shown = forRole(rows, selected);
   const piles = inPiles(shown, !other);
+  const gridShown = forRole(gridRows, selected);
   // Emptiness is what the piles actually hold, not a count taken before them.
   const empty = emptyLine(rows.length, piles.reduce((n, p) => n + p.rows.length, 0));
 
   return (
-    <div className="cal">
+    <div className="cal cal-page">
+     <aside className="cal-side" aria-label="The day">
       <div className="cal-chips" role="group" aria-label="Whose contacts">
         {[EVERYONE, ...roles].map((r) => (
           <button
@@ -113,6 +150,36 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
           </ul>
         </section>
       ))}
+     </aside>
+     <section className="cal-main" aria-label="Dates">
+      <div className="cal-bar-tools">
+        <div className="cal-nav" data-scale={scale}>
+          <button type="button" className="gr-arrow" aria-label={`Previous ${scale}`} onClick={() => goTo({ on: step(scale, anchor, -1) })}>
+            <Icon name="chev" className="i" />
+          </button>
+          <button type="button" className="gr-arrow gr-next" aria-label={`Next ${scale}`} onClick={() => goTo({ on: step(scale, anchor, 1) })}>
+            <Icon name="chev" className="i" />
+          </button>
+          <button type="button" className="cal-chip" onClick={() => goTo({ on: "" })}>Today</button>
+        </div>
+        <h2 className="cal-title">{spanTitle(scale, anchor)}</h2>
+        <div className="cal-scales" role="group" aria-label="Scale">
+          {SCALES.map((s) => (
+            <button key={s.scale} type="button" className="cal-chip" aria-pressed={scale === s.scale} onClick={() => goTo({ scale: s.scale })}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {gridFailed && <div className="state-empty">This {scale} could not be opened.</div>}
+      {!gridHave && !gridFailed && <Loading what={`this ${scale}`} shape="rows" rows={4} />}
+      {gridHave && (
+        <Grid
+          scale={scale} anchor={anchor} today={today} rows={gridShown} nameOf={nameOf}
+          onOpenPatient={onOpenPatient} onPickDay={(d) => goTo({ on: d })} onAnchor={(d) => goTo({ on: d })}
+        />
+      )}
+     </section>
     </div>
   );
 }

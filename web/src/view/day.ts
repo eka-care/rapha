@@ -4,6 +4,7 @@
  *  on, and says so when a pile is empty.
  */
 import type { CalendarRow } from "../types";
+import type { Scale } from "./cells.ts";
 
 /** Late first, because it is the only pile where somebody must act now. */
 export const PILES: { pile: string; label: string; state: string }[] = [
@@ -138,4 +139,23 @@ export function cardDays(
 ): { days: { key: string; count: number }[]; unread: boolean } {
   const more = Array.isArray(later) ? later : [];
   return { days: comingUp([...(groups ?? []), ...more], today, limit), unread: later === "failed" };
+}
+
+/** The scale a link to the calendar carries (`scale=week|month|year`). A month
+ *  when it carries none or one this screen does not draw. */
+export function scaleOf(hash: string): Scale {
+  const m = /[?&]scale=(week|month|year)(?:&|$)/.exec(hash ?? "");
+  return (m ? m[1] : "month") as Scale;
+}
+
+/** The same address with the date and/or scale changed. A part left out is
+ *  kept; an empty date is removed. Anything else in the query is kept too. */
+export function withView(hash: string, change: { on?: string; scale?: Scale }): string {
+  const [path, query = ""] = (hash ?? "").split("?");
+  const parts = new Map(query.split("&").filter(Boolean).map((kv) => [kv.split("=")[0], kv] as const));
+  if (change.on !== undefined) { if (change.on) parts.set("on", `on=${change.on}`); else parts.delete("on"); }
+  if (change.scale) parts.set("scale", `scale=${change.scale}`);
+  const order = ["on", "scale", ...[...parts.keys()].filter((k) => k !== "on" && k !== "scale")];
+  const q = order.filter((k) => parts.has(k)).map((k) => parts.get(k)).join("&");
+  return q ? `${path}?${q}` : path;
 }

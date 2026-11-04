@@ -35,7 +35,8 @@
 import assert from "node:assert/strict";
 import { WROTE } from "./types.ts";
 import type { CalendarRow } from "./types.ts";
-import { cardDays, monthAfter, wantsNextMonth, comingUp, dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips } from "./view/day.ts";
+import { cardDays, monthAfter, wantsNextMonth, comingUp, dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView } from "./view/day.ts";
+import { span, cells } from "./view/cells.ts";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1440,6 +1441,43 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   const cal = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
   assert.match(cal, /dayOn\(/, "the day screen opens on the date a link carries");
   ok("the home card: the next days with their counts, absent without the capability, a day opens the calendar on it");
+}
+
+// ------------------------------------------------------- the calendar page
+
+{
+  // The scale and the anchor date both live in the address.
+  assert.equal(scaleOf("#/views/calendar?scale=week"), "week");
+  assert.equal(scaleOf("#/views/calendar?on=2026-11-04&scale=year"), "year");
+  assert.equal(scaleOf("#/views/calendar"), "month", "no scale in the address is the month");
+  assert.equal(scaleOf("#/views/calendar?scale=decade"), "month", "an unknown scale is not trusted");
+  assert.equal(withView("#/views/calendar", { on: "2026-11-09", scale: "week" }), "#/views/calendar?on=2026-11-09&scale=week");
+  assert.equal(withView("#/views/calendar?on=2026-11-04&scale=week", { scale: "year" }), "#/views/calendar?on=2026-11-04&scale=year",
+    "changing the scale keeps the date");
+  assert.equal(withView("#/views/calendar?on=2026-11-04&scale=week", { on: "" }), "#/views/calendar?scale=week",
+    "an empty date leaves the address without one");
+  assert.equal(dayOn(withView("#/views/calendar", { on: "2026-11-09" })), "2026-11-09", "?on= still reads");
+  // Switching scale asks for the new span, never the old one.
+  assert.notDeepEqual(span("month", "2026-11-04"), span("week", "2026-11-04"));
+  assert.deepEqual(span("year", "2026-11-04"), { from: "2026-01-01", to: "2026-12-31" });
+
+  const page = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
+  assert.match(page, /from "\.\/Grid"/, "the grid is imported as ./Grid");
+  assert.match(page, /from "\.\/cells"/, "the pure logic is imported as ./cells");
+  assert.match(page, /span\(scale, /, "the range asked for follows the scale");
+  assert.match(page, /scaleOf\(/, "the scale is read from the address");
+  assert.match(page, /withView\(/, "the scale and date are written to the address");
+  assert.match(page, /forRole\(gridRows|forRole\(.*grid/s, "the role chips filter the grid too");
+  assert.match(page, /<Grid\b/, "the grid is drawn");
+  assert.match(page, /\{empty && /, "an empty day still shows its sentence beside a drawn grid");
+  assert.ok(!/\.cell\b[^;]*\.due|\.due\b[^;]*\.cell\b/.test(page), "rows are placed by cell, never by due");
+  assert.ok(!/\.operation\b|\.station\b|\.flags\b|\.reports_as\b/.test(page), "the page reads a field it should not know");
+  const apiSrc = code(readFileSync(join(SRC, "api.ts"), "utf8"));
+  assert.match(apiSrc, /from=|`from=/, "the api can ask for a range");
+  // A range answer's rows are placed by the cell they carry.
+  const r = { contact: "c", title: "c", state: "missed", owner: "r", due: "2026-09-09", cell: "2026-11-04", subject: "p", subject_row: {} } as unknown as CalendarRow;
+  assert.equal(cells("month", "2026-11-04", [r], 3, "2026-11-04").find((c) => c.key === "2026-11-04")?.rows.length, 1);
+  ok("the calendar page: scale and date in the address, the new span on a switch, chips filter the grid, an empty day still speaks");
 }
 
 console.log(`\n${checks} checks passed`);

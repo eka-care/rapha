@@ -38,3 +38,22 @@
   .cal-row { grid-template-columns: 44px 4px minmax(0, 1fr); }
   .cal-role { grid-column: 3; justify-self: start; }
 }
+
+/* The page: today's cards down the side, the grid beside them. */
+.cal.cal-page { max-width: none; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); align-items: start; gap: var(--space-6); }
+.cal-side { display: grid; gap: var(--space-6); min-width: 0; }
+.cal-main { display: grid; gap: var(--space-4); min-width: 0; }
+.cal-bar-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.cal-nav, .cal-scales { display: flex; align-items: center; gap: var(--space-2); }
+.cal-title { margin: 0; font-size: 18px; font-weight: 600; flex: 1 1 auto; }
+.cal-nav .gr-arrow { width: 36px; height: 36px; }
+@media (max-width: 900px) {
+  .cal.cal-page { grid-template-columns: minmax(0, 1fr); }
+  .cal-main { order: -1; }
+}
+/* In the side column the role drops under the sentence, as it does on a phone. */
+.cal-side .cal-row { grid-template-columns: 44px 4px minmax(0, 1fr); }
+.cal-side .cal-role { grid-column: 3; justify-self: start; }
+/* On a phone the week is one day with its own arrows; the toolbar's week
+   arrows would be a second pair that move by a different amount. */
+@media (max-width: 600px) { .cal-nav[data-scale="week"] .gr-arrow { display: none; } }
