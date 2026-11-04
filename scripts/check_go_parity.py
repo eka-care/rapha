@@ -1338,7 +1338,9 @@ def s_the_calendar_with_women_in_it(walk, codes):
             if r["subject_row"].get("name") == "parity"}
     assert len(ours) == 3, \
         "three of this walk's women are owed and the fourth miscarried: %d" % len(ours)
-    for label in ("a day that does not exist", "an empty value", "a timestamp"):
+    for label in ("a day that does not exist", "an empty value", "a timestamp",
+                  "a month that does not exist",
+                  "29 February in a year that has none", "a compact date"):
         assert answers[label][0] == 400, (label, answers[label])
     return ("the calendar over open, unseen, delivered and miscarried women, "
             "on month ends, leap days and impossible dates")
@@ -1808,9 +1810,11 @@ def properties(shape, scenario, walk):
             assert status in (200, 403), (shape, vid, status)
             if status == 200:
                 assert decls[vid]["kind"] in kinds, (shape, vid)
-        # Only the scenario that sweeps every view sets `asked`; the calendar's
-        # own scenario reads one view and is held to the checks above.
-        if walk.asked:
+        # Only the sweep sets `asked`; the calendar's own scenario reads one
+        # view. Scoped by scenario, so a sweep that stopped filling `asked`
+        # fails here instead of switching the check off.
+        if scenario.__name__ == s_the_views_see_what_the_write_did.__name__:
+            assert walk.asked, "%s: the view sweep recorded no view" % shape
             assert set(walk.asked) == set(decls), (
                 "%s: this walk asked for %s and the bundle declares %s"
                 % (shape, sorted(walk.asked), sorted(decls)))

@@ -15,7 +15,7 @@ the month's counts. Absence is what is asserted, not emptiness.
 
 Everything runs against an in-memory store through the real resolver, except
 the route refusal, which goes through the real HTTP route against a scratch
-database (PHC_DB is honoured when set, else a temporary directory is made)
+database (PHC_DB is always set to a fresh temporary file here)
 so that no developer's demo day is touched.
 """
 from __future__ import annotations
@@ -30,8 +30,9 @@ ROOT = pathlib.Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT))
 
 # Before api.main is imported: its store opens PHC_DB at import.
-if not os.environ.get("PHC_DB"):
-    os.environ["PHC_DB"] = str(pathlib.Path(tempfile.mkdtemp(prefix="calendar-")) / "phc.sqlite3")
+# Always its own file, even if the caller exported PHC_DB: this check must
+# never read or write a developer's own database.
+os.environ["PHC_DB"] = str(pathlib.Path(tempfile.mkdtemp(prefix="calendar-")) / "phc.sqlite3")
 os.environ.setdefault("PHC_DIRECTORY", "absent")
 
 from adapters.local.store import SqliteStore                  # noqa: E402
@@ -137,6 +138,16 @@ ok("1. a pregnancy that ended contributes nothing to any day, %d days either sid
 seen = appearances(store, lost_p)
 assert seen == [], \
     "a miscarriage is owed something: %s" % [(d.isoformat(), r["contact"]) for d, r in seen[:3]]
+# And in the month's counts: every day's count equals the rows of the OTHER
+# women, so a count that still carried her would exceed it.
+others = {open_p, born_p}
+for n in SPAN[::7]:
+    d = TODAY + timedelta(days=n)
+    result = day(store, d)
+    assert all(r["subject"] in others for r in result.rows), d
+    for g in result.groups:
+        gd = date.fromisoformat(g["key"])
+        assert g["count"] == len([r for r in day(store, gd).rows if r["subject"] in others]), g
 ok("2. a miscarriage contributes no home visit, and no other row, to any day: absent, not empty")
 
 
@@ -211,15 +222,20 @@ for n in range(-45, 46, 1):
     piles = {}
     for r in result.rows:
         piles.setdefault(r["state"], []).append(r)
-    assert sum(len(p) for p in piles.values()) == len(result.rows), d
-    assert len({id(r) for p in piles.values() for r in p}) == len(result.rows), d
     month = {g["key"]: g["count"] for g in result.groups}
+    # The month's count is a number the engine computed on its own, not from
+    # these rows, so the piles' total is held to it.
+    assert sum(len(p) for p in piles.values()) == month[d.isoformat()], \
+        "%s: piles hold %d and the month counts %d" % (
+            d, sum(len(p) for p in piles.values()), month[d.isoformat()])
+    keys = [(r["subject"], r["contact"]) for r in result.rows]
+    assert len(set(keys)) == len(keys), "%s: a contact is listed twice" % d
     assert month[d.isoformat()] == len(result.rows), \
         "%s: the month says %d and the day lists %d" % (d, month[d.isoformat()], len(result.rows))
     assert len(month) == (date(d.year + (d.month == 12), d.month % 12 + 1, 1)
                           - date(d.year, d.month, 1)).days, d
 assert any(day(store, TODAY + timedelta(days=n)).rows for n in range(-45, 46)), "empty fixture"
-ok("4. every day's total is the sum of its piles, and no row sits in two")
+ok("4. every day's piles add up to the month's own count for it, and no contact is listed twice")
 ok("6. the month's count for a date equals the length of that date's list, 91 days running")
 
 
