@@ -228,7 +228,10 @@ const DEC = "2026-12-09";
   assert.equal(chipTip, "Second check-up (Second antenatal contact) for Lakshmi, due 9 Sep");
   // Her page's today: the kernel's when it looks like a date, else the browser's.
   assert.equal(todayOf("2026-11-04T15:42:34Z", "2026-01-01"), "2026-11-04");
-  for (const bad of [undefined, null, "", "soon", 20261104, "04/11/2026"]) {
+  // Chosen: a date with trailing junk FALLS BACK. The kernel writes either a bare
+  // date or a timestamp, so anything else after the day is corruption, and a
+  // guard against corruption should not trust half of a damaged value.
+  for (const bad of [undefined, null, "", "soon", 20261104, "04/11/2026", "2026-99-99", "2026-11-04junk", "2026-00-10", "2026-11-32"]) {
     assert.equal(todayOf(bad, "2026-01-01"), "2026-01-01", `junk ${String(bad)} falls back`);
   }
   ok("the programme's phrasing rides behind the plain name, and only when there is one");

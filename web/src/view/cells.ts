@@ -139,10 +139,9 @@ export function tipOf(row: CalendarRow): string {
   return row.programme_title ? `${row.title} (${row.programme_title})` : row.title;
 }
 
-/** The day her page treats as today: the kernel's, when what arrived looks like
- *  a date, and the browser's otherwise, so an answer without it still draws. */
+/** The day her page treats as today: the kernel's, when what arrived is a real-looking date or the kernel's timestamp, and the browser's otherwise, so an answer without it still draws. */
 export function todayOf(stamp: unknown, browser: string): string {
-  return typeof stamp === "string" && /^\d{4}-\d\d-\d\d/.test(stamp) ? stamp.slice(0, 10) : browser;
+  return typeof stamp === "string" && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])(T|$)/.test(stamp) ? stamp.slice(0, 10) : browser;
 }
 
 /** One woman's own episodes as grid rows, for her record.
