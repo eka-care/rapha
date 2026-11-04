@@ -26,7 +26,7 @@
  *  pretending to be a medical assistant.
  */
 import { useEffect, useRef } from "react";
-import { assistantConfig } from "./config";
+import { assistantConfig, STARTERS } from "./config";
 import type { Question } from "./Lazy";
 
 const CONFIG = assistantConfig(import.meta.env as Record<string, string | undefined>);
@@ -84,6 +84,8 @@ export function AskAi({ open, question, onClose }: {
         // counter machine is the wrong place for them, by the same
         // reasoning that turned the records SDK's offline store off.
         el.setAttribute("history", "off");
+        // Not the docs site's pills, which are what it opens with otherwise.
+        el.setAttribute("starters", STARTERS);
         host.current.append(el);
         // ITS OWN FLOATING BAR STAYS DOWN. The widget draws a compact "Ask
         // AI" bar at the foot of the page for a docs site that has nothing
