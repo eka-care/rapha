@@ -22,9 +22,13 @@
 import { NAME } from "../brand";
 import { Icon } from "../icons";
 
-export function Topbar({ title, deskLabel, onSearch, onMenu, onDesk, onAssist }: {
+export function Topbar({ title, deskLabel, bell, onSearch, onMenu, onDesk, onAssist }: {
   title: string;
   deskLabel: string;
+  /** What is waiting for somebody, drawn last in this row. It is not a
+   *  place, so it is not in the rail; it is not an action a person chose,
+   *  so it does not wear a pill. */
+  bell?: React.ReactNode;
   onSearch: () => void;
   onMenu: () => void;
   onDesk: () => void;
@@ -56,6 +60,7 @@ export function Topbar({ title, deskLabel, onSearch, onMenu, onDesk, onAssist }:
         Ask {NAME}
         <span className="kbd">⌘K</span>
       </button>
+      {bell}
     </header>
   );
 }

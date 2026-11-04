@@ -869,6 +869,42 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   ok("nav: a view the caller's role cannot open is absent from the rail, and "
      + "the rail names no capability to work that out");
 
+  // -- a place you stand, versus a thing that wants you ---------------------
+  //
+  // The declared tasklist had a nav row of its own, carrying a count that
+  // barely moved across a shift. Nobody navigates to "things that need me",
+  // so it is the bell in the top right now. Both halves are asserted: it is
+  // out of the rail, and it is in the bell, off the view's own declared
+  // kind rather than off an id this renderer may not know.
+  const rail = code(readFileSync(join(SRC, "app", "Rail.tsx"), "utf8"));
+  assert.match(rail, /views\.filter\(\(v\) => v\.kind !== "tasklist"\)/,
+    "a tasklist is still offered as a place in the rail, beside the line and "
+    + "the register, which is not what it is");
+  assert.match(appSrc, /l\.decl\.kind === "tasklist"/,
+    "nothing feeds the bell, so what the tasklist declares reaches no screen");
+  const bellSrc = code(readFileSync(join(SRC, "app", "Bell.tsx"), "utf8"));
+  // The row's sentence and the button's word are both declarations'. A task
+  // title typed here would be this bundle's laboratory in the renderer.
+  assert.match(bellSrc, /op\.short \?\? op\.title/,
+    "the quick action's word is not the operation's own, so the bell names "
+    + "an action this renderer decided to call something");
+  assert.match(bellSrc, /rows\.reduce\(\(n, r\) => n \+ r\.count, 0\)/,
+    "the badge counts rows rather than things waiting, so two people waiting "
+    + "on one kind of result reads as one");
+  for (const forbidden of [/phc\./, /\blab\b/i, /station/i, /capability/i]) {
+    assert.ok(!forbidden.test(bellSrc.replace(/^import .*$/gm, "")),
+      `Bell.tsx names ${forbidden}, which belongs to the bundle and not to a screen`);
+  }
+  // Closed by Escape and by clicking away, not only by the button that
+  // opened it: a corner panel with one way out gets navigated away from.
+  assert.match(bellSrc, /e\.key === "Escape"/, "the bell panel cannot be dismissed by keyboard");
+  assert.match(bellSrc, /wrap\.current\?\.contains/, "the bell panel does not close when you click away");
+  // And the register's glyph stopped arguing with its own label.
+  assert.ok(!/icon: "folder"/.test(rail),
+    "the patient register still wears a folder, over a screen that lists people");
+  ok("nav: a tasklist is the bell and not a place, its words are the "
+     + "declaration's, and the register is not a folder");
+
   // -- the live region is in the document BEFORE it has anything to say -----
   //
   // This is the half of SC 4.1.3 that is easy to get wrong: a region that

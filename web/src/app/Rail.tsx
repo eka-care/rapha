@@ -41,13 +41,23 @@ export type Place = { id: string; label: string; icon: IconName; hash: string };
 export function places(views: ViewDecl[]): Place[] {
   return [
     { id: "home", label: "Home", icon: "home", hash: "#/" },
-    ...views.map((v) => ({
+    // A TASKLIST IS NOT A PLACE, it is an interruption, and it had a nav row
+    // of its own that sat there all day saying the same number. What is
+    // waiting for somebody belongs where a person already looks for that --
+    // the bell, top right -- and the rail goes back to being the places you
+    // can stand. The word `tasklist` is the view's own declared kind, which
+    // is the same property this file already reads to pick a glyph.
+    ...views.filter((v) => v.kind !== "tasklist").map((v) => ({
       id: `views/${v.id}`,
       label: v.title,
       icon: KIND_GLYPH[v.kind] ?? "list",
       hash: `#/views/${v.id}`,
     })),
-    { id: "patients", label: "Patients", icon: "folder", hash: "#/patients" },
+    // NOT A FOLDER. The register is people, not filing: a folder glyph says
+    // "documents are in here" above a screen that lists human beings, and it
+    // was the one row in this rail whose mark argued with its own label. A
+    // record card with a person on it is what a patient register is.
+    { id: "patients", label: "Patients", icon: "id", hash: "#/patients" },
   ];
 }
 

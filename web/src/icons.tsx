@@ -15,7 +15,7 @@ import type { Operation } from "./types";
 
 export type IconName =
   "sliders" | "mark" | "mark-lg" | "search" | "home" | "moon" | "sun" | "vitals" | "mic" | "box" | "clip" | "eye" | "plus" | "folder" | "chat" | "spark" | "check" | "alert" | "lock" | "send" | "user" | "users" | "list" | "cog" | "refer" | "chev" | "id" | "doc" |
-  "handle" | "out" | "clock";
+  "handle" | "out" | "clock" | "bell";
 
 export function Icon({ name, size, className }: {
   name: IconName; size?: "sm" | "lg"; className?: string;
@@ -88,6 +88,12 @@ const SHEET = `
   <!-- The way out: a door left open and an arrow leaving through it. Drawn
        rather than borrowed so its stroke matches the sheet. -->
   <symbol id="i-out" viewBox="0 0 24 24"><path d="M15 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H15"/><path d="M10 8l-4 4 4 4M6 12h9"/></symbol>
+  <!-- What is waiting for somebody, in the one place a person already looks
+       for that. Drawn rather than borrowed so its stroke matches the sheet:
+       a plain bell, no clapper swing and no notification dot baked in -- the
+       count is a separate element, because a glyph that always looks urgent
+       stops meaning urgent. -->
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 5-2 6.5-2 6.5h16S18 14 18 9z"/><path d="M13.7 19a2 2 0 0 1-3.4 0"/></symbol>
   <!-- A clock face. The hero says the time and nothing else, so the glyph
        has to read at a glance for somebody who does not read the numerals. -->
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>

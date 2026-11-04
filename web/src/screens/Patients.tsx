@@ -116,7 +116,7 @@ function Visits({ id, onOpenThread, onOpenSubject }: {
         </button>
       ))}
       <button className="reg-all" onClick={() => onOpenSubject(id)}>
-        <Icon name="folder" className="i sm" />
+        <Icon name="id" className="i sm" />
         Open their whole record
       </button>
     </div>

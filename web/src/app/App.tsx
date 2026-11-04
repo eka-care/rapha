@@ -24,9 +24,10 @@ import { SignIn } from "../auth/SignIn";
 import { signedIn } from "../auth/session";
 import { Control } from "../screens/Control";
 import { Today } from "../screens/Today";
-import type { Facility, QueueRow, ViewDecl, ViewResult, Workflow } from "../types";
+import type { Facility, QueueRow, TaskRow, ViewDecl, ViewResult, Workflow } from "../types";
 import { Icon, IconSheet } from "../icons";
 import { Khoj } from "./Khoj";
+import { Bell } from "./Bell";
 import { Sidebar, panelFor } from "./Sidebar";
 import { Rail } from "./Rail";
 import { PARTS } from "../screens/Control";
@@ -307,6 +308,17 @@ export function App() {
    */
   const [narrow, setNarrow] = useState<Filter>(null);
 
+  /** WHAT IS WAITING FOR SOMEBODY, out of the rows already loaded. The
+   *  declared tasklist used to be a nav row of its own; it is the bell in
+   *  the top right now, because nobody navigates to "things that need me".
+   *  The kind is the view's own, so this file names no view. */
+  const [bellOpen, setBellOpen] = useState(false);
+  const tasks = useMemo<TaskRow[]>(
+    () => loaded.filter((l) => l.decl.kind === "tasklist")
+      .flatMap((l) => (l.result.rows ?? []) as TaskRow[]),
+    [loaded],
+  );
+
   const remember = useCallback((r: Recent) => {
     setRecents((was) => {
       const next = [r, ...was.filter((x) => x.id !== r.id)].slice(0, 8);
@@ -470,6 +482,15 @@ export function App() {
             onAssist={() => { setAssistSeen(true); setAssistOpen(true); }}
             onMenu={() => setDrawer((d) => !d)}
             onDesk={() => go("#/desk")}
+            bell={
+              <Bell
+                rows={tasks}
+                open={bellOpen}
+                onOpen={setBellOpen}
+                cat={catalogue}
+                onGo={(thread) => { setBellOpen(false); go(`#/threads/${thread}`); }}
+              />
+            }
           />
         )}
         {/* The bar was also the only way back to the line on a narrow
