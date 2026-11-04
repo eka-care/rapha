@@ -907,17 +907,22 @@ def test_no_subject_carries_the_kernels_own_bookkeeping():
 
 
 def test_the_calendar_route_answers_a_day_and_refuses_a_caller_without_the_capability():
-    from datetime import date, timedelta
-    today = date.today()
+    # Every date is fixed: the window of a contact does not move with the
+    # clock, so the day asked about is always inside it.
+    from kernel.tests.test_cohort import LMP, contact, day
+    due = day(contact("anc1").due)
     main.store.db.execute(
         "INSERT INTO episode_of_care (id, patient, type, status, anchor_date, anchor_basis,"
         " outcome, created_date) VALUES ('ep-cal', ?, 'pregnancy', 'active', ?,"
-        " 'last_menstrual_period', '', ?)",
+        " 'last_menstrual_period', '', '2026-02-01T09:00:00+00:00')",
         [main.store.select("patient", thread=None, where={}, fields=(), limit=1)[0]["id"],
-         (today - timedelta(days=100)).isoformat(), (today - timedelta(days=100)).isoformat()])
+         LMP.isoformat()])
+    today = due
     body = client.get("/api/views/phc.view.calendar?on=%s" % today.isoformat())
     assert body.status_code == 200, body.text
-    assert body.json()["kind"] == "calendar" and body.json()["groups"]
+    assert body.json()["kind"] == "calendar"
+    assert [r["contact"] for r in body.json()["rows"]] == ["anc1"], body.json()["rows"]
+    assert {g["key"]: g["count"] for g in body.json()["groups"]}[due.isoformat()] == 1
     assert client.get("/api/views/phc.view.calendar?on=soon").status_code == 400
     real = main.caller
     main.caller = lambda request: {"id": "user:none", "role": "none", "capabilities": [],
