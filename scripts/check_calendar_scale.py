@@ -18,9 +18,11 @@ due date, so a grid draws a visit once. Neither is a special case of the
 other, so this does not assert that a range equals its days put together.
 It asserts the relationship that does hold (claim 1).
 
-Claims 1 and 2 run against an in-memory store through the real resolver. Claim
-2's refusal and claim 3's timing go through the real HTTP route against a
-scratch database (PHC_DB is always a fresh temporary file here).
+Claim 1 and the cap's limits run against an in-memory store through the real
+resolver, which raises ValueError. Claim 2 also makes one call through the
+real HTTP route and requires 400, so a route that let that error through as a
+500 fails. Claim 3's timing goes through the route against a scratch database
+(PHC_DB is always a fresh temporary file here, removed on exit).
 
 The pass line is a judgement, not anybody's requirement: roughly where a nurse
 with a queue in front of her starts to wonder whether the screen is broken.
@@ -29,8 +31,10 @@ draw, not its last.
 """
 from __future__ import annotations
 
+import atexit
 import os
 import pathlib
+import shutil
 import sys
 import tempfile
 import time
@@ -42,7 +46,9 @@ sys.path.insert(0, str(ROOT))
 # Before api.main is imported: its store opens PHC_DB at import.
 # Always its own file, even if the caller exported PHC_DB: this check must
 # never read or write a developer's own database.
-os.environ["PHC_DB"] = str(pathlib.Path(tempfile.mkdtemp(prefix="calendar-scale-")) / "phc.sqlite3")
+SCRATCH = tempfile.mkdtemp(prefix="calendar-scale-")
+atexit.register(shutil.rmtree, SCRATCH, ignore_errors=True)
+os.environ["PHC_DB"] = str(pathlib.Path(SCRATCH) / "phc.sqlite3")
 os.environ.setdefault("PHC_DIRECTORY", "absent")
 
 from adapters.local.store import SqliteStore                  # noqa: E402
@@ -63,7 +69,8 @@ CAL = next(v for v in BUNDLE.views.values() if v.kind == "calendar")
 ANM = set(vocab.for_bundle("phc").roles["anm"])
 AN_ANM = "user:jyothi"
 
-TODAY = date.today()
+# One clock for both: the route reads the real time, so the day is UTC's.
+TODAY = datetime.now(timezone.utc).date()
 NOW = datetime(TODAY.year, TODAY.month, TODAY.day, 12, 0, 0, tzinfo=timezone.utc)
 #: Under this many seconds, or the screen feels broken.
 LINE = 2.0
@@ -111,10 +118,11 @@ for r in ranged.rows:
 assert len({(key(r)) for r in ranged.rows}) == len(ranged.rows), "a contact is drawn twice in one range"
 assert ranged.rows, "the range answered nothing; the fixture proves nothing"
 # A range draws a contact in the cell of its due day and nowhere else; the one
-# exception is a missed contact due before the range, which is a marker on
-# today. Anything else in a cell means the range has slid back to windows.
+# exception is a missed contact due BEFORE the range, which is a marker on
+# today (a contact due inside the range is never drawn on today). Anything else in a cell means the range has slid back to windows.
 for r in ranged.rows:
-    assert r["cell"] == r["due"] or (r["state"] == "missed" and r["cell"] == TODAY.isoformat()), \
+    marker = r["state"] == "missed" and r["due"] < FIRST.isoformat() and r["cell"] == TODAY.isoformat()
+    assert r["cell"] == r["due"] or marker, \
         "%s is drawn on %s but falls due on %s" % (key(r), r["cell"], r["due"])
     assert FIRST.isoformat() <= r["cell"] <= LAST.isoformat(), (key(r), r["cell"])
 
@@ -137,7 +145,6 @@ for n in range((LAST - FIRST).days + 1):
     # range draws it once, on its due day). Counted, and required to exist.
     still_owed = {key(r) for r in asked.rows if r["due"] != iso}
     drawn_here = {key(r) for r in by_cell.get(iso, [])}
-    assert not still_owed & {key(r) for r in by_cell.get(iso, []) if r["due"] == iso}, iso
     windowed_only += len({k for k in still_owed if k not in drawn_here})
     due_rows += len(due_in_range)
     days += 1
@@ -147,6 +154,20 @@ assert windowed_only, \
 ok("1. a range draws each contact once, on its due day, and agrees with ?on= on what falls due that day "
    "(%d days, %d contacts); ?on= additionally lists %d window-only appearances the range deliberately does not"
    % (days, due_rows, windowed_only))
+
+
+try:
+    from starlette.testclient import TestClient
+except ImportError:                      # pragma: no cover
+    print("warn starlette missing: the timing did not run")
+    raise SystemExit(1)
+
+from api.main import app, store as route_store                # noqa: E402
+
+
+client = TestClient(app)
+URL = "/api/v1/phc/views/%s" % CAL.id
+HEAD = {"X-PHC-Role": "anm"}
 
 
 # ---------------------------------------------------------------------------
@@ -173,29 +194,37 @@ for n in (401, 5000):
     except ValueError:
         continue
     raise AssertionError("a range of %d days was answered" % n)
-ok("2. a range of 42, 366 and 400 days is answered; 401 and 5000 are refused")
+a, b = span_of(401)
+refused = client.get(URL + "?from=%s&to=%s" % (a, b), headers=HEAD)
+assert refused.status_code == 400, (refused.status_code, refused.text[:200])
+assert "400" in refused.json()["detail"], refused.json()
+a, b = span_of(400)
+assert client.get(URL + "?from=%s&to=%s" % (a, b), headers=HEAD).status_code == 200
+ok("2. a range of 42, 366 and 400 days is answered; 401 and 5000 are refused by the resolver, "
+   "and over the route 401 is a 400 and 400 is a 200")
 
 
 # ---------------------------------------------------------------------------
 # 3. 300 open episodes, through the real route, under the line.
 # ---------------------------------------------------------------------------
 
-try:
-    from starlette.testclient import TestClient
-except ImportError:                      # pragma: no cover
-    print("warn starlette missing: the timing did not run")
-    raise SystemExit(1)
-
-from api.main import app, store as route_store                # noqa: E402
-
+VISITS = 0
 for i in range(OPEN_EPISODES):
     # Spread across the whole arc, so most are mid-schedule and some have a
     # lot of missed contacts. 10..290 days.
-    woman(route_store, "Crowd %d" % i, 10 + (i * 280) // OPEN_EPISODES)
+    thread = woman(route_store, "Crowd %d" % i, 10 + (i * 280) // OPEN_EPISODES)
+    # And a real audit behind most of them, uneven on purpose: a quarter have
+    # never been seen, the rest have one, three or six antenatal visits
+    # committed. The audit read is the dear part of the sweep, so a cohort
+    # with nothing in its audit would flatter the timing.
+    for _ in range((0, 1, 3, 6)[i % 4]):
+        done = proposals.commit(route_store, BUNDLE, "phc.op.antenatal-visit", thread=thread,
+                                payload={"history": "Well.", "examination": "Nil.",
+                                         "assessment": "Progressing.", "plan": "Review."},
+                                caps=ANM, actor=AN_ANM)
+        assert done, done.reason
+        VISITS += 1
 
-client = TestClient(app)
-URL = "/api/v1/phc/views/%s" % CAL.id
-HEAD = {"X-PHC-Role": "anm"}
 
 
 def timed(query):
@@ -236,8 +265,8 @@ year_s = cumulative
 assert home_s < LINE, "the home page took %.2fs for %d women (line %.1fs)" % (home_s, OPEN_EPISODES, LINE)
 assert month_s < LINE, "a month took %.2fs for %d women (line %.1fs)" % (month_s, OPEN_EPISODES, LINE)
 assert first_month < LINE, "the year's first month took %.2fs (line %.1fs)" % (first_month, LINE)
-ok("3. %d open episodes: home page %.2fs, a month %.2fs, a year's first month %.2fs "
+ok("3. %d open episodes with %d visits in their audit: home page %.2fs, a month %.2fs, a year's first month %.2fs "
    "(all twelve %.2fs); line %.1fs"
-   % (OPEN_EPISODES, home_s, month_s, first_month, year_s, LINE))
+   % (OPEN_EPISODES, VISITS, home_s, month_s, first_month, year_s, LINE))
 
 print("\nok   the calendar at scale: %d checks" % checks)
