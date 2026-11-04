@@ -29,7 +29,7 @@ const LINE = 9;
 
 /** WHICH SECOND PANEL THIS ROUTE WANTS, or none at all.
  *
- *  Home is deliberately `null`. A panel that is always open is not a panel,
+ *  Home is deliberately `null`, and so is any view that is not a queue. A panel that is always open is not a panel,
  *  it is a margin, and the home screen is the one place whose whole job is
  *  to be looked at rather than navigated. The line belongs beside the line
  *  and beside a visit, because both are places you move between people
@@ -37,8 +37,18 @@ const LINE = 9;
  */
 export type Panel = "line" | "settings" | null;
 
-export function panelFor(route: string): Panel {
-  if (route.startsWith("views/") || route.startsWith("threads/")) return "line";
+export function panelFor(route: string, views: ViewDecl[]): Panel {
+  // THE LINE BESIDE THE LINE, not beside every view. A calendar or a
+  // dashboard is somewhere a person reads, not somewhere they move between
+  // people from, and the queue down its side was a second screen's worth of
+  // names next to a screen about something else. Only a view whose declared
+  // kind is a queue gets it -- the same property the shell reads to decide
+  // which rows the line is made of.
+  if (route.startsWith("views/")) {
+    const id = route.slice("views/".length).split(/[/?]/)[0];
+    return views.find((v) => v.id === id)?.kind === "queue" ? "line" : null;
+  }
+  if (route.startsWith("threads/")) return "line";
   if (route.startsWith("settings")) return "settings";
   return null;
 }

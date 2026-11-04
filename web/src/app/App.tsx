@@ -450,7 +450,7 @@ export function App() {
   }
 
   const here = location.hash.replace(/^#\/?/, "");
-  const panel = panelFor(here);
+  const panel = panelFor(here, navViews);
 
   return (
     <div className="app" data-panel={panel ?? "none"}
