@@ -90,11 +90,7 @@ threads:
         questionnaire: phc.schema.handover-reply-v1
         created_by: "user:mo"
         payload: {comment: "Coming now. Keep her in the side room.", state: acknowledged}
-    # Asked at the desk and agreed. Since 2026-11-01 the recording would be
-    # offerable either way: capture.consented is composed from the absence of
-    # a refusal, not from this. Kept so the seeded day still has a visit where
-    # the question was put and answered yes.
-    flags: [vitals.flagged, capture.agreed]
+    flags: [vitals.flagged]
     # A handover conversation, so the demo day has one (§12.3). The rows are
     # what the operations write; the audit entries are what the thread draws
     # from. Both, or the flag is raised with nothing on screen to explain it.
@@ -108,7 +104,7 @@ threads:
       - operation: phc.op.patient-register
         actor: "user:frontdesk"
         payload: {name: Ramesh Kumar, age: 61, sex: male, phone: "9800000003",
-                  village: Bhagwanpur, category: ncd, capture_consent: true}
+                  village: Bhagwanpur, category: ncd}
       - operation: phc.op.vitals-record
         actor: "user:nurse"
         payload: {systolic: 186, diastolic: 112, pulse: 92, spo2: 97,
@@ -139,14 +135,11 @@ threads:
          value: 92, unit: "/min", unit_system: "http://unitsofmeasure.org"}
       - {resource: notes, operation: phc.op.consult-document, text: "Fever three days, no red flags on examination."}
       - {resource: service_request, operation: phc.op.lab-order, code: CBC, status: active}
-    # Said no to the recording. The consultation was typed, the queue badges
-    # the visit declined, and nothing asks again.
-    flags: [capture.declined]
     audit:
       - operation: phc.op.patient-register
         actor: "user:frontdesk"
         payload: {name: Iqbal Ahmed, age: 52, sex: male, phone: "9800000004",
-                  village: Sonpur, category: general, capture_declined: true}
+                  village: Sonpur, category: general}
       - operation: phc.op.vitals-record
         actor: "user:nurse"
         payload: {systolic: 118, diastolic: 76, pulse: 92, spo2: 98,

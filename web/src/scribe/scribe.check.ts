@@ -217,10 +217,15 @@ for (const call of ["client.commit(", "client.confirm("])
   const declared = JSON.parse(read("catalogue/catalogue.json"));
   const scribe = Object.values(declared.instruments ?? {})
     .find((i: any) => i.kind === "scribe") as any;
-  ok(!!scribe?.requires,
-     "the shipped scribe instrument actually declares a gate: " + String(scribe?.requires));
-  ok((declared.states ?? []).includes(scribe.requires),
-     "and the flag it names is one this bundle really has");
+  // THIS BUNDLE DECLARES NO GATE since the owner removed consent in full on
+  // 4 November 2026, and it asserted the opposite until then. What matters
+  // is not whether there is a gate -- that is the bundle's business -- but
+  // that a declared one names a real state. A gate on a flag this bundle
+  // does not have is a microphone that can never be switched on, which is
+  // the worst of the three possible states and the only one worth failing.
+  ok(!scribe?.requires || (declared.states ?? []).includes(scribe.requires),
+     "the scribe is gated on a flag this bundle does not declare, so the "
+     + "microphone can never switch on: " + String(scribe?.requires));
 }
 ok(/draft\?\.values/.test(panel),
    "a draft lands in the panel's own editable fields, then a tap");

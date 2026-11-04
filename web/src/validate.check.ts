@@ -39,12 +39,14 @@ const CASES: [string, Record<string, unknown>][] = [
   ["phc.schema.register-v1", { name: "A", age: "41.5", sex: "female", phone: "9", village: "V" }],
   ["phc.schema.consult-v1", {}],
   ["phc.schema.dispense-v1", {}],
-  // The consent questions. A flag with no critical band is the second form of
-  // raisedFlags, and until these cases existed the browser and the server
-  // disagreed about it with nothing to notice.
+  // An answer to a question the form does not ask. These were the consent
+  // questions until 4 November 2026, when the owner removed consent in full;
+  // kept as the same five shapes, because what they prove is that the
+  // browser and the server agree about a stray answer rather than anything
+  // about consent. Both must refuse them, and identically.
   ["phc.schema.register-v1", { name: "A", age: 41, sex: "female", phone: "9", village: "V", capture_consent: true }],
   ["phc.schema.register-v1", { name: "A", age: 41, sex: "female", phone: "9", village: "V", capture_declined: true }],
-  ["phc.schema.register-v1", { name: "A", age: 41, sex: "female", phone: "9", village: "V", capture_consent: true, capture_declined: true }],
+  ["phc.schema.register-v1", { name: "A", age: 41, sex: "female", phone: "9", village: "V", gone: true, alsoGone: true }],
   ["phc.schema.register-v1", { name: "A", age: 41, sex: "female", phone: "9", village: "V", capture_consent: "yes" }],
   ["phc.schema.register-v1", { name: "A", age: 41, sex: "female", phone: "9", village: "V", capture_consent: false }],
   ["phc.schema.consult-v1", { assessment: "viral fever", capture_stop: true }],

@@ -83,7 +83,7 @@ python3 -m kernel.tests.test_clock
 # cancellation step anybody could forget to call.
 python3 -m kernel.tests.test_schedule
 python3 -m bundles.lab.check      # a second bundle on the same kernel; SKIP_E2E=1 skips its socket half
-python3 -m bundles.phc.check      # capture consent: raised, declined, scoped to the visit, withdrawable
+python3 -m bundles.phc.check      # consent is gone, and gone from both engines
 # One vertical slice through every layer: a nurse records a blood pressure, it
 # validates, it is coded, the guard allows it, the rows land, the thread
 # projects to an ABDM WellnessRecord. No socket.

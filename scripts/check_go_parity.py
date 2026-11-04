@@ -1069,30 +1069,25 @@ def s_the_state_emit(walk, codes):
     """Guard step 7, which is the one step no other scenario reaches: a flag
     the store holds because no resource can answer it.
 
-    Two kinds, both from the declarations. A critical but IN RANGE reading
-    raises its question's own flag; an out of range one never gets here
-    because the validator blocks it. And a consent is three stored flags the
-    workflow composes a fourth from, which is what a consent has to be: the
-    store can raise a flag and cannot lower one, and a consent that cannot be
-    withdrawn is not a consent.
+    A critical but IN RANGE reading raises its question's own flag; an out of
+    range one never gets here because the validator blocks it.
+
+    There used to be a second kind in this scenario: a capture consent, which
+    was three stored flags the workflow composed a fourth from. The owner
+    removed consent in full on 4 November 2026 and this bundle now declares
+    exactly one way to reach guard step 7, so that is what the walk does.
     """
     walk.open()
-    consented = dict(filled("phc.schema.register-v1", codes),
-                     capture_consent=True)
-    walk.commit("register with the consent read out at the desk",
-                "phc.op.patient-register", consented, "frontdesk")
-    walk.panel("the panel once the patient has consented")
+    walk.commit("register the patient", "phc.op.patient-register",
+                filled("phc.schema.register-v1", codes), "frontdesk")
+    walk.panel("the panel once the patient is registered")
     payload, flag = critical("phc.schema.vitals-v1", codes)
     assert payload and flag, ("no question in this bundle declares a critical "
                               "band with a flag, so this scenario proves nothing")
     walk.commit("record a critical but in-range reading", "phc.op.vitals-record",
                 payload, "nurse")
     walk.panel("the panel after a critical reading")
-    walk.commit("the doctor stops the recording", "phc.op.capture-withdraw",
-                filled("phc.schema.capture-withdraw-v1", codes), "demo")
-    walk.panel("the panel after the consent was withdrawn")
-    return ("a stored flag is raised by the answer that declares it, and a "
-            "withdrawn consent lowers a flag the store cannot lower")
+    return "a stored flag is raised by the answer that declares it"
 
 
 def a_row_group(slug):
@@ -1605,13 +1600,12 @@ def properties(shape, scenario, walk):
             "%s / %s: refusals were not audited" % (shape, scenario.__name__))
         for row in panels[-1]["audit"]:
             assert row["outcome"].startswith("denied: "), row
-        # "Left something behind" means RAISED something. Since 2026-11-01
-        # `capture.consented` is composed from the absence of a refusal, so
-        # it stands on an untouched thread and no call put it there. Allowing
-        # it by name keeps the property about writes rather than about the
-        # resting state of a visit.
-        PRESUMED = {"capture.consented"}
-        assert set(panels[-1]["flags"]) <= PRESUMED and not panels[-1]["proposals"], (
+        # "Left something behind" means RAISED something. An untouched visit
+        # carried capture.consented until 4 November 2026, because that flag
+        # was composed from the absence of a refusal and so stood with no
+        # call having put it there; consent is gone, so an untouched visit
+        # now rests with no flags at all and the allowance can go with it.
+        assert not panels[-1]["flags"] and not panels[-1]["proposals"], (
             "%s / %s: a refused call left something behind: %s"
             % (shape, scenario.__name__, panels[-1]["flags"]))
     else:

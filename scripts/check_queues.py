@@ -520,24 +520,36 @@ ok("and refused the same way when the centre has since switched the plugin "
 # A precondition that has gone since queueing. The operation is still the
 # caller's to perform; this visit is no longer one it may be performed on.
 #
-# The withdrawal is the example because its precondition is the capture gate.
-# Since 2026-11-01 that gate stands on every visit nobody refused, so the
-# visit has to actually withdraw for the precondition to go: it used to be
-# enough that nobody had consented. The property under test is the queue's,
-# not the gate's, and it is unchanged.
+# Entering a laboratory result is the example, because its preconditions are
+# `lab.ordered` and `not lab.resulted`: order the test and both hold, enter
+# the result and the second one stops holding, which is exactly a visit
+# moving out from under a queued item. It used to be the capture withdrawal,
+# whose precondition was the consent gate; the owner removed consent in full
+# on 4 November 2026, and the property under test was never the gate's.
 store3, thread3 = consulted()
 assert proposals.commit(
-    store3, BUNDLE, "phc.op.capture-withdraw", thread=thread3,
-    payload={"capture_stop": True}, caps=MO, actor=A_DOCTOR, at=NOW)
+    store3, BUNDLE, "phc.op.lab-order", thread=thread3,
+    payload={"investigations": [{"code": "CBC"}]}, caps=MO, actor=A_DOCTOR, at=NOW)
+LAB = set(vocab.for_bundle("phc").roles["lab"])
+# The analyte and its unit are DECLARED codes, read out of the value set
+# rather than typed here: a check that spells "hemoglobin" is a check that
+# breaks when the terminology is regenerated, for a reason that has nothing
+# to do with queues.
+_ANALYTE = sorted(json.loads(
+    (ROOT / "terminology" / "lab-analyte.json").read_text())["concepts"].items())[0]
+assert proposals.commit(
+    store3, BUNDLE, "phc.op.lab-result-enter", thread=thread3,
+    payload={"analyte": _ANALYTE[0], "value": 1.0, "unit": _ANALYTE[1]["unit"]},
+    caps=LAB, actor=A_DOCTOR, at=NOW)
 box3 = SqliteSpool(":memory:")
 gone = queues.enqueue(box3, kind="document", key=thread3, thread=thread3,
-                      operation="phc.op.capture-withdraw",
-                      capability="encounter.document", facility="all-plugins",
+                      operation="phc.op.lab-result-enter",
+                      capability="lab.result.enter", facility="all-plugins",
                       at=NOW, actor=A_DOCTOR)
 watched3 = Watching(store3, thread3)
 report = queues.pump(
     box3, {"document": watched3},
-    permit=queues.permit_with_guard(store3, BUNDLE, caps=MO, actor=A_DOCTOR, at=NOW),
+    permit=queues.permit_with_guard(store3, BUNDLE, caps=LAB, actor=A_DOCTOR, at=NOW),
     bodies=lambda i: {"x": 1}, now=NOW)
 assert watched3.saw == [] and report.sent == [], report
 assert "preconditions" in report.refused[0][1], report.refused

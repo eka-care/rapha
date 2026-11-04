@@ -148,6 +148,9 @@ for (const q of register.questions) {
     assert.ok(!(q.link_id in filled), `${q.link_id} is never prefilled by the journey`);
   }
 }
+// Those two were the consent questions, gone since 4 November 2026. The
+// loop above is the rule and the one below is a floor under it: the journey
+// must not invent an answer to a question the form does not even ask.
 assert.ok(!("capture_consent" in filled) && !("capture_declined" in filled));
 
 // A value the form could not display is worse than no value: a choice whose

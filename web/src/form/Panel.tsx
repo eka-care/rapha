@@ -34,7 +34,6 @@ import { human } from "../words";
 import { type ScribeDraft } from "../scribe/session";
 import { mountsFor } from "../voice/instruments";
 import { VoiceCapture } from "../voice/VoiceCapture";
-import { SpokenPrompt } from "../voice/SpokenPrompt";
 import { useDictation } from "../scribe/useDictation";
 import { DictateBar } from "../scribe/DictateBar";
 import { dictateKey } from "../scribe/dictate";
@@ -409,16 +408,9 @@ export function OperationPanel({
           </div>
         )}
 
-        {/* The consent line. Rendered whenever the form below carries the
-            fields it names, whatever `spoken` resolves to: a failed or
-            absent utterance must never be the only place a patient was told
-            anything. See web/src/voice/SpokenPrompt.tsx. */}
-        {mounts.filter((m) => m.kind === "spoken-prompt").map((m) => (
-          <SpokenPrompt key={m.id} mount={m as Extract<typeof m, { kind: "spoken-prompt" }>} />
-        ))}
 
         <VoiceCapture
-          mounts={mounts.filter((m) => m.kind !== "scribe" && m.kind !== "spoken-prompt")}
+          mounts={mounts.filter((m) => m.kind !== "scribe")}
           operation={op.id}
           thread={thread}
           payload={payload}

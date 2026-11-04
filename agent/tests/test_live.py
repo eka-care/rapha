@@ -220,10 +220,12 @@ def live(base):
     # enc-001 is seeded standing at reception with nothing recorded about it,
     # so vitals has a complete payload and an unmet precondition: the one
     # combination that makes the guard state a precondition rather than a
-    # missing answer. `capture.consented` has stood on every unrefused visit
-    # since 2026-11-01 and is nothing to do with what is being proved here.
+    # missing answer. It carried capture.consented until 4 November 2026,
+    # when the owner removed consent; a visit with nothing recorded about it
+    # now carries no flags at all, which is the cleaner version of the same
+    # fixture.
     view = kernel.thread("enc-001")
-    assert view["flags"] == ["capture.consented"] and view["station"] == "reception", view["flags"]
+    assert view["flags"] == [] and view["station"] == "reception", view["flags"]
     out = cli.respond(kernel, catalogue, view, "record her bp 140 over 90 and pulse 72",
                       which="router")
     assert "Requires registered." in out, out

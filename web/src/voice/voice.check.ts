@@ -122,7 +122,10 @@ const WRITES = /\b(fetch|XMLHttpRequest|sendBeacon|navigator\.send|client\.(comm
 const sources = readdirSync(root + "web/src/voice")
   .map((f) => `web/src/voice/${f}`)
   .filter((f) => /\.tsx?$/.test(f) && !f.endsWith("voice.check.ts"));
-ok(sources.length === 3, "the check is actually reading the three voice modules");
+// Two, since SpokenPrompt.tsx went with the instrument kind it drew. The
+// count is asserted rather than left open because a glob that silently
+// matches nothing passes every assertion under it.
+ok(sources.length === 2, `the check is reading ${sources.length} voice modules, not 2`);
 for (const f of sources) {
   const hit = read(f).split("\n").find((l) => WRITES.test(l) && !l.trim().startsWith("*"));
   ok(!hit, `${f} contains no write: ${hit ?? ""}`);
@@ -220,46 +223,31 @@ ok(!/useEffect|setTimeout|setInterval/.test(panel), "the panel has no timer and 
 // .tsx (JSX is not stripped by node --experimental-strip-types) the way
 // voice.check.ts already reads OperationPanel.tsx as text above. A browser
 // check (§ of the report) is what closes that last gap.
-const registerSchema = schema("phc.schema.register-v1");
-const register = op("phc.op.patient-register");
-const rm = mountsFor(instruments, register, registerSchema);
-const consentMount = mount("spoken-prompt", rm) as any;
-ok(consentMount, "registration mounts the declared spoken-prompt instrument");
-ok(
-  consentMount?.says === instruments["phc.inst.consent-speak"].says,
-  "the mount carries the atom's own sentence, not a paraphrase",
-);
-
-// A declaration with `spoken` turned off must still produce a mount with a
-// sentence: the on-screen path is not conditioned on the off switch.
-const unspoken = JSON.parse(JSON.stringify(instruments));
-unspoken["phc.inst.consent-speak"].spoken = false;
-const stillMounted = mount("spoken-prompt", mountsFor(unspoken, register, registerSchema)) as any;
-ok(stillMounted?.says, "spoken: false still mounts the sentence for on-screen rendering");
-
-// The panel must render every spoken-prompt mount unconditionally: the
-// selector feeding SpokenPrompt is not allowed to test `.spoken`, because
-// that would reintroduce exactly the hole this is fixing (speech resolves
-// true, fails silently, and the on-screen fallback never renders).
-const selector = panel.match(/mounts\.filter\(\(m\) => m\.kind === "spoken-prompt"\)[^)]*\)/);
-ok(selector, "OperationPanel selects spoken-prompt mounts to render");
-ok(
-  !!selector && !/\.spoken/.test(selector[0]),
-  `the spoken-prompt selector does not gate on .spoken: ${selector?.[0]}`,
-);
-ok(panel.includes("<SpokenPrompt"), "OperationPanel actually renders SpokenPrompt for those mounts");
-
-// And SpokenPrompt itself must not gate its on-screen text behind `spoken`:
-// only the speechSynthesis call may do that.
-const promptSrc = read("web/src/voice/SpokenPrompt.tsx");
-const jsxStart = promptSrc.indexOf("return (");
-ok(jsxStart > 0, "SpokenPrompt has a render");
-const jsx = promptSrc.slice(jsxStart);
-ok(jsx.includes("mount.says"), "the rendered JSX includes the sentence");
-ok(!/spoken/i.test(jsx), "the on-screen JSX does not condition on `spoken` at all");
-const effectStart = promptSrc.indexOf("useEffect(");
-const effect = promptSrc.slice(effectStart, jsxStart);
-ok(effect.includes("mount.spoken"), "only the speech effect reads `spoken`, to decide whether to also speak");
-ok(/try\s*{/.test(effect), "the speech attempt is guarded so a throw cannot reach the render");
+// THE SPOKEN PROMPT IS GONE, with the consent it read out.
+//
+// Forty lines here held it: registration mounted the declared instrument,
+// the mount carried the atom's own sentence rather than a paraphrase, a
+// facility turning the voice off still got the sentence on screen, and
+// neither the panel's selector nor the component gated the on-screen text
+// behind the off switch. Every one of those was a real bug once.
+//
+// The kind had exactly one declaration in this product -- the line a clerk
+// read to a patient before recording them -- and the owner removed consent
+// in full on 4 November 2026. An instrument kind nothing declares and no
+// pill draws is what scripts/check_instruments.py exists to refuse, so the
+// kind went, and the renderer's implementation went with it.
+//
+// What is asserted instead is that it really is all gone. A half-removed
+// instrument kind is the `palette` failure again: a word the lint still
+// accepts for something no screen implements.
+for (const [what, src] of [["the panel", panel],
+                           ["the mount builder", read("web/src/voice/instruments.ts")]] as const) {
+  ok(!/spoken-prompt|SpokenPrompt/.test(src),
+     `${what} still refers to the spoken-prompt instrument, which no bundle `
+     + "can declare any more");
+}
+ok(!/"spoken-prompt"/.test(read("catalogue/vocab.py")),
+   "spoken-prompt is still an instrument kind, so a bundle can declare one "
+   + "and get a mount no screen renders");
 
 console.log(`ok   voice mount: ${checks} checks`);

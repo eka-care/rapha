@@ -16,10 +16,11 @@ Doctrine this module enforces rather than documents
   for an operation that declaration names, and the link_ids filled are only
   the ones this module understands; anything else is left empty rather than
   guessed at.
-- Addendum E.3: capture only where `capture.consented` is on the thread. The
-  renderer checks so the button is absent; api/main.py checks again before a
-  single byte is uploaded, because that is the trust boundary and the
-  renderer's check is a courtesy.
+- There is no consent gate. Capture used to be refused unless the visit
+  carried `capture.consented`, checked in the renderer so the button was
+  absent and again in api/main.py before a byte was uploaded. The owner
+  removed the whole mechanism on 4 November 2026; the only thing that
+  refuses a recording now is the caller's capability.
 - Eka is asked for the transcript AND for a note shaped like the form
   (`transcript_template` plus one template per operation, no EMR JSON).
   Structure is ASKED OF THE SAME SERVICE, in a template built from the

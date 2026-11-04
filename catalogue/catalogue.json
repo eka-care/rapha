@@ -209,28 +209,6 @@
     "default": "all-plugins"
   },
   "instruments": {
-    "phc.inst.consent-speak": {
-      "commit": "tap",
-      "fallback": "text",
-      "fields": [
-        "capture_consent",
-        "capture_declined"
-      ],
-      "grammar": null,
-      "id": "phc.inst.consent-speak",
-      "kind": "spoken-prompt",
-      "operations": [
-        "phc.op.patient-register"
-      ],
-      "readback": "required",
-      "requires": null,
-      "says": "May we record this visit to write your notes? You can say no, or stop it any time.",
-      "spoken": false,
-      "summary": "The clerk says the line; the clerk taps what the patient answered.",
-      "title": "Ask for consent",
-      "type": "instrument",
-      "types": []
-    },
     "phc.inst.consult-scribe": {
       "commit": "tap",
       "fallback": "form",
@@ -249,7 +227,7 @@
         "phc.op.household-visit"
       ],
       "readback": "required",
-      "requires": "capture.consented",
+      "requires": null,
       "says": null,
       "spoken": true,
       "summary": "Transcribes a recording into the station's template.",
@@ -316,8 +294,7 @@
     "instruments": [
       "phc.inst.vitals-voice",
       "phc.inst.vitals-device",
-      "phc.inst.consult-scribe",
-      "phc.inst.consent-speak"
+      "phc.inst.consult-scribe"
     ],
     "khoj": {
       "description": "Searches, answers, and proposes. It never commits: every write it returns is a proposal for a clinician to review and confirm on screen, exactly like every other write tool here.",
@@ -334,7 +311,6 @@
       "phc.op.abha-link",
       "phc.op.vitals-record",
       "phc.op.consult-document",
-      "phc.op.capture-withdraw",
       "phc.op.rx-prescribe",
       "phc.op.lab-order",
       "phc.op.lab-result-enter",
@@ -488,26 +464,6 @@
         "per_row": null,
         "questions": {},
         "resource": "notes"
-      }
-    ],
-    "phc.op.capture-withdraw": [
-      {
-        "fields": {
-          "created_by": {
-            "actor": "id"
-          },
-          "payload": {
-            "json": "payload"
-          },
-          "questionnaire": {
-            "const": "phc.schema.capture-withdraw-v1"
-          }
-        },
-        "per_item": null,
-        "per_question": null,
-        "per_row": null,
-        "questions": {},
-        "resource": "questionnaire_response"
       }
     ],
     "phc.op.consult-document": [
@@ -2095,46 +2051,6 @@
         "notes"
       ]
     },
-    "phc.op.capture-withdraw": {
-      "capability": "encounter.document",
-      "description": "The patient changes their mind. One tick and the scribe is off for the rest\nof the visit. This used to ride on the consultation form, where `assessment`\nis required, so a consent could not be withdrawn without also writing a note.\nStopping a recording is not a clinical act and must not require one.",
-      "emits": [
-        "capture.withdrawn"
-      ],
-      "fields": [
-        {
-          "link_id": "capture_stop",
-          "options": null,
-          "required": true,
-          "text": "The patient asked to stop the recording. It cannot be turned back on this visit.",
-          "type": "boolean"
-        }
-      ],
-      "id": "phc.op.capture-withdraw",
-      "input": "phc.schema.capture-withdraw-v1",
-      "instrument": "form",
-      "irreversibility": "correctable",
-      "kind": "write",
-      "preconditions": [
-        "capture.consented"
-      ],
-      "presents": "event",
-      "scope_qualifier": null,
-      "short": "Stop recording",
-      "station": "doctor",
-      "summary": "Stop the scribe for the rest of this visit.",
-      "surfaces": [
-        "rendered",
-        "mcp"
-      ],
-      "title": "Stop recording this visit",
-      "tool": "propose_capture_withdraw",
-      "type": "operation",
-      "verified": "unverified",
-      "writes": [
-        "questionnaire_response"
-      ]
-    },
     "phc.op.consult-document": {
       "capability": "encounter.document",
       "description": "The doctor's note. This is narrative, and narrative is the one thing ambient\ncapture is genuinely good at, because context recovers a dropped word and the\nclinician catches the rest on review.",
@@ -2889,20 +2805,6 @@
           "required": false,
           "text": "Patient category",
           "type": "choice"
-        },
-        {
-          "link_id": "capture_consent",
-          "options": null,
-          "required": false,
-          "text": "Record this visit?",
-          "type": "boolean"
-        },
-        {
-          "link_id": "capture_declined",
-          "options": null,
-          "required": false,
-          "text": "The patient said no to recording.",
-          "type": "boolean"
         }
       ],
       "id": "phc.op.patient-register",
@@ -3804,10 +3706,6 @@
   "states": [
     "abha.linked",
     "abha.pending",
-    "capture.agreed",
-    "capture.consented",
-    "capture.declined",
-    "capture.withdrawn",
     "consult.documented",
     "dispensed.complete",
     "dispensed.partial",
@@ -3863,7 +3761,6 @@
     "phc.view.station-queue": {
       "badges": {
         "abha.pending": "warn",
-        "capture.declined": "mute",
         "dispensed.partial": "mute",
         "lab.critical": "crit",
         "vitals.flagged": "crit"
@@ -4201,10 +4098,6 @@
     "states": [
       "abha.linked",
       "abha.pending",
-      "capture.agreed",
-      "capture.consented",
-      "capture.declined",
-      "capture.withdrawn",
       "consult.documented",
       "dispensed.complete",
       "dispensed.partial",
@@ -4251,10 +4144,6 @@
         "postnatal.open",
         "referral.ended",
         "referral.open",
-        "capture.agreed",
-        "capture.declined",
-        "capture.withdrawn",
-        "capture.consented",
         "vitals.flagged",
         "lab.critical"
       ],
@@ -4272,21 +4161,6 @@
             "registered",
             "not abha.linked"
           ]
-        },
-        "capture.agreed": {
-          "stored": true
-        },
-        "capture.consented": {
-          "all_of": [
-            "not capture.declined",
-            "not capture.withdrawn"
-          ]
-        },
-        "capture.declined": {
-          "stored": true
-        },
-        "capture.withdrawn": {
-          "stored": true
         },
         "consult.documented": {
           "exists": {
@@ -4508,7 +4382,6 @@
             "phc.op.followup",
             "phc.op.rx-prescribe",
             "phc.op.lab-order",
-            "phc.op.capture-withdraw",
             "phc.op.handover",
             "phc.op.handover-reply",
             "phc.op.referral-raise",
@@ -4542,9 +4415,6 @@
         }
       ],
       "stored": [
-        "capture.agreed",
-        "capture.declined",
-        "capture.withdrawn",
         "vitals.flagged",
         "lab.critical"
       ],

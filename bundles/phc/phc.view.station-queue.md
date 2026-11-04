@@ -46,7 +46,6 @@ badges:
   vitals.flagged: crit
   lab.critical: crit
   dispensed.partial: mute
-  capture.declined: mute
 ---
 
 ## In plain words

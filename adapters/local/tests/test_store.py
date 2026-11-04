@@ -166,9 +166,9 @@ def test_the_vitals_payload_fans_out_into_one_row_per_reading():
 
 def test_a_flag_raised_twice_is_one_flag():
     store = fresh()
-    store.raise_flag("enc-002", "capture.consented")
-    store.raise_flag("enc-002", "capture.consented")
-    assert store.stored_flags("enc-002") == frozenset({"capture.consented"})
+    store.raise_flag("enc-002", "vitals.flagged")
+    store.raise_flag("enc-002", "vitals.flagged")
+    assert store.stored_flags("enc-002") == frozenset({"vitals.flagged"})
     assert store.count("thread_flag", thread="enc-002", where={}) == 1
 
 
@@ -196,11 +196,14 @@ def test_the_seed_puts_people_at_different_points_in_the_line():
     assert len(threads) == 7
     assert {t.subject.get("name") for t in threads} >= {"Ramesh Kumar", "Meera Patel",
                                                         "Lakshmi Devi"}
-    # The seed declares enc-003's consent to ambient capture as well, which is
-    # what makes the scribe offerable on the demo day. capture.consented is not
-    # here because it is composed by the workflow and never stored.
-    assert store.stored_flags("enc-003") == frozenset({"vitals.flagged", "capture.agreed"})
-    assert store.stored_flags("enc-004") == frozenset({"capture.declined"})
+    # The seed used to declare two capture consent flags here as well. The
+    # owner removed consent in full on 4 November 2026, so the one stored
+    # flag left on the demo day is the flagged vitals, and a visit that
+    # stores nothing stores nothing -- which is still worth asserting,
+    # because "no flags" and "flags we failed to read" look the same from
+    # anywhere but here.
+    assert store.stored_flags("enc-003") == frozenset({"vitals.flagged"})
+    assert store.stored_flags("enc-004") == frozenset()
     assert store.count("medication_dispense", thread="enc-006", where={}) == 2
     assert store.count("medication_dispense", thread="enc-005", where={}) == 0
 

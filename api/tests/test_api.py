@@ -45,7 +45,7 @@ def test_the_queue_draws_the_declared_view_with_everyone_on_it():
 
 def test_a_thread_returns_flags_station_line_and_actions():
     body = client.get("/api/threads/enc-002").json()
-    assert body["flags"] == ["abha.pending", "capture.consented", "registered"]
+    assert body["flags"] == ["abha.pending", "registered"]
     assert body["station"] == "nurse"
     # The sixth is the home visit step, skipped because she has not delivered.
     assert [s["status"] for s in body["line"]] == ["done", "now", "pending",
@@ -135,11 +135,11 @@ def test_an_irreversible_commit_needs_the_explicit_confirm():
     assert ok.status_code == 200
     flags = ok.json()["thread"]["flags"]
     assert "abha.linked" in flags and "abha.pending" not in flags
-    # capture.consented is composed, not stored, and since 2026-11-01 it is
-    # presumed: this visit refused nothing, so it stands. What must never be
-    # here is a claim the patient agreed, which only the consent question
-    # raises and this payload does not answer.
-    assert "capture.consented" in flags and "capture.agreed" not in flags
+    # No capture flag of any kind survives the owner's removal of consent on
+    # 4 November 2026. Asserted rather than dropped: a flag that came back
+    # here would be a gate nothing honours, which looks like protection from
+    # every other part of the product.
+    assert not [f for f in flags if f.startswith("capture.")], flags
 
 
 def test_a_walk_in_can_be_registered_and_the_line_moves():
@@ -151,7 +151,7 @@ def test_a_walk_in_can_be_registered_and_the_line_moves():
     thread = reply.json()["thread"]
     assert thread["subject"]["name"] == "Devi Prasad"
     assert thread["station"] == "nurse"
-    assert thread["flags"] == ["abha.pending", "capture.consented", "registered"]
+    assert thread["flags"] == ["abha.pending", "registered"]
     # registering twice is refused by the precondition, not by a database error.
     twice = client.post("/api/operations/phc.op.patient-register/commit",
                         json={"thread": "enc-001", "payload": payload})
@@ -272,7 +272,7 @@ def test_an_utterance_proposes_and_the_card_carries_what_the_thread_must_draw():
     # no open pregnancy, so there is nothing to close and the action is
     # absent rather than drawn and refused. 11 once referring arrived, for
     # the same reason a handover is offered at every desk.
-    assert card["order"] == "the kernel lists it 1 of 11 at nurse", \
+    assert card["order"] == "the kernel lists it 1 of 10 at nurse", \
         "ordering is read from kernel actions(), never decided by the agent"
     assert card["offered_here"] is True
 
@@ -492,28 +492,40 @@ TRANSCRIPT = {"data": {"output": [
 
 
 def consented_thread():
-    """enc-003 stands at the doctor and already carries capture.agreed in the
-    seed, which composes to capture.consented (bundles/phc/seed.yaml)."""
+    """enc-003, which stands at the doctor on the seeded day.
+
+    The name is kept for one release. It used to mean "a visit whose capture
+    consent stands"; there is no consent since 4 November 2026, so it now
+    means only that this is the visit the recording tests record."""
     return "enc-003"
 
 
-def test_a_visit_that_declined_is_never_recorded():
-    """The gate, since the owner's decision of 2026-11-01 that consent is
-    presumed. What stops a recording is a refusal, and enc-004 refused."""
+def test_no_visit_is_refused_a_recording_over_consent_any_more():
+    """The owner removed consent in full on 4 November 2026.
+
+    enc-004 is the visit that used to refuse: this asserted a 403 whose
+    sentence said so, and that not one byte left the machine. The assertion
+    is inverted rather than deleted, because a 403 reappearing here would
+    mean a gate came back somewhere with nothing left in the product to
+    lower it -- a recording refused forever, for a reason nobody can act
+    on."""
+    reset()
     fake = fake_scribe(TRANSCRIPT)
-    reply = client.post("/api/scribe/sessions?thread=enc-004", content=AUDIO,
+    reply = client.post("/api/scribe/sessions?thread=enc-004&role=mo"
+                        "&operations=phc.op.consult-document", content=AUDIO,
                         headers={"Content-Type": "audio/webm"})
-    assert reply.status_code == 403
-    assert "consent" in reply.json()["detail"].lower()
-    assert "type the note" in reply.json()["detail"].lower(), \
-        "a refusal says what to do instead, because declining is not a barrier to care"
-    assert fake.v2rx.uploads == [], "not one byte left this machine"
+    assert reply.status_code == 200, reply.text
+    assert "consent" not in reply.text.lower(), reply.text
+    assert reply.json()["status"] == "running", reply.text
+    del fake
 
 
 def test_a_visit_nobody_asked_is_recorded():
-    """The other half of the same decision, and the half that changed. enc-002
-    stands at the nurse and nobody put the question to them; it used to be
-    refused and is now an ordinary recording."""
+    """enc-002 stands at the nurse and nobody put any question to them.
+
+    This was the half that changed on 2026-11-01, when consent became
+    presumed; it is now simply the ordinary case, since there is no question
+    to put."""
     reset()
     fake = fake_scribe(RUNNING, TRANSCRIPT)
     reply = client.post(
@@ -601,17 +613,20 @@ def test_withdrawal_stops_the_fetching_and_drops_the_draft():
     assert fake.v2rx.asked == asked, "a withdrawn session is never fetched again"
 
 
-def test_consent_withdrawn_while_the_job_runs_stops_the_poll_and_the_webhook():
-    """E.3, on the server and not only in the browser.
+def test_a_stopped_job_comes_back_through_neither_the_poll_nor_the_webhook():
+    """Stopping a recording that is still running at the service.
 
-    The Stop button is a DELETE and the test above covers it. This is the other
-    half: the patient says stop, the doctor commits the withdrawal, and the
-    recording that is still running at the service must not come back. Before
-    this guard the next poll answered with the full draft.
+    The test above covers the poll. This is the webhook, which is the other
+    way a draft can arrive and is the same collect underneath: a job that
+    finishes after somebody pressed Stop must not come back by either road.
+    Before this guard the next poll answered with the full draft.
 
-    The withdrawal used to ride on the consultation form, which meant it could
-    not be recorded without also writing a note. It is now its own operation
-    with its own one question form, so this posts that instead.
+    Stopping used to be an operation of its own that lowered a capture
+    consent gate, and withdrawing that consent also blocked every later
+    recording on the visit. The owner removed consent in full on 4 November
+    2026. Stopping one recording is now exactly that and nothing more, and
+    the assertion that a second one was refused went with the gate -- it
+    was the gate's property, not this route's.
     """
     fake = fake_scribe(RUNNING)
     thread = consented_thread()
@@ -620,12 +635,8 @@ def test_consent_withdrawn_while_the_job_runs_stops_the_poll_and_the_webhook():
         content=AUDIO, headers={"Content-Type": "audio/webm"}).json()
     assert started["status"] == "running"
 
-    stop = client.post("/api/operations/phc.op.capture-withdraw/commit?role=mo",
-                       json={"thread": thread, "confirmed": True,
-                             "payload": {"capture_stop": True}})
+    stop = client.delete("/api/scribe/sessions/%s?role=mo" % started["session"])
     assert stop.status_code == 200, stop.text
-    assert "capture.withdrawn" in stop.json()["thread"]["flags"]
-    assert "capture.consented" not in stop.json()["thread"]["flags"]
 
     fake.v2rx.answers = [TRANSCRIPT]             # the service finished anyway
     asked = fake.v2rx.asked
@@ -639,11 +650,15 @@ def test_consent_withdrawn_while_the_job_runs_stops_the_poll_and_the_webhook():
     assert hook == {"ok": True, "collected": False}, hook
     assert fake.v2rx.asked == asked, "nor by the webhook"
 
-    # And a second recording cannot be started on that visit at all.
+    # And a NEW recording on the same visit is an ordinary recording. This
+    # asserted a 403 while consent existed, because withdrawing it stopped
+    # capture for the rest of the visit. Stopping one recording no longer
+    # says anything about the next.
     again = client.post(
         f"/api/scribe/sessions?thread={thread}&role=mo&operations=phc.op.consult-document",
         content=AUDIO, headers={"Content-Type": "audio/webm"})
-    assert again.status_code == 403, again.text
+    assert again.status_code == 200, again.text
+    assert again.json()["session"] != started["session"], "the stopped session came back"
 
 
 def test_the_webhook_only_collects_a_session_this_kernel_started():
@@ -665,9 +680,11 @@ def test_the_webhook_only_collects_a_session_this_kernel_started():
     assert client.get("/api/scribe/sessions/%s?role=mo" % started["session"]).json()["status"] == "ready"
 
 
-def test_consent_withdrawn_after_the_draft_is_ready_refuses_the_template_switch():
+def test_a_stopped_session_refuses_the_template_switch():
     """The extract route rebuilds drafts from a transcript, so it is a draft
-    returning path like the poll and must re-read consent like the poll."""
+    returning path like the poll and must refuse a stopped session like the
+    poll. It read the consent gate until 4 November 2026; what it reads now
+    is whether the session itself was withdrawn."""
     reset()
     fake_scribe(TRANSCRIPT)
     try:
@@ -677,9 +694,7 @@ def test_consent_withdrawn_after_the_draft_is_ready_refuses_the_template_switch(
             content=AUDIO, headers={"Content-Type": "audio/webm"}).json()
         ready = client.get(f"/api/scribe/sessions/{started['session']}?role=mo").json()
         assert ready["status"] == "ready", ready
-        stop = client.post("/api/operations/phc.op.capture-withdraw/commit?role=mo",
-                           json={"thread": thread, "confirmed": True,
-                                 "payload": {"capture_stop": True}})
+        stop = client.delete("/api/scribe/sessions/%s?role=mo" % started["session"])
         assert stop.status_code == 200, stop.text
         switched = client.post(f"/api/scribe/sessions/{started['session']}/extract?role=mo",
                                json={"operations": ["phc.op.consult-document"]})

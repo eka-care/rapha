@@ -20,11 +20,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 # What CARE cannot answer for us, so we keep it. Nothing else belongs here.
-# The three capture flags are the halves of one consent: agreed at the desk,
-# declined at the desk, withdrawn mid visit. capture.consented is not among
-# them because it is composed from all three, below.
-STORED = ("capture.agreed", "capture.declined", "capture.withdrawn",
-          "vitals.flagged", "lab.critical")
+# The three capture consent flags were here until 4 November 2026, when the
+# owner removed that mechanism in full.
+STORED = ("vitals.flagged", "lab.critical")
 
 # Station order for the outpatient line. The current station is the first step
 # whose work is not done, which is why it is derived and never stored.
@@ -76,16 +74,6 @@ def derive(s: Snapshot) -> set[str]:
         # Not an error state. Addendum SSB.3: registered, tokened and seen,
         # with the gap as a worklist item rather than a barrier to care.
         flags.add("abha.pending")
-
-    # Consent to ambient capture is composed rather than stored: the store can
-    # raise a flag and cannot lower one, so a withdrawal has to be a flag of
-    # its own that turns the gate off. Since the owner's decision of
-    # 2026-11-01 it is presumed: a visit nobody refused may be recorded, and
-    # only a decline at the desk or a withdrawal at the doctor lowers it.
-    # phc.wf.outpatient declares this rule and this is that rule, in code,
-    # until thread.py is retired.
-    if not ({"capture.declined", "capture.withdrawn"} & flags):
-        flags.add("capture.consented")
 
     if s.vitals_observations:
         flags.add("vitals.recorded")

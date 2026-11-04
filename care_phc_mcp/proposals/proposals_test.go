@@ -204,21 +204,29 @@ func TestARefusalIsAuditedAndTouchesNothing(t *testing.T) {
 func TestAFlagTheGuardRaisesCarriesNoAuthor(t *testing.T) {
 	b, s, thread := loaded(t)
 	register := b.Operations["phc.op.patient-register"]
-	consented := map[string]any{}
-	for k, v := range registration {
-		consented[k] = v
-	}
-	consented["capture_consent"] = true
-	if d, err := b.Commit(s, register, thread, consented,
+	if d, err := b.Commit(s, register, thread, registration,
 		caps(register.Capability), caps(), "user:clerk", false, ""); err != nil || !d.Allowed {
 		t.Fatalf("registration: %v %v", d.Reason, err)
+	}
+	// A CRITICAL READING, which is the flag-raising path that is left. It was
+	// the consent tick on the registration form until 4 November 2026, when
+	// the owner removed consent in full and with it the last boolean question
+	// in this product that raised a flag by being answered yes. A value
+	// outside its declared critical band raises one the other way, and the
+	// property under test -- a flag the guard raised names no author -- is
+	// the same either way.
+	vitals := b.Operations["phc.op.vitals-record"]
+	if d, err := b.Commit(s, vitals, thread,
+		map[string]any{"systolic": 200, "diastolic": 80, "pulse": 72},
+		caps(vitals.Capability), caps(), "user:nurse", false, ""); err != nil || !d.Allowed {
+		t.Fatalf("vitals: %v %v", d.Reason, err)
 	}
 	raised, err := s.StoredFlags(thread)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !raised["capture.agreed"] {
-		t.Fatalf("the consent raised nothing: %v", raised)
+	if !raised["vitals.flagged"] {
+		t.Fatalf("a reading outside its critical band raised nothing: %v", raised)
 	}
 	rows, err := s.Select("thread_flag", &thread, nil, nil, 10)
 	if err != nil {

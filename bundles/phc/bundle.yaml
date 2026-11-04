@@ -15,7 +15,6 @@ operations:
   - phc.op.abha-link
   - phc.op.vitals-record
   - phc.op.consult-document
-  - phc.op.capture-withdraw
   - phc.op.rx-prescribe
   - phc.op.lab-order
   - phc.op.lab-result-enter
@@ -49,7 +48,6 @@ instruments:
   - phc.inst.vitals-voice
   - phc.inst.vitals-device
   - phc.inst.consult-scribe
-  - phc.inst.consent-speak
 # What this centre owes somebody over the life of one episode. A schedule is
 # a clinical protocol and carries its own sign off; see the atom.
 schedules:
@@ -256,10 +254,6 @@ states:
   - registered
   - abha.linked
   - abha.pending
-  - capture.agreed
-  - capture.declined
-  - capture.withdrawn
-  - capture.consented
   - vitals.recorded
   - vitals.flagged
   - consult.documented

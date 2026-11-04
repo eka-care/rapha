@@ -69,8 +69,17 @@ const tabsFor = (past: number, papers: number): Tab[] => [
 
 /** Why the microphone is unavailable, in one place. It was written out
  *  twice -- once on the composer and once nowhere, which is how the tab
- *  came to have a disabled button with no explanation beside it. */
-const MIC_WHY = "Capture consent is not recorded on this visit";
+ *  came to have a disabled button with no explanation beside it.
+ *
+ *  IT NO LONGER NAMES A PARTICULAR REASON. It used to say which flag was
+ *  missing, in this bundle's own words, which was that bundle's reason
+ *  wearing a generic control's clothes: the gate is whatever state the
+ *  scribe instrument declares in `requires:`, and another bundle gating its
+ *  scribe on something else got the health centre's sentence. This bundle
+ *  declares no gate at all now, so nothing in this build can reach the
+ *  sentence -- but the mechanism stays, because `requires:` is still a
+ *  thing an instrument may declare. */
+const MIC_WHY = "This visit is not ready to be recorded";
 
 const TAG: Record<string, string> = {
   scribe: "mic", form: "doc", device: "vitals", "constrained-voice": "mic",
@@ -520,7 +529,7 @@ export function Encounter({
           <ScribeStart
             title={starting.title}
             nudges={nudges}
-            reason={consented ? undefined : "Capture consent is not recorded on this visit"}
+            reason={consented ? undefined : MIC_WHY}
             onStart={() => { setScribing(starting.id); setStarting(null); }}
             onType={() => { openPanel(starting); setStarting(null); }}
             onCancel={() => setStarting(null)}

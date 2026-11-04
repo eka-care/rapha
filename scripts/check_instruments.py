@@ -78,10 +78,23 @@ ok("the kernel's INSTRUMENT_KINDS is catalogue/vocab.py's own tuple")
 # exclusion naming a ghost is how `palette` would come back.
 # ---------------------------------------------------------------------------
 
-assert vocab.NOT_AN_OPERATION_DEFAULT, (
-    "NOT_AN_OPERATION_DEFAULT is empty. If every kind may now be an "
-    "operation's default, say so here and delete this check's reason."
-)
+# EMPTY, DELIBERATELY, SINCE 4 NOVEMBER 2026. This asserted the list was not
+# empty, so that emptying it had to be a decision somebody wrote down rather
+# than a line that quietly went missing. This is that decision written down.
+#
+# The list held one kind, `spoken-prompt`: a line the agent spoke TO the
+# patient, mounted inside a form, which no pill could draw and so no
+# operation could default to. The only one this product ever declared was
+# the consent script, and the owner removed consent in full. The kind went
+# with it, by this check's own ghost rule two blocks down, and the exclusion
+# list went with the kind.
+#
+# Every kind that remains -- form, device, constrained-voice, scribe -- is a
+# way of capturing an answer, which is exactly what an operation's default
+# names. So the subset really is the whole set today, and INSTRUMENTS being
+# equal to INSTRUMENT_KINDS is correct rather than a line somebody dropped.
+# The mechanism stays for the next kind that is not a way of capturing
+# anything.
 ghost_exclusions = [k for k in vocab.NOT_AN_OPERATION_DEFAULT
                     if k not in vocab.INSTRUMENT_KINDS]
 assert not ghost_exclusions, (

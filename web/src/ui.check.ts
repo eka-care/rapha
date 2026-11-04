@@ -142,7 +142,7 @@ function vocabulary(): { word: string; kind: string }[] {
  *  the capability and this would not catch it. */
 const IMPLEMENTED = [
   "event", "artifact", "handover", "task", "comment",          // THREAD_OBJECTS
-  "scribe", "device", "constrained-voice", "spoken-prompt",    // INSTRUMENT_KINDS
+  "scribe", "device", "constrained-voice",                     // INSTRUMENT_KINDS
   "queue", "summary", "dashboard", "tasklist",                 // view kinds
   // loops.SortKey. The list screen's three sorts are the renderer's own, and
   // "name" collides with this bundle's first declared queue column by

@@ -22,8 +22,12 @@ let checks = 0;
 const ok = (cond: unknown, what: string) => { checks++; assert.ok(cond, `FAIL ${what}`); };
 
 const op = (id: string): Operation => cat.operations[id] as Operation;
+// Four of the doctor's own operations, so `overflow.length === 3` below is a
+// real three. The fourth was the capture withdrawal until 4 November 2026,
+// when the owner removed consent; the referral is the doctor's action that
+// took its place in this list.
 const doctor = [op("phc.op.consult-document"), op("phc.op.rx-prescribe"),
-                op("phc.op.lab-order"), op("phc.op.capture-withdraw")];
+                op("phc.op.lab-order"), op("phc.op.referral-raise")];
 
 // -- the closer is the one filled button -----------------------------------
 const w = weigh(doctor, "phc.op.consult-document");

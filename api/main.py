@@ -929,7 +929,12 @@ def abha_config():
 # value still arrives in the renderer's editable fields to be tapped. The
 # ordinary commit route is the only way any of it reaches a row.
 
-CONSENT = "capture.consented"
+# NO CONSENT GATE. The owner removed it in full on 4 November 2026: the
+# flags, the question on the registration form, the operation that withdrew
+# it and the instrument that read the sentence out. A recording is refused
+# here for one reason only, which is that the caller does not hold the
+# capability to fill what they named. See bundles/phc/phc.wf.outpatient.md
+# for what was taken out and what it would take to put back.
 
 
 def scribe_allowed(user):
@@ -982,38 +987,32 @@ def scribe_templates(request: Request, station: str = ""):
 
 
 def collect_if_consent_stands(session):
-    """Collect a draft only while the visit still consents to being recorded.
+    """Collect a draft. Named for a gate that no longer exists.
 
-    Every path that could bring a draft back goes through here, because E.3's
-    withdrawal is mid visit by definition and the flag that records it is
-    raised on a form neither of those paths knows about. Whoever turns the
-    consent off, the next collect is a withdrawal instead and the job's result
-    is never read. The browser's Stop button is the DELETE route and does not
-    need this; a poll and a webhook do.
+    The name is kept for one release because a poll and a webhook both call
+    it; there is nothing left for it to decide. The browser's Stop button is
+    still the DELETE route, and it still withdraws.
     """
-    if CONSENT not in set(state.flags(store, session["thread"], WORKFLOW)):
-        return scribe.withdraw(session)
     return scribe.collect(session)
 
 
 def scribe_or_404(session_id, request):
-    """The caller's own session, with consent re-read, or a 404.
+    """The caller's own session, or a 404.
 
-    Every browser facing session route comes through here, so none of them can
-    forget either rule. A session belongs to the actor who started it: its
+    Every browser facing session route comes through here, so none of them
+    can forget the rule. A session belongs to the actor who started it: its
     transcript is somebody's consultation, kept for a day, and another desk
-    asking for it by id gets the same 404 as an id nobody started, so an id is
-    not a way to learn that a recording exists. And a visit whose consent has
-    since been turned off is withdrawn before the route sees it, which is E.3
-    again: the next thing anyone asks of that session is its withdrawal.
+    asking for it by id gets the same 404 as an id nobody started, so an id
+    is not a way to learn that a recording exists.
+
+    It used to re-read the visit's consent and withdraw the session when it
+    had been turned off. There is no consent to read now.
     """
     scribe.expire()
     session = scribe.SESSIONS.get(session_id)
     if not session or session["actor"] != caller(request)["id"]:
         raise HTTPException(404, "no such scribe session %r. Nothing was kept."
                             % session_id)
-    if CONSENT not in set(state.flags(store, session["thread"], WORKFLOW)):
-        scribe.withdraw(session)
     return session
 
 
@@ -1022,11 +1021,10 @@ async def scribe_start(request: Request, thread: str = None, format: str = None,
                        operations: str = "", language: str = "auto"):
     """The browser posts one recording here, as the raw body.
 
-    Four refusals before a byte leaves this machine, in this order: consent,
-    the named templates, the language, and a connector that can be reached.
-    Addendum E.3 is the first of them: a visit without `capture.consented` is
-    not recorded, and the answer says so in words a receptionist could read to
-    the patient.
+    Three refusals before a byte leaves this machine, in this order: the
+    named templates, the language, and a connector that can be reached. There
+    were four, and the first was the visit's own consent to being recorded;
+    the owner removed that in full on 4 November 2026.
 
     The audio is bytes in this process and one temporary file in scribe.start,
     deleted in its `finally`. It is never written under this repository, never
@@ -1048,10 +1046,6 @@ async def scribe_start(request: Request, thread: str = None, format: str = None,
     """
     user = caller(request)
     thread_id = thread_of({"thread": thread})
-    if CONSENT not in set(state.flags(store, thread_id, WORKFLOW)):
-        raise HTTPException(403, "Capture consent is not recorded on this visit, so "
-                                 "nothing may be recorded. Ask, record the consent, "
-                                 "or type the note: the record is the same either way.")
     if language not in scribe.LANGUAGES:
         raise HTTPException(400, "Unknown language %r." % language)
     picked, instrument = scribe_pick(user, operations.split(","))
@@ -1159,9 +1153,9 @@ async def scribe_extract(session_id: str, request: Request):
     user = caller(request)
     session = scribe_or_404(session_id, request)
     if session["status"] == "withdrawn":
-        raise HTTPException(403, "Capture consent was withdrawn on this visit, so "
-                                 "nothing from the recording is kept. Type the note: "
-                                 "the record is the same either way.")
+        raise HTTPException(403, "This recording was stopped, so nothing from it "
+                                 "is kept. Type the note: the record is the same "
+                                 "either way.")
     if session["status"] != "ready":
         raise HTTPException(409, "There is no transcript to fill from yet.")
     body = await request.json()

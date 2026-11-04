@@ -110,19 +110,12 @@ IRREVERSIBILITY = ("reversible", "correctable", "irreversible")
 # `proposed` is a request and not a write. A denial is the opposite of one.
 WROTE = ("committed", "confirmed", "allowed", "amended")
 
-INSTRUMENT_KINDS = ("form", "device", "constrained-voice", "scribe", "spoken-prompt")
+INSTRUMENT_KINDS = ("form", "device", "constrained-voice", "scribe")
 
 # INSTRUMENTS is the narrower question: what an OPERATION's `instrument:` may
 # name as its default. The renderer draws that default as a pill icon and a
 # tag and nothing else (web/src/icons.tsx, and TAG in
 # web/src/screens/Encounter.tsx), so it is exactly the kinds a pill can draw.
-#
-# A strict subset on purpose. A spoken-prompt is not a way of capturing
-# anything: it is a line the agent speaks TO the patient, mounted inside a
-# form beside the fields and rendered from the instrument declaration
-# (web/src/form/Panel.tsx), never from an operation's default. There is no
-# pill for it, and an operation defaulting to one would be a promise no screen
-# keeps.
 #
 # Derived rather than typed out a second time, so the two lists cannot drift
 # apart again. They had: `palette` was written out here, outlived the
@@ -130,7 +123,14 @@ INSTRUMENT_KINDS = ("form", "device", "constrained-voice", "scribe", "spoken-pro
 # identifier and this was a lowercase string, and was still accepted by lint
 # for an instrument no renderer implements. scripts/check_instruments.py now
 # fails if any of this disagrees, in either direction.
-NOT_AN_OPERATION_DEFAULT = ("spoken-prompt",)
+#
+# The list is empty today and the mechanism stays. `spoken-prompt` was the
+# one entry: a line the agent spoke TO the patient, mounted inside a form,
+# never an operation's default. The only one this product ever declared was
+# the consent script, and the owner removed consent in full on 4 November
+# 2026 -- so by this file's own rule, an instrument kind nothing declares
+# and no pill draws is an entry that has to go.
+NOT_AN_OPERATION_DEFAULT = ()
 INSTRUMENTS = tuple(k for k in INSTRUMENT_KINDS if k not in NOT_AN_OPERATION_DEFAULT)
 KINDS = ("read", "write")
 

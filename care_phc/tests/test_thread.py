@@ -16,23 +16,26 @@ SEEN = Snapshot(patient_exists=True, abha_number="12-3456", vitals_observations=
 
 def test_a_registered_patient_without_abha_is_pending_not_broken():
     flags = derive(REG)
-    assert flags == {"registered", "abha.pending", "capture.consented"}
+    assert flags == {"registered", "abha.pending"}
     assert "abha.linked" not in flags
 
 
 def test_linking_an_abha_clears_pending():
     flags = derive(Snapshot(patient_exists=True, abha_number="12-3456"))
-    assert flags == {"registered", "abha.linked", "capture.consented"}
+    assert flags == {"registered", "abha.linked"}
 
 
-def test_capture_is_consented_until_somebody_refuses_it():
-    """The owner's decision of 2026-11-01. A visit nobody asked about may be
-    recorded; a decline at the desk and a withdrawal at the doctor are the
-    two answers that still stop it, and either one alone is enough."""
-    assert "capture.consented" in derive(REG)
-    for refusal in ("capture.declined", "capture.withdrawn"):
-        flags = derive(Snapshot(patient_exists=True, stored=frozenset({refusal})))
-        assert "capture.consented" not in flags, refusal
+def test_no_visit_carries_a_capture_consent_flag_any_more():
+    """The owner removed consent in full on 4 November 2026.
+
+    This replaces a test that asserted the gate stood unless somebody
+    refused. It is kept, rather than deleted with the feature, because the
+    thing worth holding now is that NONE of it comes back by accident: a
+    flag reintroduced here would be a gate nothing in the product honours,
+    which is worse than either having consent or not having it."""
+    for snapshot in (REG, Snapshot(patient_exists=True, abha_number="12-3456")):
+        leaked = {f for f in derive(snapshot) if f.startswith("capture.")}
+        assert not leaked, leaked
 
 
 def test_partial_and_complete_dispense_are_a_comparison_not_a_boolean():
