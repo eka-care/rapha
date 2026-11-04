@@ -26,7 +26,7 @@ import (
 // loaded catalogue. Built per request rather than cached, because it is four
 // map references and a cached copy would be one more thing to invalidate.
 func (k *kernel) viewBundle() views.Bundle {
-	return views.Bundle{Views: k.cat.Views, Metrics: k.cat.Metrics,
+	return views.Bundle{Catalogue: k.cat, Views: k.cat.Views, Metrics: k.cat.Metrics,
 		Workflow: k.cat.Workflow, Operations: k.operations, Atoms: k.cat.ActionJSON}
 }
 
@@ -112,8 +112,15 @@ func (k *kernel) resolveView(w http.ResponseWriter, r *http.Request, viewID stri
 	if given := r.URL.Query().Get("thread"); given != "" {
 		thread = &given
 	}
+	// `on` is the day a calendar answers for. Present-but-empty is a value
+	// (and a 400), as it is for FastAPI's `on: str = None`.
+	var on *string
+	if r.URL.Query().Has("on") {
+		given := r.URL.Query().Get("on")
+		on = &given
+	}
 	result, err := views.Resolve(k.viewBundle(), viewID, k.store, thread, caps,
-		time.Now().UTC())
+		time.Now().UTC(), on)
 	if err != nil {
 		// api/main.py catches ValueError around resolve() and turns it into a
 		// 400; anything else is a 500. views.Declared is that ValueError.

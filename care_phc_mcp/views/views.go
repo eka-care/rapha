@@ -40,8 +40,10 @@ import (
 	"time"
 
 	carephc "github.com/eka-care/care_phc_mcp"
+	"github.com/eka-care/care_phc_mcp/cohort"
 	"github.com/eka-care/care_phc_mcp/kstate"
 	"github.com/eka-care/care_phc_mcp/pyval"
+	"github.com/eka-care/care_phc_mcp/schedule"
 	"github.com/eka-care/care_phc_mcp/store"
 )
 
@@ -57,6 +59,8 @@ type Reader interface {
 // Bundle is the declarations a view resolves against. Named for the Python's
 // Bundle, and carrying only what kernel/views.py actually reads off it.
 type Bundle struct {
+	// Catalogue is what a calendar's schedules are read from.
+	Catalogue  *carephc.Catalogue
 	Views      map[string]carephc.View
 	Metrics    map[string]carephc.Metric
 	Workflow   *carephc.Workflow
@@ -444,6 +448,58 @@ func summary(b Bundle, view carephc.View, s Reader, thread string,
 	return out, nil
 }
 
+// covers is kernel/views._covers: whether a contact is owed on this day. A
+// missed contact stays owed on every day after its window shuts, so its On
+// list alone is not the answer; one rule serves both the day's rows and the
+// month's counts, so they cannot disagree.
+func covers(e cohort.Entry, iso string) bool {
+	for _, d := range e.On {
+		if d == iso {
+			return true
+		}
+	}
+	return e.State == schedule.Missed && e.Closes < iso
+}
+
+// calendar is kernel/views._calendar: the day's owed contacts as rows, and the
+// day's month as counts.
+func calendar(b Bundle, view carephc.View, s Reader, on *string,
+	at time.Time) ([]cohort.Entry, []Group, error) {
+	day := at.UTC().Truncate(24 * time.Hour)
+	if on != nil {
+		parsed, err := time.Parse("2006-01-02", *on)
+		if err != nil {
+			// The Python's date.fromisoformat message, which the route
+			// turns into a 400.
+			return nil, nil, Declared{Reason: "Invalid isoformat string: " + pyval.Repr(*on)}
+		}
+		day = parsed
+	}
+	first := time.Date(day.Year(), day.Month(), 1, 0, 0, 0, 0, time.UTC)
+	last := first.AddDate(0, 1, -1)
+	owed, err := cohort.Owed(b.Catalogue, s, b.Workflow, view.Episodes, first, last, at)
+	if err != nil {
+		return nil, nil, err
+	}
+	rows := []cohort.Entry{}
+	for _, e := range owed {
+		if covers(e, day.Format("2006-01-02")) {
+			rows = append(rows, e)
+		}
+	}
+	groups := []Group{}
+	for d := first; !d.After(last); d = d.AddDate(0, 0, 1) {
+		iso, n := d.Format("2006-01-02"), 0
+		for _, e := range owed {
+			if covers(e, iso) {
+				n++
+			}
+		}
+		groups = append(groups, Group{Key: iso, Count: n})
+	}
+	return rows, groups, nil
+}
+
 // ViewResult is kernel/contracts.ViewResult, in the Python's own field order.
 type ViewResult struct {
 	View        string  `json:"view"`
@@ -462,9 +518,10 @@ func (e Declared) Error() string { return e.Reason }
 
 // Resolve evaluates one view. `thread` is required for a summary and ignored
 // otherwise. `caps` is the caller's; the capability to OPEN the view is the
-// caller's check, at the route, not here.
+// caller's check, at the route, not here. `on` is the day a calendar answers
+// for (ISO date; today when nil) and is ignored otherwise.
 func Resolve(b Bundle, viewID string, s Reader, thread *string,
-	caps map[string]bool, at time.Time) (*ViewResult, error) {
+	caps map[string]bool, at time.Time, on *string) (*ViewResult, error) {
 	view, declared := b.Views[viewID]
 	if !declared {
 		return nil, Declared{Reason: fmt.Sprintf("unknown view '%s'", viewID)}
@@ -516,6 +573,12 @@ func Resolve(b Bundle, viewID string, s Reader, thread *string,
 			return nil, err
 		}
 		result.Rows = rows
+	case "calendar":
+		rows, groups, err := calendar(b, view, s, on, at)
+		if err != nil {
+			return nil, err
+		}
+		result.Rows, result.Groups = rows, groups
 	default:
 		return nil, Declared{Reason: fmt.Sprintf("unknown view kind '%s'", view.Kind)}
 	}

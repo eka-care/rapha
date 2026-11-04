@@ -293,6 +293,8 @@ type View struct {
 	Window  string   `json:"window"`
 	// tasklist
 	Tasks []Task `json:"tasks"`
+	// calendar: the episode type names whose schedules it draws.
+	Episodes []string `json:"episodes"`
 }
 
 // Metric is kernel/contracts.Metric. Denominator is a pointer because None
