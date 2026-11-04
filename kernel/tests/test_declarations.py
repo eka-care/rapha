@@ -299,11 +299,23 @@ def test_every_contact_in_every_schedule_names_an_operation_reachable_over_its_e
     # contact's operation, never whether that step applies and the operation's
     # preconditions hold for the very episode that owes the contact. Without
     # this, a schedule can chase a woman for ever with no form to answer it.
+    #
+    # TWO HONEST LIMITS. It treats every resource that is not an episode as
+    # present, so a precondition such as "not registered" would be read as
+    # reachable when it never is. And it raises loudly on any state rule form
+    # it does not know instead of guessing, which is deliberate: a new form
+    # must be taught here, not waved through.
+    from catalogue import vocab
+    roles = vocab.for_bundle("phc").roles
     assert CAT["schedules"]
     for sid, s in CAT["schedules"].items():
         reach = _reachable(s["episode"])
         for c in s["contacts"]:
             assert c["operation"] in reach, (sid, c["id"], c["operation"])
+            # And the person it is owed to can act on it: their role holds
+            # the operation's capability.
+            cap = CAT["operations"][c["operation"]]["capability"]
+            assert cap in roles[c["owner"]], (sid, c["id"], c["owner"], cap)
 
 
 def test_every_episode_a_schedule_covers_can_be_ended_by_an_operation_offered_over_it():
@@ -381,6 +393,49 @@ def test_no_engineering_words_reach_a_worker_in_the_day_45_check():
     for t in texts:
         for bad in ("TODO", "FIXME", "sign-off", "SIGN-OFF", "HRP"):
             assert bad not in t, t
+
+
+def test_every_day_45_outcome_really_ends_the_tail_when_committed():
+    # Not inferred from the mapping: commit each answer through the real path.
+    for outcome in ("both_well", "mother_unwell", "baby_unwell", "both_unwell",
+                    "baby_died", "mother_died", "not_found"):
+        t, store, bundle, wf, state = _high_risk_mother()
+        assert "postnatal_high_risk.open" in state.flags(store, t, wf)
+        from kernel import proposals
+        from catalogue import vocab
+        r = proposals.commit(store, bundle, "phc.op.postnatal-outcome", thread=t,
+                             payload={"outcome": outcome},
+                             caps=set(vocab.for_bundle("phc").roles["anm"]),
+                             actor="user:jyothi")
+        assert r, (outcome, r.reason)
+        assert "postnatal_high_risk.open" not in state.flags(store, t, wf), outcome
+
+
+def _high_risk_mother():
+    from datetime import datetime, timedelta, timezone
+    from adapters.local.store import SqliteStore
+    from catalogue import vocab
+    from kernel import proposals, state
+
+    bundle = declarations.load("phc")
+    caps = set(vocab.for_bundle("phc").roles["anm"])
+    today = datetime.now(timezone.utc).date()
+    store = SqliteStore(":memory:")
+    t = store.open_thread(token="1", actor="user:jyothi")
+    for op, payload in (
+            ("phc.op.patient-register", {"name": "Lakshmi Devi", "age": 27, "sex": "female",
+             "phone": "9876500001", "village": "Yadiki", "category": "general"}),
+            ("phc.op.pregnancy-open", {"dating_basis": "last_menstrual_period",
+             "dating_date": (today - timedelta(days=280)).isoformat()}),
+            ("phc.op.risk-mark", {"risk_factor": "severe_anaemia",
+             "marked_date": today.isoformat()}),
+            ("phc.op.delivery-record-high-risk", {
+             "delivery_date": (today - timedelta(days=2)).isoformat(),
+             "outcome": "live_birth"})):
+        r = proposals.commit(store, bundle, op, thread=t, payload=payload,
+                             caps=caps, actor="user:jyothi")
+        assert r, (op, r.reason)
+    return t, store, bundle, bundle.workflow(), state
 
 
 def test_closing_a_high_risk_mothers_two_episodes_leaves_her_owed_nothing():
