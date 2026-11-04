@@ -332,6 +332,9 @@ const IMPLEMENTED = [
     "her record asked the centre for a range: it must read her own episodes");
   assert.match(patient, /Nothing is booked for her/, "no episodes at all is said in a sentence");
   assert.match(patient, /atOf\(/, "a card's date in the address opens her grid anchored there");
+  // `own` (no names on chips) belongs to her page alone.
+  const cal = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
+  assert.ok(!/\bown\b/.test(cal), "the facility page must never pass `own`: it would strip names from the centre's chips");
   // The month strips are gone; the plain list of visits is not.
   assert.ok(!/arc-scale|arc-months|Months\b/.test(arc), "the month strips are still drawn");
   assert.match(arc, /arc-list/, "the plain list of visits must stay");

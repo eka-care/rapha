@@ -4,7 +4,10 @@
  *
  *  THE PLACEMENT RULE these pin: a contact sits in the one cell the kernel
  *  names (its due day, or today when missed and due before the range), and in no
- *  other. The day list answers "what is owed today" by window; the grid
+ *  other. That is the FACILITY page's rule. One woman's own page differs on
+ *  purpose: ownRows keeps a missed contact on the day it was due, because her
+ *  record is a history and the point is to see when things slipped. Two right
+ *  answers to two questions; do not make either match the other. The day list answers "what is owed today" by window; the grid
  *  answers "when is each one due". Both are right, and this file is where the
  *  grid's half is held, so nobody unifies them.
  */
@@ -245,6 +248,14 @@ const DEC = "2026-12-09";
   const before = JSON.stringify(src);
   ownRows(src, "p1", she);
   assert.equal(JSON.stringify(src), before);
+  // A visit whose date cannot be read is placed nowhere, breaks nothing, and
+  // is not lost: her plain list below the grid shows every contact unfiltered.
+  const junk = ownRows([ep("e1", "pregnancy", [contact("a", "soon"), contact("b", "2026-11-20")])], "p1", she);
+  assert.equal(junk.length, 2);
+  const jg = cells("month", "2026-11-04", junk, 3, "2026-11-04");
+  assert.equal(jg.reduce((n, c) => n + c.rows.length, 0), 1, "only the readable one is drawn in the grid");
+  const arcSrc = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "thread", "Arc.tsx"), "utf8");
+  assert.match(arcSrc, /episode\.contacts\.map\(/, "the list draws every contact, unfiltered");
   ok("her own episodes: placed on their due days, two stay two, none is a sentence's business");
 }
 

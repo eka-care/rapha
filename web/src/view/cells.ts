@@ -135,6 +135,14 @@ export function wasDue(row: CalendarRow, cell: string): string {
 
 /** One woman's own episodes as grid rows, for her record.
  *
+ *  A DELIBERATE DIFFERENCE FROM THE FACILITY PAGE. The centre's range answer
+ *  moves a contact missed before the span onto today, so it is not lost off
+ *  the edge. Her record keeps it on the day it was due, because her page is a
+ *  history and the reason to open it is to see when things slipped. Both are
+ *  right for their question; do not "fix" one to match the other. A contact
+ *  with an unreadable due date lands in no cell, and is still in the plain
+ *  list on her page.
+ *
  *  Her page reads her episodes, not the centre's range answer, so her contacts
  *  have no `cell`; this gives each the one the kernel gives: its due day. A
  *  late contact keeps its due day here, because her record is the place to see

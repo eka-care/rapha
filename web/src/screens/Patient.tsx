@@ -123,6 +123,9 @@ function Care({ view, id, name }: { view: SubjectView; id: string; name: string 
   if (!view.episodes.length) {
     return <div className="state-empty">Nothing is booked for her yet.</div>;
   }
+  // The browser's date: the subject answer carries no timestamp of the
+  // kernel's own, unlike a view answer's `generated_at`. Kept as the old
+  // strips did, until the kernel sends one.
   const today = new Date().toISOString().slice(0, 10);
   const scale = scaleOf(hash);
   const anchor = atOf(hash) || today;
