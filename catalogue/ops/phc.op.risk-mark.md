@@ -64,6 +64,14 @@ never infers risk. A clinician names the factor, and that is recorded.
 The pregnancy shows as high risk, and three extra check-ups appear for the
 doctor.
 
+## NEEDS SIGN-OFF: the list of risk factors
+
+The 23 factors in the form are the programme's categories as this build
+transcribed them. Nobody clinical has checked the transcription. If one is
+miscopied or missing, a nurse may be unable to name the real reason, pick
+"other", or record the wrong one, and the audit line then carries a wrong
+clinical assertion. The extra check-ups do not depend on which is chosen.
+
 ## When it goes wrong
 
 - **The date or factor was wrong.** While this same visit is still open,
