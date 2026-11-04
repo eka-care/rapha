@@ -103,7 +103,7 @@ def test_a_range_answers_every_day_in_it_and_not_one_day_more():
     keys = [g["key"] for g in result.groups]
     assert keys == [(due + timedelta(days=n)).isoformat() for n in range(-3, 4)], keys
     assert [r["contact"] for r in result.rows] == ["anc1"], result.rows
-    assert [g["count"] for g in result.groups] == [1] * 7
+    assert [g["count"] for g in result.groups] == [0, 0, 0, 1, 0, 0, 0]
     # One day either side is outside the range and so outside the answer.
     assert span(pregnant(), (due + timedelta(days=1)).isoformat(),
                 (due + timedelta(days=3)).isoformat(), at=due).rows == []
