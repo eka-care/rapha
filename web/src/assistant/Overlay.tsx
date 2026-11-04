@@ -31,12 +31,24 @@ export function AssistantOverlay({ open, question, side, onClose }: {
     opener.current = document.activeElement as HTMLElement | null;
     // The question box if it is already there; else the dialog itself, so
     // Escape works while the assistant is still loading.
-    (shell.current?.querySelector<HTMLElement>("input") ?? shell.current)?.focus();
+    // At the side the dialog itself is never focused: a ring around a whole
+    // column is not a focus indicator, and it is not modal anyway.
+    const into = shell.current?.querySelector<HTMLElement>("input") ?? (side ? null : shell.current);
+    into?.focus();
     return () => { opener.current?.focus(); opener.current = null; };
-  }, [open]);
+  }, [open, side]);
+
+  // Escape closes the side panel from anywhere, since nothing in it need hold
+  // the focus.
+  useEffect(() => {
+    if (!open || !side) return;
+    const on = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    addEventListener("keydown", on);
+    return () => removeEventListener("keydown", on);
+  }, [open, side, onClose]);
 
   return (
-    <div hidden={!open}>
+    <div hidden={!open} className={side ? "assist-slot--side" : undefined}>
       {!side && <div className="scrim" onClick={onClose} />}
       <div className={`assist ${side ? "assist--side" : "assist--overlay"}`}
         role="dialog" aria-modal={!side} aria-label="Medical assistant"
