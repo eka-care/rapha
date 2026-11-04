@@ -268,6 +268,8 @@ const DEC = "2026-12-09";
   assert.equal(jg.reduce((n, c) => n + c.rows.length, 0), 1, "only the readable one is drawn in the grid");
   const arcSrc = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "thread", "Arc.tsx"), "utf8");
   assert.match(arcSrc, /episode\.contacts\.map\(/, "the list draws every contact, unfiltered");
+  assert.match(arcSrc, /<span className="arc-t" title=\{c\.programme_title \|\| undefined\}>/,
+    "her plain list carries the programme's words on hover, and nothing when there are none");
   ok("her own episodes: placed on their due days, two stay two, none is a sentence's business");
 }
 

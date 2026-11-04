@@ -101,7 +101,7 @@ function Step({ contact, onAct }: { contact: Contact; onAct?: (op: string) => vo
         <Icon name={(MARK[c.state] ?? "clock") as never} className="i sm" />
       </span>
       <span className="arc-b">
-        <span className="arc-t">
+        <span className="arc-t" title={c.programme_title || undefined}>
           {c.title}
           <span className={`badge ${TONE[c.state] ?? "b-mute"}`}>{title(c.state)}</span>
           {/* What the programme calls this, when it calls it anything. A
