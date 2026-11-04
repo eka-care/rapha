@@ -92,6 +92,85 @@ def test_the_groups_total_equals_the_sum_of_every_day_s_rows():
     assert sum(g["count"] for g in month) == total > 0, (sum(g["count"] for g in month), total)
 
 
+def span(store, since, until, *, at):
+    return views.resolve(BUNDLE, VIEW, store, since=since, until=until, at=noon(at))
+
+
+def test_a_range_answers_every_day_in_it_and_not_one_day_more():
+    due = day(contact("anc1").due)
+    result = span(pregnant(), (due - timedelta(days=3)).isoformat(),
+                  (due + timedelta(days=3)).isoformat(), at=due)
+    keys = [g["key"] for g in result.groups]
+    assert keys == [(due + timedelta(days=n)).isoformat() for n in range(-3, 4)], keys
+    assert [r["contact"] for r in result.rows] == ["anc1"], result.rows
+    assert [g["count"] for g in result.groups] == [1] * 7
+    # One day either side is outside the range and so outside the answer.
+    assert span(pregnant(), (due + timedelta(days=1)).isoformat(),
+                (due + timedelta(days=3)).isoformat(), at=due).rows == []
+
+
+def test_on_still_answers_exactly_what_it_did_before():
+    due = day(contact("anc1").due)
+    result = ask(pregnant(), due.isoformat())
+    first = due.replace(day=1)
+    assert [g["key"] for g in result.groups][0] == first.isoformat()
+    assert len(result.groups) == (date(due.year + (due.month == 12), due.month % 12 + 1, 1) - first).days
+    assert [r["contact"] for r in result.rows] == ["anc1"]
+
+
+def test_a_range_crossing_a_year_boundary_is_whole():
+    result = span(pregnant(), "2026-12-28", "2027-01-03", at=date(2026, 12, 28))
+    keys = [g["key"] for g in result.groups]
+    assert keys == ["2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31",
+                    "2027-01-01", "2027-01-02", "2027-01-03"], keys
+
+
+def test_a_range_of_one_day_equals_the_same_day_asked_with_on():
+    due = day(contact("anc1").due).isoformat()
+    one = span(pregnant(), due, due, at=date.fromisoformat(due))
+    same = ask(pregnant(), due)
+    key = lambda rs: [(r["contact"], r["subject"], r["due"]) for r in rs]
+    assert key(one.rows) == key(same.rows) != []
+    assert one.groups == [g for g in same.groups if g["key"] == due]
+
+
+def refused(**kw):
+    try:
+        views.resolve(BUNDLE, VIEW, pregnant(), **kw)
+    except ValueError as e:
+        return str(e)
+    raise AssertionError("%r was accepted" % (kw,))
+
+
+def test_a_range_longer_than_the_cap_is_refused_with_400():
+    assert views.resolve(BUNDLE, VIEW, pregnant(), since="2026-01-01", until="2027-02-04")
+    said = refused(since="2026-01-01", until="2027-02-05")
+    assert said == "a range may span at most 400 days", said
+
+
+def test_an_inverted_range_is_refused():
+    assert refused(since="2026-03-02", until="2026-03-01") == "from must not be after to"
+
+
+def test_from_without_to_is_refused_rather_than_guessed():
+    said = "from and to go together: give both or neither"
+    assert refused(since="2026-03-01") == said
+    assert refused(until="2026-03-01") == said
+    assert "not be combined" in refused(on="2026-03-01", since="2026-03-01", until="2026-03-02")
+    assert refused(since="soon", until="2026-03-02").startswith("from must be a real calendar day")
+
+
+def test_a_contact_due_outside_the_range_is_absent_though_its_window_overlaps():
+    anc2 = contact("anc2")
+    # The window opens at day 98 but the visit is due at 154: a range that
+    # touches only the early part of the window does not draw it.
+    since, until = day(anc2.opens), day(anc2.opens + 20)
+    result = span(pregnant(), since.isoformat(), until.isoformat(), at=since)
+    assert "anc2" not in [r["contact"] for r in result.rows], result.rows
+    wide = span(pregnant(), since.isoformat(), day(anc2.due).isoformat(), at=since)
+    assert "anc2" in [r["contact"] for r in wide.rows]
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

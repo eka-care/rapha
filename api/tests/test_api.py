@@ -909,6 +909,7 @@ def test_no_subject_carries_the_kernels_own_bookkeeping():
 def test_the_calendar_route_answers_a_day_and_refuses_a_caller_without_the_capability():
     # Every date is fixed: the window of a contact does not move with the
     # clock, so the day asked about is always inside it.
+    from datetime import timedelta
     from kernel.tests.test_cohort import LMP, contact, day
     due = day(contact("anc1").due)
     main.store.db.execute(
@@ -924,6 +925,14 @@ def test_the_calendar_route_answers_a_day_and_refuses_a_caller_without_the_capab
     assert [r["contact"] for r in body.json()["rows"]] == ["anc1"], body.json()["rows"]
     assert {g["key"]: g["count"] for g in body.json()["groups"]}[due.isoformat()] == 1
     assert client.get("/api/views/phc.view.calendar?on=soon").status_code == 400
+    span = client.get("/api/views/phc.view.calendar?from=%s&to=%s" % (
+        (due - timedelta(days=1)).isoformat(), (due + timedelta(days=1)).isoformat()))
+    assert span.status_code == 200, span.text
+    assert [r["contact"] for r in span.json()["rows"]] == ["anc1"]
+    assert len(span.json()["groups"]) == 3
+    for q in ("from=%s" % due.isoformat(), "from=2026-03-02&to=2026-03-01",
+              "from=2026-01-01&to=2028-01-01", "on=%s&from=%s&to=%s" % ((due.isoformat(),) * 3)):
+        assert client.get("/api/views/phc.view.calendar?" + q).status_code == 400, q
     real = main.caller
     main.caller = lambda request: {"id": "user:none", "role": "none", "capabilities": [],
                                    "scopes": []}

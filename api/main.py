@@ -32,7 +32,7 @@ import json
 import os
 from dataclasses import asdict
 
-from fastapi import APIRouter, Body, FastAPI, HTTPException, Request, Response
+from fastapi import APIRouter, Body, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
 
@@ -646,7 +646,8 @@ def queue(request: Request, view: str = None):
 
 
 @router.get("/views/{view_id}")
-def get_view(view_id: str, request: Request, thread: str = None, on: str = None):
+def get_view(view_id: str, request: Request, thread: str = None, on: str = None,
+             from_: str = Query(None, alias="from"), to: str = None):
     user = caller(request)
     declaration = BUNDLE.views.get(view_id)
     if not declaration:
@@ -655,7 +656,8 @@ def get_view(view_id: str, request: Request, thread: str = None, on: str = None)
         raise HTTPException(403, "missing capability %s" % declaration.capability)
     try:
         result = views.resolve(BUNDLE, view_id, store, thread=thread,
-                               caps=set(user["capabilities"]), on=on)
+                               caps=set(user["capabilities"]), on=on,
+                               since=from_, until=to)
     except ValueError as e:
         raise HTTPException(400, str(e))
     return result.to_json()

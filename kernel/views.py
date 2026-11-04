@@ -96,13 +96,16 @@ def _covers(entry, day):
     return iso in entry["on"] or (entry["state"] == "missed" and entry["closes"] < iso)
 
 
-def _day(on):
+MAX_RANGE_DAYS = 400
+
+
+def _day(on, name="on"):
     """A calendar day is a date: exactly YYYY-MM-DD. A timestamp would raise
     a timezone question (whose midnight?) the route cannot answer, and newer
     Pythons also take compact and week forms; the Go twin takes one spelling
     and so does this."""
     text = str(on)
-    said = "on must be a real calendar day written YYYY-MM-DD, not %r" % text
+    said = "%s must be a real calendar day written YYYY-MM-DD, not %r" % (name, text)
     digits = text[:4] + text[5:7] + text[8:]
     if len(text) != 10 or text[4] != "-" or text[7] != "-" \
             or not digits.isascii() or not digits.isdigit():
@@ -115,9 +118,42 @@ def _day(on):
         raise ValueError(said) from None
 
 
-def _calendar(bundle, view, store, on, at):
-    """The day's owed contacts as rows, and the day's month as counts."""
+def _span(on, since, until):
+    """The days a range names, or None when none was given. One sentence per
+    refusal, written here once."""
+    if since is None and until is None:
+        return None
+    if on is not None:
+        raise ValueError("on and from/to answer different questions and must not be combined")
+    if since is None or until is None:
+        raise ValueError("from and to go together: give both or neither")
+    first, last = _day(since, "from"), _day(until, "to")
+    if first > last:
+        raise ValueError("from must not be after to")
+    if (last - first).days + 1 > MAX_RANGE_DAYS:
+        raise ValueError("a range may span at most %d days" % MAX_RANGE_DAYS)
+    return first, last
+
+
+def _calendar(bundle, view, store, on, at, since=None, until=None):
+    """The day's owed contacts as rows, and the day's month as counts. Given a
+    range instead: the contacts drawn in it, and a count for each of its days."""
     now = at or datetime.now(timezone.utc)
+    span = _span(on, since, until)
+    if span:
+        first, last = span
+        owed = cohort.owed(bundle, store, bundle.workflows[view.workflow],
+                           types=view.episodes, since=first, until=last, at=now)
+        # A grid draws a contact on its due day, so a window that merely
+        # overlaps the range does not put it here. A missed contact is the
+        # exception, as for a day: it stays owed after its window shuts.
+        rows = [e for e in owed
+                if first.isoformat() <= e["due"] <= last.isoformat() or e["state"] == "missed"]
+        days = [first + timedelta(days=n) for n in range((last - first).days + 1)]
+        rows = [e for e in rows if any(_covers(e, d) for d in days)]
+        groups = [{"key": d.isoformat(), "count": sum(1 for e in rows if _covers(e, d))}
+                  for d in days]
+        return rows, groups
     day = now.date() if on is None else _day(on)
     first = day.replace(day=1)
     last = day.replace(day=_cal.monthrange(day.year, day.month)[1])
@@ -196,11 +232,13 @@ def _summary(bundle, view, store, thread, caps):
     return out
 
 
-def resolve(bundle, view_id, store, *, thread=None, caps=frozenset(), at=None, on=None):
+def resolve(bundle, view_id, store, *, thread=None, caps=frozenset(), at=None, on=None,
+            since=None, until=None):
     """Evaluate one view. `thread` is required for a summary and ignored
     otherwise. `caps` is the caller's; the capability to open the view is the
     caller's check, at the route, not here. `on` is the day a calendar
-    answers for (ISO date; today when absent) and is ignored otherwise."""
+    answers for (ISO date; today when absent) and is ignored otherwise. `since`
+    and `until` are a range of days instead, both or neither, never with `on`."""
     view = bundle.views[view_id]
     generated_at = (at or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -217,7 +255,7 @@ def resolve(bundle, view_id, store, *, thread=None, caps=frozenset(), at=None, o
     elif view.kind == "tasklist":
         rows, groups = _tasklist(bundle, view, store, at), []
     elif view.kind == "calendar":
-        rows, groups = _calendar(bundle, view, store, on, at)
+        rows, groups = _calendar(bundle, view, store, on, at, since, until)
     else:
         raise ValueError(f"unknown view kind '{view.kind}'")
 
