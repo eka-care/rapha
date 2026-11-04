@@ -226,3 +226,56 @@
 .sc-rec-note {
   flex-basis:100%; font-size:12px; color:var(--color-text-secondary);
 }
+
+/* ───────────────────────── speaking into a field ────────────────────────
+
+   One strip, fixed to the foot of the screen. Fixed rather than inline
+   because a bar that appears in the flow pushes the form down under the
+   cursor the instant somebody starts talking, which moves the field they
+   are dictating into away from where they last saw it. */
+.dict {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+  z-index: 60; max-width: calc(100vw - 32px);
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface); box-shadow: var(--shadow-md);
+  font-size: 13px; color: var(--color-text-primary);
+}
+/* The recording tone, which is the one this product already uses for a
+   microphone that is open. It is not the clinical tone and must not be:
+   a recording is not a risk. */
+.dict-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  background: var(--color-critical);
+  animation: dictpulse 1.1s infinite;
+}
+@keyframes dictpulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .dict-dot { animation: none; } }
+.dict-hint { color: var(--color-text-tertiary); font-size: 12px; }
+.dict-bad { border-color: var(--color-border-strong); }
+.dict-x {
+  margin-left: 2px; width: 24px; height: 24px; flex-shrink: 0;
+  display: grid; place-items: center; border-radius: var(--radius-sm);
+  border: none; background: transparent; cursor: pointer;
+  color: var(--color-text-tertiary);
+}
+.dict-x .i { transform: rotate(45deg); }
+.dict-x:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+
+/* The words that had nowhere to go. Wider, and square, because this one is
+   read and copied rather than glanced at. */
+.dict-loose {
+  flex-direction: column; align-items: stretch; gap: 9px;
+  width: 440px; border-radius: var(--radius-lg); padding: 14px;
+}
+.dict-h { font-size: 12.5px; color: var(--color-text-secondary); }
+.dict-acts { display: flex; justify-content: flex-end; }
+
+/* The shortcut, on the form's foot. Quiet: it is a fact about the product,
+   and it is read once. */
+.dict-tip {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 11.5px; color: var(--color-text-tertiary);
+}
+@media (max-width: 640px) { .dict-tip { display: none; } }

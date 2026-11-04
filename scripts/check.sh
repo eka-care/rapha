@@ -250,6 +250,9 @@ if [ -d web/node_modules ]; then
   # never leaves one. Pure rules over a rectangle, so no browser.
   (cd web && node --experimental-strip-types src/app/guide.check.ts)
   (cd web && node --experimental-strip-types src/app/width.check.ts)
+  # Speaking into whatever field has the cursor: where the words land, what
+  # the gesture means, and which fields take them. No microphone needed.
+  (cd web && node --experimental-strip-types src/scribe/dictate.check.ts)
   # The Eka session: which surface is asking, when a session is worth
   # refreshing, and the one origin where the gate cannot apply. Nectar's own
   # rules, so the claims product and this one behave the same way.

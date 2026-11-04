@@ -35,6 +35,9 @@ import { type ScribeDraft } from "../scribe/session";
 import { mountsFor } from "../voice/instruments";
 import { VoiceCapture } from "../voice/VoiceCapture";
 import { SpokenPrompt } from "../voice/SpokenPrompt";
+import { useDictation } from "../scribe/useDictation";
+import { DictateBar } from "../scribe/DictateBar";
+import { dictateKey } from "../scribe/dictate";
 
 const IRREVERSIBLE = "irreversible";
 
@@ -222,6 +225,13 @@ export function OperationPanel({
   }
 
   const irreversible = op.irreversibility === IRREVERSIBLE;
+
+  /** SPEAKING INTO WHATEVER FIELD HAS THE CURSOR, on every form in the
+   *  product, because no form in this product may exist that cannot be
+   *  filled by voice. Mounted here rather than on each screen for exactly
+   *  that reason: a form that forgot to mount it would be a form you have to
+   *  type into, and there would be nothing to see. */
+  const dictation = useDictation({ thread, operation: op.id, enabled: !busy });
 
   /** The ABHA operation is the one form in this product that is not a form.
    *  Its questionnaire is still what the kernel validates, but every answer
@@ -510,6 +520,20 @@ export function OperationPanel({
         <div className="f-hint">Heard but not filled: {heardDraft.unfilled.map((id) => labels.get(id) ?? id).join(", ")}</div>
       )}
       <div className="mod-f">
+        {/* THE SHORTCUT, SAID OUT LOUD. A gesture nobody can discover is a
+            gesture nobody uses, and this is a product whose whole claim is
+            that you speak rather than type. It sits on the form's own foot
+            rather than on every field, because it is one fact about the
+            product and not a control per box.
+
+            A browser that cannot record says nothing here rather than
+            advertising a key that would do nothing. */}
+        {dictation.supported && (
+          <span className="dict-tip">
+            <span className="kbd">{dictateKey()}</span>
+            hold to speak into any field
+          </span>
+        )}
         <span style={{ flex: 1 }} />
         {onCancel && <button className="cq" onClick={onCancel} disabled={busy}>Cancel</button>}
         {proposal && (
@@ -523,6 +547,7 @@ export function OperationPanel({
           {busy ? "Sending..." : stage === "confirm" ? "Commit" : proposal ? "Confirm" : irreversible ? "Continue" : "Commit"}
         </button>}
       </div>
+      <DictateBar state={dictation.state} onDismiss={dictation.dismiss} />
     </div>
   );
 }

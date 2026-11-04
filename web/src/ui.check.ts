@@ -965,6 +965,56 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   ok("shell: the second panel's width is the person's, clamped to a column "
      + "that can still be grabbed, and the divider works without a mouse");
 
+  // -- no form without a microphone ----------------------------------------
+  //
+  // THE RULE, in the owner's words: Rapha is a scribe-first platform and no
+  // form can exist without scribe. A form that can only be typed into is the
+  // product admitting its own claim is decoration. So dictation is mounted
+  // on the one component every form in this product goes through, and this
+  // asserts that it is still mounted there -- a screen that forgot would be
+  // a screen you have to type into, with nothing on it to say so.
+  const panel = code(readFileSync(join(SRC, "form", "Panel.tsx"), "utf8"));
+  assert.match(panel, /useDictation\(\{ thread, operation: op\.id/,
+    "the form panel no longer mounts dictation, so there are forms in this "
+    + "product that can only be typed into");
+  assert.match(panel, /<DictateBar/,
+    "dictation runs with nothing on screen to say the microphone is open");
+  assert.match(panel, /dictation\.supported && \(/,
+    "the shortcut is advertised on a browser that cannot record, so the key "
+    + "is offered to somebody for whom it does nothing");
+  // The key is read, never spelled. A shortcut typed into a component is a
+  // shortcut that cannot be changed, and there is no rupee key on a plain
+  // US or UK keyboard -- which would be the whole feature gone, silently.
+  const dict = code(readFileSync(join(SRC, "scribe", "dictate.ts"), "utf8"));
+  const bar = code(readFileSync(join(SRC, "scribe", "DictateBar.tsx"), "utf8"));
+  const hook = code(readFileSync(join(SRC, "scribe", "useDictation.ts"), "utf8"));
+  for (const [file, src] of [["Panel.tsx", panel], ["DictateBar.tsx", bar],
+                             ["useDictation.ts", hook]] as const) {
+    assert.ok(!src.includes("\u20B9"),
+      `${file} spells the dictation key, so a person whose keyboard has no `
+      + "rupee sign cannot reach dictation at all");
+  }
+  assert.match(dict, /export const DEFAULT_KEY = "\u20B9";/,
+    "the default key is declared somewhere other than the one file that owns it");
+  assert.match(hook, /dictateKey\(\)/, "the hook does not read the configured key");
+  // Where the words go is decided at keydown, not when they come back. A
+  // person may have clicked elsewhere while speaking, and a sentence about
+  // a patient's chest in whatever field they moved to is worse than none.
+  assert.match(hook, /const target = isTarget\(document\.activeElement\)/,
+    "the target is read when the transcript arrives rather than when the "
+    + "person started speaking, so the words can land in the wrong field");
+  // Assigning .value on a controlled input leaves React unaware, and the
+  // next render puts the old value back -- the words appear and vanish a
+  // frame later. Verified in the browser; held here.
+  assert.match(hook, /getOwnPropertyDescriptor\(proto, "value"\)\?\.set/,
+    "the dictated words are written straight onto .value, which React "
+    + "overwrites on its next render");
+  assert.match(hook, /new Event\("input", \{ bubbles: true \}\)/,
+    "nothing tells React the field changed, so the form's own state never "
+    + "learns what was said");
+  ok("forms: every form mounts dictation, the key is a setting rather than "
+     + "a constant, the words go where the cursor was, and React hears them");
+
   // -- the live region is in the document BEFORE it has anything to say -----
   //
   // This is the half of SC 4.1.3 that is easy to get wrong: a region that
