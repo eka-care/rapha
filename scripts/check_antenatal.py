@@ -56,7 +56,9 @@ AN_ANM = "user:jyothi"
 # Twenty eight weeks ago, so she is inside the third contact's window on the
 # day this runs. Written relative to today rather than frozen, because a
 # schedule check pinned to a date passes for a week and then asserts nothing.
-TODAY = date.today()
+# The kernel decides "today" in UTC, so the check must too. date.today() is
+# local and disagrees with the kernel for 5.5 hours after midnight in India.
+TODAY = datetime.now(timezone.utc).date()
 LMP = TODAY - timedelta(days=196)
 
 # One low haemoglobin, so the flag path is exercised too.

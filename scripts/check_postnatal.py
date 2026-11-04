@@ -47,7 +47,9 @@ ASHA = set(vocab.for_bundle("phc").roles["asha"])
 AN_ANM = "user:jyothi"
 AN_ASHA = "user:parvathi"
 
-TODAY = date.today()
+# The kernel decides "today" in UTC, so the check must too. date.today() is
+# local and disagrees with the kernel for 5.5 hours after midnight in India.
+TODAY = datetime.now(timezone.utc).date()
 LMP = TODAY - timedelta(days=280)
 
 

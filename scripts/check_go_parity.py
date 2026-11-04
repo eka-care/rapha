@@ -1286,7 +1286,9 @@ def s_the_calendar_with_women_in_it(walk, codes):
     (which must leave no row at all). Then `?on=` is walked over the dates
     where the two engines' calendars are most likely to differ.
     """
-    today = datetime.date.today()
+    # UTC, because the kernel's "today" is UTC; a local date disagrees for
+    # 5.5 hours after midnight in India.
+    today = datetime.datetime.now(datetime.timezone.utc).date()
     day = lambda n: (today - datetime.timedelta(days=n)).isoformat()
 
     def woman(label, lmp_days_ago):

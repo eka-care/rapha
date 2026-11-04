@@ -55,7 +55,9 @@ POSTNATAL = BUNDLE.schedules["phc.sched.postnatal"]
 ANM = set(vocab.for_bundle("phc").roles["anm"])
 AN_ANM = "user:jyothi"
 
-TODAY = date.today()
+# The kernel decides "today" in UTC, so the check must too. date.today() is
+# local and disagrees with the kernel for 5.5 hours after midnight in India.
+TODAY = datetime.now(timezone.utc).date()
 NOW = datetime(TODAY.year, TODAY.month, TODAY.day, 12, 0, 0, tzinfo=timezone.utc)
 #: Far enough either side to cover every window of both arcs.
 SPAN = range(-420, 421)
