@@ -313,11 +313,32 @@
    sits under the patient and above everything else, so the person is the
    one thing that never changes as you move between tabs.
 */
+/* TWO PARTS: the tabs, which scroll, and one control pinned to the right
+   end, which does not. The row itself stopped scrolling as a whole when the
+   panel's switch moved into it -- a control that scrolls off the end of the
+   row is a control a phone cannot reach. */
 .vtabs {
-  display: flex; gap: 2px; flex-shrink: 0; padding: 0 9px;
+  display: flex; align-items: center; flex-shrink: 0; padding: 0 9px;
   border-bottom: 1px solid var(--color-border-subtle);
+}
+.vtabs-l {
+  display: flex; gap: 2px; min-width: 0; flex: 1;
   overflow-x: auto; scrollbar-width: none;
 }
+.vtabs-l::-webkit-scrollbar { display: none; }
+/* The switch for the column beside this one. Quiet when that column is
+   open, because the normal state of a thing does not need announcing. */
+.vtabs-fold {
+  flex-shrink: 0; margin-left: 6px; width: 30px; height: 30px;
+  display: grid; place-items: center; border-radius: var(--radius-sm);
+  border: none; background: transparent; cursor: pointer;
+  color: var(--color-text-tertiary);
+}
+.vtabs-fold:hover { background: var(--color-bg-subtle); color: var(--color-text-primary); }
+.vtabs-fold.on { color: var(--color-text-secondary); }
+/* Below the width where the panel exists at all, its switch is a control
+   for something that is not there. */
+@media (max-width: 1100px) { .vtabs-fold { display: none; } }
 .vtabs::-webkit-scrollbar { display: none; }
 /* Underlined by what it selects, not boxed: a row of filled pills reads as
    a row of buttons, and these are places, not actions. */

@@ -905,6 +905,66 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   ok("nav: a tasklist is the bell and not a place, its words are the "
      + "declaration's, and the register is not a folder");
 
+  // -- two columns of one screen start at the same height -------------------
+  //
+  // The panel beside a visit carried its own "Hide" pill, in a row of its
+  // own above its first card. That row pushed every card in that column 56px
+  // below the card it sat beside: two columns of one screen, starting at
+  // different heights, which is what the owner reported. A control that
+  // opens and closes a column does not belong inside the column.
+  const tabsSrc = code(readFileSync(join(SRC, "thread", "Tabs.tsx"), "utf8"));
+  const encSrc = code(readFileSync(join(SRC, "screens", "Encounter.tsx"), "utf8"));
+  assert.match(tabsSrc, /trailing\?: React\.ReactNode/,
+    "the tab row cannot carry the panel's switch, so that switch is back "
+    + "inside the column it controls");
+  assert.match(encSrc, /className=\{`vtabs-fold/,
+    "the panel's switch is not in the visit's tab row");
+  assert.ok(!/rail-top|rail-fold/.test(encSrc),
+    "the panel still draws its own fold row above its first card, which is "
+    + "what pushed that column below the one beside it");
+  const chatCss = readFileSync(join(SRC, "style", "chat.css"), "utf8");
+  const partsCss = readFileSync(join(SRC, "style", "parts.css"), "utf8");
+  const orphan = [...rules(chatCss), ...rules(partsCss)]
+    .filter((r) => /\.rail-top|\.rail-fold|\.rail-open/.test(r.selector))
+    .map((r) => r.selector);
+  assert.deepEqual(orphan, [],
+    "the old fold row's stylesheet outlived the row: " + orphan.join(", "));
+  // The grid is what actually holds the alignment, so it is asserted too: a
+  // column that starts its children at `start` keeps both tops level.
+  assert.match(chatCss, /\.chatgrid \{[^}]*align-items:\s*start/,
+    "the visit's two columns no longer start at the same height");
+  ok("visit: the panel's switch is in the row that spans the screen, and "
+     + "both columns start level");
+
+  // -- the second panel is the person's own width ---------------------------
+  //
+  // A centre working off the line all day wants that column wide; one
+  // reading long notes wants it out of the way. The rule and its limits are
+  // pure and checked in app/width.check.ts; what is checked here is that the
+  // screen actually goes through them, and that the divider is reachable
+  // without a mouse.
+  const grip = code(readFileSync(join(SRC, "app", "Grip.tsx"), "utf8"));
+  const shellCssSrc = readFileSync(join(SRC, "style", "shell.css"), "utf8");
+  assert.match(grip, /role="separator"/,
+    "the divider is a div with a drag handler, so a keyboard cannot reach it");
+  assert.match(grip, /aria-valuenow=\{width\}/,
+    "the divider announces no width, so its position is a fact only a "
+    + "sighted person has");
+  assert.match(grip, /setPointerCapture/,
+    "the drag is not captured, so moving faster than a re-render drops it "
+    + "halfway and the column stops under the cursor");
+  assert.match(grip, /nudge\(width, e\.key\)/,
+    "the divider's keyboard behaviour is written in the component rather "
+    + "than in the rule that is checked");
+  assert.match(appSrc, /clampWidth\(px\)/,
+    "the shell sets the width without the clamp, so a drag can produce a "
+    + "column too narrow to grab again -- and that width is what gets saved");
+  assert.match(shellCssSrc, /width: var\(--panel-w/,
+    "the column's width is still fixed in the stylesheet, so nothing a "
+    + "person drags can change it");
+  ok("shell: the second panel's width is the person's, clamped to a column "
+     + "that can still be grabbed, and the divider works without a mouse");
+
   // -- the live region is in the document BEFORE it has anything to say -----
   //
   // This is the half of SC 4.1.3 that is easy to get wrong: a region that

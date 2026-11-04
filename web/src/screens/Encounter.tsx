@@ -344,7 +344,26 @@ export function Encounter({
           </div>
         </header>
 
-        <Tabs open={tab} tabs={tabsFor(past.length, papers.length)} onPick={setTab} />
+        <Tabs
+          open={tab}
+          tabs={tabsFor(past.length, papers.length)}
+          onPick={setTab}
+          /* THE PANEL'S OWN SWITCH, in the row that spans the screen rather
+             than inside the column it controls. It was a "Hide" row at the
+             top of that column, which pushed every card in it below the
+             card it sat beside -- the misalignment the owner reported. */
+          trailing={
+            <button
+              type="button"
+              className={`vtabs-fold${folded ? "" : " on"}`}
+              aria-pressed={!folded}
+              aria-label={folded ? "Show the panels beside this visit" : "Hide the panels beside this visit"}
+              onClick={() => fold(!folded)}
+            >
+              <Icon name="sidebar" className="i sm" />
+            </button>
+          }
+        />
 
         {tab === "context" && (
           <div className="vbody">
@@ -541,20 +560,8 @@ export function Encounter({
         </>}
       </div>
 
-      {folded ? (
-        <button type="button" className="rail-open" onClick={() => fold(false)}
-                aria-label="Show the panels beside this visit">
-          <Icon name="chev" className="i sm" />
-        </button>
-      ) : (
+      {!folded && (
         <aside className="panel" aria-label="Beside this visit">
-          <div className="rail-top">
-            <button type="button" className="rail-fold" onClick={() => fold(true)}>
-              <Icon name="chev" className="i sm" />
-              Hide
-            </button>
-          </div>
-
           {/* WHAT USED TO BE HERE: the 16 raw capability codes this caller
               holds, and the audit trail. Both are true and neither is a
               clinician's. A nurse reading our capability ids beside a

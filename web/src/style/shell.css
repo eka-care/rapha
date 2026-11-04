@@ -66,12 +66,32 @@
 .rail .prof-menu { top: auto; bottom: calc(100% + 6px); right: auto; left: 0; }
 
 .sb {
-  width: 248px; flex-shrink: 0;
+  /* The person's own width, set on .app and remembered. 248 is only the
+     starting point now; width.ts holds the limits and why they are there. */
+  width: var(--panel-w, 248px); flex-shrink: 0;
   background: var(--color-bg-rail);
   border-right: 1px solid var(--color-border-subtle);
   display: flex; flex-direction: column;
   transition: background var(--duration-slow) var(--ease-out);
 }
+/* ---------------------------------------------- the divider you can drag
+
+   5px wide and sitting in the gap, with a bigger invisible target around it
+   because 5px is a hard thing to hit with a trackpad and an impossible one
+   with a thumb. It takes the accent only while it is being used, so the
+   screen does not carry a coloured line down the middle of it all day. */
+.grip {
+  width: 5px; flex-shrink: 0; margin-left: -5px; z-index: 20;
+  cursor: col-resize; position: relative; background: transparent;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.grip::after { content: ""; position: absolute; inset: 0 -4px; }
+.grip:hover, .grip:focus-visible, .grip:active { background: var(--color-agent-line); }
+.grip:focus-visible { outline: 2px solid var(--color-agent); outline-offset: 0; }
+/* Where the panel is a drawer over the screen, there is no edge between two
+   columns to drag -- the columns are stacked. */
+@media (max-width: 900px) { .grip { display: none; } }
+
 /* Panel two's own head: what this column is, and how much of it there is.
    It replaces the brand block, which was the product's name repeated on
    the second column of every screen. */

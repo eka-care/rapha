@@ -477,19 +477,14 @@
   .cp-row-end { margin-left: 0; text-align: left; }
 }
 
-/* ── The rail beside a visit: folds away, and each panel can go ─────────── */
+/* ── The rail beside a visit: each panel can go ─────────────────────────
 
-.rail-top { display: flex; justify-content: flex-end; }
-.rail-fold, .rail-open {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 10px; border-radius: var(--radius-pill); cursor: pointer;
-  border: 1px solid var(--color-border-subtle); background: transparent;
-  color: var(--color-text-tertiary); font: inherit; font-size: 12px;
-}
-.rail-fold:hover, .rail-open:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
-.rail-fold .i { transform: rotate(-90deg); }
-.rail-open { align-self: start; padding: 7px; }
-.rail-open .i { transform: rotate(90deg); }
+   ITS OWN FOLD CONTROL IS GONE from here. A "Hide" pill in a row of its
+   own at the top of this column pushed every card in it 56px below the
+   card it sat beside, so the two columns of one screen started at
+   different heights. The switch is in the visit's tab row now (.vtabs-fold
+   in chat.css), which is the row that spans the screen, and this column
+   starts where the card beside it starts. */
 
 /* The remove control appears on the panel it would remove, and only when
    the pointer is on it: four always-visible crosses down a rail read as four

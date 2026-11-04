@@ -15,7 +15,7 @@ import type { Operation } from "./types";
 
 export type IconName =
   "sliders" | "mark" | "mark-lg" | "search" | "home" | "moon" | "sun" | "vitals" | "mic" | "box" | "clip" | "eye" | "plus" | "folder" | "chat" | "spark" | "check" | "alert" | "lock" | "send" | "user" | "users" | "list" | "cog" | "refer" | "chev" | "id" | "doc" |
-  "handle" | "out" | "clock" | "bell";
+  "handle" | "out" | "clock" | "bell" | "sidebar";
 
 export function Icon({ name, size, className }: {
   name: IconName; size?: "sm" | "lg"; className?: string;
@@ -88,6 +88,10 @@ const SHEET = `
   <!-- The way out: a door left open and an arrow leaving through it. Drawn
        rather than borrowed so its stroke matches the sheet. -->
   <symbol id="i-out" viewBox="0 0 24 24"><path d="M15 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H15"/><path d="M10 8l-4 4 4 4M6 12h9"/></symbol>
+  <!-- A panel beside the page, shown as the page with one edge filled. The
+       control that opens and closes a column should look like the column,
+       not like an arrow: an arrow says "go", and this goes nowhere. -->
+  <symbol id="i-sidebar" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M15 4.5v15"/></symbol>
   <!-- What is waiting for somebody, in the one place a person already looks
        for that. Drawn rather than borrowed so its stroke matches the sheet:
        a plain bell, no clapper swing and no notification dot baked in -- the

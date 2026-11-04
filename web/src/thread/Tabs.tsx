@@ -37,13 +37,24 @@ export type TabId = "messages" | "scribe" | "context" | "past" | "ask";
 
 export type Tab = { id: TabId; title: string; icon: IconName; count?: number };
 
-export function Tabs({ open, tabs, onPick }: {
+export function Tabs({ open, tabs, trailing, onPick }: {
   open: TabId;
   tabs: Tab[];
+  /** Pinned to the right end of this row, outside the tablist.
+   *
+   *  The panel beside this visit used to carry its own Hide control, in a
+   *  row of its own above its first card -- which pushed every card in that
+   *  column 56px below the card they sat beside, and was the misalignment
+   *  the owner saw. A control that opens and closes a column does not
+   *  belong inside the column: it belongs in the row that spans the screen,
+   *  at the end of it, which is where it is now and where Heidi keeps the
+   *  same control. */
+  trailing?: React.ReactNode;
   onPick: (id: TabId) => void;
 }) {
   return (
-    <div className="vtabs" role="tablist">
+    <div className="vtabs">
+      <div className="vtabs-l" role="tablist">
       {tabs.map((t) => (
         <button
           key={t.id}
@@ -61,6 +72,8 @@ export function Tabs({ open, tabs, onPick }: {
           {!!t.count && <span className="vtab-n">{t.count}</span>}
         </button>
       ))}
+      </div>
+      {trailing}
     </div>
   );
 }

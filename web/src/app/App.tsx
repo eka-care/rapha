@@ -28,6 +28,8 @@ import type { Facility, QueueRow, TaskRow, ViewDecl, ViewResult, Workflow } from
 import { Icon, IconSheet } from "../icons";
 import { Khoj } from "./Khoj";
 import { Bell } from "./Bell";
+import { Grip } from "./Grip";
+import { clampWidth, readWidth, saveWidth } from "./width";
 import { Sidebar, panelFor } from "./Sidebar";
 import { Rail } from "./Rail";
 import { PARTS } from "../screens/Control";
@@ -313,6 +315,11 @@ export function App() {
    *  the top right now, because nobody navigates to "things that need me".
    *  The kind is the view's own, so this file names no view. */
   const [bellOpen, setBellOpen] = useState(false);
+  /** How wide the second panel is, which is the person's choice and not
+   *  ours. A centre that works off the line all day wants it wide; one
+   *  reading long consultation notes wants it out of the way. The rule and
+   *  its limits are in width.ts, checked under plain node. */
+  const [panelW, setPanelW] = useState(readWidth);
   const tasks = useMemo<TaskRow[]>(
     () => loaded.filter((l) => l.decl.kind === "tasklist")
       .flatMap((l) => (l.result.rows ?? []) as TaskRow[]),
@@ -420,7 +427,8 @@ export function App() {
   const panel = panelFor(here);
 
   return (
-    <div className="app" data-panel={panel ?? "none"}>
+    <div className="app" data-panel={panel ?? "none"}
+         style={{ "--panel-w": `${panelW}px` } as React.CSSProperties}>
       <IconSheet />
       {/* SC 2.4.2: every screen was called "Workspace", so a person with the
           queue and a patient open in two tabs could not tell them apart. Both
@@ -461,6 +469,14 @@ export function App() {
           onGo={go}
           onCall={(token) => { setKhojOpen(false); go(`#/desk?q=${encodeURIComponent(token)}`); }}
           onCloseDrawer={() => setDrawer(false)}
+        />
+      )}
+      {panel && (
+        <Grip
+          width={panelW}
+          label="Width of this panel"
+          onWidth={(px) => setPanelW(clampWidth(px))}
+          onDone={(px) => saveWidth(px)}
         />
       )}
       {tour && <Tour onClose={() => setTour(false)} />}
