@@ -190,8 +190,8 @@ export function App() {
   // callers still say where they are asking from; nothing reads it, and the
   // argument stays so this is one decision to reverse rather than thirty
   // call sites.
-  const askAssistant = (text: string, _where: "side" | "centre") => {
-    setAssistQuestion({ text, n: Date.now() });
+  const askAssistant = (text: string, _where: "side" | "centre", context?: Question["context"]) => {
+    setAssistQuestion({ text, n: Date.now(), context });
     setAssistSeen(true);
     setAssistOpen(true);
   };
@@ -557,7 +557,7 @@ export function App() {
                 onSay={(t) => onSay(route.id, t)}
                 onChanged={reload}
                 onOpenSubject={(sid) => go(`#/patients/${sid}`)}
-                onAskRapha={(q) => askAssistant(q, "side")}
+                onAskRapha={(q, c) => askAssistant(q, "side", c)}
                 onRemember={remember}
                 catchment={facility.data?.catchment}
               />
@@ -699,7 +699,7 @@ function ThreadScreen({ id, cat, ctx, said, asking, nonce, catchment, onSay, onC
   catchment?: Facility["catchment"];
   onSay: (t: string) => void; onChanged: () => void; onRemember: (r: Recent) => void;
   onOpenSubject: (subjectId: string) => void;
-  onAskRapha: (question: string) => void;
+  onAskRapha: (question: string, context: { title: string; text: string }) => void;
 }) {
   const { data, error, loading, reload } = useAsync(() => api.thread(id), [id, nonce]);
   // header() already answers "what is this thread called", using the queue

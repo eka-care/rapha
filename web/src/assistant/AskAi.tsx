@@ -68,43 +68,50 @@ export function AskAi({ open, question, onClose }: {
 }) {
   const host = useRef<HTMLDivElement>(null);
   const made = useRef<Widget | null>(null);
-  const asked = useRef<string | null>(null);
+  const asked = useRef(0);
+  const quieted = useRef(false);
 
+  // THE ELEMENT IS MADE BEFORE THE SCRIPT LOADS. The bundle, the moment it
+  // runs, looks for an `<eka-ask-ai>` in the page and makes its own, pointed
+  // at the developer docs' agent, if there is none; that is the "Ask AI" bar
+  // that appeared at the foot of every screen. With ours already in the
+  // document it finds ours and makes nothing.
   useEffect(() => {
     if (!CONFIG.ready || !open) return;
     let live = true;
+    if (!made.current && host.current) {
+      const el = document.createElement("eka-ask-ai") as Widget;
+      el.setAttribute("agent-id", CONFIG.agentId);
+      if (CONFIG.authToken) el.setAttribute("auth-token", CONFIG.authToken);
+      // The reader's own conversations, kept on this origin. A shared
+      // counter machine is the wrong place for them, by the same
+      // reasoning that turned the records SDK's offline store off.
+      el.setAttribute("history", "off");
+      // Not the docs site's pills, which are what it opens with otherwise.
+      el.setAttribute("starters", STARTERS);
+      host.current.append(el);
+      // The widget removes `open` itself when a reader closes the panel,
+      // so that is what this app listens to rather than keeping its own
+      // idea of whether it is showing.
+      new MutationObserver(() => {
+        if (!el.hasAttribute("open")) onClose();
+      }).observe(el, { attributes: true, attributeFilter: ["open"] });
+      made.current = el;
+    }
     void load().then(() => {
-      if (!live || !host.current) return;
-      let el = made.current;
-      if (!el) {
-        el = document.createElement("eka-ask-ai") as Widget;
-        el.setAttribute("agent-id", CONFIG.agentId);
-        if (CONFIG.authToken) el.setAttribute("auth-token", CONFIG.authToken);
-        // The reader's own conversations, kept on this origin. A shared
-        // counter machine is the wrong place for them, by the same
-        // reasoning that turned the records SDK's offline store off.
-        el.setAttribute("history", "off");
-        // Not the docs site's pills, which are what it opens with otherwise.
-        el.setAttribute("starters", STARTERS);
-        host.current.append(el);
-        // ITS OWN FLOATING BAR STAYS DOWN. The widget draws a compact "Ask
-        // AI" bar at the foot of the page for a docs site that has nothing
-        // else to type in. This app has a composer on every thread and a
-        // command bar over everything, so a third place to ask would be a
-        // third place to look. One rule, into its shadow root, which is
-        // reaching into somebody else's component and is written down here
-        // rather than discovered later: if the widget ever grows an
-        // attribute for this, that attribute replaces these four lines.
+      const el = made.current;
+      if (!live || !el) return;
+      // ITS OWN FLOATING BAR STAYS DOWN. This app has a composer on every
+      // thread and a command bar over everything, so a third place to ask
+      // is a third place to look. One rule, into its shadow root, which is
+      // reaching into somebody else's component and is written down here:
+      // if the widget ever grows an attribute for this, that attribute
+      // replaces these lines.
+      if (!quieted.current && el.shadowRoot) {
         const quiet = document.createElement("style");
         quiet.textContent = ".ask-ai__float { display: none !important; }";
-        el.shadowRoot?.append(quiet);
-        // The widget removes `open` itself when a reader closes the panel,
-        // so that is what this app listens to rather than keeping its own
-        // idea of whether it is showing.
-        new MutationObserver(() => {
-          if (!el!.hasAttribute("open")) onClose();
-        }).observe(el, { attributes: true, attributeFilter: ["open"] });
-        made.current = el;
+        el.shadowRoot.append(quiet);
+        quieted.current = true;
       }
       el.setAttribute("open", "");
       seed(el);
@@ -112,20 +119,26 @@ export function AskAi({ open, question, onClose }: {
     return () => { live = false; };
   }, [open, onClose]);
 
-  // A question only seeds the composer once. Asking the same thing again
-  // from the same screen is the reader's to do, not this effect's.
+  // A question only seeds the composer once per asking (`n`), so asking the
+  // same thing twice works and a re-render does not ask again.
   //
-  // The widget is made after a script load, so the question can arrive before
-  // the element exists: the first open both made it and found nothing to seed.
-  // `latest` holds the question so the load can seed it once the element is
-  // there, and this effect covers every later asking.
+  // The visit's details are not pasted into the box. They are attached as a
+  // chip the reader can see and remove, and the widget sends them with the
+  // first message. The widget is made after a script load, so the question
+  // can arrive before it exists: `latest` lets the load seed it once there.
   const latest = useRef<Question | null>(null);
   latest.current = question;
   const seed = (el: Widget) => {
-    const text = latest.current?.text;
-    if (!text || asked.current === text) return;
-    asked.current = text;
-    el.setAttribute("question", text);
+    const q = latest.current;
+    const page = (el as Widget & { attachPage?: (p: unknown) => void }).attachPage;
+    // Before the script has run the element is a plain tag with no methods;
+    // wait for the load to seed it, rather than counting this as asked.
+    if (!q || asked.current === q.n || typeof page !== "function") return;
+    asked.current = q.n;
+    page.call(el, q.context
+      ? { title: q.context.title, markdown: q.context.text, context: q.context.text }
+      : null);
+    el.setAttribute("question", q.text);
   };
   useEffect(() => {
     if (made.current && open) seed(made.current);

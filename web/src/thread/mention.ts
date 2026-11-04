@@ -26,8 +26,7 @@ export function raphaQuestion(text: string, name: string): string | null {
  *  The whole text is what the assistant is sent AND what the person sees in
  *  the chat, so nothing leaves the page that is not on the screen.
  */
-export function withPatient(
-  question: string,
+export function patientContext(
   about: string[],
   readings: { label: string; value: string; crit: boolean }[],
   /** Words that identify the person (their name), kept out of every value. */
@@ -48,5 +47,16 @@ export function withPatient(
     lines.push("Recorded this visit: "
       + readings.map((r) => `${r.label} ${r.value}${r.crit ? " (flagged)" : ""}`).join("; ") + ".");
   }
-  return lines.length ? `${lines.join("\n")}\n\n${question}` : question;
+  return lines.join("\n");
+}
+
+/** The same details in front of a question, as one text. */
+export function withPatient(
+  question: string,
+  about: string[],
+  readings: { label: string; value: string; crit: boolean }[],
+  hide: string[] = [],
+): string {
+  const c = patientContext(about, readings, hide);
+  return c ? `${c}\n\n${question}` : question;
 }

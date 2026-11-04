@@ -26,7 +26,7 @@ import { KeptNotes, Nudges, StartHere, SubTabs, Templates as TemplatesPane, Tran
 import { usePane } from "../scribe/usePane";
 import { mergeDrafts, type Opened } from "../scribe/session";
 import { Stream, operationFor } from "../thread/Thread";
-import { withPatient } from "../thread/mention";
+import { patientContext } from "../thread/mention";
 import { Carry, PastVisits, Team, Trend, usePast, visitOf } from "../thread/Past";
 import { Background } from "../thread/Background";
 import { Tabs, type Tab, type TabId } from "../thread/Tabs";
@@ -104,7 +104,7 @@ export function Encounter({
   onChanged: () => void;
   onOpenSubject: (subjectId: string) => void;
   /** `@rapha ...` in the composer: open the assistant at the side. */
-  onAskRapha?: (question: string) => void;
+  onAskRapha?: (question: string, context: { title: string; text: string }) => void;
 }) {
   /** THE FORM IS NOT A POP-UP. One state for both ways a form opens -- a
    *  new record and a correction -- because both are drawn in the same
@@ -593,7 +593,10 @@ export function Encounter({
              somebody who already knows what they are doing: it opens on
              whatever this station recorded last. */
           onStartScribe={() => setScribing("")}
-          onAskRapha={onAskRapha && ((q) => onAskRapha(withPatient(q, head.meta, todayVisit.values, [head.name])))}
+          onAskRapha={onAskRapha && ((q) => onAskRapha(q, {
+            title: head.name,
+            text: patientContext(head.meta, todayVisit.values, [head.name]),
+          }))}
           micReason={consented ? undefined : MIC_WHY}
           quick={
             <>
