@@ -207,18 +207,34 @@ def test_the_womans_own_record_and_the_facilitys_day_pick_the_same_open_pregnanc
     # about whether she is pregnant. One pregnancy opened and ended at the very
     # same instant (a delivery is one commit); a second is open.
     from kernel import spine
-    store = centre()
     same = "2026-02-01T09:00:00+00:00"
-    episode_row(store, "ep-old-end", "p-amina", "pregnancy", "ended", same, anchor=None,
-                basis=None, outcome="live_birth")
-    episode_row(store, "ep-old", "p-amina", "pregnancy", "active", same)
+
+    def pair(store, rid):
+        episode_row(store, rid, "p-amina", "pregnancy", "active", same)
+        episode_row(store, rid + "-end", "p-amina", "pregnancy", "ended", same,
+                    anchor=None, basis=None, outcome="live_birth")
+
+    def verdicts(store):
+        mine = [e["id"] for e in spine.episodes(BUNDLE, store, WF, "p-amina", [], at=noon(day(100)))
+                if e["status"] == "active"]
+        theirs = {r["episode"] for r in owed(store, LMP, day(300), at=day(100))}
+        return mine, theirs
+
+    # ONE pregnancy opened and ended at the same instant, nothing later to
+    # mask it: the ending must be seen after its own opening or it pops
+    # nothing and she stays pregnant. Both sides must say she is done.
+    store = centre()
+    pair(store, "ep-1")
+    mine, theirs = verdicts(store)
+    assert mine == [] and theirs == set(), (mine, theirs)
+
+    # And with a second pregnancy open after the tied pair, both pick it.
+    store = centre()
+    pair(store, "ep-old")
     episode_row(store, "ep-new", "p-amina", "pregnancy", "active", "2026-06-01T09:00:00+00:00",
                 anchor=day(150))
-    mine = [e["id"] for e in spine.episodes(BUNDLE, store, WF, "p-amina", [], at=noon(day(200)))
-            if e["status"] == "active"]
-    theirs = {r["episode"] for r in owed(store, day(150), day(400), at=day(200))}
-    assert mine == ["ep-new"], mine
-    assert theirs == {"ep-new"}, theirs
+    mine, theirs = verdicts(store)
+    assert mine == ["ep-new"] and theirs == {"ep-new"}, (mine, theirs)
 
 
 if __name__ == "__main__":
