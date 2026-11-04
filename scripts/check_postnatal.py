@@ -212,20 +212,23 @@ assert schedule.contacts(BUNDLE, lost, WF, kinds["pregnancy"]) == []
 ok("a miscarriage opens no postnatal care: not cancelled, not empty, absent")
 
 # And it is absent BY CONSTRUCTION rather than by this one path behaving. The
-# only operation that writes a postnatal row is recording a delivery, and
-# recording a delivery offers no outcome that means a loss.
+# only operations that write a postnatal row are the two ways of recording a
+# delivery (ordinary, and high risk, which opens this episode too), and both
+# offer the same form, which has no outcome that means a loss.
 openers = [op_id for op_id, op in BUNDLE.operations.items()
            for record in op["mapping"]
            if record["resource"] == "episode_of_care"
            and (record["fields"].get("type") or {}).get("const") == "postnatal"
            and (record["fields"].get("status") or {}).get("const") == "active"]
-assert openers == ["phc.op.delivery-record"], openers
+assert sorted(openers) == ["phc.op.delivery-record", "phc.op.delivery-record-high-risk"], openers
+assert (BUNDLE.operations["phc.op.delivery-record"]["input"]
+        == BUNDLE.operations["phc.op.delivery-record-high-risk"]["input"])
 outcomes = {o["value"] for o in next(
     q for q in __import__("catalogue.validate", fromlist=["x"]).load(
         BUNDLE.operations["phc.op.delivery-record"]["input"])["questions"]
     if q["link_id"] == "outcome")["answer_option"]}
 assert outcomes == {"live_birth", "stillbirth"}, outcomes
-ok("and only one operation can open it, with no outcome in it that means a loss")
+ok("and only the two delivery forms can open it, with no outcome in them that means a loss")
 
 # A stillbirth DOES open it. The mother is at the same risk either way, and a
 # product that stopped visiting her would be making a judgement nobody asked

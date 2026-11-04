@@ -1,0 +1,57 @@
+{
+  "version": "1.0",
+  "slug": "phc-postnatal-outcome-v1",
+  "title": "Day 45 check",
+  "status": "active",
+  "subject_type": "encounter",
+  "styling_metadata": {
+    "phc": {
+      "operation": "phc.op.postnatal-outcome"
+    }
+  },
+  "questions": [
+    {
+      "link_id": "outcome",
+      "text": "How are the mother and baby at day 45?",
+      "type": "choice",
+      "required": true,
+      "answer_option": [
+        {"value": "both_well"},
+        {"value": "mother_unwell"},
+        {"value": "baby_unwell"},
+        {"value": "both_unwell"},
+        {"value": "baby_died"},
+        {"value": "mother_died"},
+        {"value": "not_found"}
+      ],
+      "styling_metadata": {
+        "phc": {
+          "short": "Outcome",
+          "help": "Record how things are, even if they are not good. Recording it ends this check for her, and you can say what needs following up below."
+        }
+      }
+    },
+    {
+      "link_id": "narrative",
+      "text": "What did you find?",
+      "type": "text",
+      "required": false,
+      "styling_metadata": {
+        "phc": {
+          "short": "Found"
+        }
+      }
+    },
+    {
+      "link_id": "followup_needed",
+      "text": "Does anything need following up?",
+      "type": "boolean",
+      "required": false,
+      "styling_metadata": {
+        "phc": {
+          "short": "Follow up"
+        }
+      }
+    }
+  ]
+}

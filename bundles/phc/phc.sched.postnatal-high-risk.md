@@ -1,86 +1,14 @@
 ---
 id: phc.sched.postnatal-high-risk
 type: schedule
-title: Postnatal home visits for a high-risk delivery
-summary: What this centre owes a high-risk mother in the 45 days after she delivers.
+title: Day 45 check after a high-risk delivery
+summary: The one outcome check this centre owes a high-risk mother 45 days after she delivers.
 episode: postnatal_high_risk
-# One basis, because there is only one thing postnatal care can be measured
-# from. A pregnancy can be dated three ways and each means a different number
-# of days; a delivery happened on a day, and that day is day zero.
+# Measured from the day she delivered, the same day zero as the ordinary
+# postnatal schedule.
 anchor:
   delivery: 0
 contacts:
-  - id: hbnc1
-    title: First home visit
-    due: 1
-    opens: 0
-    closes: 2
-    owner: asha
-    escalates_to: anm
-    operation: phc.op.postnatal-visit
-    authority: statutory
-    reports_as: HBNC1
-  - id: hbnc2
-    title: Third day visit
-    due: 3
-    opens: 3
-    closes: 5
-    owner: asha
-    escalates_to: anm
-    operation: phc.op.postnatal-visit
-    authority: statutory
-    reports_as: HBNC2
-  - id: hbnc3
-    title: Seventh day visit
-    due: 7
-    opens: 6
-    closes: 9
-    owner: asha
-    escalates_to: anm
-    operation: phc.op.postnatal-visit
-    authority: statutory
-    reports_as: HBNC3
-  - id: hbnc4
-    title: Second week visit
-    due: 14
-    opens: 12
-    closes: 17
-    owner: asha
-    escalates_to: anm
-    operation: phc.op.postnatal-visit
-    authority: statutory
-    reports_as: HBNC4
-  - id: hbnc5
-    title: Third week visit
-    due: 21
-    opens: 19
-    closes: 24
-    owner: asha
-    escalates_to: anm
-    operation: phc.op.postnatal-visit
-    authority: statutory
-    reports_as: HBNC5
-  - id: hbnc6
-    title: Fourth week visit
-    due: 28
-    opens: 26
-    closes: 31
-    owner: asha
-    escalates_to: anm
-    operation: phc.op.postnatal-visit
-    authority: statutory
-    reports_as: HBNC6
-  - id: hbnc7
-    title: Six week check
-    due: 42
-    opens: 40
-    closes: 44
-    owner: asha
-    escalates_to: anm
-    operation: phc.op.postnatal-visit
-    authority: statutory
-    reports_as: HBNC7
-  # NEEDS SIGN-OFF. The programme tracks a high-risk woman to day 45.
   - id: hbnc45
     title: Day 45 check
     due: 45
@@ -88,106 +16,53 @@ contacts:
     closes: 52
     owner: anm
     escalates_to: cho
-    operation: phc.op.postnatal-visit
+    operation: phc.op.postnatal-outcome
     authority: statutory
     reports_as: HRP-OUTCOME
 ---
 
-## Why this differs from the ordinary schedule
-
-The same visits as the ordinary schedule, plus one. The programme follows a high-risk woman to
-day 45 and wants a verified outcome recorded. An ordinary woman's care still
-ends at day 42. The day-45 check is the ANM's, not the ASHA's, because it
-confirms an outcome rather than checking on a newborn at home. The six week check
-closes a day earlier here (44, against 45 for an ordinary woman) and the
-day-45 check opens on 45, so a visit on day 45 belongs to exactly one contact.
-That is why this copy's six week window is a day shorter. The window and
-owner need clinical sign-off.
-
 ## In plain words
 
-Eight contacts in the 45 days after a high-risk woman delivers. Somebody goes
-to the house on the first day, the third, the seventh, then once a week for
-three weeks, and once more at six weeks. Then the ANM makes a day-45 check
-that records a verified outcome.
+One check, by the ANM, 45 days after a high-risk woman delivers. It records
+whether mother and baby are well, and it ends this episode.
 
-They are home visits rather than appointments, and that is the point of
-them: a woman who has just given birth does not come to the centre, so
-anybody waiting for her at the centre will not see her.
+## Why only one contact is here
+
+A high-risk delivery opens TWO postnatal episodes in the same act. The
+ordinary one, `postnatal`, carries the seven home visits and is described in
+`bundles/phc/phc.sched.postnatal.md`. This one, `postnatal_high_risk`, carries
+only what is extra for a high-risk woman. The seven visits are not copied
+here, because a copied schedule is a schedule that drifts: change the visits
+in one place and they change for every mother.
+
+So a high-risk mother is visited at home exactly as any mother is, and in
+addition the ANM makes this check. The two episodes are closed separately.
+The home visits end with `phc.op.postnatal-close`; this one ends when the
+outcome is recorded with `phc.op.postnatal-outcome`.
 
 ## NEEDS SIGN-OFF
 
-The same banner `bundles/phc/phc.sched.antenatal.md` carries, for the same
-reason and with one addition.
-
-Seven home visits in six weeks, on the days below, plus the day-45 check, is the shape of India's home
-based newborn care. The DAYS were taken from that programme. The WINDOWS
-around each day -- how early a visit may count and how late it may still
-count -- were not: no published source gives them, and they are a product
-choice made here so that a visit a day early is not a visit that did not
-happen. The day-45 check is the programme's number for a high-risk woman;
-its owner and its window are also this bundle's choice, and so is the
-six week check closing on day 44 to make room for it. A named clinical officer has to confirm both before anybody is asked
-to act on a missed one.
-
-The addition is this: **the visits in the real programme are for the mother
-AND the newborn, and these are the mother's half only.** The newborn has no
-record in this build, because whether and when a child becomes a patient here
-is an open decision for this facility's owner. So a visit recorded against
-this schedule says somebody went to the house; it does not yet say what was
-found about the baby. That gap is named rather than papered over, and
-closing it is a schedule for the child, on the child's own record, not more
-contacts on this one.
+The programme tracks a high-risk woman to day 45. The day is the programme's
+number. The window (the day itself, and seven days after it) and the owner
+are this bundle's choice, and a named clinical officer has to confirm both
+before anybody is asked to act on a missed one. The check is the ANM's and
+not the ASHA's because it confirms an outcome rather than checking on a
+newborn at home.
 
 ## What a window means here
 
-The same as everywhere else: `opens` is the first day a visit may count,
-`due` is the day it is aimed at, `closes` is the last day it may still count.
-Before the window it is upcoming, inside it is due, after it with nothing
-against it is missed.
+`opens` is the first day the check may count, `due` is the day it is aimed
+at, `closes` is the last day it may still count. Before the window it is
+upcoming, inside it is due, after it with nothing against it is missed.
 
-THE WINDOWS DO NOT OVERLAP and that is deliberate, because these visits are
-close together. Two windows that touched would let a single visit on the
-shared day discharge either of two contacts depending on the order they were
-read in, and a mother visited once would read as visited twice. There is a
-gap between the fourth week and the six week check, which is the programme's
-own shape rather than a mistake here: nothing is owed in weeks five and most
-of six.
+## What closes it
 
-## Who owns one
-
-The ASHA, escalating to the ANM when the window closes with the visit still
-undone. That is who does home based newborn care, and the lint confirms she
-can: a postnatal visit needs `visit.household` and she holds it.
-
-The lint also confirms that somebody is OFFERED it, which is a different
-question and the one that caught something. The obvious operation to close
-these with was `phc.op.household-visit`, the general home visit this bundle
-already declares. It cannot be performed by anybody: it is loaded, it is
-listed by the scribe instrument, and no step of the line draws it, so the
-guard refuses every attempt. A schedule built on it would have been owed for
-ever. `catalogue/ops/phc.op.postnatal-visit.md` says what was done instead
-and what is still the owner's to decide.
-
-The escalation is the ANM rather than the medical officer because the ANM is
-the next person who can also go, and an escalation that hands the work to
-somebody who cannot do it is a notification rather than an escalation.
-
-## What closes one
-
-A committed `phc.op.postnatal-visit` on a visit belonging to this episode,
-inside the window. One visit closes one contact: the earliest open one whose
-window contains it.
-
-A visit recorded late closes the latest contact whose window had already
-opened, which here means an ASHA entering three days of visits on the day
-she gets back to the centre closes them in the order she made them.
+A committed `phc.op.postnatal-outcome` inside the window. Recording it also
+ends the episode, whatever the outcome, so a mother whose outcome was poor is
+not chased for ever. What went wrong is for the follow-up question on the
+form and for the doctor.
 
 ## And what stops it
 
-Closing the episode, with `phc.op.postnatal-close`, or never opening it. A
-postnatal episode is opened only by a delivery: `phc.op.delivery-record`
-opens an ordinary one and `phc.op.delivery-record-high-risk` opens this
-kind. Neither can be reached except on an open pregnancy, and neither has an
-outcome that means a loss. A woman who miscarried never acquires one of these, so there is
-no visit to cancel, because there was never a visit to begin with.
+Recording the outcome, or never opening it: only a high-risk delivery opens
+this episode, and a pregnancy that ended any other way never acquires one.

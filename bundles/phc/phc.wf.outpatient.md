@@ -26,7 +26,7 @@ steps:
                  phc.op.pregnancy-open, phc.op.risk-mark,
                  phc.op.delivery-record, phc.op.delivery-record-high-risk,
                  phc.op.pregnancy-close, phc.op.pregnancy-close-high-risk,
-                 phc.op.postnatal-close]
+                 phc.op.postnatal-close, phc.op.postnatal-outcome]
   - station: doctor
     done_when: consult.documented
     operations: [phc.op.consult-document, phc.op.ncd-review,
@@ -139,6 +139,16 @@ states:
     all_of:
       - {exists: {resource: episode_of_care, where: {type: postnatal, status: active}}}
       - "not postnatal.ended"
+  # The high-risk tail, the same pair over the same table. It carries only
+  # the day-45 outcome check; the home visits live on `postnatal`.
+  postnatal_high_risk.ended:
+    gte:
+      - {resource: episode_of_care, where: {type: postnatal_high_risk, status: ended}}
+      - {resource: episode_of_care, where: {type: postnatal_high_risk, status: active}}
+  postnatal_high_risk.open:
+    all_of:
+      - {exists: {resource: episode_of_care, where: {type: postnatal_high_risk, status: active}}}
+      - "not postnatal_high_risk.ended"
   # The same pair over the same table, for the other kind of episode this
   # bundle keeps. "Every referral closed" is this flag being false.
   referral.ended:

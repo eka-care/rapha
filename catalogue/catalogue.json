@@ -474,6 +474,7 @@
       "phc.op.pregnancy-close-high-risk",
       "phc.op.postnatal-close",
       "phc.op.postnatal-visit",
+      "phc.op.postnatal-outcome",
       "phc.op.referral-raise",
       "phc.op.referral-close",
       "phc.op.context-add",
@@ -808,6 +809,30 @@
           },
           "type": {
             "const": "pregnancy_high_risk"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "episode_of_care"
+      },
+      {
+        "fields": {
+          "anchor_basis": {
+            "const": "delivery"
+          },
+          "anchor_date": {
+            "answer": "delivery_date"
+          },
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "active"
+          },
+          "type": {
+            "const": "postnatal"
           }
         },
         "per_item": null,
@@ -1311,6 +1336,29 @@
           },
           "type": {
             "const": "postnatal"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "episode_of_care"
+      }
+    ],
+    "phc.op.postnatal-outcome": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "outcome": {
+            "answer": "outcome"
+          },
+          "status": {
+            "const": "ended"
+          },
+          "type": {
+            "const": "postnatal_high_risk"
           }
         },
         "per_item": null,
@@ -2543,7 +2591,7 @@
     },
     "phc.op.delivery-record-high-risk": {
       "capability": "episode.manage",
-      "description": "She is a high-risk woman and she has delivered. This records it, and in the\nsame act it ends the pregnancy, ends the extra doctor visits, and starts the\npostnatal care she is owed, which runs to day 45 rather than day 42.",
+      "description": "She is a high-risk woman and she has delivered. This records it, and in the\nsame act it ends the pregnancy, ends the extra doctor visits, and starts the\npostnatal care she is owed: the same home visits as any mother, and a\nday-45 outcome check by the ANM.",
       "emits": [],
       "fields": [
         {
@@ -3267,6 +3315,66 @@
       ],
       "title": "Close postnatal care",
       "tool": "propose_postnatal_close",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "episode_of_care"
+      ]
+    },
+    "phc.op.postnatal-outcome": {
+      "capability": "episode.manage",
+      "description": "The ANM's check at day 45 after a high-risk delivery. It says how the mother\nand baby are, and it ends the high-risk tail of her care.",
+      "emits": [],
+      "fields": [
+        {
+          "link_id": "outcome",
+          "options": [
+            "both_well",
+            "mother_unwell",
+            "baby_unwell",
+            "both_unwell",
+            "baby_died",
+            "mother_died",
+            "not_found"
+          ],
+          "required": true,
+          "text": "How are the mother and baby at day 45?",
+          "type": "choice"
+        },
+        {
+          "link_id": "narrative",
+          "options": null,
+          "required": false,
+          "text": "What did you find?",
+          "type": "text"
+        },
+        {
+          "link_id": "followup_needed",
+          "options": null,
+          "required": false,
+          "text": "Does anything need following up?",
+          "type": "boolean"
+        }
+      ],
+      "id": "phc.op.postnatal-outcome",
+      "input": "phc.schema.postnatal-outcome-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "postnatal_high_risk.open"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "Day 45 check",
+      "station": "nurse",
+      "summary": "Record how mother and baby are at day 45 after a high-risk delivery, which ends this check.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Record the day 45 outcome",
+      "tool": "propose_postnatal_outcome",
       "type": "operation",
       "verified": "unverified",
       "writes": [
@@ -4085,103 +4193,12 @@
       "contacts": [
         {
           "authority": "statutory",
-          "closes": 2,
-          "due": 1,
-          "escalates_to": "anm",
-          "id": "hbnc1",
-          "opens": 0,
-          "operation": "phc.op.postnatal-visit",
-          "owner": "asha",
-          "programme_title": null,
-          "reports_as": "HBNC1",
-          "title": "First home visit"
-        },
-        {
-          "authority": "statutory",
-          "closes": 5,
-          "due": 3,
-          "escalates_to": "anm",
-          "id": "hbnc2",
-          "opens": 3,
-          "operation": "phc.op.postnatal-visit",
-          "owner": "asha",
-          "programme_title": null,
-          "reports_as": "HBNC2",
-          "title": "Third day visit"
-        },
-        {
-          "authority": "statutory",
-          "closes": 9,
-          "due": 7,
-          "escalates_to": "anm",
-          "id": "hbnc3",
-          "opens": 6,
-          "operation": "phc.op.postnatal-visit",
-          "owner": "asha",
-          "programme_title": null,
-          "reports_as": "HBNC3",
-          "title": "Seventh day visit"
-        },
-        {
-          "authority": "statutory",
-          "closes": 17,
-          "due": 14,
-          "escalates_to": "anm",
-          "id": "hbnc4",
-          "opens": 12,
-          "operation": "phc.op.postnatal-visit",
-          "owner": "asha",
-          "programme_title": null,
-          "reports_as": "HBNC4",
-          "title": "Second week visit"
-        },
-        {
-          "authority": "statutory",
-          "closes": 24,
-          "due": 21,
-          "escalates_to": "anm",
-          "id": "hbnc5",
-          "opens": 19,
-          "operation": "phc.op.postnatal-visit",
-          "owner": "asha",
-          "programme_title": null,
-          "reports_as": "HBNC5",
-          "title": "Third week visit"
-        },
-        {
-          "authority": "statutory",
-          "closes": 31,
-          "due": 28,
-          "escalates_to": "anm",
-          "id": "hbnc6",
-          "opens": 26,
-          "operation": "phc.op.postnatal-visit",
-          "owner": "asha",
-          "programme_title": null,
-          "reports_as": "HBNC6",
-          "title": "Fourth week visit"
-        },
-        {
-          "authority": "statutory",
-          "closes": 44,
-          "due": 42,
-          "escalates_to": "anm",
-          "id": "hbnc7",
-          "opens": 40,
-          "operation": "phc.op.postnatal-visit",
-          "owner": "asha",
-          "programme_title": null,
-          "reports_as": "HBNC7",
-          "title": "Six week check"
-        },
-        {
-          "authority": "statutory",
           "closes": 52,
           "due": 45,
           "escalates_to": "cho",
           "id": "hbnc45",
           "opens": 45,
-          "operation": "phc.op.postnatal-visit",
+          "operation": "phc.op.postnatal-outcome",
           "owner": "anm",
           "programme_title": null,
           "reports_as": "HRP-OUTCOME",
@@ -4190,8 +4207,8 @@
       ],
       "episode": "postnatal_high_risk",
       "id": "phc.sched.postnatal-high-risk",
-      "summary": "What this centre owes a high-risk mother in the 45 days after she delivers.",
-      "title": "Postnatal home visits for a high-risk delivery",
+      "summary": "The one outcome check this centre owes a high-risk mother 45 days after she delivers.",
+      "title": "Day 45 check after a high-risk delivery",
       "type": "schedule"
     },
     "phc.sched.referral": {
@@ -4356,6 +4373,8 @@
     "order.accessioned",
     "postnatal.ended",
     "postnatal.open",
+    "postnatal_high_risk.ended",
+    "postnatal_high_risk.open",
     "pregnancy.ended",
     "pregnancy.open",
     "pregnancy.ordinary",
@@ -4781,6 +4800,8 @@
       "lab.validated",
       "postnatal.ended",
       "postnatal.open",
+      "postnatal_high_risk.ended",
+      "postnatal_high_risk.open",
       "pregnancy.ended",
       "pregnancy.open",
       "pregnancy.ordinary",
@@ -4820,6 +4841,8 @@
         "pregnancy.ordinary",
         "postnatal.ended",
         "postnatal.open",
+        "postnatal_high_risk.ended",
+        "postnatal_high_risk.open",
         "referral.ended",
         "referral.open",
         "vitals.flagged",
@@ -4935,6 +4958,38 @@
               }
             },
             "not postnatal.ended"
+          ]
+        },
+        "postnatal_high_risk.ended": {
+          "gte": [
+            {
+              "resource": "episode_of_care",
+              "where": {
+                "status": "ended",
+                "type": "postnatal_high_risk"
+              }
+            },
+            {
+              "resource": "episode_of_care",
+              "where": {
+                "status": "active",
+                "type": "postnatal_high_risk"
+              }
+            }
+          ]
+        },
+        "postnatal_high_risk.open": {
+          "all_of": [
+            {
+              "exists": {
+                "resource": "episode_of_care",
+                "where": {
+                  "status": "active",
+                  "type": "postnatal_high_risk"
+                }
+              }
+            },
+            "not postnatal_high_risk.ended"
           ]
         },
         "pregnancy.ended": {
@@ -5087,7 +5142,8 @@
             "phc.op.delivery-record-high-risk",
             "phc.op.pregnancy-close",
             "phc.op.pregnancy-close-high-risk",
-            "phc.op.postnatal-close"
+            "phc.op.postnatal-close",
+            "phc.op.postnatal-outcome"
           ],
           "station": "nurse"
         },

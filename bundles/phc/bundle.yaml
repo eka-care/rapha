@@ -32,6 +32,7 @@ operations:
   - phc.op.pregnancy-close-high-risk
   - phc.op.postnatal-close
   - phc.op.postnatal-visit
+  - phc.op.postnatal-outcome
   - phc.op.referral-raise
   - phc.op.referral-close
   - phc.op.context-add
@@ -297,6 +298,8 @@ states:
   # delivery. A pregnancy that ended any other way never acquires one.
   - postnatal.open
   - postnatal.ended
+  - postnatal_high_risk.open
+  - postnatal_high_risk.ended
   # A referral this centre has not heard the end of. Derived from the same
   # pair of episode rows a pregnancy is, because a referral IS an episode:
   # it starts, it is owed, and it ends with an outcome.

@@ -16,11 +16,12 @@ input: phc.schema.delivery-record-v1
 writes: [episode_of_care]
 mapping:
   records:
-    # THREE ROWS, AND THE ORDER OF THEM IS THE WHOLE POINT. The first ends the
+    # FOUR ROWS, AND THE ORDER OF THEM IS THE WHOLE POINT. The first ends the
     # pregnancy, which stops every antenatal contact instantly, because a
     # contact is derived and there is nothing to cancel. The second ends the
-    # high-risk episode, which stops her three extra visits. The third opens
-    # postnatal care, which starts the home visits owed to the mother. One
+    # high-risk pregnancy, which stops her three extra visits. The third opens
+    # ordinary postnatal care, which owes her the seven home visits. The
+    # fourth opens the high-risk tail, which owes only the day-45 check. One
     # commit, so there is no window in which she is neither pregnant nor
     # postnatal and nobody owes her anything.
     - resource: episode_of_care
@@ -38,6 +39,16 @@ mapping:
     - resource: episode_of_care
       fields:
         created_by: {actor: id}
+        type: {const: postnatal}
+        status: {const: active}
+        # Measured from the day she delivered and not from the day somebody
+        # keyed this in. A woman discharged on the third day is recorded on
+        # the third day, and the first home visit was due on the first.
+        anchor_date: {answer: delivery_date}
+        anchor_basis: {const: delivery}
+    - resource: episode_of_care
+      fields:
+        created_by: {actor: id}
         type: {const: postnatal_high_risk}
         status: {const: active}
         # Measured from the day she delivered and not from the day somebody
@@ -51,7 +62,7 @@ verified:
   status: unverified
   against: care-local
 related:
-  operations: [phc.op.delivery-record, phc.op.pregnancy-close-high-risk]
+  operations: [phc.op.delivery-record, phc.op.pregnancy-close-high-risk, phc.op.postnatal-outcome]
   concepts: []
 ---
 
@@ -59,7 +70,8 @@ related:
 
 She is a high-risk woman and she has delivered. This records it, and in the
 same act it ends the pregnancy, ends the extra doctor visits, and starts the
-postnatal care she is owed, which runs to day 45 rather than day 42.
+postnatal care she is owed: the same home visits as any mother, and a
+day-45 outcome check by the ANM.
 
 ## Why this is not `phc.op.delivery-record`
 
@@ -74,18 +86,22 @@ A high-risk pregnancy is open for her. You need `episode.manage`.
 
 ## What happens
 
-THREE rows, in one commit: the pregnancy ends, the high-risk episode ends,
-and `postnatal_high_risk` opens, dated from the delivery. They are written
+FOUR rows, in one commit: the pregnancy ends, the high-risk pregnancy ends,
+and two kinds of postnatal care open, both dated from the delivery:
+`postnatal` for the seven home visits and `postnatal_high_risk` for the
+day-45 check. They are written
 together because a gap between them would be an instant in which nothing is
 owed to her. Ending the high-risk episode is what stops her three extra
 visits; nothing is cancelled, because they are derived.
 
-The tail is `bundles/phc/phc.sched.postnatal-high-risk.md`.
+The home visits are recorded with `phc.op.postnatal-visit`, as for any
+mother. The day-45 check is `phc.op.postnatal-outcome`, and its schedule is
+`bundles/phc/phc.sched.postnatal-high-risk.md`.
 
 ## How you know it worked
 
 Her pregnancy and the extra visits read as closed, and a postnatal card
-appears with the first home visits due.
+appears with the first home visits due and the day-45 check ahead.
 
 ## When it goes wrong
 
