@@ -925,6 +925,11 @@ def test_the_calendar_route_answers_a_day_and_refuses_a_caller_without_the_capab
     assert [r["contact"] for r in body.json()["rows"]] == ["anc1"], body.json()["rows"]
     assert {g["key"]: g["count"] for g in body.json()["groups"]}[due.isoformat()] == 1
     assert client.get("/api/views/phc.view.calendar?on=soon").status_code == 400
+    queued = client.get("/api/queue?view=phc.view.calendar")
+    assert queued.status_code == 200, queued.text
+    direct = client.get("/api/views/phc.view.calendar")
+    assert queued.json()["rows"] == direct.json()["rows"]
+    assert queued.json()["groups"] == direct.json()["groups"]
     span = client.get("/api/views/phc.view.calendar?from=%s&to=%s" % (
         (due - timedelta(days=1)).isoformat(), (due + timedelta(days=1)).isoformat()))
     assert span.status_code == 200, span.text

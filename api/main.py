@@ -642,7 +642,9 @@ def queue(request: Request, view: str = None):
         if not queues:
             raise HTTPException(404, "this bundle declares no queue view")
         view = queues[0]
-    return get_view(view, request)
+    # Called as a plain function, so the Query() defaults are not applied:
+    # every parameter get_view would read from the URL is passed as None.
+    return get_view(view, request, thread=None, on=None, from_=None, to=None)
 
 
 @router.get("/views/{view_id}")

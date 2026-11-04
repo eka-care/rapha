@@ -99,12 +99,12 @@ def _covers(entry, day):
 MAX_RANGE_DAYS = 400
 
 
-def _day(on, name="on"):
+def _day(text, name="on"):
     """A calendar day is a date: exactly YYYY-MM-DD. A timestamp would raise
     a timezone question (whose midnight?) the route cannot answer, and newer
     Pythons also take compact and week forms; the Go twin takes one spelling
     and so does this."""
-    text = str(on)
+    text = str(text)
     said = "%s must be a real calendar day written YYYY-MM-DD, not %r" % (name, text)
     digits = text[:4] + text[5:7] + text[8:]
     if len(text) != 10 or text[4] != "-" or text[7] != "-" \

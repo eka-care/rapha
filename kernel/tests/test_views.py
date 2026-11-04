@@ -141,12 +141,8 @@ def test_a_range_counts_each_day_by_the_rows_due_on_it():
                   at=day(anc2.opens))
     # anc1 is missed by then and stays owed; anc2 is due inside the range.
     assert [r["contact"] for r in result.rows] == ["anc1", "anc2"], result.rows
-    for g in result.groups:
-        today = day(anc2.opens).isoformat()
-        drawn = sum(1 for r in result.rows if r["due"] == g["key"]
-                    or (g["key"] == today and r["due"] < today))
-        assert g["count"] == drawn, g
-    assert sum(g["count"] for g in result.groups) == 2       # anc2 on its due day, anc1 on today
+    counts = {g["key"]: g["count"] for g in result.groups if g["count"]}
+    assert counts == {day(anc2.opens).isoformat(): 1, day(anc2.due).isoformat(): 1}, counts
 
 
 def test_a_missed_contact_counts_once_on_its_due_day_or_on_today_or_nowhere():
