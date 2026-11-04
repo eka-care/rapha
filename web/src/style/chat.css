@@ -404,3 +404,10 @@
   color: var(--color-text-secondary);
 }
 .bg-add { align-self: flex-start; }
+
+/* The assistant docked at the right edge takes the rail's place rather than
+   standing beside it. Two columns of chrome on one side left the
+   conversation a sliver; see the data-assist attribute in app/App.tsx. */
+.app[data-assist="side"] .chatgrid { grid-template-columns: minmax(0, 1fr); }
+.app[data-assist="side"] .chatgrid > .panel,
+.app[data-assist="side"] .chatgrid > .grip { display: none; }

@@ -34,7 +34,7 @@ import { Sidebar, panelFor } from "./Sidebar";
 import { Rail } from "./Rail";
 import { PARTS } from "../screens/Control";
 import { NAME } from "../brand";
-import { AssistantOverlay } from "../assistant/Overlay";
+import { AskAi } from "../assistant/AskAi";
 import type { Question } from "../assistant/Lazy";
 import { Topbar } from "./Topbar";
 
@@ -182,13 +182,16 @@ export function App() {
   const [assistOpen, setAssistOpen] = useState(false);
   const [assistSeen, setAssistSeen] = useState(false);
   const [assistQuestion, setAssistQuestion] = useState<Question | null>(null);
-  // Where it comes forward: in the middle of the page when asked from the
-  // command bar, at the side when asked about a patient with `@rapha`, so the
-  // visit stays in view while it answers.
-  const [assistSide, setAssistSide] = useState(false);
-  const askAssistant = (text: string, where: "side" | "centre") => {
+  // ONE SHAPE NOW. It used to come forward in the middle of the page when
+  // asked from the command bar and dock at the side when asked about a
+  // patient, which was two layouts to keep right for one assistant. The Ask
+  // AI widget has one, the docked one, which is the shape that lets a
+  // clinician keep the visit in view and does no harm anywhere else. The
+  // callers still say where they are asking from; nothing reads it, and the
+  // argument stays so this is one decision to reverse rather than thirty
+  // call sites.
+  const askAssistant = (text: string, _where: "side" | "centre") => {
     setAssistQuestion({ text, n: Date.now() });
-    setAssistSide(where === "side");
     setAssistSeen(true);
     setAssistOpen(true);
   };
@@ -450,6 +453,13 @@ export function App() {
 
   return (
     <div className="app" data-panel={panel ?? "none"}
+         /* THE RIGHT RAIL STANDS DOWN WHILE THE ASSISTANT IS AT THE SIDE.
+            Both live at the right edge, so with the assistant open a visit
+            had two columns of its own beside it and the conversation was
+            squeezed into what was left. Which of the two a person wants is
+            not a question: they just opened the assistant. The rail comes
+            back the moment they close it, and nothing about it is lost. */
+         data-assist={assistSeen && assistOpen ? "side" : undefined}
          style={{ "--panel-w": `${panelW}px` } as React.CSSProperties}>
       <IconSheet />
       {/* SC 2.4.2: every screen was called "Workspace", so a person with the
@@ -625,7 +635,16 @@ export function App() {
         </main>
       </div>
 
-      {assistSeen && <AssistantOverlay open={assistOpen} question={assistQuestion} side={assistSide} onClose={() => setAssistOpen(false)} />}
+      {/* THE ASSISTANT IS EKA'S OWN ASK AI WIDGET. It docks to the right
+          edge and brings its own panel, so there is no overlay of this
+          app's around it; assistant/AskAi.tsx says why it replaced the
+          hand-built one. `side` is gone with it: the widget has one shape
+          and it is the docked one, which is what a clinician wants in a
+          visit and does no harm anywhere else. */}
+      {assistSeen && (
+        <AskAi open={assistOpen} question={assistQuestion}
+               onClose={() => setAssistOpen(false)} />
+      )}
 
       {khojOpen && (
         <Khoj
