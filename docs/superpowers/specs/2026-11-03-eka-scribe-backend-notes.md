@@ -189,3 +189,47 @@ In `2026-11-03-hera-and-the-cleaner-shell-design.md`:
   (§5). It is the strongest frontline story available and most of the
   machinery exists. It needs the owner's call on whether the hackathon
   demo leads with it.
+
+## 9. FHIR from the scribe, probed 2026-11-04
+
+Owner: "on the scribe voice to rx repo there's a fhir service, which should
+help you get the structured note in FHIR." Probed with one synthetic
+recording (a computer voice reading an invented consultation, no real person)
+through the same SDK path the kernel uses, asking for the Default Prescription
+Print template, `7d03dd95-45b2-41e1-a5d3-fba98fee0418`. Nothing was published.
+
+**What came back.** A correct transcript and a correct note: patient, age,
+complaint, vitals (130/85, 84, 98.6 F, 51 kg), examination, the diagnosis, a
+medication row (Nitrofurantoin 100 mg, twice daily, 5 days, after food), a
+urine routine, advice and the follow-up. The note is MARKDOWN: headings and
+pipe tables. The session names a `document_id` for it.
+
+**What did not.** `GET /voice/api/v1/documents/{id}` answered with
+`fhir_data: null`, `ag_ui_data: null` and `publish: {}`. So:
+
+- The structured state (`ag_ui_data`) is saved by a CLIENT, when the Eka
+  scribe editor saves or publishes. The SDK path never produces it, so there
+  is nothing structured to convert.
+- The NRCES (ABDM) bundle is built only by `POST /sessions/{s}/documents/{d}/publish`
+  with that state as the JSON body, and only for templates on an allow-list
+  that currently holds the Default Prescription Print. Publishing is not a
+  conversion: it also pushes the bundle into AWS HealthLake (Eka's patient
+  store), uploads the vault PDF and fires the EMR webhook. It is an outward
+  write about a real person and is not to be done to try it.
+- `GET /voice/medical-record/api/fhir/{txn}` is reachable with the kernel's
+  credentials and reads the older `fhir-parser` composition. It answers 408
+  "Data unavailable" for this recording: the older path is not run for it.
+- The conversion itself (`voice2rx/services/fhir/converter.py`, over the
+  `scribe2fhir` SDK) is pure, but it is Eka's code and a dependency.
+
+**What this means for Rapha.** There are three honest ways to have the note in
+FHIR, and none is free: (a) build Eka's `ScribeState` ourselves from the forms
+a clinician committed and publish it, accepting that publishing writes to
+Eka's store; (b) run Eka's converter locally over a state we build, adding
+their SDK as a dependency; (c) leave the note as a reading copy and let the
+committed forms be the record, which `kernel/fhir.py` already turns into an
+ABDM bundle. (c) is what runs today. The choice is the owner's: it decides
+which system holds the patient's record.
+
+A synthetic recording, transcript and document (`a17ed378-...`) now sit in the
+Eka workspace under txn `phc-a1e6c5605b06459b`. They hold an invented patient.
