@@ -11,9 +11,11 @@
 import { useEffect, useRef } from "react";
 import { Icon } from "../icons";
 import { trapTab } from "../parts";
-import { AssistantPanel } from "./Lazy";
+import { AssistantPanel, type Question } from "./Lazy";
 
-export function AssistantOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function AssistantOverlay({ open, question, onClose }: {
+  open: boolean; question: Question | null; onClose: () => void;
+}) {
   const shell = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
 
@@ -43,7 +45,7 @@ export function AssistantOverlay({ open, onClose }: { open: boolean; onClose: ()
             <Icon name="plus" className="i sm assist__x" />
           </button>
         </header>
-        <AssistantPanel />
+        <AssistantPanel question={question} />
       </div>
     </div>
   );

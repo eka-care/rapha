@@ -10,10 +10,14 @@ import { lazy, Suspense } from "react";
 
 const Assistant = lazy(() => import("./Assistant"));
 
-export function AssistantPanel() {
+/** A question carried in from outside, e.g. the command bar. `n` tells two
+ *  identical questions apart, so asking the same thing twice sends twice. */
+export type Question = { text: string; n: number };
+
+export function AssistantPanel({ question }: { question?: Question | null }) {
   return (
     <Suspense fallback={<p className="assist__note">Opening…</p>}>
-      <Assistant />
+      <Assistant question={question} />
     </Suspense>
   );
 }

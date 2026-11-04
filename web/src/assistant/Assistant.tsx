@@ -17,10 +17,11 @@ import {
 } from "@eka-care/medassist-react";
 import { Icon } from "../icons";
 import { assistantConfig } from "./config";
+import type { Question } from "./Lazy";
 
 const CONFIG = assistantConfig(import.meta.env as Record<string, string | undefined>);
 
-export default function Assistant() {
+export default function Assistant({ question }: { question?: Question | null }) {
   if (!CONFIG.ready) return <p className="assist__note">{CONFIG.why}</p>;
   return (
     <MedAssistProvider
@@ -28,18 +29,28 @@ export default function Assistant() {
       environment={CONFIG.environment}
       authToken={CONFIG.authToken}
     >
-      <Chat />
+      <Chat question={question} />
     </MedAssistProvider>
   );
 }
 
-function Chat() {
+function Chat({ question }: { question?: Question | null }) {
   const {
     messages, isConnected, isStreaming, isWaitingForResponse, progressMessage, initialMessage,
     error, canRetry, needsNewSession, authExpired, elicitation,
     sendMessage, sendSuggestion, retry, startNewChat,
   } = useMedAssist();
   const end = useRef<HTMLDivElement>(null);
+
+  // A question brought from the command bar is sent once, as soon as the chat
+  // is ready, and never again for the same asking.
+  const sent = useRef(0);
+  useEffect(() => {
+    if (!question || !isConnected || question.n === sent.current) return;
+    sent.current = question.n;
+    void sendMessage(question.text);
+  }, [question, isConnected, sendMessage]);
+
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); },
     [messages.length, progressMessage, elicitation?.tool_id, isWaitingForResponse]);
 

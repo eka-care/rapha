@@ -34,6 +34,7 @@ import { Sidebar, panelFor } from "./Sidebar";
 import { Rail } from "./Rail";
 import { PARTS } from "../screens/Control";
 import { AssistantOverlay } from "../assistant/Overlay";
+import type { Question } from "../assistant/Lazy";
 import { Topbar } from "./Topbar";
 
 type Route =
@@ -179,6 +180,7 @@ export function App() {
   // after the first opening so closing it does not end the conversation.
   const [assistOpen, setAssistOpen] = useState(false);
   const [assistSeen, setAssistSeen] = useState(false);
+  const [assistQuestion, setAssistQuestion] = useState<Question | null>(null);
   const [drawer, setDrawer] = useState(false);
   const [said, setSaid] = useState<Record<string, Said[]>>(() => read(SAID_KEY, {}));
   const [recents, setRecents] = useState<Recent[]>(() => read(RECENT_KEY, []));
@@ -605,7 +607,7 @@ export function App() {
         </main>
       </div>
 
-      {assistSeen && <AssistantOverlay open={assistOpen} onClose={() => setAssistOpen(false)} />}
+      {assistSeen && <AssistantOverlay open={assistOpen} question={assistQuestion} onClose={() => setAssistOpen(false)} />}
 
       {khojOpen && (
         <Khoj
@@ -616,16 +618,7 @@ export function App() {
           onClose={() => setKhojOpen(false)}
           onOpenThread={(t) => go(`#/threads/${t}`)}
           onGoView={(v) => go(v ? `#/views/${v}` : "#/")}
-          onAnswer={async (question) => {
-            // The visit a question is about, as far as this box can tell:
-            // the one somebody had open, else the first on today's line. The
-            // answer names it, so a wrong guess is visible rather than
-            // silent.
-            const thread = shownRecents[0]?.id ?? liveThreads[0];
-            if (!thread) return null;
-            const got = await ask({ utterance: question, thread, role: currentRole() });
-            return { said: got.said, thread };
-          }}
+          onAsk={(question) => { setAssistQuestion({ text: question, n: Date.now() }); setAssistSeen(true); setAssistOpen(true); }}
           /* A search miss goes to the desk, not straight to an empty visit.
              The palette searches today's line; the desk searches the whole
              register and the patient directory, so "no matching patient" in
