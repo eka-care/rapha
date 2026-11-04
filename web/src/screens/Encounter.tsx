@@ -27,6 +27,7 @@ import { usePane } from "../scribe/usePane";
 import { ScribeStart } from "../scribe/Start";
 import { mergeDrafts, type Opened } from "../scribe/session";
 import { Stream, operationFor } from "../thread/Thread";
+import { withPatient } from "../thread/mention";
 import { Carry, PastVisits, Team, Trend, usePast, visitOf } from "../thread/Past";
 import { Background } from "../thread/Background";
 import { Tabs, type Tab, type TabId } from "../thread/Tabs";
@@ -583,7 +584,7 @@ export function Encounter({
              somebody who already knows what they are doing: it opens on
              whatever this station recorded last. */
           onStartScribe={() => setScribing("")}
-          onAskRapha={onAskRapha}
+          onAskRapha={onAskRapha && ((q) => onAskRapha(withPatient(q, head.meta, todayVisit.values)))}
           micReason={consented ? undefined : MIC_WHY}
           quick={
             <>

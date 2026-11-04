@@ -1,7 +1,7 @@
 /** The medical assistant's start-up rules, with no package and no browser. */
 import assert from "node:assert/strict";
 import { assistantConfig } from "./config.ts";
-import { raphaQuestion } from "../thread/mention.ts";
+import { raphaQuestion, withPatient } from "../thread/mention.ts";
 
 const ok = (m: string) => console.log("  ok  " + m);
 
@@ -34,6 +34,13 @@ const ok = (m: string) => console.log("  ok  " + m);
   assert.equal(raphaQuestion("@raphael hello", "Rapha"), null, "a longer name is somebody else");
   assert.equal(raphaQuestion("@Priya repeat BP", "Rapha"), null, "another addressee is an ordinary message");
   ok("assistant: @rapha takes the rest of the line as the question, and only for that name");
+}
+
+{
+  const t = withPatient("what next?", ["61", "Male"], [{ label: "Pulse", value: "92 /min", crit: true }]);
+  assert.ok(t.includes("Patient: 61, Male.") && t.includes("Pulse 92 /min (flagged)") && t.endsWith("what next?"));
+  assert.equal(withPatient("what next?", [], []), "what next?", "no details, no preamble");
+  ok("assistant: the patient's details precede the question, and only those");
 }
 
 console.log("assistant: all checks passed");
