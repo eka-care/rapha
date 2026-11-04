@@ -55,6 +55,17 @@ export function Background({
 }) {
   // Bumped when a paper lands on the record, so the list beside it refetches.
   const [filed, setFiled] = useState(0);
+  // TWO PLACES A PAPER CAN BE, and they are genuinely different things, so
+  // they are two tabs rather than one list with two kinds of row in it.
+  //
+  // "This visit" is what somebody typed up here: a questionnaire_response in
+  // this kernel's own store, signed, part of this encounter.
+  //
+  // "Eka records" is the patient's own record, which is ONE record across
+  // every application on this workspace. A discharge summary a colleague
+  // uploaded in the claims app is on it, and so is anything uploaded here.
+  // None of it belongs to this visit and none of it is ours.
+  const [sub, setSub] = useState<"visit" | "eka">("visit");
 
   // THE UPLOAD DOES NOT NEED THE FORM. Attaching a document to the patient's
   // record is a complete act on its own -- the owner's point on 4 November
@@ -67,25 +78,15 @@ export function Background({
   // Which operation it belongs to is still the declaration's answer, not
   // this file's: `add` is what the guard offered this person, and the mount
   // is only drawn if a document instrument names it.
-  const op = add[0];
-  const schema = op ? questionnaire(op.input) : null;
-  const scan = op && schema
-    ? mountsFor(cat.instruments, op, schema).filter((m) => m.kind === "document")
+  const first = add[0];
+  const schema = first ? questionnaire(first.input) : null;
+  const scan = first && schema
+    ? mountsFor(cat.instruments, first, schema).filter((m) => m.kind === "document")
     : [];
 
-  return (
-    <div className="bgtab">
-      {!adding && op && scan.length > 0 && (
-        <Scan mounts={scan} operation={op.id} patient={patient}
-              onSaved={() => setFiled((n) => n + 1)}
-              /* A reading on this path has no form open to fill, so it is
-                 dropped rather than held: the paper is on the record, which
-                 is what was asked for. Somebody who wants the numbers typed
-                 up opens the form below, where a reading does fill it. */
-              onDraft={() => { /* nothing to fill from here */ }} />
-      )}
-      {!adding && <Filed patient={patient} reload={filed} />}
-      {adding ? (
+  if (adding) {
+    return (
+      <div className="bgtab">
         <OperationPanel
           inline
           op={adding}
@@ -97,7 +98,34 @@ export function Background({
           onDone={onDone}
           onCancel={() => onAdd(null)}
         />
-      ) : (
+      </div>
+    );
+  }
+
+  return (
+    <div className="bgtab">
+      <div className="stabs" role="tablist" aria-label="Papers">
+        {([["visit", "This visit"], ["eka", "Eka records"]] as const).map(([id, title]) => (
+          <button key={id} type="button" role="tab" aria-selected={sub === id}
+                  className={`stab${sub === id ? " on" : ""}`}
+                  onClick={() => setSub(id)}>
+            {title}
+          </button>
+        ))}
+      </div>
+
+      {first && scan.length > 0 && (
+        <Scan mounts={scan} operation={first.id} patient={patient}
+              onSaved={() => setFiled((n) => n + 1)}
+              /* A reading on this path has no form open to fill, so it is
+                 dropped rather than held: the paper is on the record, which
+                 is what was asked for. Somebody who wants the numbers typed
+                 up opens the form below, where a reading does fill it. */
+              onDraft={() => { /* nothing to fill from here */ }} />
+      )}
+      {sub === "eka" && <Filed patient={patient} reload={filed} />}
+
+      {sub === "visit" && (
         <>
           {papers.length === 0 ? (
             <div className="state-empty">

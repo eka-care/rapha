@@ -1403,6 +1403,49 @@ async def medical_records(rest: str, request: Request):
 
 
 @app.middleware("http")
+async def records_cors(request: Request, call_next):
+    """Credentialed CORS, for the medical records seam only.
+
+    @eka-care/medical-records-ts-sdk sends its Eka calls with
+    `credentials: "include"`, and a browser refuses a credentialed response
+    whose `Access-Control-Allow-Origin` is `*`. The kernel's own CORS is the
+    wildcard, so every call the SDK made failed in the browser with "Failed
+    to fetch" after a preflight that had just succeeded -- which is the most
+    confusing shape this failure has.
+
+    There is no cookie to send and the SDK does not know that: the
+    authorisation is a bearer token api/vault.py attaches on this side. So
+    rather than ask the SDK not to, the answer names the origin that asked
+    and says credentials are allowed.
+
+    SCOPED TO THESE PATHS. Doing it kernel wide would turn every route
+    credentialed for every origin, which is a bigger change than the one
+    problem needs.
+    """
+    if not request.scope["path"].startswith("/mr/api/"):
+        return await call_next(request)
+    origin = request.headers.get("origin")
+    if request.method == "OPTIONS":
+        # Answered here rather than by the wildcard CORS middleware below,
+        # because a credentialed preflight must name the origin too.
+        asked = request.headers.get("access-control-request-headers", "")
+        return Response(status_code=200, headers={
+            "Access-Control-Allow-Origin": origin or "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": asked or "*",
+            "Access-Control-Max-Age": "600",
+            "Vary": "Origin",
+        })
+    answer = await call_next(request)
+    if origin:
+        answer.headers["Access-Control-Allow-Origin"] = origin
+        answer.headers["Access-Control-Allow-Credentials"] = "true"
+        answer.headers["Vary"] = "Origin"
+    return answer
+
+
+@app.middleware("http")
 async def either_spelling(request: Request, call_next):
     """kernel/contracts.py ROUTES spells every path with a trailing slash and
     the routes above are declared without one. Rather than pick a winner and

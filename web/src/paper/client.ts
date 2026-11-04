@@ -52,12 +52,19 @@ export function records(): MedicalRecordsClient {
  *  `patientId` is the patient's own Eka oid, which the patient directory
  *  put on their row when this centre published them. It is what the service
  *  files the document under, and it is why the paper follows the patient
- *  rather than living on this visit alone.
+ *  rather than living on this visit alone. Null when this centre has not
+ *  published them; see above for what happens then.
  */
-export async function filePaper(patientId: string, file: File): Promise<string> {
+export async function filePaper(patientId: string | null, file: File): Promise<string> {
   const answer = await records().addDocument({
     bid: BID,
-    patientId,
+    // EMPTY WHERE THERE IS NO EKA IDENTIFIER, which is not a refusal. The
+    // oid becomes an `X-Pt-Id` header and the kernel drops an empty one, so
+    // the document goes up under the facility instead of under the person.
+    // That is a worse place for it and it is still a place: a clerk holding
+    // a discharge summary should never be told they cannot put it anywhere
+    // because of a registration step nobody has done yet.
+    patientId: patientId ?? "",
     batchRequests: [{
       // "lr" is the service's code for a laboratory report, which is what
       // the parser reads best and what a patient most often carries. A
@@ -122,6 +129,8 @@ export type FiledPaper = {
   /** Whether the service managed to read it. Not whether it is useful: a
    *  photograph nobody could parse is still the paper the patient brought. */
   read: boolean;
+  /** The Eka application that put it on the record, when the service says. */
+  from: string | null;
   url: string | null;
 };
 
@@ -131,8 +140,8 @@ export type FiledPaper = {
  *  the service through this kernel like every other call, so the credential
  *  stays on that side.
  */
-export async function listPapers(patientId: string): Promise<FiledPaper[]> {
-  const items = await records().listDocuments({ bid: BID, patientId });
+export async function listPapers(patientId: string | null): Promise<FiledPaper[]> {
+  const items = await records().listDocuments({ bid: BID, patientId: patientId ?? "" });
   return items
     .slice()
     .sort((a, b) => (b.upload_date ?? 0) - (a.upload_date ?? 0))
@@ -143,6 +152,12 @@ export async function listPapers(patientId: string): Promise<FiledPaper[]> {
       title: d.metadata?.title?.trim() || KINDS[d.document_type] || "A document",
       on: when(d.metadata?.document_date ?? d.upload_date),
       read: d.is_smart === true,
+      // WHICH EKA APPLICATION PUT IT THERE. The record is one record across
+      // every application on the workspace, so a discharge summary uploaded
+      // in the claims app is on it too, and the only honest way to show a
+      // row is to say where it came from. Absent on a document the service
+      // does not attribute, and then nothing is claimed.
+      from: d.source ?? null,
       url: d.metadata?.thumbnail ?? null,
     }));
 }

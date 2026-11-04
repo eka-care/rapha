@@ -36,6 +36,11 @@ import "./paper.css";
  *  person a spreadsheet they are about to be told off for choosing. */
 const TAKES = "image/jpeg,image/png,image/heic,image/webp,application/pdf";
 
+/** Where it went, said in four words, because the two places are not the
+ *  same place and a person filing paper should know which one they used. */
+const where = (patient: string | null) =>
+  patient ? "Uploaded to the patient's record" : "Uploaded to the centre's record";
+
 export function Scan({ mounts, operation, patient, disabled, onDraft, onSaved }: {
   /** Every document mount for this operation. Normally one; the loop is
    *  because a bundle may declare more than one way in and this file does
@@ -47,9 +52,11 @@ export function Scan({ mounts, operation, patient, disabled, onDraft, onSaved }:
    *  it, which is what makes the document follow the patient instead of
    *  living on this visit alone.
    *
-   *  Null for somebody this centre has not published. That is not an error
-   *  and is not fudged: there is nowhere to file the paper, so the control
-   *  says so rather than quietly doing something else. */
+   *  Null for somebody this centre has not published, and the upload still
+   *  works: the document goes up under the facility instead of under the
+   *  person. A worse place, and still a place. This used to refuse, and
+   *  refusing meant a clerk holding a discharge summary was told they could
+   *  not put it anywhere because of a registration step nobody had done. */
   patient: string | null;
   disabled?: boolean;
   onDraft: (draft: ScribeDraft) => void;
@@ -71,7 +78,7 @@ export function Scan({ mounts, operation, patient, disabled, onDraft, onSaved }:
   if (!docs.length) return null;
 
   const take = async (file: File | undefined) => {
-    if (!file || !patient) return;
+    if (!file) return;
     setFailed(null);
     setNote(null);
     setPhase("saving");
@@ -98,38 +105,20 @@ export function Scan({ mounts, operation, patient, disabled, onDraft, onSaved }:
     // nothing here is reported as a failure -- saying "it did not work"
     // about an upload that worked is how a person learns to distrust it.
     try {
-      const draft = await readPaper(operation, id, patient);
+      const draft = await readPaper(operation, id, patient ?? "");
       if (draft) {
         onDraft(draft as Parameters<typeof onDraft>[0]);
-        setNote("Saved to the patient's record, and the fields below are "
-                + "what it read. Check them against the paper.");
+        setNote(where(patient) + ", and the fields below are what it read. "
+                + "Check them against the paper.");
       } else {
-        setNote("Saved to the patient's record. Nothing could be read off "
-                + "it, so type what it says below.");
+        setNote(where(patient) + ". Nothing could be read off it.");
       }
     } catch {
-      setNote("Saved to the patient's record. It could not be read just "
-              + "now, so type what it says below.");
+      setNote(where(patient) + ". It could not be read just now.");
     } finally {
       setPhase("saved");
     }
   };
-
-  // NOWHERE TO FILE IT. Said plainly, with the reason, because the fix is
-  // one the person at the counter can actually carry out. A disabled button
-  // with no sentence beside it is how somebody learns a feature is broken.
-  if (!patient) {
-    return (
-      <div className="scan scan-cant">
-        <Icon name="clip" className="i sm" />
-        <span className="scan-say">
-          Photographing the paper needs this patient on the patient directory,
-          and they are not on it yet. Add them from the patient screen, or
-          type what the paper says below.
-        </span>
-      </div>
-    );
-  }
 
   return (
     <div className="scan">
@@ -143,19 +132,20 @@ export function Scan({ mounts, operation, patient, disabled, onDraft, onSaved }:
         onClick={() => box.current?.click()}
       >
         <Icon name={busy ? "spark" : "clip"} className="i sm" />
-        {phase === "saving" ? "Saving…"
+        {phase === "saving" ? "Uploading…"
           : phase === "reading" ? "Reading…"
-          : phase === "saved" ? "Add another" : "Add the paper"}
+          : phase === "saved" ? "Upload another" : "Upload a document"}
       </button>
       {/* WHAT IT WILL AND WILL NOT DO, before anybody photographs anything.
           A reader that silently leaves a field empty teaches a person to
           distrust the fields it does fill. */}
       <span className="scan-say">
-        {phase === "saving" ? "Putting it on the patient's record…"
-          : phase === "reading" ? "Saved. Seeing whether it can be read, which "
-                                  + "takes about half a minute."
-          : note ?? "Saved to the patient's record, and fills what it reads "
-                    + "for you to check. Who wrote it is still yours to type."}
+        {phase === "saving" ? "Uploading…"
+          : phase === "reading" ? "Uploaded. Seeing whether it can be read."
+          : note ?? (patient
+              ? "A photograph or a PDF. It goes on the patient's record."
+              : "A photograph or a PDF. This patient is not on the patient "
+                + "directory, so it goes on the centre's record instead.")}
       </span>
       {failed && <div className="f-bad block">{failed}</div>}
     </div>
