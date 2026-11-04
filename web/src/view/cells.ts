@@ -5,8 +5,10 @@
  *  in the row's `cell`: its due day, or today when it is missed and its due
  *  day is before the range. The counts the kernel sends come from the same
  *  field, so grid and counts agree. A row with no `cell` (the single-day
- *  answer's shape) is placed nowhere. Never across its window, however wide. Drawn across its window, one woman would fill twenty
- *  squares and a missed contact would fill every day after it for ever, and a
+ *  answer's shape) is placed nowhere.
+ *
+ *  Never across its window, however wide. Drawn across its window, one woman
+ *  would fill twenty squares and a missed contact would fill every day after it for ever, and a
  *  month would become a wall of colour nobody reads. The day list answers a
  *  different question, "what is owed today", by window, and is right too.
  *  Do not unify the two.
@@ -15,6 +17,7 @@
  *  date and counted. Nothing is stored; every call works from what it is given.
  */
 import type { CalendarRow } from "../types";
+import { dayOf } from "./day.ts";
 
 export type Scale = "week" | "month" | "year";
 
@@ -107,4 +110,24 @@ export function step(unit: Scale | "day", anchor: string, by: number): string {
   if (unit === "week") return iso(a + by * 7 * DAY);
   if (unit === "month") return iso(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + by, 1));
   return iso(Date.UTC(d.getUTCFullYear() + by, d.getUTCMonth(), 1));
+}
+
+/** The tone a day is tinted in, from the tones of the rows it holds: the most
+ *  urgent wins, so a day with a done contact and a missed one tints as missed.
+ *  No rows is no tint. A tone this list does not know still tints, in the
+ *  quietest known one: a day with work must never look empty. Tones are the
+ *  arc's own names; no state is spelled here. */
+const URGENCY = ["b-crit", "b-ink", "b-mute", "b-ok"];
+export function dayTone(tones: string[]): string | undefined {
+  if (!tones.length) return undefined;
+  return URGENCY.find((t) => tones.includes(t)) ?? "b-mute";
+}
+
+/** When a row was really due, as "9 Sep", but only when it is drawn in a cell
+ *  that is not its due day (a late contact sits on today). "" otherwise, so a
+ *  chip says nothing extra when the square already tells the truth. */
+export function wasDue(row: CalendarRow, cell: string): string {
+  if (!row.due || row.due === cell) return "";
+  const { day, month } = dayOf(row.due);
+  return day ? `${day} ${month}` : "";
 }

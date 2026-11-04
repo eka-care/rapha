@@ -15,7 +15,7 @@ import { Icon } from "../icons";
 import { MARK, TONE } from "../thread/Arc";
 import type { CalendarRow } from "../types";
 import { dayLabel, dayOf } from "./day";
-import { cells, step, type Scale } from "./cells";
+import { cells, dayTone, step, wasDue, type Scale } from "./cells";
 
 /** How many contacts a month cell lists before it says "+N more". */
 const MAX = 3;
@@ -25,6 +25,8 @@ const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "Ju
 /** The hour grid opens here, not at midnight. */
 const FIRST_HOUR = 7;
 const HOUR_PX = 48;
+/** The week's band has no room limit: it grows to fit, so it never says "+N more". */
+const NO_LIMIT = Infinity;
 
 type Cell = ReturnType<typeof cells>[number];
 
@@ -63,15 +65,19 @@ export function Grid(p: GridProps) {
   return narrow ? <OneDay {...p} /> : <Week {...p} />;
 }
 
-function Chip({ row, nameOf, onOpenPatient }: Pick<GridProps, "nameOf" | "onOpenPatient"> & { row: CalendarRow }) {
+function Chip({ row, cell, nameOf, onOpenPatient }: Pick<GridProps, "nameOf" | "onOpenPatient"> & { row: CalendarRow; cell: string }) {
   const who = nameOf(row.subject_row);
+  // A late contact is drawn on today; the chip says when she was really due.
+  const was = wasDue(row, cell);
+  const said = `${row.title} for ${who}${was ? `, due ${was}` : ""}`;
   return (
     <button
       type="button" className="gr-chip" data-tone={TONE[row.state] ?? "b-mute"}
-      title={`${row.title} for ${who}`} aria-label={`${row.title} for ${who}`} onClick={() => onOpenPatient?.(row.subject)}
+      title={said} aria-label={said} onClick={() => onOpenPatient?.(row.subject)}
     >
       <Icon name={(MARK[row.state] ?? "clock") as never} className="i sm" />
       <span className="gr-chip-t">{row.title}</span>
+      {was && <span className="gr-chip-was">due {was}</span>}
       <span className="gr-chip-who">{who}</span>
     </button>
   );
@@ -97,7 +103,7 @@ function Month(p: GridProps) {
         <div key={c.key} className="gr-cell" data-out={!c.inMonth || undefined} data-today={c.isToday || undefined}>
           <DayNumber c={c} onPickDay={p.onPickDay} />
           {c.rows.map((r) => (
-            <Chip key={`${r.schedule}|${r.episode}|${r.contact}|${r.subject}`} row={r} nameOf={p.nameOf} onOpenPatient={p.onOpenPatient} />
+            <Chip key={`${r.schedule}|${r.episode}|${r.contact}|${r.subject}`} row={r} cell={c.key} nameOf={p.nameOf} onOpenPatient={p.onOpenPatient} />
           ))}
           {c.more > 0 && (
             <button type="button" className="gr-more" onClick={() => p.onPickDay?.(c.key)}>+{c.more} more</button>
@@ -129,7 +135,7 @@ function Days({ all, p, single }: { all: Cell[]; p: GridProps; single: boolean }
         {all.map((c) => (
           <div key={c.key} className="gr-band" data-today={c.isToday || undefined}>
             {c.rows.map((r) => (
-              <Chip key={`${r.schedule}|${r.episode}|${r.contact}|${r.subject}`} row={r} nameOf={p.nameOf} onOpenPatient={p.onOpenPatient} />
+              <Chip key={`${r.schedule}|${r.episode}|${r.contact}|${r.subject}`} row={r} cell={c.key} nameOf={p.nameOf} onOpenPatient={p.onOpenPatient} />
             ))}
             {c.more > 0 && <button type="button" className="gr-more" onClick={() => p.onPickDay?.(c.key)}>+{c.more} more</button>}
           </div>
@@ -151,13 +157,11 @@ function Days({ all, p, single }: { all: Cell[]; p: GridProps; single: boolean }
   );
 }
 
-// Contacts are not bookable at an hour, so the week asks for a high `max`
-// only to keep the band from hiding anyone: it grows to fit.
-const Week = (p: GridProps) => <Days all={cells("week", p.anchor, p.rows, 99, p.today)} p={p} single={false} />;
+const Week = (p: GridProps) => <Days all={cells("week", p.anchor, p.rows, NO_LIMIT, p.today)} p={p} single={false} />;
 
 function OneDay(p: GridProps) {
   // The week's cells include the shown day; it is the one the phone draws.
-  const day = cells("week", p.anchor, p.rows, 99, p.today).find((c) => c.key === p.anchor);
+  const day = cells("week", p.anchor, p.rows, NO_LIMIT, p.today).find((c) => c.key === p.anchor);
   return (
     <div className="gr-one">
       <div className="gr-nav">
@@ -173,10 +177,6 @@ function OneDay(p: GridProps) {
     </div>
   );
 }
-
-/** Rank of a tone when a day holds several: the one that most needs a person
- *  wins the tint. Ranked by the arc's tone names, so no state is spelled. */
-const URGENCY = ["b-crit", "b-ink", "b-mute", "b-ok"];
 
 function Year(p: GridProps) {
   const y = p.anchor.slice(0, 4);
@@ -195,7 +195,7 @@ function Year(p: GridProps) {
               {cells("month", first, [], 0).map((shape) => {
                 if (!shape.inMonth) return <span key={shape.key} />;
                 const c = day.get(shape.key)!;
-                const tone = URGENCY.find((t) => c.rows.some((r) => (TONE[r.state] ?? "b-mute") === t));
+                const tone = dayTone(c.rows.map((r) => TONE[r.state] ?? "b-mute"));
                 return (
                   <button
                     key={c.key} type="button" className="gr-dot" data-tone={tone}

@@ -92,3 +92,5 @@
   .gr-month .gr-chip-t { display: none; }
 }
 .gr-month .gr-chip-who { display: none; }
+.gr-chip-was { flex: none; font-size: 11px; font-weight: 600; color: var(--color-critical); white-space: nowrap; }
+@media (max-width: 600px) { .gr-month .gr-chip-was { display: none; } }

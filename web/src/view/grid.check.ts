@@ -2,7 +2,8 @@
  *
  *  Run: node --experimental-strip-types src/view/grid.check.ts   (from web/)
  *
- *  THE PLACEMENT RULE these pin: a contact sits on its DUE day and on no
+ *  THE PLACEMENT RULE these pin: a contact sits in the one cell the kernel
+ *  names (its due day, or today when missed and due before the range), and in no
  *  other. The day list answers "what is owed today" by window; the grid
  *  answers "when is each one due". Both are right, and this file is where the
  *  grid's half is held, so nobody unifies them.
@@ -11,7 +12,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cells, span, step } from "./cells.ts";
+import { cells, dayTone, span, step, wasDue } from "./cells.ts";
 import type { CalendarRow } from "../types.ts";
 
 let checks = 0;
@@ -120,6 +121,15 @@ const DEC = "2026-12-09";
   assert.equal(cells("month", ANCHOR, [], 5).filter((g) => g.inMonth).length, 30);
   assert.equal(cells("month", ANCHOR, [], 5)[0].key, "2026-11-01");
   assert.equal(cells("week", ANCHOR, [], 5).length, 7);
+  // A month whose 1st is a Saturday, and a leap February.
+  const aug = cells("month", "2026-08-15", [], 5);
+  assert.equal(aug[0].key, "2026-07-26");
+  assert.equal(aug.findIndex((c) => c.inMonth), 6, "the 1st is the last column of the first row");
+  assert.equal(aug.filter((c) => c.inMonth).length, 31);
+  const feb = cells("month", "2028-02-10", [], 5);
+  assert.equal(feb[0].key, "2028-01-30");
+  assert.equal(feb.filter((c) => c.inMonth).length, 29);
+  assert.ok(feb.some((c) => c.key === "2028-02-29" && c.inMonth));
   ok("a month is 42 cells in order, 30 of them in November, which starts on its first Sunday; a week is 7");
 }
 
@@ -130,6 +140,12 @@ const DEC = "2026-12-09";
   assert.equal(cell.rows.length, 3);
   assert.equal(cell.more, 2);
   assert.deepEqual(cell.rows.map((r) => r.contact), ["a", "b", "c"], "the first max, in the kernel's order");
+  const exact = cells("week", "2026-11-10", many.slice(0, 4), 3).find((g) => g.key === "2026-11-10")!;
+  assert.deepEqual([exact.rows.length, exact.more], [3, 1], "max + 1 reports one more");
+  const full = cells("week", "2026-11-10", many.slice(0, 3), 3).find((g) => g.key === "2026-11-10")!;
+  assert.deepEqual([full.rows.length, full.more], [3, 0], "exactly max reports none");
+  const free = cells("week", "2026-11-10", many, Infinity).find((g) => g.key === "2026-11-10")!;
+  assert.deepEqual([free.rows.length, free.more], [5, 0], "no limit lists everyone");
   const roomy = cells("week", "2026-11-10", many, 5).find((g) => g.key === "2026-11-10")!;
   assert.deepEqual([roomy.rows.length, roomy.more], [5, 0]);
   ok("a cell over max reports the remainder, and rows + remainder is everything");
@@ -141,6 +157,22 @@ const DEC = "2026-12-09";
   assert.equal(cells("year", ANCHOR, [], 1).length, 365);
   assert.equal(cells("year", "2028-06-01", [], 1).length, 366);
   ok("the year ignores max: it tints a day, it lists nothing");
+}
+
+// ---------------------------------------------------------------- tone and lateness
+{
+  assert.equal(dayTone([]), undefined, "no work, no tint");
+  assert.equal(dayTone(["b-ok", "b-crit"]), "b-crit", "done and missed tints as missed");
+  assert.equal(dayTone(["b-ok", "b-mute", "b-ink"]), "b-ink");
+  assert.equal(dayTone(["b-ok"]), "b-ok");
+  assert.equal(dayTone(["something-new"]), "b-mute", "an unknown tone still tints");
+  ok("a day tints by its most urgent tone, never by nothing when it has work");
+
+  const late = row("late", "2026-09-09", "missed", "2026-11-04");
+  assert.equal(wasDue(late, "2026-11-04"), "9 Sep");
+  assert.notEqual(wasDue(late, "2026-11-04"), "4 Nov", "the chip's date is not the square's");
+  assert.equal(wasDue(row("ontime", "2026-11-04"), "2026-11-04"), "");
+  ok("a contact drawn away from its due day says when it was really due");
 }
 
 // ---------------------------------------------------------------- today
@@ -167,7 +199,9 @@ const DEC = "2026-12-09";
   for (const v of Object.values(cat.views ?? {}) as { columns?: string[] }[]) add(v.columns);
   // The kernel's four contact states are a word list the renderer is held
   // to as well: tone and mark come from the arc's own tables by lookup.
-  for (const s of ["upcoming", "done", "missed"]) words.add(s);
+  // `due` is three letters, under the length filter above, so it is added
+  // here, where no filter applies.
+  for (const s of ["due", "upcoming", "done", "missed"]) words.add(s);
   const prose = (s: string) => s.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
   for (const f of ["cells.ts", "Grid.tsx"]) {
     const body = prose(readFileSync(join(here, f), "utf8"));
