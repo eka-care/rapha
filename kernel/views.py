@@ -156,14 +156,21 @@ def _calendar(bundle, view, store, on, at, since=None, until=None):
         owed = cohort.owed(bundle, store, bundle.workflows[view.workflow],
                            types=view.episodes, since=first, until=last, at=now)
         # A grid draws a contact on its due day, so a window that merely
-        # overlaps the range does not put it here. A missed contact is the
-        # exception, as for a day: it stays owed after its window shuts.
-        rows = [e for e in owed
-                if first.isoformat() <= e["due"] <= last.isoformat() or e["state"] == "missed"]
+        # overlaps the range does not put it here. A missed contact due
+        # before the range is a marker on today instead, when today is in the
+        # range; if it is not, it has no cell and is left out.
+        lo, hi, today = first.isoformat(), last.isoformat(), now.date()
+        marker = first <= today <= last
+
+        def cell(e):
+            if lo <= e["due"] <= hi:
+                return e["due"]
+            return today.isoformat() if e["state"] == "missed" and marker else None
+
+        rows = [e for e in owed if cell(e)]
         days = [first + timedelta(days=n) for n in range((last - first).days + 1)]
-        rows = [e for e in rows if any(_covers(e, d) for d in days)]
         groups = [{"key": d.isoformat(),
-                   "count": sum(1 for e in rows if e["due"] == d.isoformat())} for d in days]
+                   "count": sum(1 for e in rows if cell(e) == d.isoformat())} for d in days]
         return rows, groups
     day = now.date() if on is None else _day(on)
     first = day.replace(day=1)

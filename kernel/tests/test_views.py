@@ -142,8 +142,29 @@ def test_a_range_counts_each_day_by_the_rows_due_on_it():
     # anc1 is missed by then and stays owed; anc2 is due inside the range.
     assert [r["contact"] for r in result.rows] == ["anc1", "anc2"], result.rows
     for g in result.groups:
-        assert g["count"] == sum(1 for r in result.rows if r["due"] == g["key"]), g
-    assert sum(g["count"] for g in result.groups) == 1       # only anc2 is due in it
+        today = day(anc2.opens).isoformat()
+        drawn = sum(1 for r in result.rows if r["due"] == g["key"]
+                    or (g["key"] == today and r["due"] < today))
+        assert g["count"] == drawn, g
+    assert sum(g["count"] for g in result.groups) == 2       # anc2 on its due day, anc1 on today
+
+
+def test_a_missed_contact_counts_once_on_its_due_day_or_on_today_or_nowhere():
+    anc1 = contact("anc1")
+    store = pregnant()
+    today = day(anc1.due + 30)
+    count = lambda r: {g["key"]: g["count"] for g in r.groups}
+    # Due inside the range: on its due day, not on today.
+    r = span(store, day(anc1.due - 2).isoformat(), day(anc1.due + 40).isoformat(), at=today)
+    assert count(r)[day(anc1.due).isoformat()] == 1 and count(r)[today.isoformat()] == 0
+    assert sum(count(r).values()) == 1
+    # Due before the range, today inside it: a marker on today.
+    r = span(store, day(anc1.due + 10).isoformat(), day(anc1.due + 40).isoformat(), at=today)
+    assert [x["contact"] for x in r.rows] == ["anc1"] and count(r)[today.isoformat()] == 1
+    assert sum(count(r).values()) == 1
+    # Due before the range, today outside it: no row and no count.
+    r = span(store, day(anc1.due + 50).isoformat(), day(anc1.due + 60).isoformat(), at=today)
+    assert r.rows == [] and sum(count(r).values()) == 0, r.rows
 
 
 def refused(**kw):
