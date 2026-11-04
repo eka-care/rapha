@@ -280,14 +280,14 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
 
       {cal && (
         <div className="card">
-          <div className="card-h"><div className="card-t">Coming up</div></div>
+          <div className="card-h"><div className="card-t">Next visits</div></div>
           {owed === "failed" ? (
-            <div className="state-empty">Could not load the visits coming up.</div>
+            <div className="state-empty">Could not load visits</div>
           ) : cards.length === 0 ? (
-            owed && <div className="state-empty">Nobody is owed a contact in the coming year.</div>
+            owed && <div className="state-empty">No visits coming up</div>
           ) : (
             <>
-              {noneMine && <div className="stk-note">{`Nothing is owed to you. Showing the ${others} owed to others.`}</div>}
+              {noneMine && <div className="stk-note">{`No visits for you. Showing ${others} for others.`}</div>}
               <Cards key={everyone || noneMine ? "all" : "mine"} rows={cards} now={today} roleName={(r) => cat.vocabulary?.role_titles?.[r] ?? r}
                      nameOf={(s) => fields(cal.decl, { station: null, subject: s }).name}
                      /* The register's own declared columns, the first two values: the
@@ -301,7 +301,7 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
               the viewer owns nothing (noneMine): they already see everything. */}
           {owed !== "failed" && !noneMine && others > 0 && (
             <button type="button" className="stk-more" onClick={() => setEveryone(!everyone)}>
-              {everyone ? "Show only mine" : `${others} more owed to others. Show everyone's`}
+              {everyone ? "Show only mine" : `${others} more for others. Show all`}
             </button>
           )}
         </div>

@@ -1512,7 +1512,7 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.match(home, /cardHash\(r\)/, "a card goes to her page through day.ts");
   assert.ok(!/views\/\$\{cal\.decl\.id\}/.test(home), "a card does not open the facility view");
   assert.match(home, /currentRole\(\)/, "the stack opens on the viewer's own role");
-  assert.ok(!/Coming up<\/div>[\s\S]*contacts? owed/.test(home) && !/contacts owed/.test(home), "the count table is gone");
+  assert.ok(!/Next visits<\/div>[\s\S]*contacts? owed/.test(home) && !/contacts owed/.test(home), "the count table is gone");
   // The renderer never names a station, flag, capability, operation or column.
   // Today.tsx also draws the line of patients, which reads stations on purpose;
   // the stack's own parts are the read of the visits and the card that draws them.
@@ -1533,15 +1533,15 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.match(home, /setOwed\("failed"\)/, "a failed read of the visits is recorded, not swallowed");
   assert.ok(!/(,|\.catch\()\s*(\(\s*\w*\s*\)|\w+|function\s*\(\s*\w*\s*\))\s*(=>\s*)?\{\s*\}\s*\)/.test(home),
     "an empty handler (arrow with or without a parameter, or function) hides a failed read");
-  assert.match(home, /Could not load the visits coming up/, "the failure is shown");
+  assert.match(home, /Could not load visits/, "the failure is shown");
   // The stack opens on the viewer's role and says what else exists.
-  assert.match(home, /more owed to others/, "the stack says how much belongs to others");
+  assert.match(home, /more for others/, "the stack says how much belongs to others");
   // A viewer who owns nothing while others are owed: told so, shown the others' cards, never "nobody".
   const stk = between(home, "const all =", "if (loading");
   assert.match(stk, /noneMine = all\.length > 0 && mine\.length === 0/, "owning nothing while others are owed is its own case");
   assert.match(stk, /everyone \|\| noneMine \? all/, "that viewer is shown the others' cards");
-  assert.match(home, /Nothing is owed to you\. Showing the \$\{others\} owed to others/, "and told how many");
-  assert.match(home, /cards\.length === 0 \? \(\s*owed && <div[^>]*>Nobody is owed/, '"nobody is owed" is only for an empty stack');
+  assert.match(home, /No visits for you\. Showing \$\{others\} for others/, "and told how many");
+  assert.match(home, /cards\.length === 0 \? \(\s*owed && <div[^>]*>No visits coming up/, '"no visits" is only for an empty stack');
   const endOfBranch = home.indexOf("</>\n          )}"), control = home.indexOf('className="stk-more"');
   assert.ok(endOfBranch >= 0 && control > endOfBranch, "the control sits after, so outside, the empty-or-cards branch");
   assert.match(home, /!noneMine && others > 0/, "and is hidden for a viewer who already sees everything");
