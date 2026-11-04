@@ -2213,14 +2213,14 @@
       ],
       "presents": "artifact",
       "scope_qualifier": null,
-      "short": "Outside record",
+      "short": "Papers",
       "station": "nurse",
       "summary": "A letter, a result or a discharge note another facility wrote, copied in as given.",
       "surfaces": [
         "rendered",
         "mcp"
       ],
-      "title": "Add a record from outside",
+      "title": "Add papers from elsewhere",
       "tool": "propose_context_add",
       "type": "operation",
       "verified": "unverified",

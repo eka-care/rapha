@@ -2,8 +2,8 @@
 id: phc.op.context-add
 type: operation
 kind: write
-short: Outside record
-title: Add a record from outside
+short: Papers
+title: Add papers from elsewhere
 summary: A letter, a result or a discharge note another facility wrote, copied in as given.
 capability: context.record
 scope_qualifier: null
@@ -121,12 +121,13 @@ person types, exactly as before.
 It is `correctable`, not reversible: a letter copied in wrongly is corrected
 in place and the correction is signed, the same as every other row here.
 
-## It is called an outside record now, and nothing moved
+## It is called papers now, and nothing moved
 
 It was called "Background" on every screen that showed it, which named where
 it sits rather than what it is, and a clinician reading "Background" has to
-open it to find out it is somebody else's paper. "Outside record" says the
-one thing that matters about every row in it: this is not ours.
+open it to find out it is somebody else's paper. "Papers" is what everybody
+at the counter already calls it, and it is the plainest possible word for a
+thing the patient is holding in their hand.
 
 Only the words changed. The operation is still `phc.op.context-add`, the
 capability is still `context.record`, the tab is still `context` and the
@@ -135,7 +136,7 @@ already right; it was the display that was vague.
 
 ## How you know it worked
 
-The outside record appears on the visit, with who copied it in and when, and it is
+The papers appear on the visit, with who copied it in and when, and it is
 there for the consultation that follows. No step closes and the patient does
 not move.
 

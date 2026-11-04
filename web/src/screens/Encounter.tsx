@@ -64,7 +64,7 @@ const tabsFor = (past: number, papers: number): Tab[] => [
   { id: "scribe", title: "Scribe", icon: "mic" },
   /* Next to the recording, because both are ways something gets INTO this
      visit, and before the history, because this is what you read first. */
-  { id: "context", title: "Outside records", icon: "clip", count: papers },
+  { id: "context", title: "Papers", icon: "clip", count: papers },
   { id: "past", title: "Earlier visits", icon: "clock", count: past },
   { id: "ask", title: "Ask", icon: "spark" },
 ];
