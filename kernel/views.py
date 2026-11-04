@@ -156,16 +156,19 @@ def _calendar(bundle, view, store, on, at, since=None, until=None):
         owed = cohort.owed(bundle, store, bundle.workflows[view.workflow],
                            types=view.episodes, since=first, until=last, at=now)
         # A grid draws a contact on its due day, so a window that merely
-        # overlaps the range does not put it here. A missed contact due
-        # before the range is a marker on today instead, when today is in the
-        # range; if it is not, it has no cell and is left out.
+        # overlaps the range does not put it here. A late contact (anything
+        # not done and not upcoming: due, with its window still open, or
+        # missed) whose due day is before the range is a marker on today
+        # instead, when today is in the range; if it is not, it has no cell
+        # and is left out.
         lo, hi, today = first.isoformat(), last.isoformat(), now.date()
         marker = first <= today <= last
 
         def cell(e):
             if lo <= e["due"] <= hi:
                 return e["due"]
-            return today.isoformat() if e["state"] == "missed" and marker else None
+            return today.isoformat() if (
+                e["due"] < lo and e["state"] not in ("done", "upcoming") and marker) else None
 
         rows = [dict(e, cell=cell(e)) for e in owed if cell(e)]
         days = [first + timedelta(days=n) for n in range((last - first).days + 1)]

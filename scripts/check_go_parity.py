@@ -1208,6 +1208,11 @@ def s_the_views_see_what_the_write_did(walk, codes):
                       ordered=False)
     walk.read("the queue, with the thread this walk opened on it", "/queue",
               ordered=False)
+    # /queue hands a view no thread, so a summary named through it is refused.
+    for vid, decl in sorted(declared()["views"].items()):
+        if decl["kind"] == "summary":
+            walk.read("a summary named through the queue with a thread: %s" % vid,
+                      "/queue?view=%s&thread=%s" % (vid, walk.thread), ordered=False)
 
     for vid, decl in sorted(declared()["views"].items()):
         path = "/views/%s" % vid
@@ -1292,6 +1297,10 @@ def s_the_calendar_with_women_in_it(walk, codes):
 
     woman("an open pregnancy", 100)
     woman("a pregnancy nobody has seen for months", 190)
+    # Day 160: the second check-up fell due on day 154 and its window runs to
+    # 182, so it is still `due` and two days late. A range that starts today
+    # must still draw her, as a marker on today.
+    woman("a woman six days past a check-up's due day", 160)
     woman("a delivery", 270)
     walk.commit("the delivery is recorded", "phc.op.delivery-record",
                 {"delivery_date": day(3), "outcome": "live_birth"}, "anm")
@@ -1371,10 +1380,27 @@ def s_the_calendar_with_women_in_it(walk, codes):
             if r["due"] in span_days:
                 assert r["cell"] == r["due"], (label, r["due"], r["cell"])
             else:
-                assert r["state"] == "missed" and r["cell"] == today.isoformat(), (label, r)
+                assert r["state"] not in ("done", "upcoming") \
+                    and r["cell"] == today.isoformat(), (label, r)
     # A missed contact due before the week is drawn on today.
     assert any(r["due"] < week_start.isoformat() and r["cell"] == today.isoformat()
                for r in ranges["a week around today"]["rows"]), "no late marker in the week"
+    # A woman past a due date whose window is still open is state `due`, not
+    # `missed`, and is a marker on today all the same, once.
+    late = [r for r in ranges["a week around today"]["rows"]
+            if r["state"] == "due" and r["due"] < week_start.isoformat()]
+    assert late and all(r["cell"] == today.isoformat() for r in late), late
+    home = (today, today + datetime.timedelta(days=365))
+    status, body = walk.read("the home page's range: today and a year on",
+                             "/views/phc.view.calendar?from=%s&to=%s" % (
+                                 home[0].isoformat(), home[1].isoformat()), ordered=False)
+    assert status == 200
+    ids = [(r["subject"], r["contact"]) for r in body["rows"]]
+    assert len(ids) == len(set(ids)), "a visit was drawn twice"
+    assert any(r["state"] == "due" and r["due"] < today.isoformat()
+               and r["cell"] == today.isoformat() for r in body["rows"]), \
+        "a woman past her due date is missing from the home page's range"
+    assert sum(g["count"] for g in body["groups"]) == len(body["rows"])
     # A day has one cell, and it is the day: its rows carry none.
     assert all("cell" not in r for r in answers["today, by saying nothing"][1]["rows"])
     # Not one day's answer wearing a range's name.
@@ -1410,8 +1436,8 @@ def s_the_calendar_with_women_in_it(walk, codes):
     # registered are the ones it named "parity".
     ours = {r["subject"] for r in body["rows"]
             if r["subject_row"].get("name") == "parity"}
-    assert len(ours) == 3, \
-        "three of this walk's women are owed and the fourth miscarried: %d" % len(ours)
+    assert len(ours) == 4, \
+        "four of this walk's women are owed and the fifth miscarried: %d" % len(ours)
     for label in ("a day that does not exist", "an empty value", "a timestamp",
                   "a month that does not exist",
                   "29 February in a year that has none", "a compact date"):

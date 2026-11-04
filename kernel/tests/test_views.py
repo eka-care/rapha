@@ -170,6 +170,30 @@ def test_a_missed_contact_counts_once_on_its_due_day_or_on_today_or_nowhere():
     assert r.rows == [] and sum(count(r).values()) == 0, r.rows
 
 
+def test_a_due_contact_past_its_due_day_lands_on_today_and_one_inside_stays_put():
+    anc2 = contact("anc2")
+    store = pregnant()
+    today = day(anc2.due + 2)                      # state is still due: the window runs on
+    assert today < day(anc2.closes)
+    count = lambda r: {g["key"]: g["count"] for g in r.groups}
+    # Due two days before the range, today the first day of it: a marker on today.
+    r = span(store, today.isoformat(), (today + timedelta(days=365)).isoformat(), at=today)
+    row = next(x for x in r.rows if x["contact"] == "anc2")
+    assert row["state"] == "due" and row["cell"] == today.isoformat(), row
+    assert count(r)[today.isoformat()] >= 1
+    assert sum(count(r).values()) == len(r.rows), "a row was counted twice or not at all"
+    assert [x["contact"] for x in r.rows].count("anc2") == 1
+    # Due inside the range: on its own day, not on today.
+    r = span(store, day(anc2.due - 3).isoformat(), day(anc2.due + 10).isoformat(), at=today)
+    row = next(x for x in r.rows if x["contact"] == "anc2")
+    assert row["cell"] == day(anc2.due).isoformat(), row
+    assert sum(count(r).values()) == len(r.rows)
+    # Due before the range and today outside it: no cell.
+    r = span(store, (today + timedelta(days=5)).isoformat(),
+             (today + timedelta(days=12)).isoformat(), at=today)
+    assert "anc2" not in [x["contact"] for x in r.rows]
+
+
 def refused(**kw):
     try:
         views.resolve(BUNDLE, VIEW, pregnant(), **kw)

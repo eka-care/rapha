@@ -335,3 +335,52 @@ func TestADayHasNoCellOnItsRows(t *testing.T) {
 		t.Errorf("cell on the wire: %s", raw)
 	}
 }
+
+// A contact is `due` for as long as its window is open, so one past its due
+// day is still due. Asked about from a range that starts after that day, it is
+// late: a marker on today, once, and a due day inside the range keeps its own.
+func TestADueContactPastItsDueDayLandsOnToday(t *testing.T) {
+	g := gridCentre(t)
+	g.today = time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC) // day 156: ANC2 (due 154) is still open
+	const today = "2026-06-10"
+	var late cohort.Entry
+	wide, err := cohort.Owed(g.b.Catalogue, g.s, g.b.Workflow, g.view.Episodes,
+		time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2027, 12, 31, 0, 0, 0, 0, time.UTC), g.today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range wide {
+		if e.State == schedule.Due && e.Due < today {
+			late = e
+			break
+		}
+	}
+	if late.Due == "" {
+		t.Fatal("the fixture has no due contact past its due day")
+	}
+	id := late.Contact.Contact
+	times := func(rows []CalendarRow) (n int, cell string) {
+		for _, r := range rows {
+			if r.Contact.Contact == id {
+				n++
+				cell = r.Cell
+			}
+		}
+		return
+	}
+	rows, groups := g.ask(today, "2027-06-09")
+	if n, cell := times(rows); n != 1 || cell != today {
+		t.Errorf("due %s: drawn %d times on %q, want once on today", late.Due, n, cell)
+	}
+	sum := 0
+	for _, grp := range groups {
+		sum += grp.Count
+	}
+	if sum != len(rows) {
+		t.Errorf("%d counted for %d rows", sum, len(rows))
+	}
+	rows, _ = g.ask(late.Due, "2026-06-11")
+	if n, cell := times(rows); n != 1 || cell != late.Due {
+		t.Errorf("due inside the range: drawn %d times on %q, want once on %s", n, cell, late.Due)
+	}
+}

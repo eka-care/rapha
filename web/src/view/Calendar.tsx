@@ -89,7 +89,7 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
   return (
     <div className="cal cal-page">
      <aside className="cal-side" aria-label="The day">
-      <div className="cal-chips" role="group" aria-label="Whose contacts">
+      <div className="cal-chips" role="group" aria-label="Whose visits">
         {[EVERYONE, ...roles].map((r) => (
           <button
             key={r || "everyone"} type="button" className="cal-chip"

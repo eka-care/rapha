@@ -537,16 +537,17 @@ func calendar(b Bundle, view carephc.View, s Reader, on, since, until *string,
 		if err != nil {
 			return nil, nil, err
 		}
-		// A missed contact due before the range is a marker on today
-		// instead, when today is in the range; if it is not, it has no cell
-		// and is left out.
+		// A late contact (anything not done and not upcoming: due with its
+		// window still open, or missed) whose due day is before the range is
+		// a marker on today instead, when today is in the range; if it is
+		// not, it has no cell and is left out.
 		lo, hi, today := first.Format(dateLayout), last.Format(dateLayout), now.Format(dateLayout)
 		marker := today >= lo && today <= hi
 		cell := func(e cohort.Entry) string {
 			if e.Due >= lo && e.Due <= hi {
 				return e.Due
 			}
-			if e.State == schedule.Missed && marker {
+			if e.Due < lo && e.State != schedule.Done && e.State != schedule.Upcoming && marker {
 				return today
 			}
 			return ""

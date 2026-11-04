@@ -112,7 +112,8 @@ func (k *kernel) resolveView(w http.ResponseWriter, r *http.Request, viewID stri
 		return
 	}
 	var thread *string
-	if given := r.URL.Query().Get("thread"); given != "" {
+	// The queue route hands the Python's resolve no thread either.
+	if given := r.URL.Query().Get("thread"); asked && given != "" {
 		thread = &given
 	}
 	// `on` is the day a calendar answers for. Present-but-empty is a value
