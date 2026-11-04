@@ -251,6 +251,7 @@ if [ -d web/node_modules ]; then
   (cd web && node --experimental-strip-types src/app/guide.check.ts)
   (cd web && node --experimental-strip-types src/app/width.check.ts)
   (cd web && node --experimental-strip-types src/form/span.check.ts)
+  (cd web && node --experimental-strip-types src/ui/pick.check.ts)
   # Speaking into whatever field has the cursor: where the words land, what
   # the gesture means, and which fields take them. No microphone needed.
   (cd web && node --experimental-strip-types src/scribe/dictate.check.ts)

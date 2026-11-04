@@ -243,44 +243,12 @@
 
 .f-check { display: flex; align-items: flex-start; gap: var(--space-2); font-size: 13px; }
 .f-check.big { font-size: 14px; font-weight: 500; }
-.f-check input { margin-top: 2px; width: 16px; height: 16px; flex: 0 0 auto; }
 
-/* The box itself, which was the browser's and therefore the browser's blue.
- * Nothing else in this product is that blue, and a checked box is the
- * selected state of a control, so it wears the accent: the hue that carries
- * interactive chrome. The tick is a clipped square rather than a glyph,
- * because a glyph is a font the device may not have. */
-.f-check input[type="checkbox"] {
-  appearance: none; -webkit-appearance: none;
-  width: 18px; height: 18px; margin-top: 1px;
-  display: grid; place-content: center; cursor: pointer;
-  border: 1px solid var(--color-border-control);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-surface);
-  transition: background var(--duration-fast) var(--ease-out),
-              border-color var(--duration-fast) var(--ease-out);
-}
-.f-check input[type="checkbox"]::after {
-  content: ""; width: 11px; height: 11px;
-  background: var(--color-bg-surface);
-  clip-path: polygon(13% 46%, 0 61%, 40% 100%, 100% 20%, 85% 7%, 39% 72%);
-  transform: scale(0);
-  transition: transform var(--duration-fast) var(--ease-out);
-}
-.f-check input[type="checkbox"]:checked {
-  background: var(--color-accent); border-color: var(--color-accent);
-}
-.f-check input[type="checkbox"]:checked::after { transform: scale(1); }
-.f-check input[type="checkbox"]:focus-visible {
-  outline: 2px solid var(--color-accent); outline-offset: 2px;
-}
-.f-check input[type="checkbox"]:disabled {
-  background: var(--color-bg-subtle); border-color: var(--color-border-strong);
-  cursor: not-allowed;
-}
-.f-check input[type="checkbox"]:disabled:checked {
-  background: var(--color-text-disabled); border-color: var(--color-text-disabled);
-}
+/* The tick box moved to ui/Check.tsx, which is Radix's, so the rules that
+   styled an <input> with its appearance taken away are gone with it. What
+   stays here is the ROW -- the box beside its sentence -- because that is
+   this form's layout and not the control's. The control's own styling is in
+   style/ui.css. */
 
 .f-flags { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 

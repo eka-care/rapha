@@ -1,0 +1,134 @@
+/* The shared controls: shadcn's anatomy, this product's tokens.
+ *
+ * Every colour here is a var() from tokens.css, which is the only file in
+ * web/src allowed to name one. That is what "shadcn with our design system"
+ * means in practice: the behaviour and the structure are the library's, the
+ * look is ours, and there is no second palette to keep in step.
+ */
+
+/* ---- the trigger: a select and a combobox look identical closed --------
+ *
+ * They have to. Which of the two a question gets is decided from the length
+ * of its own option list (ui/pick.ts), so the same form can hold both, and a
+ * person must never have to work out which kind of control they are looking
+ * at before they can use it. Matched to .f-in deliberately: a picker and a
+ * text box on the same form are the same object with different contents. */
+.pk {
+  display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; min-height: 36px;
+  border: 1px solid var(--color-border-control); border-radius: var(--radius-md);
+  background: var(--color-bg-surface); color: var(--color-text-primary);
+  padding: var(--space-2) var(--space-3);
+  font: inherit; font-size: 14px; line-height: 21px; text-align: left;
+  cursor: pointer;
+}
+.pk:hover:not(:disabled) { border-color: var(--color-border-strong); }
+.pk:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.pk:disabled {
+  color: var(--color-text-disabled); background: var(--color-bg-subtle);
+  cursor: not-allowed;
+}
+.pk[aria-invalid="true"] { border-color: var(--color-critical); }
+
+/* The chosen value takes the room; the chevron keeps its own. A long option
+   is clipped with an ellipsis rather than wrapping the control to two lines,
+   because the full text is one tap away in the list. */
+.pk > span:first-child,
+.pk [data-radix-select-value] { flex: 1 1 auto; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+/* Nothing picked yet reads as a prompt, not as an answer. */
+.pk-v.empty,
+.pk [data-placeholder] { color: var(--color-text-tertiary); }
+.pk-c { flex: 0 0 auto; display: inline-flex; color: var(--color-text-tertiary); }
+
+/* ---- the panel that opens ---------------------------------------------- */
+.pk-pop {
+  z-index: 60;
+  /* The trigger's own width, so the list lines up under the control rather
+     than sizing itself to its longest entry. Radix sets one of these two at
+     runtime depending on which primitive opened the panel; the `auto` is
+     what the panel falls back to if neither arrives, which is a panel as
+     wide as its contents rather than a panel with no width at all. */
+  width: var(--radix-select-trigger-width, var(--radix-popover-trigger-width, auto));
+  min-width: var(--radix-select-trigger-width, var(--radix-popover-trigger-width, auto));
+  max-height: min(340px, var(--radix-select-content-available-height,
+                            var(--radix-popover-content-available-height, 340px)));
+  display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-overlay);
+}
+
+/* The search box, pinned above a list that scrolls under it. */
+.pk-find {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-tertiary);
+  flex: 0 0 auto;
+}
+.pk-q {
+  flex: 1 1 auto; min-width: 0;
+  border: 0; background: transparent; outline: none; padding: 0;
+  font: inherit; font-size: 14px; line-height: 21px;
+  color: var(--color-text-primary);
+}
+.pk-q::placeholder { color: var(--color-text-tertiary); }
+
+.pk-list { overflow-y: auto; padding: var(--space-1); flex: 1 1 auto; min-height: 0; }
+
+/* §68: a row of a list somebody taps is a tap target before it is a line of
+   text. 36px rather than 44 only because this list is reached with the
+   finger already on the screen and the rows are adjacent. */
+.pk-row {
+  display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; min-height: 36px;
+  padding: var(--space-2) var(--space-3);
+  border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--color-text-primary);
+  font: inherit; font-size: 14px; line-height: 20px; text-align: left;
+  cursor: pointer;
+}
+.pk-row > span:first-child { flex: 1 1 auto; min-width: 0; }
+/* One highlight, driven by the keyboard as well as the mouse, so arrowing
+   down the list and running the mouse down it look the same. */
+.pk-row.on,
+.pk-row[data-highlighted] { background: var(--color-bg-hover); outline: none; }
+.pk-row[data-state="checked"] { font-weight: 550; }
+.pk-tick { flex: 0 0 auto; display: inline-flex; color: var(--color-accent); }
+.pk-none {
+  padding: var(--space-3); font-size: 13px; line-height: 18px;
+  color: var(--color-text-tertiary);
+}
+
+/* ---- the checkbox ------------------------------------------------------
+ *
+ * Radix's, so the tick is a real control with a real checked state that a
+ * screen reader reports, rather than a styled input whose appearance was
+ * taken away. The tick is a clipped square and not a glyph, because a glyph
+ * is a font the device may not have. */
+.cb {
+  flex: 0 0 auto;
+  width: 18px; height: 18px; margin-top: 1px;
+  display: grid; place-content: center; cursor: pointer;
+  border: 1px solid var(--color-border-control); border-radius: var(--radius-sm);
+  background: var(--color-bg-surface); padding: 0;
+  transition: background var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out);
+}
+.cb[data-state="checked"] { background: var(--color-accent); border-color: var(--color-accent); }
+.cb:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.cb:disabled { background: var(--color-bg-subtle); border-color: var(--color-border-strong);
+  cursor: not-allowed; }
+.cb:disabled[data-state="checked"] {
+  background: var(--color-text-disabled); border-color: var(--color-text-disabled);
+}
+.cb-i {
+  display: block; width: 11px; height: 11px;
+  background: var(--color-bg-surface);
+  clip-path: polygon(13% 46%, 0 61%, 40% 100%, 100% 20%, 85% 7%, 39% 72%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cb { transition: none; }
+}

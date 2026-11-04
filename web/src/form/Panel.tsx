@@ -36,6 +36,7 @@ import { mountsFor } from "../voice/instruments";
 import { VoiceCapture } from "../voice/VoiceCapture";
 import { useDictation } from "../scribe/useDictation";
 import { DictateBar } from "../scribe/DictateBar";
+import { Box } from "../ui/Check";
 import { dictateKey } from "../scribe/dictate";
 
 const IRREVERSIBLE = "irreversible";
@@ -499,8 +500,7 @@ export function OperationPanel({
           <div className="confirmbox">
             <div className="card-t">This cannot be undone</div>
             <label className="f-check big">
-              <input type="checkbox" checked={confirmed} disabled={busy}
-                     onChange={(e) => setConfirmed(e.target.checked)} />
+              <Box checked={confirmed} disabled={busy} onChange={setConfirmed} />
               <span>I have read the values above and I am doing this.</span>
             </label>
           </div>

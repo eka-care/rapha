@@ -45,6 +45,7 @@ import { inert, inertReason, type Withheld } from "../grants";
 import { Icon } from "../icons";
 import type { Catalogue } from "../types";
 import { title } from "../words";
+import { Box } from "../ui/Check";
 
 /** One switch. `label` is always the best declared words available; `declared`
  *  says whether they ARE declared words, so the identifier is drawn once and
@@ -226,8 +227,7 @@ export function Roles({
                     className={marks[i].off ? "f-check roles-row off" : "f-check roles-row"}
                     key={cap}
                   >
-                    <input
-                      type="checkbox"
+                    <Box
                       checked={caps.has(cap)}
                       disabled={marks[i].off || busy || !role}
                       onChange={() => toggle(cap)}

@@ -11,6 +11,8 @@ import type { Operation, Payload, Question, Questionnaire } from "../types";
 import { blankRow, itemFields, toRow, type ItemField } from "../structured";
 import { options } from "../declarations";
 import { capFor, weightFor } from "./span";
+import { Pick } from "../ui/Picker";
+import { Check } from "../ui/Check";
 import { enabled, isRowGroup, labelOf, phcOf, prune, rowQuestions, validate, raisedFlags, rangeBlocked, walk } from "../validate";
 
 export { validate, rangeBlocked, raisedFlags };
@@ -93,25 +95,22 @@ function Widget({
   switch (q.type) {
     case "boolean":
       return (
-        <label className="f-check">
-          <input type="checkbox" id={id} checked={value === true} disabled={disabled} autoFocus={autoFocus}
-                 onChange={(e) => set(e.target.checked)} />
-          <span>Yes</span>
-        </label>
+        <Check id={id} checked={value === true} disabled={disabled} autoFocus={autoFocus}
+               onChange={set}>Yes</Check>
       );
     case "choice":
       // The values the form declared, or the codes of the value set this
       // question bound its answer to. The option's label is the display the
       // terminology gave the code, because nobody reads 229799001; the value
       // posted is still the code, so what is stored is what was confirmed.
+      // A SHORT LIST IS A MENU AND A LONG ONE IS SEARCHED, and which this is
+      // comes off the list itself (ui/pick.ts). The native control could do
+      // neither well: it opens a menu this product cannot draw, it clips a
+      // long option to the width of the box, and picking one of eleven
+      // similar laboratory phrases meant reading all eleven.
       return (
-        <select className="f-in" id={id} value={str} disabled={disabled} autoFocus={autoFocus}
-                onChange={(e) => set(e.target.value || undefined)}>
-          <option value="">Choose</option>
-          {options(q).map((o) => (
-            <option key={o.value} value={o.value}>{o.display}</option>
-          ))}
-        </select>
+        <Pick id={id} value={str} options={options(q)} disabled={disabled}
+              autoFocus={autoFocus} onChange={set} />
       );
     case "text":
       return <textarea className="f-in" id={id} rows={4} value={str} disabled={disabled}
