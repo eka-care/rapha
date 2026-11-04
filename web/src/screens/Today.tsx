@@ -112,7 +112,9 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
   const all = Array.isArray(owed) ? stack(owed, today, EVERYONE) : [];
   const mine = forRole(all, currentRole());
   // A viewer who owns nothing is shown everyone's, and told so: the stack is
-  // never empty while somebody is owed, and never says nobody is.
+  // never empty while somebody is owed, and never says nobody is. That viewer
+  // is already seeing everything, so the toggle below is hidden for them: it
+  // could only offer them their own, empty, list.
   const noneMine = all.length > 0 && mine.length === 0;
   const cards = everyone || noneMine ? all : mine;
   const others = all.length - mine.length;
@@ -295,7 +297,8 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
                      onOpen={(r) => { location.hash = cardHash(r); }} />
             </>
           )}
-          {/* Outside the branch above: the way through is there whatever the stack holds. */}
+          {/* Outside the empty-or-cards branch, so it does not depend on what is drawn. Hidden when
+              the viewer owns nothing (noneMine): they already see everything. */}
           {owed !== "failed" && !noneMine && others > 0 && (
             <button type="button" className="stk-more" onClick={() => setEveryone(!everyone)}>
               {everyone ? "Show only mine" : `${others} more owed to others. Show everyone's`}

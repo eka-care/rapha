@@ -1516,7 +1516,13 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   // The renderer never names a station, flag, capability, operation or column.
   // Today.tsx also draws the line of patients, which reads stations on purpose;
   // the stack's own parts are the read of the visits and the card that draws them.
-  const stackPart = home.slice(home.indexOf("const calId"), home.indexOf("if (loading")) + home.slice(home.indexOf("{cal && ("), home.indexOf('<div className="hgrid">'));
+  // A marker that is not found must fail, never slice from -1 and guard air.
+  const between = (text: string, from: string, to: string) => {
+    const a = text.indexOf(from), b = text.indexOf(to, a + 1);
+    assert.ok(a >= 0 && b > a, `the scan's markers moved: "${from}" ... "${to}"`);
+    return text.slice(a, b);
+  };
+  const stackPart = between(home, "const calId", "if (loading") + between(home, "{cal && (", '<div className="hgrid">');
   assert.ok(stackPart.length > 400, "the scan found the stack's parts of Today.tsx");
   const dayLogic = code(readFileSync(join(SRC, "view", "day.ts"), "utf8"));
   for (const [name, text] of [["Cards.tsx", src], ["the stack's part of Today.tsx", stackPart], ["day.ts", dayLogic]] as const) {
@@ -1525,17 +1531,24 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   }
   // A failed read of the visits is said, never swallowed into a quiet card.
   assert.match(home, /setOwed\("failed"\)/, "a failed read of the visits is recorded, not swallowed");
-  assert.ok(!/(,|\.catch\()\s*\(\)\s*=>\s*\{\s*\}\s*\)/.test(home), "an empty catch hides a failed read, however it is written");
+  assert.ok(!/(,|\.catch\()\s*(\(\s*\w*\s*\)|\w+|function\s*\(\s*\w*\s*\))\s*(=>\s*)?\{\s*\}\s*\)/.test(home),
+    "an empty handler (arrow with or without a parameter, or function) hides a failed read");
   assert.match(home, /Could not load the visits coming up/, "the failure is shown");
   // The stack opens on the viewer's role and says what else exists.
   assert.match(home, /more owed to others/, "the stack says how much belongs to others");
   // A viewer who owns nothing while others are owed: told so, shown the others' cards, never "nobody".
-  const stk = home.slice(home.indexOf("const all ="), home.indexOf("if (loading"));
+  const stk = between(home, "const all =", "if (loading");
   assert.match(stk, /noneMine = all\.length > 0 && mine\.length === 0/, "owning nothing while others are owed is its own case");
   assert.match(stk, /everyone \|\| noneMine \? all/, "that viewer is shown the others' cards");
   assert.match(home, /Nothing is owed to you\. Showing the \$\{others\} owed to others/, "and told how many");
   assert.match(home, /cards\.length === 0 \? \(\s*owed && <div[^>]*>Nobody is owed/, '"nobody is owed" is only for an empty stack');
-  assert.ok(home.indexOf("</>\n          )}") < home.indexOf('className="stk-more"'), "the control sits outside the empty-or-cards branch");
+  const endOfBranch = home.indexOf("</>\n          )}"), control = home.indexOf('className="stk-more"');
+  assert.ok(endOfBranch >= 0 && control > endOfBranch, "the control sits after, so outside, the empty-or-cards branch");
+  assert.match(home, /!noneMine && others > 0/, "and is hidden for a viewer who already sees everything");
+  // The role filter the home page uses agrees with the one stack() applies.
+  const mixed = [later, soon, late, today];
+  assert.deepEqual(forRole(stack(mixed, NOW, ""), "nurse").map((r) => r.contact), stack(mixed, NOW, "nurse").map((r) => r.contact),
+    "forRole over the whole stack is the role's stack, in the same order");
   assert.deepEqual(stack([soon, later], NOW, "pharmacist").map((r) => r.contact), ["c", "d"], "owning nothing shows everyone's, never none");
   assert.match(home, /setEveryone\(/, "and offers a way to see it");
   assert.ok(!/split\(" · "\)/.test(home), "a value containing the separator is not cut: facts are taken before they are joined");
