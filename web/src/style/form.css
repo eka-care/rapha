@@ -97,9 +97,14 @@
    anything that went wrong stay the width of the form, because those are
    sentences and a sentence squeezed into eight characters is worse than a
    wide box. Prose declares no ceiling and keeps the line. See form/span.ts. */
-.f-field > .f-lab,
 .f-field > .f-in,
 .f-field > .f-rows { max-width: var(--cap, none); }
+/* A LABEL IS A SENTENCE and keeps the width of the form. It was capped with
+   the control, so "The date that refers to" over a date box broke after
+   three words. The one case that needs the cap is a label carrying a unit
+   chip, which sits at the label's right edge and has to land over the right
+   edge of the control rather than out at the end of the line. */
+.f-field > .f-lab:has(.f-unit) { max-width: var(--cap, none); }
 
 /* A repeating group is a <fieldset>, and nothing here had ever styled one, so
    every form that holds a diagnosis or a prescription drew the browser's own

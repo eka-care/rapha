@@ -116,6 +116,19 @@ function Widget({
     case "text":
       return <textarea className="f-in" id={id} rows={4} value={str} disabled={disabled}
                        autoFocus={autoFocus} onChange={(e) => set(e.target.value)} />;
+    // A DECLARED DATE GETS A CALENDAR. It fell through to the plain string
+    // box below, so a form asking a nurse for the first day of a last
+    // period gave her an empty rectangle and no hint of what to type in it.
+    // The browser's own control knows the person's locale and writes the
+    // one unambiguous form underneath, which is also the only form the
+    // kernel should ever be sent: 03/04 is two different days in two
+    // countries and a pregnancy is dated off this field.
+    case "date":
+      return (
+        <input className="f-in" id={id} type="date" value={str} disabled={disabled}
+               autoFocus={autoFocus}
+               onChange={(e) => set(e.target.value || undefined)} />
+      );
     case "integer":
     case "decimal":
       // The id is how an instrument that refused to guess hands the cursor
@@ -374,6 +387,15 @@ export function Form({
           {phc.unit && <span className="f-unit">{phc.unit}</span>}
         </label>
         {q.description && <div className="f-hint">{q.description}</div>}
+        {/* THE SENTENCE THE BUNDLE WROTE FOR THIS FIELD. A group drew its
+            declared help and a plain field threw it away, so "A remembered
+            period and a scan are not equally reliable, and every date after
+            this one is measured from whichever you pick" was written,
+            compiled, served -- and never once put on a screen. That is most
+            of why these forms read as though they were written for whoever
+            built them: the part written for the nurse was being dropped on
+            the floor. */}
+        {phc.help && <div className="f-hint">{phc.help}</div>}
         <Widget q={q} op={op} ids={ids} value={value[q.link_id]} autoFocus={first}
                 onChange={(v) => set(q.link_id, v)} disabled={disabled} />
         {phc.range && (

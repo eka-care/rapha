@@ -63,6 +63,10 @@ export function useDictation({ thread, operation, enabled = true }: {
   const presses = useRef<Press[]>([]);
   const live = useRef<{ reading: Reading; target: Element | null; handsfree: boolean } | null>(null);
   const running = useRef<"hold" | "handsfree" | null>(null);
+  /** Whether the shortcut key is physically down right now. Only while it is
+   *  may this refuse the character: outside that moment a ₹ in a field is
+   *  somebody writing a price. */
+  const held = useRef(false);
   const supported = canRecord();
 
   const finish = useCallback(async (reading: Reading, target: Element | null) => {
@@ -114,10 +118,17 @@ export function useDictation({ thread, operation, enabled = true }: {
     };
 
     const down = (e: KeyboardEvent) => {
-      if (e.key !== key || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
-      // The key is the shortcut and never a character. Without this it is
-      // also typed into the field it is dictating into.
+      if (e.key !== key || e.metaKey || e.ctrlKey || e.altKey) return;
+      // THE KEY IS THE SHORTCUT AND NEVER A CHARACTER, and that has to hold
+      // for every one of the keydowns a held key produces, not just the
+      // first. This returned early on `e.repeat` BEFORE preventing the
+      // default, so holding the key to dictate -- which is the whole
+      // gesture -- let the operating system's own key repeat type the
+      // character over and over into the field being dictated into. A date
+      // box came back reading "₹₹₹₹₹₹₹₹₹₹₹".
       e.preventDefault();
+      held.current = true;
+      if (e.repeat) return;
       presses.current = [...presses.current.slice(-3), { at: performance.now() }];
       const what = gesture(presses.current, performance.now(), running.current);
       if (what === "stop") {
@@ -139,6 +150,7 @@ export function useDictation({ thread, operation, enabled = true }: {
     const up = (e: KeyboardEvent) => {
       if (e.key !== key) return;
       e.preventDefault();
+      held.current = false;
       const last = presses.current[presses.current.length - 1];
       if (last && last.released === undefined) last.released = performance.now();
       const open = live.current;
@@ -153,11 +165,30 @@ export function useDictation({ thread, operation, enabled = true }: {
       }, 0);
     };
 
+    // THE SECOND DOOR. Preventing the keydown stops the character on a
+    // plain keyboard, and a plain keyboard is not the only way this symbol
+    // arrives: a layout that composes it, a key repeat the browser raises
+    // as input rather than as a key, an input method editor. All of them
+    // reach the field through `beforeinput` and none of them through a
+    // keydown this file ever sees. So the character is refused here too,
+    // but only while the key is actually down, which is the one moment it
+    // cannot be a character somebody meant to type.
+    const typing = (e: Event) => {
+      const ev = e as InputEvent;
+      if (!held.current) return;
+      if (ev.data === key || (ev.inputType === "insertText" && ev.data === key)) {
+        ev.preventDefault();
+      }
+    };
+
     addEventListener("keydown", down, true);
     addEventListener("keyup", up, true);
+    addEventListener("beforeinput", typing, true);
     return () => {
       removeEventListener("keydown", down, true);
       removeEventListener("keyup", up, true);
+      removeEventListener("beforeinput", typing, true);
+      held.current = false;
       // Leaving the screen mid-recording keeps nothing: the microphone
       // stops and the audio is never sent.
       live.current?.reading.abandon();

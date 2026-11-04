@@ -1,5 +1,6 @@
 /** The dictation rules, checked without a microphone or a browser. */
 import assert from "node:assert";
+import { readFileSync } from "node:fs";
 import {
   DEFAULT_KEY, DOUBLE_MS, HOLD_MS, gesture, insert, isTarget, listening,
 } from "./dictate.ts";
@@ -156,3 +157,31 @@ check("the default key is the one the owner chose", () => {
 });
 
 console.log(`\n${n} dictation checks passed`);
+
+// -- THE KEY MUST NEVER BECOME A CHARACTER ------------------------------
+//
+// The rules above are pure and the wiring is not, so this reads the wiring.
+// Holding the key IS the gesture, a held key repeats, and a repeat that is
+// not prevented is typed: a date box came back reading "₹₹₹₹₹₹₹₹₹₹₹". The
+// bug was an early return ordered before the prevention, which no pure
+// check could ever have seen.
+{
+  const src = readFileSync(new URL("./useDictation.ts", import.meta.url), "utf8");
+  const down = src.slice(src.indexOf("const down ="), src.indexOf("const up ="));
+  assert.ok(down.includes("e.preventDefault()"), "the keydown handler prevents nothing");
+  assert.ok(down.includes("if (e.repeat)"),
+    "the keydown handler no longer tests e.repeat at all, so a held key "
+    + "restarts the gesture on every repeat");
+  assert.ok(
+    down.indexOf("e.preventDefault()") < down.indexOf("if (e.repeat)"),
+    "the keydown handler tests e.repeat before it prevents the default, so "
+    + "every repeat of a held key types the shortcut into the field",
+  );
+  assert.ok(src.includes('addEventListener("beforeinput"'),
+    "nothing refuses the character on the input path, which is how a composed "
+    + "key or an input method editor reaches the field without a keydown");
+  assert.ok(src.includes("held.current"),
+    "the input guard is not gated on the key being down, so a person could "
+    + "never type this character at all");
+}
+ok("dictate: the shortcut key cannot type itself, held, repeated or composed");
