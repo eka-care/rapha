@@ -221,13 +221,21 @@ const PAIRS: [string, string, number, string][] = [
   const dangling: string[] = [];
   for (const file of cssFiles(SRC)) {
     decomment(readFileSync(file, "utf8")).split("\n").forEach((line, i) => {
-      for (const m of line.matchAll(/var\((--[a-z0-9-]+)/g)) {
+      // A var() WITH A FALLBACK is not dangling, and the rule above says
+      // why: the harm is a browser dropping the whole declaration, and a
+      // fallback is exactly what stops it doing that. Some values are not
+      // tokens and cannot be -- a field's share of its line is set per
+      // element by the renderer, from the question's own declaration (see
+      // form/span.ts) -- so they are written with the value they take when
+      // nothing sets them, and the stylesheet works without React.
+      for (const m of line.matchAll(/var\((--[a-z0-9-]+)(\s*,)?/g)) {
+        if (m[2]) continue;
         if (!declared.has(m[1])) dangling.push(`${relative(SRC, file)}:${i + 1}: ${m[1]}`);
       }
     });
   }
   assert.deepEqual(dangling, [],
-    "var() naming a token tokens.css does not declare; a browser drops the " +
+    "var() with no fallback naming a token tokens.css does not declare; a browser drops the " +
     "whole declaration and the rule renders unstyled:\n  " + dangling.join("\n  "));
   ok("completeness: every var() resolves to a declared token");
 }

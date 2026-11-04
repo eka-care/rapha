@@ -92,22 +92,31 @@
 /* ---- fields (§39) ------------------------------------------------------ */
 .f-form { display: grid; gap: var(--space-4); }
 .f-field { display: grid; gap: var(--space-1); }
+/* A field that stands alone is as wide as its answer, not as wide as the
+   panel. The ceiling is on the control; the label, the declared range and
+   anything that went wrong stay the width of the form, because those are
+   sentences and a sentence squeezed into eight characters is worse than a
+   wide box. Prose declares no ceiling and keeps the line. See form/span.ts. */
+.f-field > .f-lab,
+.f-field > .f-in,
+.f-field > .f-rows { max-width: var(--cap, none); }
 
 /* A repeating group is a <fieldset>, and nothing here had ever styled one, so
    every form that holds a diagnosis or a prescription drew the browser's own
    2px groove border and its default legend in the middle of an otherwise
    designed panel. That is the single thing that made these forms look
    unfinished. */
+/* It is a heading over its rows, not a box around them. It WAS a box, and
+   each row inside it is a card with its own border, so a prescription drew
+   a bordered card inside a bordered box inside a bordered panel: three
+   frames deep before a single field. The rows are the only things here that
+   need an edge, because they are the things you can add and remove. */
 .f-group {
-  display: grid; gap: var(--space-3);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-canvas);
-  padding: var(--space-4);
-  margin: 0; min-width: 0;
+  display: grid; gap: var(--space-2);
+  border: 0; padding: 0; margin: 0; min-width: 0;
 }
 .f-group > legend {
-  padding: 0 var(--space-2); margin-left: calc(var(--space-2) * -1);
+  padding: 0; margin: 0 0 var(--space-1);
   font-size: 13px; line-height: 18px; font-weight: 600;
   color: var(--color-text-primary);
 }
@@ -152,7 +161,15 @@
 .provenance { font-size: 11px; font-weight: 600; color: var(--color-abdm); }
 
 /* repeating rows (a structured answer: medications, investigations) */
-.f-rows { display: grid; gap: var(--space-2); }
+.f-rows { display: grid; gap: var(--space-2); justify-items: stretch; }
+/* Adding a row is a smaller act than filling one in, and it was drawn as a
+   full-width slab heavier than every field above it. */
+.f-rows > .cq,
+.f-group > .cq {
+  justify-self: start; min-height: 32px;
+  padding: var(--space-1) var(--space-3); font-size: 12px;
+  color: var(--color-text-secondary);
+}
 
 /* One row of a repeating group is one condition, one medicine, one test, so
    it is drawn as one card and not as a line of fields that happens to wrap.
@@ -162,8 +179,20 @@
    separate, more important looking one. Equal grid columns cannot do that:
    the fourth field is the width of the other three whether it shares a line
    with them or not. */
+/* ONE ROW OF A REPEATING GROUP divides its line in proportion to what each
+   field holds, not into equal parts. Equal parts is what made these forms
+   look unaligned: a prescription gave "Amoxicillin only product" and "500"
+   the same 148 pixels, so the drug name was cut off and the dose had a
+   hundred pixels of nothing after it.
+
+   Each field's basis AND its growth are its declared weight, so a line
+   divides the width in proportion and the leftover in the same proportion.
+   Every row of one group has the same shape, so every row divides its line
+   identically and the second medicine's dose still sits under the first's.
+   Unlike the grid, a line with three fields on it has no hole at the end.
+   The weights are form/span.ts; nothing here knows what a dose is. */
 .f-item {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  display: flex; flex-wrap: wrap;
   gap: var(--space-3); align-items: start; width: 100%;
   padding: var(--space-3) var(--space-4) var(--space-4);
   border: 1px solid var(--color-border-subtle);
@@ -173,23 +202,39 @@
 /* The row's own number. It used to sit on the baseline of the first field,
    which read as a stray digit beside a dropdown rather than as the label of
    anything. It is the card's heading now. */
+/* The row's own number and the way out of it, on one line above the fields.
+   Only drawn once there are two rows to tell apart. */
+.f-item-h {
+  flex: 1 0 100%;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-3); margin-bottom: calc(var(--space-1) * -1);
+}
 .f-item-n {
-  grid-column: 1 / -1;
   font: 700 10px/14px var(--font-mono); letter-spacing: .09em;
   text-transform: uppercase; color: var(--color-eyebrow);
 }
 .f-item-n::before { content: "Row "; }
 /* Removing a row is not as important as filling one in. */
-.f-item > .cq {
-  grid-column: 1 / -1; justify-self: start;
+.f-item-x {
   min-height: 30px; padding: var(--space-1) var(--space-3);
   font-size: 12px; border-color: transparent;
   color: var(--color-text-secondary); background: transparent;
 }
-.f-item > .cq:hover:not(:disabled) {
+.f-item-x:hover:not(:disabled) {
   background: var(--color-critical-soft); color: var(--color-critical);
 }
-.f-sub { min-width: 0; display: grid; gap: var(--space-1); align-content: start; }
+/* The share of the line one field takes. --w is the declared weight; the
+   basis is that weight in units so a short answer starts short, and the
+   growth is the same weight so the leftover is split the same way. */
+.f-sub {
+  flex: var(--w, 6) 1 calc(var(--w, 6) * 30px);
+  /* The floor is what makes the line WRAP rather than squeeze. Without it
+     seven fields all fit on one line by shrinking, and a route reads "Ora"
+     and a frequency reads "Thr", which is not a narrower field: it is a
+     field you cannot read. */
+  min-width: calc(var(--w, 6) * 17px);
+  display: grid; gap: var(--space-1); align-content: start;
+}
 
 .f-check { display: flex; align-items: flex-start; gap: var(--space-2); font-size: 13px; }
 .f-check.big { font-size: 14px; font-weight: 500; }

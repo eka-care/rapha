@@ -342,9 +342,16 @@ export function OperationPanel({
   // they have tried, because a machine filled this in and the gap it left is
   // the first thing to say about it, not a scolding after the tap.
   const labels = new Map(labelled(schema, payload).map(([id, text]) => [id, text]));
-  const missing = problems
-    .filter((p) => p.message.endsWith("is required"))
-    .map((p) => labels.get(p.link_id) ?? p.link_id);
+  // One name per thing that is missing. A repeating group answers for every
+  // sub field of its empty row and every one of those problems carries the
+  // GROUP's link_id, so a blank prescription read "Missing: medications,
+  // medications, medications, medications, medications, medications,
+  // medications" in red above a form nobody had touched yet.
+  const missing = [...new Set(
+    problems
+      .filter((p) => p.message.endsWith("is required"))
+      .map((p) => labels.get(p.link_id) ?? p.link_id),
+  )];
 
   /** Whether a MACHINE put anything in these fields: a proposal, a recording,
    *  a record the desk found, or the national journey. Only then is the list

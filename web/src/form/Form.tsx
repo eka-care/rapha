@@ -6,9 +6,11 @@
  *  behaviour below is driven by the declaration: type, required,
  *  answer_option, and styling_metadata.phc range / critical / unit.
  */
+import type { CSSProperties } from "react";
 import type { Operation, Payload, Question, Questionnaire } from "../types";
 import { blankRow, itemFields, toRow, type ItemField } from "../structured";
 import { options } from "../declarations";
+import { capFor, weightFor } from "./span";
 import { enabled, isRowGroup, labelOf, phcOf, prune, rowQuestions, validate, raisedFlags, rangeBlocked, walk } from "../validate";
 
 export { validate, rangeBlocked, raisedFlags };
@@ -37,6 +39,24 @@ const unsureHint = (score: number) =>
 const OVERRIDE = "override_reason";
 
 const answeredHere = (v: unknown) => v !== undefined && v !== null && v !== "";
+
+/** How much of a line this question's answer is worth. A choice is measured
+ *  on the displays the terminology gave its codes, which is what the picker
+ *  will actually show; everything else is measured on its declared type. See
+ *  span.ts for why a form that gives every field the same width is the form
+ *  that looks unaligned. */
+const weight = (q: Question) =>
+  weightFor(q.type, q.type === "choice" ? options(q).map((o) => o.display) : []);
+
+/** The style one field carries: its share of a row, and -- when it stands
+ *  alone rather than in a row -- the width past which it stops growing. */
+const sized = (q: Question, alone: boolean): CSSProperties => {
+  const w = weight(q);
+  const cap = alone ? capFor(w) : null;
+  return cap === null
+    ? ({ "--w": w } as CSSProperties)
+    : ({ "--w": w, "--cap": `${cap}ch` } as CSSProperties);
+};
 
 function outsideCritical(q: Question, v: unknown): boolean {
   const crit = phcOf(q).critical;
@@ -269,7 +289,19 @@ export function Form({
           const given = (row ?? {}) as Record<string, unknown>;
           return (
             <div className="f-item" key={i}>
-              <span className="f-item-n">{i + 1}</span>
+              {/* A row number on a form with one row names nothing: there is
+                  no second row to tell it from. It arrives with the second
+                  medicine, which is when a person needs to know which one
+                  they are reading. The way out of a row comes with it. */}
+              {drawn.length > 1 && (
+                <div className="f-item-h">
+                  <span className="f-item-n">{i + 1}</span>
+                  {stored.length > 1 && (
+                    <button type="button" className="cq f-item-x" disabled={disabled}
+                            onClick={() => dropRow(q.link_id, i)}>Remove</button>
+                  )}
+                </div>
+              )}
               {subs.map((sub) => {
                 const id = `${q.link_id}[${i}].${sub.link_id}`;
                 const bad = mine.filter((p) => p.message.startsWith(`${id} `));
@@ -278,7 +310,7 @@ export function Form({
                 const unsure = score !== undefined && score < SURE;
                 return (
                   <label className={`f-sub${bad.length ? " bad" : ""}${unsure ? " unsure" : ""}`}
-                         key={sub.link_id}>
+                         style={sized(sub, false)} key={sub.link_id}>
                     <span>{labelOf(sub)}{phcOf(sub).unit ? ` (${phcOf(sub).unit})` : ""}</span>
                     <Widget q={sub} op={op} ids={`${ids}-${q.link_id}-${i}`}
                             value={given[sub.link_id]}
@@ -290,10 +322,6 @@ export function Form({
                   </label>
                 );
               })}
-              {stored.length > 1 && (
-                <button type="button" className="cq" disabled={disabled}
-                        onClick={() => dropRow(q.link_id, i)}>Remove</button>
-              )}
             </div>
           );
         })}
@@ -335,7 +363,8 @@ export function Form({
     const first = !focused;
     focused = true;
     return (
-      <div className={`f-field${mine.length ? " bad" : ""}${unsure ? " unsure" : ""}`} key={q.link_id}>
+      <div className={`f-field${mine.length ? " bad" : ""}${unsure ? " unsure" : ""}`}
+           style={sized(q, true)} key={q.link_id}>
         {/* A structured answer is a GROUP of fields, not one field, and each
             of its own sub widgets is already inside its own label. Pointing
             this one at an id that is not in the document would be worse than

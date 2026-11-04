@@ -22,7 +22,7 @@
               "src/grants.check.ts", "src/style.check.ts", "src/ui.check.ts", "src/agent.check.ts",
               "src/live.check.ts", "src/pwa.check.ts", "src/desk.check.ts",
               "src/thread/earlier.check.ts", "src/thread/fold.check.ts", "src/thread/commands.check.ts",
-              "src/app/guide.check.ts", "src/app/width.check.ts", "src/scribe/dictate.check.ts",
+              "src/app/guide.check.ts", "src/app/width.check.ts", "src/form/span.check.ts", "src/scribe/dictate.check.ts",
               "src/auth/client.check.ts",
               "src/assistant/assistant.check.ts"]
 }
