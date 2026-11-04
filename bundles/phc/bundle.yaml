@@ -26,6 +26,7 @@ operations:
   # docs/superpowers/specs/2026-11-04-maternal-and-child-health-design.md
   - phc.op.pregnancy-open
   - phc.op.pregnancy-close
+  - phc.op.risk-mark
   - phc.op.delivery-record
   - phc.op.postnatal-close
   - phc.op.postnatal-visit
@@ -56,6 +57,7 @@ instruments:
 # a clinical protocol and carries its own sign off; see the atom.
 schedules:
   - phc.sched.antenatal
+  - phc.sched.antenatal-high-risk
   - phc.sched.postnatal
   - phc.sched.referral
 metrics:
@@ -284,6 +286,8 @@ states:
   # `pregnancy.open` is an opening with no ending yet.
   - pregnancy.open
   - pregnancy.ended
+  - pregnancy_high_risk.open
+  - pregnancy_high_risk.ended
   # The six weeks after a delivery. Derived from the same pair of episode
   # rows a pregnancy is, and opened by one operation only: recording a
   # delivery. A pregnancy that ended any other way never acquires one.

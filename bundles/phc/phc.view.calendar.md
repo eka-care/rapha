@@ -6,7 +6,7 @@ title: Calendar
 summary: Every contact the centre owes, day by day, across all its patients.
 capability: patient.find
 workflow: phc.wf.outpatient
-episodes: [pregnancy, postnatal]
+episodes: [pregnancy, pregnancy_high_risk, postnatal]
 ---
 
 ## In plain words

@@ -468,6 +468,7 @@
       "phc.op.handover-reply",
       "phc.op.pregnancy-open",
       "phc.op.pregnancy-close",
+      "phc.op.risk-mark",
       "phc.op.delivery-record",
       "phc.op.postnatal-close",
       "phc.op.postnatal-visit",
@@ -481,6 +482,7 @@
     ],
     "schedules": [
       "phc.sched.antenatal",
+      "phc.sched.antenatal-high-risk",
       "phc.sched.postnatal",
       "phc.sched.referral"
     ],
@@ -1411,6 +1413,32 @@
         "per_row": null,
         "questions": {},
         "resource": "questionnaire_response"
+      }
+    ],
+    "phc.op.risk-mark": [
+      {
+        "fields": {
+          "anchor_basis": {
+            "const": "marked"
+          },
+          "anchor_date": {
+            "answer": "marked_date"
+          },
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "active"
+          },
+          "type": {
+            "const": "pregnancy_high_risk"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "episode_of_care"
       }
     ],
     "phc.op.rx-prescribe": [
@@ -3334,6 +3362,76 @@
         "questionnaire_response"
       ]
     },
+    "phc.op.risk-mark": {
+      "capability": "episode.manage",
+      "description": "A woman's pregnancy is judged high risk. This records the risk factor\nfound and the date, and from that day she is owed three extra check-ups\nwith a doctor, over and above her ordinary four.",
+      "emits": [],
+      "fields": [
+        {
+          "link_id": "risk_factor",
+          "options": [
+            "severe_anaemia",
+            "pregnancy_induced_hypertension",
+            "gestational_diabetes",
+            "hypothyroidism",
+            "hiv",
+            "syphilis",
+            "hepatitis_b",
+            "tuberculosis",
+            "malaria",
+            "previous_caesarean",
+            "cephalo_pelvic_disproportion",
+            "bad_obstetric_history",
+            "previous_stillbirth",
+            "twins_or_more",
+            "teenage_pregnancy",
+            "early_or_elderly_first_pregnancy",
+            "short_stature",
+            "grand_multipara",
+            "negative_blood_group",
+            "abnormal_fetal_heart_rate",
+            "high_fever",
+            "rti_or_sti",
+            "other"
+          ],
+          "required": true,
+          "text": "Which risk factor was found?",
+          "type": "choice"
+        },
+        {
+          "link_id": "marked_date",
+          "options": null,
+          "required": true,
+          "text": "Date she is marked high risk",
+          "type": "date"
+        }
+      ],
+      "id": "phc.op.risk-mark",
+      "input": "phc.schema.risk-mark-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "pregnancy.open",
+        "not pregnancy_high_risk.open"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "Mark high risk",
+      "station": "nurse",
+      "summary": "Record the risk factor found, and open the three extra check-ups it earns.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Mark a pregnancy high risk",
+      "tool": "propose_risk_mark",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "episode_of_care"
+      ]
+    },
     "phc.op.rx-prescribe": {
       "capability": "rx.prescribe",
       "description": "The doctor prescribes. Confirming the prescription is what makes the\npharmacist's dispense action exist at all.",
@@ -3615,6 +3713,58 @@
       "title": "Antenatal contacts",
       "type": "schedule"
     },
+    "phc.sched.antenatal-high-risk": {
+      "anchor": {
+        "marked": 0
+      },
+      "anchor_from": "recorded",
+      "contacts": [
+        {
+          "authority": "statutory",
+          "closes": 44,
+          "due": 30,
+          "escalates_to": "cho",
+          "id": "hrp1",
+          "opens": 16,
+          "operation": "phc.op.antenatal-visit",
+          "owner": "mo",
+          "programme_title": "First follow-up ANC for a high-risk pregnancy",
+          "reports_as": "HRP1",
+          "title": "First extra check-up"
+        },
+        {
+          "authority": "statutory",
+          "closes": 74,
+          "due": 60,
+          "escalates_to": "cho",
+          "id": "hrp2",
+          "opens": 46,
+          "operation": "phc.op.antenatal-visit",
+          "owner": "mo",
+          "programme_title": "Second follow-up ANC for a high-risk pregnancy",
+          "reports_as": "HRP2",
+          "title": "Second extra check-up"
+        },
+        {
+          "authority": "statutory",
+          "closes": 104,
+          "due": 90,
+          "escalates_to": "cho",
+          "id": "hrp3",
+          "opens": 76,
+          "operation": "phc.op.antenatal-visit",
+          "owner": "mo",
+          "programme_title": "Third follow-up ANC for a high-risk pregnancy",
+          "reports_as": "HRP3",
+          "title": "Third extra check-up"
+        }
+      ],
+      "episode": "pregnancy_high_risk",
+      "id": "phc.sched.antenatal-high-risk",
+      "summary": "The three additional check-ups a woman is owed once she is marked high risk.",
+      "title": "Extra antenatal contacts for a high-risk pregnancy",
+      "type": "schedule"
+    },
     "phc.sched.postnatal": {
       "anchor": {
         "delivery": 0
@@ -3883,6 +4033,8 @@
     "postnatal.open",
     "pregnancy.ended",
     "pregnancy.open",
+    "pregnancy_high_risk.ended",
+    "pregnancy_high_risk.open",
     "referral.ended",
     "referral.open",
     "registered",
@@ -3902,6 +4054,7 @@
       "columns": [],
       "episodes": [
         "pregnancy",
+        "pregnancy_high_risk",
         "postnatal"
       ],
       "escalate_minutes": null,
@@ -4303,6 +4456,8 @@
       "postnatal.open",
       "pregnancy.ended",
       "pregnancy.open",
+      "pregnancy_high_risk.ended",
+      "pregnancy_high_risk.open",
       "referral.ended",
       "referral.open",
       "registered",
@@ -4332,6 +4487,8 @@
         "followup.booked",
         "pregnancy.ended",
         "pregnancy.open",
+        "pregnancy_high_risk.ended",
+        "pregnancy_high_risk.open",
         "postnatal.ended",
         "postnatal.open",
         "referral.ended",
@@ -4483,6 +4640,38 @@
             "not pregnancy.ended"
           ]
         },
+        "pregnancy_high_risk.ended": {
+          "gte": [
+            {
+              "resource": "episode_of_care",
+              "where": {
+                "status": "ended",
+                "type": "pregnancy_high_risk"
+              }
+            },
+            {
+              "resource": "episode_of_care",
+              "where": {
+                "status": "active",
+                "type": "pregnancy_high_risk"
+              }
+            }
+          ]
+        },
+        "pregnancy_high_risk.open": {
+          "all_of": [
+            {
+              "exists": {
+                "resource": "episode_of_care",
+                "where": {
+                  "status": "active",
+                  "type": "pregnancy_high_risk"
+                }
+              }
+            },
+            "not pregnancy_high_risk.ended"
+          ]
+        },
         "referral.ended": {
           "gte": [
             {
@@ -4558,6 +4747,7 @@
             "phc.op.antenatal-measure",
             "phc.op.context-add",
             "phc.op.pregnancy-open",
+            "phc.op.risk-mark",
             "phc.op.delivery-record",
             "phc.op.pregnancy-close",
             "phc.op.postnatal-close"

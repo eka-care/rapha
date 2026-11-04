@@ -1,0 +1,109 @@
+{
+    "version": "1.0",
+    "slug": "phc-risk-mark-v1",
+    "title": "Mark a pregnancy high risk",
+    "status": "active",
+    "subject_type": "encounter",
+    "styling_metadata": {
+        "phc": {
+            "operation": "phc.op.risk-mark"
+        }
+    },
+    "questions": [
+        {
+            "link_id": "risk_factor",
+            "text": "Which risk factor was found?",
+            "type": "choice",
+            "required": true,
+            "answer_option": [
+                {
+                    "value": "severe_anaemia"
+                },
+                {
+                    "value": "pregnancy_induced_hypertension"
+                },
+                {
+                    "value": "gestational_diabetes"
+                },
+                {
+                    "value": "hypothyroidism"
+                },
+                {
+                    "value": "hiv"
+                },
+                {
+                    "value": "syphilis"
+                },
+                {
+                    "value": "hepatitis_b"
+                },
+                {
+                    "value": "tuberculosis"
+                },
+                {
+                    "value": "malaria"
+                },
+                {
+                    "value": "previous_caesarean"
+                },
+                {
+                    "value": "cephalo_pelvic_disproportion"
+                },
+                {
+                    "value": "bad_obstetric_history"
+                },
+                {
+                    "value": "previous_stillbirth"
+                },
+                {
+                    "value": "twins_or_more"
+                },
+                {
+                    "value": "teenage_pregnancy"
+                },
+                {
+                    "value": "early_or_elderly_first_pregnancy"
+                },
+                {
+                    "value": "short_stature"
+                },
+                {
+                    "value": "grand_multipara"
+                },
+                {
+                    "value": "negative_blood_group"
+                },
+                {
+                    "value": "abnormal_fetal_heart_rate"
+                },
+                {
+                    "value": "high_fever"
+                },
+                {
+                    "value": "rti_or_sti"
+                },
+                {
+                    "value": "other"
+                }
+            ],
+            "styling_metadata": {
+                "phc": {
+                    "short": "Risk factor",
+                    "help": "Name the main one. The system never infers risk; you do."
+                }
+            }
+        },
+        {
+            "link_id": "marked_date",
+            "text": "Date she is marked high risk",
+            "type": "date",
+            "required": true,
+            "styling_metadata": {
+                "phc": {
+                    "short": "Marked",
+                    "help": "Usually today. The three extra check-ups are counted from this date."
+                }
+            }
+        }
+    ]
+}

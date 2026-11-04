@@ -23,7 +23,8 @@ steps:
     # bench whose job is to take a reading.
     operations: [phc.op.vitals-record, phc.op.antenatal-measure,
                  phc.op.context-add,
-                 phc.op.pregnancy-open, phc.op.delivery-record,
+                 phc.op.pregnancy-open, phc.op.risk-mark,
+                 phc.op.delivery-record,
                  phc.op.pregnancy-close, phc.op.postnatal-close]
   - station: doctor
     done_when: consult.documented
@@ -113,6 +114,15 @@ states:
     all_of:
       - {exists: {resource: episode_of_care, where: {type: pregnancy, status: active}}}
       - "not pregnancy.ended"
+  # A high-risk pregnancy: a second episode beside the first, same pair.
+  pregnancy_high_risk.ended:
+    gte:
+      - {resource: episode_of_care, where: {type: pregnancy_high_risk, status: ended}}
+      - {resource: episode_of_care, where: {type: pregnancy_high_risk, status: active}}
+  pregnancy_high_risk.open:
+    all_of:
+      - {exists: {resource: episode_of_care, where: {type: pregnancy_high_risk, status: active}}}
+      - "not pregnancy_high_risk.ended"
   # The six weeks after a delivery, the same pair over the same table. Note
   # what is NOT here: no rule relates this to how the pregnancy ended. A
   # postnatal episode exists because somebody recorded a delivery, and a
