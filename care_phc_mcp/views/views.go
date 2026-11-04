@@ -470,10 +470,11 @@ func calendar(b Bundle, view carephc.View, s Reader, on *string,
 		// Exactly YYYY-MM-DD, as the Python's _day: a timestamp raises a
 		// timezone question the route cannot answer.
 		parsed, err := time.Parse("2006-01-02", *on)
-		if err != nil || len(*on) != 10 {
-			// The Python's date.fromisoformat message, which the route
-			// turns into a 400.
-			return nil, nil, Declared{Reason: "Invalid isoformat string: " + pyval.Repr(*on)}
+		// Year 0000 parses here and is refused by Python's date (MINYEAR 1).
+		if err != nil || len(*on) != 10 || parsed.Year() < 1 {
+			// kernel/views._day's one sentence for every refusal, which the
+			// route turns into a 400.
+			return nil, nil, Declared{Reason: "on must be a real calendar day written YYYY-MM-DD, not " + pyval.Repr(*on)}
 		}
 		day = parsed
 	}

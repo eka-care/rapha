@@ -102,11 +102,17 @@ def _day(on):
     Pythons also take compact and week forms; the Go twin takes one spelling
     and so does this."""
     text = str(on)
+    said = "on must be a real calendar day written YYYY-MM-DD, not %r" % text
+    digits = text[:4] + text[5:7] + text[8:]
     if len(text) != 10 or text[4] != "-" or text[7] != "-" \
-            or not (text[:4] + text[5:7] + text[8:]).isascii() \
-            or not (text[:4] + text[5:7] + text[8:]).isdigit():
-        raise ValueError("Invalid isoformat string: %r" % text)
-    return date.fromisoformat(text)
+            or not digits.isascii() or not digits.isdigit():
+        raise ValueError(said)
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        # Well formed and not a day: 2026-02-30, month 13, year 0000. One
+        # sentence for every refusal; the caller's remedy is the same.
+        raise ValueError(said) from None
 
 
 def _calendar(bundle, view, store, on, at):
