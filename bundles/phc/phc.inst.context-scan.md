@@ -8,6 +8,12 @@ operations: [phc.op.context-add]
 fills:
   date: dated
   findings: body
+# The subject field holding the identifier a paper is filed under: the
+# patient directory's Eka oid, which kernel/directory.py puts on the row when
+# this centre publishes somebody. Declared because no screen may type a
+# subject's field names, and because which identifier this is belongs to the
+# bundle and not to a renderer.
+patient_key: directory_id
 readback: required
 commit: tap
 fallback: form

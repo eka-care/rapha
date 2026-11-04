@@ -58,6 +58,7 @@ type Decl = {
   spoken?: boolean;
   requires?: string | null;
   fills?: Record<string, string>;
+  patient_key?: string | null;
 };
 
 type Common = {
@@ -83,7 +84,14 @@ export type Mount =
    *  paper; the renderer never reads it -- the kernel does -- and it is
    *  carried here only so the control can say which fields a read will
    *  touch before anybody photographs anything. */
-  | (Common & { kind: "document"; fills: Record<string, string> });
+  | (Common & {
+      kind: "document";
+      fills: Record<string, string>;
+      /** Which field of the SUBJECT holds the identifier a paper is filed
+       *  under. The renderer may not type a subject's field name, so the
+       *  declaration says which one and the screen reads that. */
+      patientKey: string;
+    });
 
 export function mountsFor(
   instruments: Record<string, unknown> | undefined,
@@ -140,8 +148,12 @@ export function mountsFor(
       // again, because the renderer is the thing that would actually put a
       // camera on screen.
       const fills = d.fills ?? {};
-      if (!Object.keys(fills).length) continue;
-      out.push({ ...common, kind: "document", fills });
+      const patientKey = (d.patient_key ?? "").trim();
+      // No key is a camera that cannot say whose record it is filing to.
+      // The kernel's lint refuses one; this refuses it again, because the
+      // renderer is the thing that would actually put a camera on screen.
+      if (!Object.keys(fills).length || !patientKey) continue;
+      out.push({ ...common, kind: "document", fills, patientKey });
     } else if (d.kind === "device") {
       // Declared, and there is no pairing code on this machine. It is drawn
       // as one honest line rather than left out, so the screen does not imply

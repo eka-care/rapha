@@ -420,6 +420,9 @@ def _lint_documents_instrument(instruments, ops):
             bad.append(f"{who}: a document instrument declares `fills`, which says "
                        f"which question takes which part of the paper")
             continue
+        if not str(fm.get("patient_key") or "").strip():
+            bad.append(f"{who}: a document instrument declares `patient_key`, "
+                       f"the subject field holding the identifier it files under")
         for part in fills:
             if part not in vocab.DOCUMENT_PARTS:
                 bad.append(f"{who}: fills '{part}' is not a part a document read "

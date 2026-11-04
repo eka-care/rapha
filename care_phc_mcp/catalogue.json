@@ -227,6 +227,7 @@
         "phc.op.rx-prescribe",
         "phc.op.household-visit"
       ],
+      "patient_key": null,
       "readback": "required",
       "requires": null,
       "says": null,
@@ -250,6 +251,7 @@
       "operations": [
         "phc.op.context-add"
       ],
+      "patient_key": "directory_id",
       "readback": "required",
       "requires": null,
       "says": null,
@@ -275,6 +277,7 @@
       "operations": [
         "phc.op.vitals-record"
       ],
+      "patient_key": null,
       "readback": "required",
       "requires": null,
       "says": null,
@@ -302,6 +305,7 @@
       "operations": [
         "phc.op.vitals-record"
       ],
+      "patient_key": null,
       "readback": "required",
       "requires": null,
       "says": null,

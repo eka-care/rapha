@@ -300,6 +300,16 @@ class Instrument:
     # into a field meaning something else is a guess nobody can see being
     # made. A part this bundle does not want filled is simply left out.
     fills: dict = field(default_factory=dict)
+    # WHICH FIELD OF THE SUBJECT CARRIES THE IDENTIFIER this instrument files
+    # under, for a `document` instrument and nothing else.
+    #
+    # Declared because the renderer may not type a subject's field names --
+    # web/src/ui.check.ts holds that rule and caught this exact break -- and
+    # because which identifier a document is filed under is a fact about the
+    # bundle rather than about any screen. The PHC files under the patient
+    # directory's `directory_id`, the Eka oid; a bundle whose directory is
+    # somebody else's names its own column here and no renderer changes.
+    patient_key: Optional[str] = None
     type: str = "instrument"
 
 

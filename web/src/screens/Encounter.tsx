@@ -404,13 +404,11 @@ export function Encounter({
             <Background
               papers={papers} add={canAdd} adding={adding} onAdd={setAdding}
               thread={thread.id} client={client} cat={cat} flags={thread.flags}
-              /* The patient's own Eka identifier, from the directory, when
-                 this centre has published them. The kernel serves it on the
-                 subject beside the ABHA number and for the same reason: it
-                 is an identifier belonging to the person, not our name for
-                 their row. */
-              patient={typeof thread.subject?.directory_id === "string"
-                         ? thread.subject.directory_id : null}
+              /* The subject as the kernel sent it. WHICH field of it holds
+                 the identifier a paper is filed under is the instrument
+                 declaration's, read where the mount is built, because no
+                 screen may type a subject's field names. */
+              subject={thread.subject ?? {}}
               onDone={() => { setAdding(null); onChanged(); }} />
           </div>
         )}
