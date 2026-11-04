@@ -22,16 +22,16 @@ import type { Catalogue, Facility, Operation, Payload, Proposal, ThreadView } fr
 import { Composer } from "../thread/Composer";
 import { commands } from "../thread/commands";
 import { ScribeBar } from "../scribe/ScribeBar";
-import { SubTabs, Templates as TemplatesPane, Transcript, WrittenNotes } from "../scribe/Pane";
+import { KeptNotes, Nudges, StartHere, SubTabs, Templates as TemplatesPane, TranscriptText } from "../scribe/Pane";
 import { usePane } from "../scribe/usePane";
-import { ScribeStart } from "../scribe/Start";
 import { mergeDrafts, type Opened } from "../scribe/session";
 import { Stream, operationFor } from "../thread/Thread";
+import { withPatient } from "../thread/mention";
 import { Carry, PastVisits, Team, Trend, usePast, visitOf } from "../thread/Past";
 import { Background } from "../thread/Background";
 import { Tabs, type Tab, type TabId } from "../thread/Tabs";
-import { withPatient } from "../thread/mention";
 import { Line } from "../view/View";
+import { Garland } from "../auth/Bloom";
 import { RAIL, railFolded, railShown, setRailFolded, setRailShown, type RailId } from "./rail";
 import { human, sentence, spell, title } from "../words";
 import { initialsOf } from "../agent";
@@ -174,10 +174,6 @@ export function Encounter({
 
   const [carried, setCarried] = useState<{ thread: string; payload: Payload } | null>(null);
   const [scribing, setScribing] = useState<string | null>(null);
-  /** The action somebody tapped, waiting on how they want to record it.
-   *  Tapping an action no longer opens a form: it opens the way in, and the
-   *  form is one of the two doors there. */
-  const [starting, setStarting] = useState<Operation | null>(null);
   const [drafts, setDrafts] = useState<Opened[]>([]);
   /** The Scribe tab's three views share one thing to choose and one session
    *  to read. See scribe/usePane.ts. */
@@ -274,12 +270,34 @@ export function Encounter({
     // Whichever tab the tap came from, the form opens where the recorder and
     // the drafts already are; the thread keeps the conversation.
     setTab("scribe");
+    pane.setSub("notes");
     setForm({ op, seed: carry(op) });
   };
   const take = (op: Operation) => {
-    // The way in is chosen on the Scribe tab, the same as the form behind it.
-    if (speakable.has(op.id)) { setTab("scribe"); setStarting(op); }
-    else openPanel(op);
+    // THE CALL TO ACTION STARTS THE RECORDING. Not a choice of how to record
+    // first: the person pressed "Record vitals" or "Document a consultation"
+    // and the next thing that happens is that the scribe is listening, on
+    // the Transcript view, with this station's note already chosen. The form
+    // by hand is still one tap away from there, and `/` still opens it.
+    if (speakable.has(op.id)) {
+      setTab("scribe");
+      pane.setSub("transcript");
+      if (consented && scribing === null) setScribing(op.id);
+    } else openPanel(op);
+  };
+
+  /** WHAT THE CALL TO ACTION SAYS WHILE ITS RECORDING IS HAPPENING. The
+   *  button that started it is the one place the person is looking, so it
+   *  carries the state: recording with a clock, paused, transcribing. Only
+   *  the action this recording is for changes; the others stay as they were. */
+  const doing = (op: Operation): string | null => {
+    if (scribing === null || (pane.op || scribing) !== op.id) return null;
+    const { phase, seconds } = pane.status;
+    const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    return phase === "recording" ? `Recording ${clock}`
+         : phase === "paused" ? `Paused ${clock}`
+         : phase === "uploading" || phase === "waiting" ? "Transcribing"
+         : null;
   };
 
 
@@ -330,6 +348,7 @@ export function Encounter({
   return (
     <div className={`chatgrid${folded ? " folded" : ""}`}>
       <div className="card chatcard">
+        <Garland kind="spray" />
         <header className="pt-head">
           <span className="avatar">{initialsOf(head.name)}</span>
           <div style={{ minWidth: 0, flex: 1 }}>
@@ -385,11 +404,11 @@ export function Encounter({
             <Background
               papers={papers} add={canAdd} adding={adding} onAdd={setAdding}
               thread={thread.id} client={client} cat={cat} flags={thread.flags}
-              /* The patient's own Eka identifier, from the patient
-                 directory, when this centre has published them. The kernel
-                 serves it on the subject beside the ABHA number and for the
-                 same reason: it is an identifier belonging to the person,
-                 not our name for their row. */
+              /* The patient's own Eka identifier, from the directory, when
+                 this centre has published them. The kernel serves it on the
+                 subject beside the ABHA number and for the same reason: it
+                 is an identifier belonging to the person, not our name for
+                 their row. */
               patient={typeof thread.subject?.directory_id === "string"
                          ? thread.subject.directory_id : null}
               onDone={() => { setAdding(null); onChanged(); }} />
@@ -398,27 +417,51 @@ export function Encounter({
 
         {tab === "past" && <div className="vbody"><PastVisits visits={past} /></div>}
 
-        {tab === "scribe" && (
-          <div className="vbody">
+        {/* HIDDEN, NOT UNMOUNTED. The recorder lives in this tab, and a
+            recording is the one thing on this screen that cannot survive
+            being unmounted: React tearing the tab down stops the microphone
+            and throws the audio away. Looking at the conversation while it
+            runs -- which is what the call to action invites -- must not do
+            that, so the tab is always here and only shown when it is open. */}
+        {(
+          <div className="vbody" hidden={!(tab === "scribe")}>
+            <SubTabs open={pane.sub}
+                     notes={drafts.length + pane.kept.length}
+                     onPick={pane.setSub} />
+
+            {/* RECORDING HAPPENS ON THE TRANSCRIPT VIEW. The recorder is
+                mounted for as long as a recording exists, whichever view is
+                open, so looking at the notes never stops it; it draws as the
+                Transcript view's own panel -- the daffodil, pause and
+                continue, stop -- when that view is open, and as a one line
+                bar above the others. Owner, 2026-11-04. */}
             {scribing !== null && (
-              <ScribeBar thread={thread.id} op={pane.op} lib={pane.lib} onPhase={pane.setPhase}
+              <ScribeBar thread={thread.id} op={pane.op} lib={pane.lib}
+                         full={pane.sub === "transcript"}
+                         onStatus={pane.setStatus}
+                         onByHand={() => {
+                           const o = cat.operations[pane.op] ?? cat.operations[scribing];
+                           if (o) openPanel(o);
+                         }}
                          onDrafts={(s) => {
                            setDrafts((all) => mergeDrafts(all, s.drafts, s.session));
                            pane.setSession(s);
-                           // What came back is what to look at: the notes, not the
-                           // templates tab somebody had open while it was written.
+                           // What came back is what to look at: the notes, not
+                           // whichever view somebody had open while it was written.
                            if (s.drafts.length || s.notes?.length) pane.setSub("notes");
                          }}
                          onClose={() => {
                            setScribing(null); setDrafts([]);
-                           pane.setSession(null); pane.setPhase("idle");
-                         }} />
+                           pane.setSession(null); pane.setStatus({ phase: "idle", seconds: 0 });
+                         }}>
+                <TranscriptText session={pane.session} />
+                {!pane.session?.transcript && <Nudges nudges={nudges} />}
+              </ScribeBar>
             )}
-
-            <SubTabs open={pane.sub} notes={drafts.length + (pane.session?.notes?.length ?? 0)}
-                     onPick={pane.setSub} />
-
-            {pane.sub === "transcript" && <Transcript session={pane.session} phase={pane.phase} />}
+            {scribing === null && pane.sub === "transcript" && (
+              <StartHere onStart={() => setScribing("")} session={pane.session}
+                         reason={consented ? undefined : MIC_WHY} />
+            )}
 
             {pane.sub === "templates" && (
               <TemplatesPane menu={pane.menu} library={pane.library} op={pane.op} lib={pane.lib}
@@ -426,10 +469,12 @@ export function Encounter({
             )}
 
             {pane.sub === "notes" && <>
-            <WrittenNotes session={pane.session} lib={pane.lib} phase={pane.phase}
-                          titles={Object.fromEntries(
-                            "items" in (pane.library ?? {}) ? (pane.library as { items: { id: string; title: string }[] })
-                              .items.map((t) => [t.id, t.title]) : [])} />
+            <KeptNotes kept={pane.kept} lib={pane.lib} phase={pane.phase}
+                       pending={scribing === null ? [] : pane.lib.filter(
+                         (id) => !(pane.session?.notes ?? []).some((n) => n.template === id))}
+                       titles={Object.fromEntries(
+                         "items" in (pane.library ?? {}) ? (pane.library as { items: { id: string; title: string }[] })
+                           .items.map((t) => [t.id, t.title]) : [])} />
             {drafts.map(({ draft: d, key }) => {
               const op = cat.operations[d.operation];
               return op ? (
@@ -439,20 +484,6 @@ export function Encounter({
                   onCancel={() => setDrafts((all) => all.filter((x) => x.draft.operation !== d.operation))} />
               ) : null;
             })}
-            {/* AFTER THE CHOICE, NEVER BEFORE IT. A person picks what they are
-                about to record on the thread; this is what that tap opens, and
-                from here speaking is the way in and the form is the way round.
-                The examples are the bundle's, never typed here. */}
-            {starting && !scribing && (
-              <ScribeStart
-                title={starting.title}
-                nudges={nudges}
-                reason={consented ? undefined : MIC_WHY}
-                onStart={() => { setScribing(starting.id); setStarting(null); }}
-                onType={() => { openPanel(starting); setStarting(null); }}
-                onCancel={() => setStarting(null)}
-              />
-            )}
 
             {/* THE FORM, ON THE SCRIBE TAB. Note structuring has one home:
                 the recorder, the drafts it produced and a form somebody
@@ -474,28 +505,6 @@ export function Encounter({
                   }}
                   onCancel={() => setForm(null)}
                 />
-              </div>
-            )}
-            {/* ONE BUTTON, IN THE MIDDLE, AND NOTHING ELSE. What was here
-                was two sentences explaining where the microphone lives,
-                which is a screen apologising for itself. The tab a person
-                opened to record in should let them record. */}
-            {scribing === null && drafts.length === 0 && !form && !starting && (
-              <div className="scribe-off">
-                <button
-                  type="button"
-                  className="btn btn-b scribe-go"
-                  onClick={() => setScribing("")}
-                  disabled={!consented}
-                  title={consented ? undefined : MIC_WHY}
-                >
-                  <Icon name="mic" className="i" />
-                  Start session
-                </button>
-                {/* A disabled control that does not say why is a dead end.
-                    The reason is the kernel's, read off the instrument's
-                    own `requires:`, never a word typed here. */}
-                {!consented && <p className="scribe-why">{MIC_WHY}</p>}
               </div>
             )}
             </>}
@@ -529,7 +538,7 @@ export function Encounter({
                     <div className="props">
                       {offered.map((op, i) => (
                         <button
-                          className={`prop${i === 0 ? " primary" : ""}`}
+                          className={`prop${i === 0 ? " primary" : ""}${doing(op) ? " rec" : ""}`}
                           key={op.id}
                           onClick={() => take(op)}
                           title={op.summary || op.title}
@@ -543,7 +552,7 @@ export function Encounter({
                                       : TAG[op.instrument] ?? "doc") as never} className="i sm" />
                           </span>
                           <span className="p-b">
-                            <span className="p-l">{op.title}</span>
+                            <span className="p-l">{doing(op) ?? op.title}</span>
                           </span>
                           {op.irreversibility === "irreversible" && (
                             <span className="p-tag irr">Needs confirming</span>
@@ -584,7 +593,7 @@ export function Encounter({
              somebody who already knows what they are doing: it opens on
              whatever this station recorded last. */
           onStartScribe={() => setScribing("")}
-          onAskRapha={onAskRapha && ((q) => onAskRapha(withPatient(q, head.meta, todayVisit.values)))}
+          onAskRapha={onAskRapha && ((q) => onAskRapha(withPatient(q, head.meta, todayVisit.values, [head.name])))}
           micReason={consented ? undefined : MIC_WHY}
           quick={
             <>
