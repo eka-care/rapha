@@ -1,0 +1,94 @@
+/* The calendar grid: week, month, year. Tones are the contact arc's own, so a
+   missed contact is the same red here as on the visit. Class names are gr-. */
+.gr { background: var(--color-bg-surface); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-lg); overflow: hidden; }
+.gr-wd { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-eyebrow); text-align: center; padding: var(--space-2) 0; }
+
+/* A contact: a chip in the state's tone. Colour is never the only sign; the
+   mark and the words are there too. */
+.gr-chip {
+  display: flex; align-items: center; gap: var(--space-1); width: 100%; min-width: 0; min-height: 22px;
+  padding: 1px var(--space-2); border: 0; border-left: 3px solid var(--color-border-strong); border-radius: var(--radius-sm);
+  background: var(--color-bg-subtle); color: var(--color-text-primary); font: inherit; font-size: 12px; text-align: left; cursor: pointer;
+}
+.gr-chip:hover { background: var(--color-bg-hover); }
+.gr-chip[data-tone="b-crit"] { border-left-color: var(--color-critical); background: var(--color-critical-soft); }
+.gr-chip[data-tone="b-ok"] { border-left-color: var(--color-success); background: var(--color-success-soft); }
+.gr-chip[data-tone="b-ink"] { border-left-color: var(--color-text-primary); }
+.gr-chip .i { flex: none; }
+.gr-chip-t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+.gr-chip-who { color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 0; min-width: 0; }
+.gr-more { border: 0; background: none; font: inherit; font-size: 12px; color: var(--color-text-secondary); text-align: left; padding: 0 var(--space-2); cursor: pointer; }
+.gr-more:hover { text-decoration: underline; }
+
+/* The date numeral. Today's is filled. */
+.gr-num {
+  display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 var(--space-1);
+  border: 0; border-radius: var(--radius-pill); background: none; color: var(--color-text-primary);
+  font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.gr-num:hover { background: var(--color-bg-hover); }
+.gr-num[aria-current="date"] { background: var(--color-cta); color: var(--color-cta-ink); }
+
+/* Month: seven columns, six rows. Spill days are quieter, not hidden. */
+.gr-month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.gr-month > .gr-wd { border-bottom: 1px solid var(--color-border-subtle); }
+.gr-cell {
+  display: grid; align-content: start; gap: 2px; min-height: 104px; min-width: 0; padding: var(--space-1);
+  border-right: 1px solid var(--color-border-subtle); border-bottom: 1px solid var(--color-border-subtle);
+}
+.gr-cell:nth-child(7n + 14) { border-right: 0; }
+.gr-cell[data-out] .gr-num { color: var(--color-text-tertiary); }
+.gr-cell[data-out] { background: var(--color-bg-subtle); }
+.gr-cell .gr-num { justify-self: start; }
+
+/* Week: a head, the all-day band, then hours that scroll. */
+.gr-head, .gr-allday { display: grid; }
+.gr-head { border-bottom: 1px solid var(--color-border-subtle); }
+.gr-dayhead { display: grid; justify-items: center; padding-bottom: var(--space-1); }
+.gr-dayhead .gr-wd { padding-bottom: 0; }
+.gr-allday { border-bottom: 1px solid var(--color-border-strong); }
+.gr-band { display: grid; align-content: start; gap: 2px; min-height: 56px; padding: var(--space-1); border-left: 1px solid var(--color-border-subtle); min-width: 0; }
+.gr-gutter { font-size: 11px; color: var(--color-text-tertiary); padding: var(--space-1) var(--space-2); text-align: right; }
+.gr-hours { max-height: min(60vh, 480px); overflow-y: auto; }
+.gr-hours-in { display: grid; position: relative; }
+.gr-hourcol { position: relative; }
+.gr-hr { position: absolute; right: 0; left: 0; transform: translateY(-50%); background: var(--color-bg-surface); }
+.gr-lines {
+  border-left: 1px solid var(--color-border-subtle);
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 47px, var(--color-border-subtle) 47px, var(--color-border-subtle) 48px);
+}
+.gr-week [data-today].gr-band, .gr-week [data-today].gr-lines { background-color: var(--color-accent-soft); }
+
+/* Year: twelve small months; a day is tinted when it has work. */
+.gr-year { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--space-4); padding: var(--space-4); }
+.gr-mini-h { margin: 0 0 var(--space-1); font-size: 13px; font-weight: 600; }
+.gr-mini-g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.gr-mini-wd { font-size: 10px; text-align: center; color: var(--color-text-tertiary); }
+.gr-dot {
+  aspect-ratio: 1; display: grid; place-items: center; border: 0; border-radius: var(--radius-pill); background: none;
+  color: var(--color-text-secondary); font: inherit; font-size: 11px; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.gr-dot:hover { background: var(--color-bg-hover); }
+.gr-dot[data-tone] { color: var(--color-text-primary); font-weight: 600; background: var(--color-bg-selected); }
+.gr-dot[data-tone="b-ink"] { background: var(--color-text-primary); color: var(--color-bg-surface); }
+.gr-dot[data-tone="b-crit"] { background: var(--color-critical-soft); color: var(--color-critical); }
+.gr-dot[data-tone="b-ok"] { background: var(--color-success-soft); }
+.gr-dot[aria-current="date"] { outline: 2px solid var(--color-cta); outline-offset: 1px; }
+
+/* A phone: one day with arrows, and the year as a single scrolling column. */
+.gr-one { display: grid; gap: var(--space-2); }
+.gr-nav { display: flex; align-items: center; justify-content: space-between; }
+.gr-nav-t { font-weight: 600; }
+.gr-arrow { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--color-border-strong); border-radius: var(--radius-pill); background: var(--color-bg-surface); color: var(--color-text-primary); cursor: pointer; }
+.gr-arrow .i { transform: rotate(90deg); }
+.gr-next .i { transform: rotate(-90deg); }
+@media (max-width: 600px) {
+  .gr-year { grid-template-columns: 1fr; }
+  .gr-dot { font-size: 13px; }
+  .gr-cell { min-height: 72px; }
+  .gr-chip-who { display: none; }
+  /* A month cell is about 50px wide: the mark and tone say what and how urgent, the tap says who. */
+  .gr-month .gr-chip { width: auto; justify-self: start; min-height: 26px; }
+  .gr-month .gr-chip-t { display: none; }
+}
+.gr-month .gr-chip-who { display: none; }
