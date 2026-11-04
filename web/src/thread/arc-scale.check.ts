@@ -1,5 +1,6 @@
 /** Run: node --experimental-strip-types src/thread/arc-scale.check.ts   (from web/) */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { bands, months, unplaced } from "./arc-scale.ts";
 import type { Episode } from "../types.ts";
 
@@ -69,4 +70,10 @@ const half = ep("h", [
 ]);
 ok(months(half).length === 1 && unplaced(half) === 1, "months drawn and one contact reported unplaced");
 ok(unplaced(a) === 0, "nothing unplaced when every date reads");
+// The component must actually render the warning. JSX cannot be loaded here,
+// so read the source: if Arc.tsx stops calling unplaced(), an arc that dropped
+// a contact goes back to presenting an incomplete picture as a complete one.
+const arcSource = readFileSync(new URL("./Arc.tsx", import.meta.url), "utf8");
+ok(/unplaced\(episode\)\s*>\s*0/.test(arcSource),
+   "Arc.tsx renders the unplaced-contact warning; without it a dropped contact leaves a month falsely reading as empty");
 console.log(`ok   arc-scale: ${checks} checks`);
