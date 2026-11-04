@@ -25,7 +25,8 @@
  *  and a build with no agent id gets no widget at all rather than a mock
  *  pretending to be a medical assistant.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Loading } from "../parts";
 import { assistantConfig, STARTERS } from "./config";
 import type { Question } from "./Lazy";
 
@@ -67,6 +68,12 @@ export function AskAi({ open, question, onClose }: {
   onClose: () => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  // WHETHER THE PANEL IS THERE YET. The widget is 200KB fetched on the first
+  // ask, so between somebody opening the assistant and the panel existing
+  // there is a real gap on a health centre's line, and until now that gap
+  // drew nothing at all: they asked, and the screen did not change. The
+  // skeleton stands where the panel will be.
+  const [ready, setReady] = useState(false);
   const made = useRef<Widget | null>(null);
   const asked = useRef(0);
   const quieted = useRef(false);
@@ -114,6 +121,7 @@ export function AskAi({ open, question, onClose }: {
         quieted.current = true;
       }
       el.setAttribute("open", "");
+      setReady(true);
       seed(el);
     });
     return () => { live = false; };
@@ -149,6 +157,19 @@ export function AskAi({ open, question, onClose }: {
     made.current.removeAttribute("open");
   }, [open]);
 
+  // The element outlives a close, so a second open has nothing to wait for
+  // and must not flash a skeleton over a panel that is already there.
+  useEffect(() => { if (!open && made.current) setReady(true); }, [open]);
+
   if (!CONFIG.ready) return null;
-  return <div ref={host} />;
+  return (
+    <>
+      <div ref={host} />
+      {open && !ready && (
+        <div className="assist-wait">
+          <Loading what="the assistant" shape="messages" rows={3} />
+        </div>
+      )}
+    </>
+  );
 }

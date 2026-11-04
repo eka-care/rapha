@@ -35,7 +35,7 @@
 import assert from "node:assert/strict";
 import { WROTE } from "./types.ts";
 import type { CalendarRow } from "./types.ts";
-import { monthAfter, wantsNextMonth, comingUp, dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips } from "./view/day.ts";
+import { cardDays, monthAfter, wantsNextMonth, comingUp, dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips } from "./view/day.ts";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -837,10 +837,26 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
     "the bar still tests for a visit inside itself, which means it is still "
     + "drawn there");
   // And the one control that bar carried into a visit has somewhere to be.
-  assert.match(code(readFileSync(join(SRC, "thread", "Composer.tsx"), "utf8")),
-    /onAsk && \(/,
-    "the composer no longer opens the question box, so removing the bar took "
-    + "the only way to ask with it");
+  //
+  // IT IS `@rapha` NOW, not a button. This asserted `onAsk && (`, a control
+  // the composer drew to open the question box; the thing that replaced it
+  // is typing the assistant's name at the start of a line, which the
+  // composer routes through `onAskRapha` instead of saying it to the
+  // thread. The property the rule protects is unchanged and is not about
+  // either name: the top bar is not drawn inside a visit, so if the
+  // composer cannot reach the assistant then inside a visit nothing can.
+  //
+  // Checked in two places rather than one, because the old check watched a
+  // prop that could exist while being wired to nothing. The composer must
+  // send to the assistant on that path, and the shell must connect that
+  // prop to the thing that opens it.
+  const composer = code(readFileSync(join(SRC, "thread", "Composer.tsx"), "utf8"));
+  assert.match(composer, /onAskRapha!?\(/,
+    "the composer no longer reaches the assistant, so inside a visit -- "
+    + "where the top bar is not drawn -- there is no way left to ask");
+  assert.match(appSrc, /onAskRapha=\{/,
+    "the shell does not wire the composer's question to anything, so the "
+    + "composer can ask and nothing opens");
   assert.match(appSrc, /if \(session !== true\) \{[\s\S]{0,400}?<SignIn/,
     "the sign-in screen must REPLACE the shell, not sit inside it: two h1s "
     + "on one page is what this allows and it is only safe because it returns");
@@ -1386,6 +1402,31 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
     ["2026-12-31", "2027-01-01", "2027-01-02", "2027-01-03", "2027-01-04"]);
   assert.equal(comingUp(dec, "2026-12-31").length, 1, "without the next month the card would be short");
   assert.equal(monthAfter("junk"), "");
+  // Other month shapes: February (plain and leap), and a 30-day month that is not November.
+  assert.equal(monthAfter("2027-02-28"), "2027-03-01");
+  assert.equal(monthAfter("2028-02-29"), "2028-03-01");
+  assert.equal(monthAfter("2026-04-30"), "2026-05-01");
+  const feb = month(2027, 2, 28), mar = month(2027, 3, 31), apr = month(2026, 4, 30), may = month(2026, 5, 31);
+  assert.deepEqual(cardDays(feb, mar, "2027-02-27").days.map((d) => d.key),
+    ["2027-02-27", "2027-02-28", "2027-03-01", "2027-03-02", "2027-03-03"]);
+  assert.deepEqual(cardDays(apr, may, "2026-04-30").days.map((d) => d.key),
+    ["2026-04-30", "2026-05-01", "2026-05-02", "2026-05-03", "2026-05-04"]);
+  // The merge: order is by date whatever order the pieces arrive in; a day in both is not doubled by position.
+  assert.deepEqual(cardDays(dec, jan, "2026-12-30").days.map((d) => d.key),
+    ["2026-12-30", "2026-12-31", "2027-01-01", "2027-01-02", "2027-01-03"]);
+  assert.deepEqual(cardDays([...dec].reverse(), [...jan].reverse(), "2026-12-30").days.map((d) => d.key),
+    ["2026-12-30", "2026-12-31", "2027-01-01", "2027-01-02", "2027-01-03"]);
+  // Not yet read: the days there are, nothing claimed unread. Failed: the good days are kept and it says so.
+  assert.deepEqual(cardDays(dec, null, "2026-12-30"), { days: [g("2026-12-30", 1), g("2026-12-31", 1)], unread: false });
+  assert.deepEqual(cardDays(dec, "failed", "2026-12-30"), { days: [g("2026-12-30", 1), g("2026-12-31", 1)], unread: true });
+  assert.equal(cardDays(dec, jan, "2026-12-30").unread, false);
+  assert.equal(cardDays(undefined, "failed", "2026-12-30").unread, true);
+  const t2 = code(readFileSync(join(SRC, "screens", "Today.tsx"), "utf8"));
+  assert.match(t2, /setSpill\("failed"\)/, "a failed read of the next month is recorded, not swallowed");
+  assert.ok(!/,\s*\(\)\s*=>\s*\{\s*\}\)/.test(t2), "an empty catch hides a failed read");
+  assert.match(t2, /Could not load the days after this/);
+  const cal2 = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
+  assert.match(cal2, /waiting \? \[\]/, "the last day's rows are not shown under the next day's heading");
   const cal = code(readFileSync(join(SRC, "view", "Calendar.tsx"), "utf8"));
   assert.match(cal, /dayOn\(/, "the day screen opens on the date a link carries");
   ok("the home card: the next days with their counts, absent without the capability, a day opens the calendar on it");
