@@ -390,6 +390,48 @@ def _lint_instrument(fm, ops, fail, voc):
             fail(f"question type '{qtype}' is not a CARE type")
 
 
+def _lint_documents_instrument(instruments, ops):
+    """A document instrument's `fills` names real parts and real questions.
+
+    The whole value of declaring the map is that it can be checked. A part
+    nothing implements, or a link_id no form asks, would be a promise the
+    screen could not keep: the paper would be read, the answer would have
+    nowhere to go, and nothing would say so.
+    """
+    bad = []
+    for fm in instruments:
+        if fm.get("kind") != "document":
+            continue
+        who = fm.get("id")
+        fills = fm.get("fills") or {}
+        if not isinstance(fills, dict) or not fills:
+            bad.append(f"{who}: a document instrument declares `fills`, which says "
+                       f"which question takes which part of the paper")
+            continue
+        for part in fills:
+            if part not in vocab.DOCUMENT_PARTS:
+                bad.append(f"{who}: fills '{part}' is not a part a document read "
+                           f"produces; one of {list(vocab.DOCUMENT_PARTS)}")
+        for oid in fm.get("operations") or []:
+            op = ops.get(oid)
+            if not op:
+                bad.append(f"{who}: operations names '{oid}', which is not an operation")
+                continue
+            schema_id = op.input if hasattr(op, "input") else op.get("input")
+            try:
+                schema = validate.load(schema_id)
+            except FileNotFoundError:
+                bad.append(f"{who}: '{oid}' names questionnaire '{schema_id}', "
+                           f"which does not exist")
+                continue
+            asked = {q["link_id"] for q in validate.walk(schema["questions"])}
+            for part, link_id in fills.items():
+                if link_id not in asked:
+                    bad.append(f"{who}: fills.{part} is '{link_id}', which "
+                               f"'{schema_id}' does not ask")
+    return bad
+
+
 def _lint_scribe(manifest, instruments):
     """Every station default and choice is an operation a scribe may fill."""
     allowed = {oid for fm in instruments if fm.get("kind") == "scribe"
@@ -854,6 +896,7 @@ def load(bundle_id="phc", catalogue=None, facility=None):
     bad = lint(manifest, decls, ops, seed) + bad_mappings
     raw_instruments = [fm for fm, _ in decls.values() if fm.get("type") == "instrument"]
     bad += _lint_scribe(manifest, raw_instruments)
+    bad += _lint_documents_instrument(raw_instruments, ops)
     bad += _lint_documents(manifest, ops)
     # The doctor's templates, which are generated operations. Linted here with
     # everything else that references a questionnaire, and against the

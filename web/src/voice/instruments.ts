@@ -57,6 +57,7 @@ type Decl = {
   says?: string;
   spoken?: boolean;
   requires?: string | null;
+  fills?: Record<string, string>;
 };
 
 type Common = {
@@ -76,7 +77,13 @@ export type Mount =
       labels: Record<string, string>;
     })
   | (Common & { kind: "scribe"; targets: Question[] })
-  | (Common & { kind: "device"; fields: string[] });
+  | (Common & { kind: "device"; fields: string[] })
+  /** A photographed document, read by the kernel into this form. `fills`
+   *  is the declaration's own map of which question takes which part of the
+   *  paper; the renderer never reads it -- the kernel does -- and it is
+   *  carried here only so the control can say which fields a read will
+   *  touch before anybody photographs anything. */
+  | (Common & { kind: "document"; fills: Record<string, string> });
 
 export function mountsFor(
   instruments: Record<string, unknown> | undefined,
@@ -127,6 +134,14 @@ export function mountsFor(
       );
       if (!targets.length) continue;
       out.push({ ...common, kind: "scribe", targets });
+    } else if (d.kind === "document") {
+      // A document instrument with nothing mapped would be a camera that
+      // fills no field. The kernel's lint refuses one; this refuses it
+      // again, because the renderer is the thing that would actually put a
+      // camera on screen.
+      const fills = d.fills ?? {};
+      if (!Object.keys(fills).length) continue;
+      out.push({ ...common, kind: "document", fills });
     } else if (d.kind === "device") {
       // Declared, and there is no pairing code on this machine. It is drawn
       // as one honest line rather than left out, so the screen does not imply

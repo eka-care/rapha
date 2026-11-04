@@ -48,6 +48,9 @@ instruments:
   - phc.inst.vitals-voice
   - phc.inst.vitals-device
   - phc.inst.consult-scribe
+  # Reads a photographed report into the outside-record form. An accelerator
+  # over that form, never a gate on it: the three fields stay typeable.
+  - phc.inst.context-scan
 # What this centre owes somebody over the life of one episode. A schedule is
 # a clinical protocol and carries its own sign off; see the atom.
 schedules:

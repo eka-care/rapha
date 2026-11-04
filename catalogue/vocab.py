@@ -110,7 +110,27 @@ IRREVERSIBILITY = ("reversible", "correctable", "irreversible")
 # `proposed` is a request and not a write. A denial is the opposite of one.
 WROTE = ("committed", "confirmed", "allowed", "amended")
 
-INSTRUMENT_KINDS = ("form", "device", "constrained-voice", "scribe")
+INSTRUMENT_KINDS = ("form", "device", "constrained-voice", "scribe", "document")
+
+# What a READ OF A DOCUMENT can produce, and so the whole of what a document
+# instrument's `fills:` may name on its left hand side. Closed for the same
+# reason INSTRUMENT_KINDS is closed: the kernel implements each of these and
+# a bundle naming a sixth would be a declaration nothing could keep.
+#
+# `date` is the date the paper itself carries, which the parsing service
+# answers as an epoch. `findings` is its table of readings, each with a name,
+# a value, a unit, a reference range and whether the laboratory called it
+# high or low, rendered as lines.
+#
+# THERE IS NO `source`, and that is a finding rather than an omission. The
+# service answers a `source` field and what it holds is OUR OWN client tag,
+# not the name of the laboratory that wrote the paper (seen live against
+# https://api.eka.care on 4 November 2026: "EC_1789058387727"). Filling "who
+# wrote it" from that would put our own identifier where somebody else's
+# name belongs, on the one form whose whole safety property is that it is
+# plainly a copy of somebody else's document. So the person types it, and a
+# field a machine cannot honestly answer is left for them.
+DOCUMENT_PARTS = ("date", "findings")
 
 # INSTRUMENTS is the narrower question: what an OPERATION's `instrument:` may
 # name as its default. The renderer draws that default as a pill icon and a

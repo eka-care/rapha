@@ -213,6 +213,7 @@
       "commit": "tap",
       "fallback": "form",
       "fields": [],
+      "fills": {},
       "grammar": null,
       "id": "phc.inst.consult-scribe",
       "kind": "scribe",
@@ -235,6 +236,29 @@
       "type": "instrument",
       "types": []
     },
+    "phc.inst.context-scan": {
+      "commit": "tap",
+      "fallback": "form",
+      "fields": [],
+      "fills": {
+        "date": "dated",
+        "findings": "body"
+      },
+      "grammar": null,
+      "id": "phc.inst.context-scan",
+      "kind": "document",
+      "operations": [
+        "phc.op.context-add"
+      ],
+      "readback": "required",
+      "requires": null,
+      "says": null,
+      "spoken": true,
+      "summary": "Reads a photographed report and fills what it can, for a person to check.",
+      "title": "Scan the paper",
+      "type": "instrument",
+      "types": []
+    },
     "phc.inst.vitals-device": {
       "commit": "tap",
       "fallback": "keypad",
@@ -244,6 +268,7 @@
         "pulse",
         "spo2"
       ],
+      "fills": {},
       "grammar": null,
       "id": "phc.inst.vitals-device",
       "kind": "device",
@@ -270,6 +295,7 @@
         "weight",
         "temperature"
       ],
+      "fills": {},
       "grammar": "number",
       "id": "phc.inst.vitals-voice",
       "kind": "constrained-voice",
@@ -294,7 +320,8 @@
     "instruments": [
       "phc.inst.vitals-voice",
       "phc.inst.vitals-device",
-      "phc.inst.consult-scribe"
+      "phc.inst.consult-scribe",
+      "phc.inst.context-scan"
     ],
     "khoj": {
       "description": "Searches, answers, and proposes. It never commits: every write it returns is a proposal for a clinician to review and confirm on screen, exactly like every other write tool here.",
@@ -2178,7 +2205,7 @@
       ],
       "id": "phc.op.context-add",
       "input": "phc.schema.context-v1",
-      "instrument": "form",
+      "instrument": "document",
       "irreversibility": "correctable",
       "kind": "write",
       "preconditions": [
@@ -2186,14 +2213,14 @@
       ],
       "presents": "artifact",
       "scope_qualifier": null,
-      "short": "Background",
+      "short": "Outside record",
       "station": "nurse",
       "summary": "A letter, a result or a discharge note another facility wrote, copied in as given.",
       "surfaces": [
         "rendered",
         "mcp"
       ],
-      "title": "Add background from elsewhere",
+      "title": "Add a record from outside",
       "tool": "propose_context_add",
       "type": "operation",
       "verified": "unverified",

@@ -38,7 +38,7 @@ from starlette.concurrency import run_in_threadpool
 
 from adapters.local.store import SqliteStore, seed
 from agent import turn
-from api import fill, outbox, scribe
+from api import fill, outbox, paper, scribe
 from catalogue import validate, vocab
 from kernel import (declarations, directory, plugins, queues, spine, proposals,
                     state, terminology, tokens, views)
@@ -1114,6 +1114,69 @@ def _suffix(content_type):
     return {"audio/webm": ".webm", "audio/ogg": ".ogg", "audio/mp4": ".mp4",
             "audio/mpeg": ".mp3", "audio/wav": ".wav", "audio/x-wav": ".wav",
             "audio/wave": ".wav"}.get(kind, ".webm")
+
+
+def paper_allowed(user, operation):
+    """The document instrument that may fill this operation for this caller.
+
+    Three things have to hold, and they are the same three the recording
+    route checks: a declared instrument of kind `document` names the
+    operation, its readback and commit are the fixed ones, and the caller
+    holds the operation's own capability. A caller who could not commit the
+    form may not have a machine fill it either -- otherwise the read is a way
+    to put values in front of somebody who is not allowed to put them there.
+    """
+    caps = set(user["capabilities"])
+    for decl in BUNDLE.instruments.values():
+        if decl.kind != "document" or decl.commit != "tap" or decl.readback != "required":
+            continue
+        if operation not in decl.operations:
+            continue
+        op = BUNDLE.operations.get(operation)
+        if not op:
+            continue
+        if op["capability"] not in caps:
+            raise HTTPException(403, "You cannot %s at this centre." % op["title"].lower())
+        return decl
+    return None
+
+
+@router.post("/paper")
+async def paper_read(request: Request, operation: str = ""):
+    """The browser posts one photograph here, as the raw body.
+
+    The answer is a Draft and never a write. This route has no Store, calls
+    nothing that does, and the values it returns reach the record only the
+    way every other drafted value does: drawn in editable fields, checked by
+    a person, committed by a tap.
+
+    The picture is one temporary file inside api/paper.read, deleted in its
+    `finally`, and it is deleted from the service too in the same `finally`.
+    Nothing under this repository ever holds it.
+
+    A read that fills nothing answers 422 with a sentence, rather than an
+    empty draft. An empty draft looks like an answer, and the honest reading
+    of a handwritten camp note is that the parser made nothing of it.
+    """
+    user = caller(request)
+    decl = paper_allowed(user, operation)
+    if not decl:
+        raise HTTPException(400, "Nothing here reads a document into %r." % operation)
+    picture = await request.body()
+    try:
+        body = await run_in_threadpool(
+            paper.read, picture,
+            content_type=request.headers.get("content-type"),
+            filename=request.headers.get("x-filename"))
+    except paper.PaperError as broke:
+        raise HTTPException(503, str(broke))
+    draft = paper.parse(body, operation=operation, instrument=decl.id,
+                        fills=decl.fills)
+    if not draft:
+        raise HTTPException(
+            422, "Nothing could be read off that picture. Type what the "
+                 "paper says.")
+    return draft
 
 
 @router.get("/scribe/sessions/{session_id}")

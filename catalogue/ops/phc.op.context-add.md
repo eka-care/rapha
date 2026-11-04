@@ -2,13 +2,13 @@
 id: phc.op.context-add
 type: operation
 kind: write
-short: Background
-title: Add background from elsewhere
+short: Outside record
+title: Add a record from outside
 summary: A letter, a result or a discharge note another facility wrote, copied in as given.
 capability: context.record
 scope_qualifier: null
 station: nurse
-instrument: form
+instrument: document
 presents: artifact
 preconditions:
   - registered
@@ -97,16 +97,45 @@ date on somebody else's document is a fabricated fact.
 ## What it cannot do
 
 It emits no flag and writes no resource any `done_when` reads, so the line
-does not move. It cannot be dictated: `instrument: form`, because this is
-paper being copied, not speech being heard, and a scribe guessing at a
-discharge summary is the exact failure this operation exists to avoid.
+does not move.
+
+IT STILL CANNOT BE DICTATED, and the reason is unchanged: this is paper being
+copied, not speech being heard, and a scribe guessing at a discharge summary
+is the exact failure this operation exists to avoid. No scribe instrument
+names this operation and none may.
+
+What it can now be is SCANNED. `instrument: document`, and
+`bundles/phc/phc.inst.context-scan.md` declares what that means: the paper is
+photographed, Eka's medical records service reads it, and the date it carries
+and the readings it holds open in these same fields, unconfirmed, for a
+person to check and tap. Who wrote it is still typed, because the service
+cannot honestly answer that one -- its `source` field holds our own client
+identifier, not the laboratory's name.
+
+The scan is an accelerator and never a gate. `fallback: form` on the
+instrument, and the three fields below are the same three fields they always
+were: there is no camera on a desktop, the service can be unreachable, and a
+handwritten note from a camp will parse to nothing. In all three cases a
+person types, exactly as before.
 
 It is `correctable`, not reversible: a letter copied in wrongly is corrected
 in place and the correction is signed, the same as every other row here.
 
+## It is called an outside record now, and nothing moved
+
+It was called "Background" on every screen that showed it, which named where
+it sits rather than what it is, and a clinician reading "Background" has to
+open it to find out it is somebody else's paper. "Outside record" says the
+one thing that matters about every row in it: this is not ours.
+
+Only the words changed. The operation is still `phc.op.context-add`, the
+capability is still `context.record`, the tab is still `context` and the
+questionnaire is still `phc.schema.context-v1`. The machine names were
+already right; it was the display that was vague.
+
 ## How you know it worked
 
-The background appears on the visit, with who copied it in and when, and it is
+The outside record appears on the visit, with who copied it in and when, and it is
 there for the consultation that follows. No step closes and the patient does
 not move.
 

@@ -579,6 +579,13 @@ var served = []struct {
 	{"/scribe/sessions/{session_id}", "G8 serves the outbox, and the scribe with it"},
 	{"/scribe/sessions/{session_id}/extract", "G8 serves the outbox, and the scribe with it"},
 	{"/scribe/webhook", "G8 serves the outbox, and the scribe with it"},
+	// Reading a photographed document is the same seam as the scribe and is
+	// unserved here for the same reason: nothing in Go reads an Eka
+	// credential, so the read would have no service behind it. The Python
+	// deletes the upload from that service in a `finally`; a half built twin
+	// that uploaded and could not clean up would be worse than one that says
+	// plainly it does not do this.
+	{"/paper", "G8 serves the outbox, and the document reader with it"},
 }
 
 // literal is the part of a route before its first template segment, which is

@@ -286,6 +286,16 @@ class Instrument:
     # hard-coded that flag, which meant a bundle whose consent flag is spelled
     # differently got no gate at all. One of this bundle's own states, or None.
     requires: Optional[str] = None
+    # WHICH QUESTION RECEIVES WHICH PART OF A DOCUMENT, for a `document`
+    # instrument and for nothing else. Keyed by a DOCUMENT_PARTS name and
+    # valued with a link_id on every operation this instrument names.
+    #
+    # It is declared rather than inferred because the alternative is the
+    # renderer or the kernel guessing which box a date goes in from the
+    # question's wording, and a guess that puts a laboratory's report date
+    # into a field meaning something else is a guess nobody can see being
+    # made. A part this bundle does not want filled is simply left out.
+    fills: dict = field(default_factory=dict)
     type: str = "instrument"
 
 

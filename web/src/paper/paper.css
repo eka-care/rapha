@@ -1,0 +1,36 @@
+/* Photographing the paper, at the head of the outside-record form.
+ *
+ * It sits above the fields rather than beside them because it is the way
+ * most people will fill this form, and a control that fills six fields
+ * belongs over the six and not next to one of them. Typing stays directly
+ * underneath, unmoved: the camera is an accelerator and the fields are the
+ * form.
+ */
+.scan {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  border: 1px dashed var(--color-border-control);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+}
+/* The input is the thing that actually opens the camera, and it is never
+   drawn: a browser's own file control cannot be styled and says "Choose
+   file", which is not what this does. The button clicks it. */
+.scan-in { display: none; }
+.scan-go { flex: 0 0 auto; }
+.scan-say {
+  flex: 1 1 220px; min-width: 0;
+  font-size: 12px; line-height: 17px; color: var(--color-text-tertiary);
+}
+.scan > .f-bad { flex: 1 0 100%; }
+
+/* The mark turns while the service reads, the same way it turns while the
+   service listens. One product, one thing that means working. */
+.scan-go:disabled .i { animation: scanturn 3.4s linear infinite; }
+@keyframes scanturn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .scan-go:disabled .i { animation: scanbreathe 2.4s ease-in-out infinite; }
+  @keyframes scanbreathe { 50% { opacity: .45; } }
+}

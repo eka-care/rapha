@@ -34,6 +34,7 @@ import { human } from "../words";
 import { type ScribeDraft } from "../scribe/session";
 import { mountsFor } from "../voice/instruments";
 import { VoiceCapture } from "../voice/VoiceCapture";
+import { Scan } from "../paper/Scan";
 import { useDictation } from "../scribe/useDictation";
 import { DictateBar } from "../scribe/DictateBar";
 import { Box } from "../ui/Check";
@@ -417,8 +418,15 @@ export function OperationPanel({
         )}
 
 
+        {/* The camera, above the fields it fills. A declaration decides
+            whether it is there at all; see paper/Scan.tsx. */}
+        {showForm && (
+          <Scan mounts={mounts} operation={op.id} disabled={busy}
+                onDraft={fromInstrument} />
+        )}
+
         <VoiceCapture
-          mounts={mounts.filter((m) => m.kind !== "scribe")}
+          mounts={mounts.filter((m) => m.kind !== "scribe" && m.kind !== "document")}
           operation={op.id}
           thread={thread}
           payload={payload}
