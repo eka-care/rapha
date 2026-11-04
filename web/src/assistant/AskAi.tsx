@@ -105,19 +105,28 @@ export function AskAi({ open, question, onClose }: {
         made.current = el;
       }
       el.setAttribute("open", "");
+      seed(el);
     });
     return () => { live = false; };
   }, [open, onClose]);
 
   // A question only seeds the composer once. Asking the same thing again
   // from the same screen is the reader's to do, not this effect's.
-  useEffect(() => {
-    const el = made.current;
-    if (!el || !open || !question) return;
-    const text = question.text;
+  //
+  // The widget is made after a script load, so the question can arrive before
+  // the element exists: the first open both made it and found nothing to seed.
+  // `latest` holds the question so the load can seed it once the element is
+  // there, and this effect covers every later asking.
+  const latest = useRef<Question | null>(null);
+  latest.current = question;
+  const seed = (el: Widget) => {
+    const text = latest.current?.text;
     if (!text || asked.current === text) return;
     asked.current = text;
     el.setAttribute("question", text);
+  };
+  useEffect(() => {
+    if (made.current && open) seed(made.current);
   }, [open, question]);
 
   useEffect(() => {

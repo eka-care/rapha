@@ -40,6 +40,14 @@ const ok = (m: string) => console.log("  ok  " + m);
   const t = withPatient("what next?", ["61", "Male"], [{ label: "Pulse", value: "92 /min", crit: true }]);
   assert.ok(t.includes("Patient: 61, Male.") && t.includes("Pulse 92 /min (flagged)") && t.endsWith("what next?"));
   assert.equal(withPatient("what next?", [], []), "what next?", "no details, no preamble");
+  const reg = withPatient("q", ["61"], [
+    { label: "Full name", value: "Ramesh Kumar", crit: false },
+    { label: "Mobile", value: "9800000003", crit: false },
+    { label: "Note", value: "Ramesh Kumar is in the side room", crit: false },
+    { label: "Pulse", value: "92 /min", crit: false },
+  ], ["Ramesh Kumar"]);
+  assert.ok(reg.includes("Pulse 92") && !/Ramesh|9800000003|Mobile|Full name/.test(reg),
+    "the registration's name and phone, and any value repeating the name, never go");
   ok("assistant: the patient's details precede the question, and only those");
 }
 
