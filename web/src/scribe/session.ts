@@ -85,6 +85,10 @@ export type ScribeSession = {
   drafts: ScribeDraft[];
   transcript: string;
   operations: string[];
+  /** Notes written in one of Eka's library templates: words for somebody to
+   *  read, not values for a form. Empty unless a library template was asked
+   *  for, with the recording or afterwards. */
+  notes?: { template: string; title: string; text: string }[];
 };
 
 // ----------------------------------------------------------------- the pure half

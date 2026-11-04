@@ -10,7 +10,7 @@ import { createLabel, firstOperation } from "../search";
 import { displayFor, load as loadDeclarations, questionnaire } from "../declarations";
 import { deskTitle } from "../desk";
 import { keep, type Filter, type Recent } from "../loops";
-import { header, queueViewFor, type Ctx, type Said } from "../messages";
+import { header, mentionsOf, queueViewFor, type Ctx, type Said } from "../messages";
 import { say } from "../announce";
 import { Announcer, Boundary, Failed, Loading, PageTitle } from "../parts";
 import { Encounter } from "../screens/Encounter";
@@ -359,12 +359,21 @@ export function App() {
 
   const onSay = async (thread: string, text: string) => {
     const at = new Date().toISOString();
-    const mine: Said = { id: `u-${at}`, at, who: "user", text, actor: "You" };
+    const to = mentionsOf(text);
+    const mine: Said = { id: `u-${at}`, at, who: "user", text, actor: "You",
+                         ...(to.length ? { to } : {}) };
     setSaid((was) => {
       const next = { ...was, [thread]: [...(was[thread] ?? []), mine] };
       save(SAID_KEY, next);
       return next;
     });
+    // AN @ MAKES IT A MESSAGE TO A PERSON, NOT A QUESTION FOR THE AGENT. It
+    // goes on the thread as what the user said, addressed to whoever they
+    // named, and nothing answers it -- the agent used to, in the third
+    // person, about a colleague who had been spoken to directly. Owner,
+    // 2026-11-04: "it should just treat it as part of the message from the
+    // user to the other user".
+    if (to.length) return;
     setAsking(true);
     try {
       const answer = await ask({ utterance: text, thread, role: currentRole() });

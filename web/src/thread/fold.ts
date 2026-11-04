@@ -77,6 +77,9 @@ export function blocks(msgs: Msg[]): Block[] {
 
 function joins(a: Spoken, b: Spoken): boolean {
   if (a.who !== b.who || a.actor !== b.actor) return false;
+  // Said to somebody else, it is a different message: one turn is one
+  // speaker talking to one audience.
+  if ((a.to ?? []).join(",") !== (b.to ?? []).join(",")) return false;
   const gap = Date.parse(b.at) - Date.parse(a.at);
   return Number.isFinite(gap) && gap >= 0 && gap <= TALK_GAP;
 }

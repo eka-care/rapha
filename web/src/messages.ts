@@ -33,7 +33,19 @@ export type Tag = { text: string; style: string };
 /** Something a person or the agent said in this browser. The kernel has no
  *  route for an utterance and stores none, so these live in the renderer and
  *  are not part of the record. */
-export type Said = { id: string; at: string; who: "user" | "agent"; text: string; actor: string };
+export type Said = {
+  id: string; at: string; who: "user" | "agent"; text: string; actor: string;
+  /** Who this was said TO, when it was said to a person. A message with an
+   *  @mention in it is one colleague writing to another: it is part of the
+   *  conversation and it is not a question for the agent. */
+  to?: string[];
+};
+
+/** The people an utterance is addressed to: every @name that starts the text
+ *  or follows a space, so an address mid-word ("a@b.com") is nobody's. Names
+ *  are returned as typed, without the @, once each. */
+export const mentionsOf = (text: string): string[] =>
+  [...new Set([...text.matchAll(/(?:^|\s)@([\w.-]+)/g)].map((m) => m[1]))];
 
 export type Msg =
   | {
@@ -59,7 +71,8 @@ export type Msg =
        *  would refuse this if it were confirmed. Say so before they tap. */
       stale: boolean;
     }
-  | { kind: "said"; id: string; at: string; who: "user" | "agent"; text: string; actor: string }
+  | { kind: "said"; id: string; at: string; who: "user" | "agent"; text: string; actor: string;
+      to?: string[] }
   /** §12: a handover is a conversation, not a delivery. One object carrying
    *  what was asked, every reply to it, and the state the last reply left it
    *  in. Built from operations whose atom declares `presents: handover`; this

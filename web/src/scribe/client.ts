@@ -59,9 +59,9 @@ export async function templates(station: string): Promise<Templates> {
  *  in a primary health centre is not in one language, and asking somebody
  *  to predict their own before they speak cost them the transcript when
  *  they guessed wrong. api/scribe.LANGUAGES says the same at length. */
-export const startSession = (thread: string, audio: Blob, operations: string[]) =>
+export const startSession = (thread: string, audio: Blob, operations: string[], library: string[] = []) =>
   ask(`${ROUTE}?thread=${encodeURIComponent(thread)}&operations=${encodeURIComponent(operations.join(","))}` +
-      ``,
+      (library.length ? `&library=${encodeURIComponent(library.join(","))}` : ``),
       { method: "POST", body: audio, headers: { "Content-Type": audio.type || "audio/webm" } });
 
 export const pollSession = (id: string) =>
@@ -78,3 +78,24 @@ export const refill = (id: string, operations: string[]) =>
  *  draft held is dropped. */
 export const dropSession = (id: string) =>
   ask(`${ROUTE}/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+
+/** One of Eka's own note templates, as the workspace lists it. */
+export type LibraryItem = { id: string; title: string; desc: string; default: boolean; favorite: boolean };
+
+/** The workspace's template library, ahead of any recording. Read only. */
+export async function library(): Promise<LibraryItem[]> {
+  const res = await fetch(`${API_BASE}${ROUTE.replace("/sessions", "/library")}`,
+                          { headers: { "X-PHC-Role": currentRole() } });
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.json()).detail ?? ""; } catch { /* not json */ }
+    throw new ApiError(detail || `The kernel answered ${res.status}.`, "Type the note.", res.status);
+  }
+  return (await res.json()).items;
+}
+
+/** Have a recording already transcribed written up in one library template.
+ *  No audio moves: the service shapes the transcript it holds. */
+export const writeNote = (id: string, template: string) =>
+  ask(`${ROUTE}/${encodeURIComponent(id)}/note?template=${encodeURIComponent(template)}`, { method: "POST" });

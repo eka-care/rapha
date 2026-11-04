@@ -122,6 +122,81 @@ def shaped_template(op_id, fields):
     _templates[op_id] = new_id
     return new_id
 
+# ------------------------------------------------------- Eka's template library
+# Eka keeps a library of note templates for the workspace: its own defaults
+# (SOAP, a discharge summary, a prescription-only note) and whatever the centre
+# has added in the console. A template is the SHAPE OF AN OUTPUT NOTE, which is
+# a different thing from the form an operation fills. The recording screen
+# offers both: a form to fill, and a note to have written.
+#
+# The ones this module makes itself (`phc · <operation>`, above) are the
+# library's plumbing and not its contents, so they are not offered.
+
+LIBRARY_SECONDS = 300
+_library = {"at": 0.0, "items": []}
+
+
+def library(now=None):
+    """[{id, title, desc, default, favorite}] for this workspace, minus ours.
+
+    Cached for five minutes: the library changes when somebody edits it in the
+    console, which is not something that happens mid consultation, and this is
+    called when a doctor opens a tab.
+    """
+    now = time.time() if now is None else now
+    if _library["items"] and now - _library["at"] < LIBRARY_SECONDS:
+        return _library["items"]
+    try:
+        listed = sdk(lambda: client().request("GET", "/voice/api/v1/template"))
+    except ScribeError:
+        raise
+    except Exception as broke:
+        raise ScribeError(
+            "Could not reach the scribe service to read its templates (%s). "
+            "Type the note." % _scrub(str(broke))[:300]) from None
+    mine = TEMPLATE_TITLE % ""
+    items = [{"id": str(i["id"]), "title": str(i.get("title") or ""),
+              "desc": str(i.get("desc") or ""),
+              "default": bool(i.get("default")),
+              "favorite": bool(i.get("is_favorite"))}
+             for i in (listed or {}).get("items") or []
+             if i.get("id") and not str(i.get("title") or "").startswith(mine)]
+    # Favourites first, then Eka's own, then the centre's, each by name: the
+    # order a person would look for them in.
+    items.sort(key=lambda i: (not i["favorite"], not i["default"], i["title"].lower()))
+    _library.update(at=now, items=items)
+    return items
+
+
+def library_pick(ids):
+    """The library templates named, each one a template this workspace really
+    has. An id Eka does not list is refused rather than sent: the upload would
+    otherwise carry whatever string a browser chose."""
+    known = {i["id"]: i for i in library()}
+    wanted = list(dict.fromkeys(i for i in (ids or []) if i))
+    missing = [i for i in wanted if i not in known]
+    if missing:
+        raise ScribeError("The scribe service has no template %s." % ", ".join(missing))
+    return {i: known[i]["title"] for i in wanted}
+
+
+def note(session, template, title=""):
+    """One library template's note for this session: the one already held, or
+    the one the service writes now from the transcript it already has. Returns
+    the text, or None when the service has not written it yet.
+
+    Held notes are kept on the session, which is in memory and dropped with it.
+    Nothing here writes a record: a note is words for somebody to read.
+    """
+    held = session["notes"].get(template)
+    if held:
+        return held["text"]
+    text = reshape(session, template)
+    if text:
+        session["notes"][template] = {"title": title or template, "text": text}
+    return text
+
+
 # What Eka is told was spoken. Hinglish is two languages at once, which is
 # how it is sent.
 #
@@ -365,7 +440,7 @@ def transcript_of(status):
 SESSIONS = {}
 
 
-def begin(thread, actor, txn, operations, instrument="", templates=None):
+def begin(thread, actor, txn, operations, instrument="", templates=None, want=None):
     """A new session, already carrying its expiry. Set here and not only when a
     transcript arrives, because a session that fails, is withdrawn or is simply
     abandoned never gets a transcript and would otherwise never be dropped."""
@@ -373,6 +448,9 @@ def begin(thread, actor, txn, operations, instrument="", templates=None):
                "actor": actor, "txn": txn, "operations": operations,
                "instrument": instrument, "status": "running", "reason": "",
                "templates": dict(templates or {}),
+               # Library templates asked for with the recording ({id: title}),
+               # and the notes that came back ({id: {title, text}}).
+               "want": dict(want or {}), "notes": {},
                "drafts": [], "transcript": "",
                "expires": time.time() + TRANSCRIPT_SECONDS}
     SESSIONS[session["id"]] = session
@@ -511,12 +589,15 @@ def collect(session, *, reader=None):
     session.update(transcript=transcript, expires=time.time() + TRANSCRIPT_SECONDS)
     # The shaped notes came back in the same body as the transcript, so the
     # ordinary path needs no second call to anything.
-    return refill(session, session["operations"],
-                  notes=decoded(status), reader=reader)
+    came = decoded(status)
+    for template, title in session["want"].items():
+        if came.get(template):
+            session["notes"][template] = {"title": title, "text": came[template]}
+    return refill(session, session["operations"], notes=came, reader=reader)
 
 
 def withdraw(session):
-    session.update(status="withdrawn", drafts=[], transcript="",
+    session.update(status="withdrawn", drafts=[], transcript="", notes={},
                    reason="Withdrawn. Nothing from this recording was kept.")
     return session
 
@@ -525,6 +606,8 @@ def public(session):
     return {"session": session["id"], "status": session["status"],
             "reason": session["reason"], "drafts": session["drafts"],
             "transcript": session["transcript"],
+            "notes": [{"template": t, "title": n["title"], "text": n["text"]}
+                      for t, n in session["notes"].items()],
             "operations": sorted(session["operations"])}
 
 
@@ -696,6 +779,69 @@ def demo():
                           reader=lambda *a: {}))
     assert "Nothing in the recording fills this form" in empty["reason"], empty["reason"]
     assert "shaped" not in empty["reason"], empty["reason"]
+
+    # -- Eka's template library ---------------------------------------------
+    # The workspace lists its own templates beside the ones this module files
+    # for itself. Offering our own plumbing as a choice of note would be
+    # offering a form's shape as though it were a note, and a doctor picking
+    # "phc . phc.op.consult-document" has no idea what they chose.
+    class Listing:
+        calls = 0
+
+        def request(self, method, path, **kw):
+            Listing.calls += 1
+            assert (method, path) == ("GET", "/voice/api/v1/template"), (method, path)
+            return {"items": [
+                {"id": "t-soap", "title": "SOAP note", "desc": "", "default": True,
+                 "is_favorite": False},
+                {"id": "t-mine", "title": "Antenatal summary", "desc": "x",
+                 "default": False, "is_favorite": True},
+                {"id": "t-ours", "title": TEMPLATE_TITLE % "phc.op.consult-document",
+                 "desc": "", "default": False, "is_favorite": False},
+                {"title": "no id, so not a template"}]}
+
+    was = _client
+    try:
+        _client = Listing()
+        _library.update(at=0.0, items=[])
+        listed = library(now=1000.0)
+        assert [i["id"] for i in listed] == ["t-mine", "t-soap"], listed
+        assert "t-ours" not in [i["id"] for i in listed], "our own templates are not offered"
+        assert listed[0]["favorite"] and listed[1]["default"], listed
+        library(now=1100.0)
+        assert Listing.calls == 1, "five minutes of one listing, not one per tap"
+        library(now=1000.0 + LIBRARY_SECONDS + 1)
+        assert Listing.calls == 2, "and then it asks again"
+        assert library_pick(["t-soap", "t-soap"]) == {"t-soap": "SOAP note"}
+        try:
+            library_pick(["not-a-template"])
+            raise AssertionError("an id Eka does not list must be refused, not sent")
+        except ScribeError as broke:
+            assert "not-a-template" in str(broke), broke
+    finally:
+        _client = was
+        _library.update(at=0.0, items=[])
+
+    # A library note that rode with the transcript is on the session, in the
+    # shape the screen reads, and a withdrawal takes it with everything else.
+    WITH_NOTE = {"data": {"output": [
+        {"template_id": "t-soap", "status": "success",
+         "value": base64.b64encode(b"S: fever. O: BP 140/90.").decode()}],
+        "template_results": {"transcript": [
+            {"template_id": "transcript", "status": "success",
+             "value": base64.b64encode(b"Fever for three days.").decode()}]}}}
+    real_poll, poll = poll, lambda txn: WITH_NOTE
+    try:
+        n = begin("enc-003", "user:mo", "phc-n", {"v.op": {"schema": vitals}},
+                  instrument="i", templates={"v.op": "tpl-v"}, want={"t-soap": "SOAP note"})
+        collect(n, reader=lambda *a: {})
+    finally:
+        poll = real_poll
+    shown = public(n)
+    assert shown["notes"] == [{"template": "t-soap", "title": "SOAP note",
+                               "text": "S: fever. O: BP 140/90."}], shown["notes"]
+    assert note(n, "t-soap") == "S: fever. O: BP 140/90.", "a held note is not asked for twice"
+    assert public(withdraw(n))["notes"] == [], "withdrawn means nothing is kept"
 
     print("ok api.scribe")
 

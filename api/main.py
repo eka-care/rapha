@@ -986,6 +986,18 @@ def scribe_templates(request: Request, station: str = ""):
             }
 
 
+@router.get("/scribe/library")
+async def scribe_library(request: Request):
+    """Eka's own note templates for this workspace, for the screen to offer
+    beside the forms a recording fills. Read only: this lists, it makes
+    nothing, and the ones this kernel files for itself are left out."""
+    caller(request)
+    try:
+        return {"items": await run_in_threadpool(scribe.library)}
+    except scribe.ScribeError as broke:
+        raise HTTPException(503, str(broke))
+
+
 def collect_if_consent_stands(session):
     """Collect a draft. Named for a gate that no longer exists.
 
@@ -1018,7 +1030,8 @@ def scribe_or_404(session_id, request):
 
 @router.post("/scribe/sessions")
 async def scribe_start(request: Request, thread: str = None, format: str = None,
-                       operations: str = "", language: str = "auto"):
+                       operations: str = "", language: str = "auto",
+                       library: str = ""):
     """The browser posts one recording here, as the raw body.
 
     Three refusals before a byte leaves this machine, in this order: the
@@ -1049,6 +1062,13 @@ async def scribe_start(request: Request, thread: str = None, format: str = None,
     if language not in scribe.LANGUAGES:
         raise HTTPException(400, "Unknown language %r." % language)
     picked, instrument = scribe_pick(user, operations.split(","))
+    # Library templates asked for beside the forms: a note in Eka's own shape
+    # (a SOAP note, a discharge summary) written from the same recording.
+    try:
+        wanted = await run_in_threadpool(
+            scribe.library_pick, [i for i in library.split(",") if i][:2])
+    except scribe.ScribeError as broke:
+        raise HTTPException(400, str(broke))
     audio = await request.body()
     suffix = _suffix(format or request.headers.get("content-type"))
     # The template that shapes each of these forms, resolved BEFORE the audio
@@ -1064,12 +1084,12 @@ async def scribe_start(request: Request, thread: str = None, format: str = None,
         txn = await run_in_threadpool(
             scribe.start, audio, suffix=suffix,
             languages=scribe.LANGUAGES[language],
-            templates=list(shapes.values()))
+            templates=list(shapes.values()) + list(wanted))
     except scribe.ScribeError as broke:
         raise HTTPException(503, hold_or_say(
             audio, thread_id, user, picked, suffix, str(broke)))
     session = scribe.begin(thread_id, user["id"], txn, picked,
-                           instrument=instrument, templates=shapes)
+                           instrument=instrument, templates=shapes, want=wanted)
     return scribe.public(session)
 
 
@@ -1224,6 +1244,36 @@ async def scribe_extract(session_id: str, request: Request):
     body = await request.json()
     picked, _ = scribe_pick(user, body.get("operations") or [])
     return scribe.public(await run_in_threadpool(scribe.refill, session, picked))
+
+
+@router.post("/scribe/sessions/{session_id}/note")
+async def scribe_note(session_id: str, request: Request, template: str = ""):
+    """Have this recording written up in one of Eka's library templates.
+
+    Nothing is uploaded: the service keeps the transcript for the session and
+    shapes it again. The note comes back as text on the session, held for the
+    day with it, and it is words for somebody to read -- this route writes no
+    record, and no value in a note reaches one without a person typing it into
+    a form of their own.
+    """
+    caller(request)
+    session = scribe_or_404(session_id, request)
+    if session["status"] == "withdrawn":
+        raise HTTPException(403, "This recording was stopped, so nothing from it "
+                                 "is kept. Type the note.")
+    if session["status"] != "ready":
+        raise HTTPException(409, "There is no transcript to write a note from yet.")
+    try:
+        picked = await run_in_threadpool(scribe.library_pick, [template])
+    except scribe.ScribeError as broke:
+        raise HTTPException(400, str(broke))
+    if not picked:
+        raise HTTPException(400, "Name one template to write the note in.")
+    text = await run_in_threadpool(scribe.note, session, template, picked[template])
+    if not text:
+        raise HTTPException(503, "The scribe service has not written that note yet. "
+                                 "Try again in a moment, or type the note.")
+    return scribe.public(session)
 
 
 @router.post("/scribe/webhook")

@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { blocks, split, FOLD_EARLIER, KEEP_OPEN, TALK_GAP, type Block } from "./fold.ts";
-import type { Msg } from "../messages.ts";
+import { mentionsOf, type Msg } from "../messages.ts";
 
 let checks = 0;
 const ok = (cond: unknown, what: string) => { checks++; assert.ok(cond, `FAIL ${what}`); };
@@ -17,6 +17,7 @@ const no = (actor: string, min = 0): Msg =>
      reason: "Already recorded.", old: false });
 const say = (actor: string, min: number, text = "hello"): Msg =>
   ({ kind: "said", id: `s${++n}`, at: t(min), who: actor === "agent" ? "agent" : "user", text, actor });
+const to = (m: Msg, who: string[]): Msg => ({ ...m, to: who } as Msg);
 const kept = (): Msg =>
   ({ kind: "posted", id: `p${++n}`, at: t(0), title: "Record vitals", actor: "meena",
      operation: "x", tags: [], values: [], payload: {}, edited: false });
@@ -46,6 +47,21 @@ ok(blocks([say("meena", 0), say("meena", 1 + TALK_GAP / 60000)]).length === 2,
    "the same person, twenty minutes later, has said two things");
 ok(blocks([say("meena", 0), kept(), say("meena", 1)]).length === 3,
    "a record between two lines breaks the turn: something happened in between");
+
+// -- a message to a person ------------------------------------------------
+ok(mentionsOf("@Priya please repeat BP").join() === "Priya",
+   "an @ at the start names who it is for");
+ok(mentionsOf("ask @mo and @Priya about it").join() === "mo,Priya",
+   "and so does one after a space, every name once");
+ok(mentionsOf("send it to a@b.com").length === 0 && mentionsOf("no one here").length === 0,
+   "an address inside a word is nobody's, and plain text addresses no one");
+ok(mentionsOf("@mo @mo hi").length === 1, "a name said twice is one person");
+ok(blocks([to(say("meena", 0), ["mo"]), to(say("meena", 1), ["mo"])]).length === 1,
+   "two lines to the same person are one turn");
+ok(blocks([to(say("meena", 0), ["mo"]), to(say("meena", 1), ["priya"])]).length === 2,
+   "a line to somebody else is a different turn, even a minute later from the same speaker");
+ok(blocks([say("meena", 0), to(say("meena", 1), ["mo"])]).length === 2,
+   "and a line to a person never folds into one that was nobody's");
 
 // -- the older part of a long visit ---------------------------------------
 const many = (count: number): Block[] =>

@@ -22,6 +22,8 @@ import type { Catalogue, Facility, Operation, Payload, Proposal, ThreadView } fr
 import { Composer } from "../thread/Composer";
 import { commands } from "../thread/commands";
 import { ScribeBar } from "../scribe/ScribeBar";
+import { SubTabs, Templates as TemplatesPane, Transcript, WrittenNotes } from "../scribe/Pane";
+import { usePane } from "../scribe/usePane";
 import { ScribeStart } from "../scribe/Start";
 import { mergeDrafts, type Opened } from "../scribe/session";
 import { Stream, operationFor } from "../thread/Thread";
@@ -179,6 +181,10 @@ export function Encounter({
    *  form is one of the two doors there. */
   const [starting, setStarting] = useState<Operation | null>(null);
   const [drafts, setDrafts] = useState<Opened[]>([]);
+  /** The Scribe tab's three views share one thing to choose and one session
+   *  to read. See scribe/usePane.ts. */
+  const pane = usePane({ thread: thread.id, station: thread.station ?? "",
+                         open: tab === "scribe", asked: scribing });
 
   // THE RECORDING OPENS ITS OWN VIEW. Pressing the microphone and having
   // nothing appear would be the same silence the old inline bar at least
@@ -398,10 +404,35 @@ export function Encounter({
         {tab === "scribe" && (
           <div className="vbody">
             {scribing !== null && (
-              <ScribeBar thread={thread.id} station={thread.station ?? ""} pick={scribing}
-                         onDrafts={(s) => setDrafts((all) => mergeDrafts(all, s.drafts, s.session))}
-                         onClose={() => { setScribing(null); setDrafts([]); }} />
+              <ScribeBar thread={thread.id} op={pane.op} lib={pane.lib} onPhase={pane.setPhase}
+                         onDrafts={(s) => {
+                           setDrafts((all) => mergeDrafts(all, s.drafts, s.session));
+                           pane.setSession(s);
+                           // What came back is what to look at: the notes, not the
+                           // templates tab somebody had open while it was written.
+                           if (s.drafts.length || s.notes?.length) pane.setSub("notes");
+                         }}
+                         onClose={() => {
+                           setScribing(null); setDrafts([]);
+                           pane.setSession(null); pane.setPhase("idle");
+                         }} />
             )}
+
+            <SubTabs open={pane.sub} notes={drafts.length + (pane.session?.notes?.length ?? 0)}
+                     onPick={pane.setSub} />
+
+            {pane.sub === "transcript" && <Transcript session={pane.session} phase={pane.phase} />}
+
+            {pane.sub === "templates" && (
+              <TemplatesPane menu={pane.menu} library={pane.library} op={pane.op} lib={pane.lib}
+                             phase={pane.phase} onOp={pane.chooseOp} onLib={pane.toggleLib} />
+            )}
+
+            {pane.sub === "notes" && <>
+            <WrittenNotes session={pane.session} lib={pane.lib} phase={pane.phase}
+                          titles={Object.fromEntries(
+                            "items" in (pane.library ?? {}) ? (pane.library as { items: { id: string; title: string }[] })
+                              .items.map((t) => [t.id, t.title]) : [])} />
             {drafts.map(({ draft: d, key }) => {
               const op = cat.operations[d.operation];
               return op ? (
@@ -470,6 +501,7 @@ export function Encounter({
                 {!consented && <p className="scribe-why">{MIC_WHY}</p>}
               </div>
             )}
+            </>}
           </div>
         )}
 

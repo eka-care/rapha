@@ -336,3 +336,54 @@
   font-size: 11.5px; color: var(--color-text-tertiary);
 }
 @media (max-width: 640px) { .dict-tip { display: none; } }
+
+/* ---- the Scribe tab's own tabs: Notes, Transcript, Templates ------------ */
+.stabs {
+  display: flex; gap: var(--space-1); margin: var(--space-3) 0 var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.stab {
+  min-height: 36px; padding: 0 var(--space-3);
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  border: 0; border-bottom: 2px solid transparent; background: transparent;
+  font: 600 13px/1 var(--font-sans); color: var(--color-text-secondary); cursor: pointer;
+  margin-bottom: -1px;
+}
+.stab:hover { color: var(--color-text-primary); }
+.stab.on { color: var(--color-text-primary); border-bottom-color: var(--color-cta); }
+.stab-n {
+  font: 600 11px/1 var(--font-mono); color: var(--color-text-tertiary);
+  background: var(--color-bg-subtle); border-radius: var(--radius-pill); padding: 3px 6px;
+}
+
+/* Transcript: what was said, as prose, with a measure. */
+.tx { max-width: 74ch; font-size: 14px; line-height: 1.65; color: var(--color-text-primary); }
+.tx p { margin: 0 0 var(--space-3); white-space: pre-wrap; }
+.tx-empty { color: var(--color-text-secondary); font-size: 13px; }
+
+/* A note written in one of Eka's templates. */
+.nt { border: 1px solid var(--color-border-subtle); border-radius: var(--radius-lg);
+      background: var(--color-bg-surface); margin-bottom: var(--space-3); }
+.nt-h { display: flex; align-items: center; gap: var(--space-2);
+        padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border-subtle); }
+.nt-t { font-size: 13px; font-weight: 700; }
+.nt-b { padding: var(--space-3) var(--space-4); font-size: 13.5px; line-height: 1.6;
+        white-space: pre-wrap; max-width: 74ch; }
+.nt-wait { padding: var(--space-3) var(--space-4); font-size: 13px; color: var(--color-text-secondary);
+           display: flex; align-items: center; gap: var(--space-2); }
+
+/* Templates: two lists, what to fill and what to have written. */
+.tp { display: grid; gap: var(--space-5); }
+.tp-h { font: 700 11px/16px var(--font-mono); letter-spacing: .09em; text-transform: uppercase;
+        color: var(--color-eyebrow); margin: 0 0 var(--space-2); }
+.tp-sub { font-size: 12.5px; color: var(--color-text-secondary); margin: 0 0 var(--space-3); max-width: 64ch; }
+.tp-list { display: grid; gap: var(--space-2); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.tp-card {
+  display: grid; gap: 2px; text-align: left; padding: var(--space-3) var(--space-4);
+  min-height: 44px; border: 1px solid var(--color-border-subtle); border-radius: var(--radius-lg);
+  background: var(--color-bg-surface); cursor: pointer; color: inherit;
+}
+.tp-card:hover { background: var(--color-bg-hover); }
+.tp-card[aria-pressed="true"] { border-color: var(--color-cta); background: var(--color-accent-soft); }
+.tp-name { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: var(--space-2); }
+.tp-state { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--color-text-tertiary); }

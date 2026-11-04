@@ -578,6 +578,10 @@ var served = []struct {
 	{"/scribe/sessions", "G8 serves the outbox, and the scribe with it"},
 	{"/scribe/sessions/{session_id}", "G8 serves the outbox, and the scribe with it"},
 	{"/scribe/sessions/{session_id}/extract", "G8 serves the outbox, and the scribe with it"},
+	// Eka's template library and a note written in one of its templates: both
+	// are calls to the scribe service, which nothing in Go can reach.
+	{"/scribe/library", "G8 serves the outbox, and the scribe with it"},
+	{"/scribe/sessions/{session_id}/note", "G8 serves the outbox, and the scribe with it"},
 	{"/scribe/webhook", "G8 serves the outbox, and the scribe with it"},
 	// Reading a photographed document is the same seam as the scribe and is
 	// unserved here for the same reason: nothing in Go reads an Eka

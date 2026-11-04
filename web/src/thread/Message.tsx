@@ -23,8 +23,10 @@ export function Message({ who, actor, at, text }: {
  *  for one thing somebody said. The header belongs to the turn; which line
  *  it was is not information anybody needs. Who speaks and when is decided
  *  in fold.ts, not here. */
-export function Turn({ who, actor, at, texts }: {
+export function Turn({ who, actor, at, to, texts }: {
   who: "user" | "agent"; actor: string; at: string; texts: string[];
+  /** Who it was said to, when it was said to a person. */
+  to?: string[];
 }) {
   const mine = who === "user";
   return (
@@ -33,7 +35,9 @@ export function Turn({ who, actor, at, texts }: {
         {who === "agent" ? <Icon name="spark" className="i sm" /> : initialsOf(actor)}
       </div>
       <div className="m-b">
-        <div className="m-meta">{actor} · {at}</div>
+        <div className="m-meta">
+          {actor}{to?.length ? <> <span aria-hidden="true">→</span> {to.map((n) => `@${n}`).join(" ")}</> : null} · {at}
+        </div>
         {texts.map((text, i) => (
           <div className="bubble" key={i}>{withMentions(text)}</div>
         ))}

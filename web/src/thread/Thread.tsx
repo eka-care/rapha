@@ -203,7 +203,7 @@ function Body({ msgs, editable, onEdit, onReview }: {
     if (b.kind === "turn") {
       const first = b.msgs[0];
       return <Turn key={b.id} who={first.who} actor={first.actor} at={clock(first.at)}
-                   texts={b.msgs.map((m) => m.text)} />;
+                   to={first.to} texts={b.msgs.map((m) => m.text)} />;
     }
     return <Entry key={b.id} m={b.msg} editable={editable} onEdit={onEdit} onReview={onReview} />;
   };

@@ -24,38 +24,45 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "../icons";
-import { currentRole, type ApiError } from "../api";
-import { dropSession, pollSession, refill, startSession, templates, type Templates } from "./client";
-import { lastTemplate, pickMime, reasonFor, rememberTemplate, sentence, type ScribeSession } from "./session";
+import type { ApiError } from "../api";
+import { dropSession, pollSession, refill, startSession, writeNote } from "./client";
+import { pickMime, reasonFor, sentence, type ScribeSession } from "./session";
 import "./scribe.css";
 
 const POLL_MS = 3000;
 
-type Phase = "idle" | "recording" | "uploading" | "waiting" | "ready" | "failed" | "withdrawn";
+export type Phase = "idle" | "recording" | "uploading" | "waiting" | "ready" | "failed" | "withdrawn";
 
-export function ScribeBar({ thread, station, pick: asked, onDrafts, onClose }: {
+export function ScribeBar({ thread, op, lib, onPhase, onDrafts, onClose }: {
   thread: string;
-  station: string;
-  /** The operation the person chose on the thread before the microphone
-   *  opened. They picked the thing they were about to do; opening on a
-   *  different template would be the screen overruling them. */
-  pick?: string;
+  /** The form the recording will fill, chosen on the Templates tab. It is the
+   *  tab's to choose and the bar's only to obey: changing it on a transcribed
+   *  recording refills from the same transcript, and on a failed or idle one
+   *  starts the next recording. Empty means nothing is chosen yet. */
+  op: string;
+  /** Library templates to have a note written in, also chosen on the tab. They
+   *  go up with the recording, or are asked for once it is transcribed. */
+  lib: string[];
+  /** Where the recording is, for the tabs beside this bar to say. */
+  onPhase?: (phase: Phase) => void;
   /** Called with every ready session, including after a template switch. */
   onDrafts: (s: ScribeSession) => void;
   onClose: () => void;
 }) {
-  const [menu, setMenu] = useState<Templates | null>(null);
-  const [template, setTemplate] = useState<string>("");
   const [phase, setPhase] = useState<Phase>("idle");
   const [session, setSession] = useState<ScribeSession | null>(null);
   const [note, setNote] = useState("");
   const [seconds, setSeconds] = useState(0);
 
-  /** The picker as it is NOW. The upload runs from the recorder's onstop, set
-   *  up when recording began, and a template switched mid-consultation
+  /** The choices as they are NOW. The upload runs from the recorder's onstop,
+   *  set up when recording began, and a template switched mid-consultation
    *  would be lost reading state through that closure. */
-  const chosen = useRef({ template });
-  chosen.current = { template };
+  const chosen = useRef({ template: op, lib });
+  chosen.current = { template: op, lib };
+
+  const phaseRef = useRef<Phase>("idle");
+  phaseRef.current = phase;
+  useEffect(() => { onPhase?.(phase); }, [phase]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   /** One outcome per recording. Two polls can be in flight at once, and both
    *  can come back ready: seen in a browser, where the second one reported a
@@ -93,45 +100,51 @@ export function ScribeBar({ thread, station, pick: asked, onDrafts, onClose }: {
     };
   }, []);
 
-  useEffect(() => {
-    templates(station).then((t) => {
-      if (!alive.current) return;
-      setMenu(t);
-      const remembered = lastTemplate(currentRole(), station);
-      const pick = t.choose.find((c) => c.operation === asked)?.operation
-                ?? t.choose.find((c) => c.operation === remembered)?.operation
-                ?? t.default ?? "";
-      setTemplate(pick);
-      chosen.current.template = pick;
-      if (pick) void begin();   // recording starts on the click that opened the bar
-    }).catch((e) => { setPhase("failed"); setNote(String(e.message ?? e)); });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [station]);
-
   const fail = (e: unknown) => {
     if (!alive.current) return;
     setPhase("failed");
     setNote(`${(e as ApiError).message} ${(e as ApiError).next ?? ""}`.trim());
   };
 
-  const choose = async (op: string) => {
-    setTemplate(op);
-    chosen.current.template = op;
-    rememberTemplate(currentRole(), station, op);
-    // A recording that failed or was withdrawn is over; choosing a template
-    // starts the next one rather than leaving the bar stuck until it is closed.
-    if (phase === "idle" || phase === "failed" || phase === "withdrawn") return void begin();
-    if (session && phase === "ready") {
-      try {
-        const next = await refill(session.session, [op]);
+  /** THE FORM CHANGED, on the Templates tab. What that means depends on
+   *  where the recording is: nothing yet, so start one; a recording that
+   *  failed or was withdrawn is over, so start the next; a transcript in
+   *  hand, so refill it; mid recording, only what the upload will name. */
+  const lastOp = useRef("");
+  useEffect(() => {
+    if (!op || op === lastOp.current) return;
+    const first = lastOp.current === "";
+    lastOp.current = op;
+    const now = phaseRef.current;
+    if (first || now === "idle" || now === "failed" || now === "withdrawn") return void begin();
+    if (session && now === "ready") {
+      void refill(session.session, [op]).then((next) => {
         if (!alive.current) return;
         setSession(next);
         onDrafts(next);
-      } catch (e) {
-        fail(e);
-      }
+      }).catch(fail);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [op]);
+
+  /** A LIBRARY TEMPLATE CHOSEN AFTER THE FACT is written from the transcript
+   *  already held, one at a time, and never twice: a note that is on the
+   *  session is not asked for again. Asked for BEFORE the recording went up,
+   *  it rode with the audio and is already here. */
+  const writing = useRef(new Set<string>());
+  useEffect(() => {
+    if (phase !== "ready" || !session) return;
+    const have = new Set((session.notes ?? []).map((n) => n.template));
+    const next = lib.find((id) => !have.has(id) && !writing.current.has(id));
+    if (!next) return;
+    writing.current.add(next);
+    void writeNote(session.session, next).then((s) => {
+      if (!alive.current) return;
+      setSession(s);
+      onDrafts(s);
+    }).catch(fail).finally(() => writing.current.delete(next));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lib, phase, session]);
 
   /** Poll until the kernel says ready or failed. The webhook only shortens
    *  this; it is not required, and nothing here assumes one arrived. */
@@ -226,8 +239,8 @@ export function ScribeBar({ thread, station, pick: asked, onDrafts, onClose }: {
 
   const upload = async (blob: Blob) => {
     try {
-      const { template: op } = chosen.current;
-      const s = await startSession(thread, blob, [op]);
+      const { template: op, lib } = chosen.current;
+      const s = await startSession(thread, blob, [op], lib);
       // Discarded or closed while the upload was in the air: the kernel has
       // it now, so tell it to keep nothing rather than poll for a draft.
       if (!keep.current || !alive.current) return void dropSession(s.session).catch(() => {});
@@ -271,7 +284,7 @@ export function ScribeBar({ thread, station, pick: asked, onDrafts, onClose }: {
     phase === "recording" ? `Recording ${mmss(seconds)}`
     : phase === "uploading" || phase === "waiting" ? "Transcribing"
     : phase === "ready" ? "Ready"
-    : phase === "idle" && !template ? "Choose a template to record"
+    : phase === "idle" && !op ? "Choose a template to record"
     : "";
   const hint = sentence(phase === "waiting" ? "running" : phase, note);
 
@@ -291,25 +304,9 @@ export function ScribeBar({ thread, station, pick: asked, onDrafts, onClose }: {
         {said && <span className="sc-rec-said">{said}</span>}
       </span>
 
-      {/* Both pickers are the browser's `select` wearing this product's
-          clothes. They were bare: a white system dropdown and a default
-          grey button sat in the middle of a dark clinical screen, which is
-          what an unstyled control looks like and is the first thing
-          anybody notices. */}
-      <label className="sc-pick">
-        <span className="u-sr">Template</span>
-        <select value={template} onChange={(e) => void choose(e.target.value)}
-                disabled={!menu || busy}>
-          {!template && <option value="">Choose a template</option>}
-          {menu?.choose.map((c) => <option key={c.operation} value={c.operation}>{c.title}</option>)}
-        </select>
-        <Icon name="chev" className="i sm" />
-      </label>
-
-
       <span className="sc-rec-do">
         {live && <button className="sc-stop" onClick={stop}>Stop</button>}
-        {over && template && <button className="sc-quiet" onClick={() => void begin()}>Record again</button>}
+        {over && op && <button className="sc-quiet" onClick={() => void begin()}>Record again</button>}
         {(live || busy || phase === "ready") && (
           <button className="sc-quiet" onClick={() => void withdraw()}>Discard</button>
         )}
