@@ -95,7 +95,7 @@ export function Patient({ id, cat, onOpenThread }: {
         </div>
       </section>
 
-      {open_tab === "care" && <Arc episodes={view.episodes} />}
+      {open_tab === "care" && <Arc episodes={view.episodes} scale="year" />}
       {open_tab === "encounters" && <Encounters view={view} cat={cat} onOpenThread={onOpenThread} />}
       {open_tab === "overview" && <Overview view={view} />}
       {open_tab === "timeline" && <Timeline view={view} onOpenThread={onOpenThread} />}

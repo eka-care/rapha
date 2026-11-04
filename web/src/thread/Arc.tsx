@@ -11,7 +11,9 @@
  *  for any contact. A bundle that schedules something else entirely draws
  *  through this unchanged.
  */
+import { useState } from "react";
 import { Icon } from "../icons";
+import { months, type Scale } from "./arc-scale";
 import type { Contact, Episode } from "../types";
 import { human, title } from "../words";
 
@@ -36,8 +38,11 @@ export const MARK: Record<string, string> = {
   upcoming: "clock",
 };
 
-export function Arc({ episodes, onAct }: {
+export function Arc({ episodes, onAct, scale: first = "day" }: {
   episodes: Episode[];
+  /** Which layout opens first. The patient screen asks for "year", because
+   *  the reason to open it is the shape of the whole arc. */
+  scale?: Scale;
   /** Open the operation that would close a contact. Absent where this
    *  screen cannot act, which is every screen that is not a visit. */
   onAct?: (operation: string) => void;
@@ -45,12 +50,13 @@ export function Arc({ episodes, onAct }: {
   if (!episodes.length) return null;
   return (
     <>
-      {episodes.map((e) => <OneArc key={e.id} episode={e} onAct={onAct} />)}
+      {episodes.map((e) => <OneArc key={e.id} episode={e} onAct={onAct} first={first} />)}
     </>
   );
 }
 
-function OneArc({ episode, onAct }: { episode: Episode; onAct?: (op: string) => void }) {
+function OneArc({ episode, onAct, first }: { episode: Episode; onAct?: (op: string) => void; first: Scale }) {
+  const [scale, setScale] = useState<Scale>(first);
   const over = episode.status === "ended";
   return (
     <section className="card arc">
@@ -83,11 +89,24 @@ function OneArc({ episode, onAct }: { episode: Episode; onAct?: (op: string) => 
             : "Nothing is due."}
         </p>
       ) : (
+        <>
+        <div className="arc-scale" role="tablist" aria-label="Scale">
+          {(["day", "month", "year"] as Scale[]).map((k) => (
+            <button key={k} type="button" role="tab" aria-selected={scale === k}
+              className={scale === k ? "on" : ""} onClick={() => setScale(k)}>
+              {title(k)}
+            </button>
+          ))}
+        </div>
+        {scale !== "day" && <Months episode={episode} dense={scale === "year"} />}
+        {scale === "day" && (
         <ol className="arc-list">
           {episode.contacts.map((c) => (
             <Step key={c.contact} contact={c} onAct={onAct} />
           ))}
         </ol>
+        )}
+        </>
       )}
     </section>
   );
@@ -122,5 +141,32 @@ function Step({ contact, onAct }: { contact: Contact; onAct?: (op: string) => vo
         </button>
       )}
     </li>
+  );
+}
+
+const monthName = (key: string) =>
+  new Date(`${key}-01T00:00:00Z`).toLocaleString("en-IN", { month: "short", year: "numeric", timeZone: "UTC" });
+
+/** The arc as months, every month between the first contact and the last
+ *  drawn even when nothing falls in it: the empty stretch is the point. */
+function Months({ episode, dense }: { episode: Episode; dense: boolean }) {
+  const ms = months(episode);
+  return (
+    <div className={`arc-months${dense ? " dense" : ""}`}>
+      {ms.map((m) => (
+        <div key={m.month} className="arc-month">
+          <div className="arc-mn">{monthName(m.month)}</div>
+          <div className="arc-days">
+            {!m.days.some((d) => d.state) && <span className="arc-none">Nothing booked</span>}
+            {m.days.map((d) => (
+              <span key={d.day} title={d.state ? `${d.event}, ${d.state}, ${d.day}` : d.day}
+                className={`arc-d${d.state ? ` s-${d.state}` : ""}`}>
+                {!dense && Number(d.day.slice(8))}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

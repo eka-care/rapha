@@ -259,6 +259,8 @@ if [ -d web/node_modules ]; then
   (cd web && node --experimental-strip-types src/thread/earlier.check.ts)
   (cd web && node --experimental-strip-types src/thread/fold.check.ts)
   (cd web && node --experimental-strip-types src/thread/commands.check.ts)
+  # An arc laid out as months: first month to last, the empty ones included.
+  (cd web && node --experimental-strip-types src/thread/arc-scale.check.ts)
   # The tour: it points at elements that are really on screen, and its card
   # never leaves one. Pure rules over a rectangle, so no browser.
   (cd web && node --experimental-strip-types src/app/guide.check.ts)

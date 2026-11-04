@@ -325,3 +325,30 @@
 /* The sentence that stands where the contacts would be. It is inside the
    card and has to be padded like them; `rail-none` is shaped for a rail. */
 .arc .rail-none { padding: 2px 15px 14px; }
+
+/* The arc as months. A marked day is a filled cell; an unmarked month is a
+   long empty strip, which is how a gap announces itself. */
+.arc-scale { margin: 0 15px 10px; display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--radius-pill); background: var(--color-bg-subtle); }
+.arc-scale button {
+  border: 0; background: transparent; color: var(--color-text-secondary); cursor: pointer;
+  font: inherit; font-size: 11.5px; padding: 3px 11px; border-radius: var(--radius-pill);
+}
+.arc-scale button.on { background: var(--color-accent-soft); color: var(--color-accent); font-weight: 600; }
+.arc-months { padding: 0 15px 13px; display: flex; flex-direction: column; gap: 6px; }
+.arc-month { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.arc-mn { width: 64px; flex-shrink: 0; font-size: 11.5px; color: var(--color-text-tertiary); }
+.arc-days { position: relative; flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 2px; }
+.arc-d {
+  flex: 1 1 0; min-width: 4px; height: 14px; border-radius: 2px;
+  background: var(--color-bg-subtle); font-size: 10px; text-align: center; line-height: 14px;
+  color: var(--color-text-tertiary);
+}
+.arc-months:not(.dense) .arc-d { flex: 0 0 26px; height: 26px; line-height: 26px; }
+.arc-d.s-done { background: var(--color-success); color: var(--color-bg-surface); }
+.arc-d.s-due { background: var(--color-accent); color: var(--color-bg-surface); }
+.arc-d.s-missed { background: var(--color-critical); color: var(--color-bg-surface); }
+.arc-d.s-upcoming { background: var(--color-text-tertiary); color: var(--color-bg-surface); }
+.arc-none {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 10.5px; color: var(--color-text-tertiary); pointer-events: none;
+}
