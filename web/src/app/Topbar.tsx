@@ -22,7 +22,7 @@
 import { NAME } from "../brand";
 import { Icon } from "../icons";
 
-export function Topbar({ title, deskLabel, bell, onSearch, onMenu, onDesk, onAssist }: {
+export function Topbar({ title, deskLabel, bell, onSearch, onMenu, onDesk }: {
   title: string;
   deskLabel: string;
   /** What is waiting for somebody, drawn last in this row. It is not a
@@ -32,8 +32,6 @@ export function Topbar({ title, deskLabel, bell, onSearch, onMenu, onDesk, onAss
   onSearch: () => void;
   onMenu: () => void;
   onDesk: () => void;
-  /** Absent inside a visit, where the assistant is a tab of that visit. */
-  onAssist?: () => void;
 }) {
   return (
     <header className="topbar">
@@ -49,12 +47,6 @@ export function Topbar({ title, deskLabel, bell, onSearch, onMenu, onDesk, onAss
         <Icon name="plus" className="i sm" />
         {deskLabel}
       </button>
-      {onAssist && (
-        <button className="pill" onClick={onAssist} aria-label="Medical assistant">
-          <Icon name="spark" className="i sm" />
-          <span className="pill__long">Medical assistant</span>
-        </button>
-      )}
       <button className="pill" onClick={onSearch}>
         <Icon name="search" className="i sm" />
         Ask {NAME}

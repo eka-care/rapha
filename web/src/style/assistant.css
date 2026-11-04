@@ -19,8 +19,14 @@
     backdrop-filter: none; -webkit-backdrop-filter: none;
   }
 }
-/* The tab fills its body; the overlay fills its box. */
-.assist--tab { flex: 1; min-height: 0; }
+/* Docked to the right edge for `@rapha` in a visit. No scrim: the patient
+   stays readable beside it. */
+.assist--side {
+  position: fixed; z-index: 31; top: 0; right: 0; bottom: 0;
+  width: min(420px, 100vw);
+  background: var(--color-bg-surface); border-left: 1px solid var(--color-border-strong);
+  box-shadow: var(--shadow-overlay);
+}
 
 .assist__bar {
   display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 16px;
@@ -82,14 +88,10 @@
 .assist__entry .input { flex: 1; min-width: 0; }
 
 @media (max-width: 520px) {
+  .assist--side { width: 100vw; }
   .assist--overlay { top: var(--space-4); left: var(--space-2); transform: none;
     width: calc(100vw - var(--space-4)); height: calc(100dvh - var(--space-8)); }
 }
 
-/* On a phone the top bar has no room for a third word; the mark stays and the
-   button keeps its name through aria-label. */
-@media (max-width: 520px) {
-  .pill__long { display: none; }
-  /* A phone has no ⌘ key; the hint only costs the row its room. */
-  .topbar .kbd { display: none; }
-}
+/* A phone has no ⌘ key; the hint only costs the top bar its room. */
+@media (max-width: 520px) { .topbar .kbd { display: none; } }

@@ -74,6 +74,12 @@ stations: [reception, nurse, doctor, lab, pharmacy, community]
 # person picks, which is the community worker's case: several surveys, none
 # of them obviously first.
 #
+# `note` names the Eka library template a recording at this station is also
+# written up in, by its title in the workspace's library, unless the person
+# turns it off. It is optional and a recording needs none. The nurse and the
+# doctor name the same one on purpose: what the doctor opens is ONE note with
+# the nurse's part already in it, each under their own name.
+#
 # `nudges` are what the screen SHOWS somebody who has pressed record and does
 # not know what to say. They are examples, not a form and not a limit: the
 # microphone takes whatever is said, and a visit that needs a fourth reading
@@ -97,6 +103,7 @@ scribe:
   nurse:
     default: phc.op.vitals-record
     choose: [phc.op.vitals-record]
+    note: Default Prescription Print
     nudges:
       - {field: Vitals,   say: "BP one twenty over eighty, pulse eighty four."}
       - {field: Vitals,   say: "Temperature ninety nine point four, weight fifty one kilos."}
@@ -107,6 +114,7 @@ scribe:
     choose: [phc.op.consult-document, phc.op.ncd-review,
              phc.op.antenatal-visit, phc.op.followup,
              phc.op.rx-prescribe]
+    note: Default Prescription Print
     nudges:
       - {field: Symptoms,        say: "Burning when she passes urine, four days now."}
       - {field: Medical history, say: "Diabetic for six years, on metformin."}

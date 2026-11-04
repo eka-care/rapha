@@ -24,8 +24,7 @@ import { Icon, type IconName } from "../icons";
  *  a feature of ours. The private conversation with the agent is the next
  *  one and is not here yet: it waits on a decision recorded in the design
  *  note, and a tab that opens on an apology is worse than a tab that is not
- *  there. "ask" is the medical assistant, which is general medicine and not
- *  this visit's own agent: it is given nothing about the patient.
+ *  there.
  *
  *  "context" is paper from somewhere else -- a discharge summary, an outside
  *  result -- and it is a tab rather than a line in the conversation because
@@ -33,7 +32,7 @@ import { Icon, type IconName } from "../icons";
  *  in a chat bubble is not a readable letter. What belongs in it is not
  *  decided here: the screen picks it out by the `presents:` word the atom
  *  declares, so a bundle with no such operation simply has an empty tab. */
-export type TabId = "messages" | "scribe" | "context" | "past" | "ask";
+export type TabId = "messages" | "scribe" | "context" | "past";
 
 export type Tab = { id: TabId; title: string; icon: IconName; count?: number };
 

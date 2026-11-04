@@ -28,7 +28,6 @@ import { ScribeStart } from "../scribe/Start";
 import { mergeDrafts, type Opened } from "../scribe/session";
 import { Stream, operationFor } from "../thread/Thread";
 import { Carry, PastVisits, Team, Trend, usePast, visitOf } from "../thread/Past";
-import { AssistantPanel } from "../assistant/Lazy";
 import { Background } from "../thread/Background";
 import { Tabs, type Tab, type TabId } from "../thread/Tabs";
 import { Line } from "../view/View";
@@ -66,7 +65,6 @@ const tabsFor = (past: number, papers: number): Tab[] => [
      visit, and before the history, because this is what you read first. */
   { id: "context", title: "Papers", icon: "clip", count: papers },
   { id: "past", title: "Earlier visits", icon: "clock", count: past },
-  { id: "ask", title: "Ask", icon: "spark" },
 ];
 
 /** Why the microphone is unavailable, in one place. It was written out
@@ -91,7 +89,7 @@ const TAG: Record<string, string> = {
 
 export function Encounter({
   thread, cat, ctx, client, said, asking, catchment, onSay, onChanged, onOpenSubject,
-  onAsk,
+  onAskRapha,
 }: {
   thread: ThreadView;
   cat: Catalogue;
@@ -104,9 +102,8 @@ export function Encounter({
   onSay: (text: string) => void;
   onChanged: () => void;
   onOpenSubject: (subjectId: string) => void;
-  /** A visit draws no top bar, so the question box opens from the
-   *  composer instead. */
-  onAsk?: () => void;
+  /** `@rapha ...` in the composer: open the assistant at the side. */
+  onAskRapha?: (question: string) => void;
 }) {
   /** THE FORM IS NOT A POP-UP. One state for both ways a form opens -- a
    *  new record and a correction -- because both are drawn in the same
@@ -400,14 +397,6 @@ export function Encounter({
 
         {tab === "past" && <div className="vbody"><PastVisits visits={past} /></div>}
 
-        {/* Mounted only while the tab is open, so the assistant does not
-            connect for a visit nobody asked it about. */}
-        {tab === "ask" && (
-          <div className="vbody">
-            <div className="assist assist--tab"><AssistantPanel /></div>
-          </div>
-        )}
-
         {tab === "scribe" && (
           <div className="vbody">
             {scribing !== null && (
@@ -594,7 +583,7 @@ export function Encounter({
              somebody who already knows what they are doing: it opens on
              whatever this station recorded last. */
           onStartScribe={() => setScribing("")}
-          onAsk={onAsk}
+          onAskRapha={onAskRapha}
           micReason={consented ? undefined : MIC_WHY}
           quick={
             <>

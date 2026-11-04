@@ -4,6 +4,9 @@
  *  visit to put a tab in, so it comes forward in the middle of the page, the
  *  way Fern's docs bring their assistant forward.
  *
+ *  AT THE SIDE, for `@rapha` in a visit: the same assistant docked to the right
+ *  edge, so the patient stays in view and nothing is held back behind a scrim.
+ *
  *  KEPT ONCE OPENED. Closing hides it rather than unmounting it, so a person
  *  who looks something up, closes it to read the list behind, and opens it
  *  again finds the conversation where they left it.
@@ -13,8 +16,11 @@ import { Icon } from "../icons";
 import { trapTab } from "../parts";
 import { AssistantPanel, type Question } from "./Lazy";
 
-export function AssistantOverlay({ open, question, onClose }: {
-  open: boolean; question: Question | null; onClose: () => void;
+export function AssistantOverlay({ open, question, side, onClose }: {
+  open: boolean; question: Question | null;
+  /** At the side of the screen, with the page still usable beside it, rather
+   *  than in the middle with the page held back. */
+  side: boolean; onClose: () => void;
 }) {
   const shell = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -31,12 +37,13 @@ export function AssistantOverlay({ open, question, onClose }: {
 
   return (
     <div hidden={!open}>
-      <div className="scrim" onClick={onClose} />
-      <div className="assist assist--overlay" role="dialog" aria-modal="true" aria-label="Medical assistant"
+      {!side && <div className="scrim" onClick={onClose} />}
+      <div className={`assist ${side ? "assist--side" : "assist--overlay"}`}
+        role="dialog" aria-modal={!side} aria-label="Medical assistant"
         ref={shell} tabIndex={-1}
         onKeyDown={(e) => {
           if (e.key === "Escape") { e.preventDefault(); onClose(); return; }
-          trapTab(e, shell.current);
+          if (!side) trapTab(e, shell.current);
         }}>
         <header className="assist__bar">
           <Icon name="spark" className="i sm" />

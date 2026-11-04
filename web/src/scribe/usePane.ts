@@ -10,10 +10,10 @@
  *  It can write nothing. It lists templates and holds a transcript; every
  *  value that reaches a record still arrives in a form and waits for a tap.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { currentRole } from "../api";
-import { library as loadLibrary, templates, type LibraryItem, type Templates } from "./client";
-import type { Phase } from "./ScribeBar";
+import { library as loadLibrary, templates, threadNotes, type LibraryItem, type Templates, type ThreadNote } from "./client";
+import type { Status } from "./ScribeBar";
 import { lastTemplate, rememberTemplate, type ScribeSession } from "./session";
 
 export type Sub = "notes" | "transcript" | "templates";
@@ -34,20 +34,41 @@ export function usePane({ thread, station, open, asked }: {
    *  "whatever this station recorded last", or null when nothing is starting. */
   asked: string | null;
 }) {
-  const [sub, setSub] = useState<Sub>("notes");
+  // The recorder lives on the Transcript view, so that is where a visit to the
+  // tab opens: a person who came to record finds the way to start in front of
+  // them, and the notes are one tap away.
+  const [sub, setSub] = useState<Sub>("transcript");
   const [menu, setMenu] = useState<Templates | null>(null);
   const [library, setLibrary] = useState<Library>(null);
   const [op, setOp] = useState("");
   const [lib, setLib] = useState<string[]>([]);
   const [session, setSession] = useState<ScribeSession | null>(null);
-  const [phase, setPhase] = useState<Phase>("idle");
+  const [status, setStatus] = useState<Status>({ phase: "idle", seconds: 0 });
+  /** What this visit has had written, by anybody, kept on the server. */
+  const [kept, setKept] = useState<ThreadNote[]>([]);
+  /** Whether a person has chosen a note template themselves. Until they have,
+   *  the station's default is chosen for them; after, their choice stands,
+   *  including choosing none. */
+  const touched = useRef(false);
 
   // A different visit is a different recording. This component is not keyed by
   // thread, so what one patient's recording chose must not follow the reader
   // to the next patient's.
   useEffect(() => {
-    setSub("notes"); setOp(""); setLib([]); setSession(null); setPhase("idle");
+    setSub("transcript"); setOp(""); setLib([]); setSession(null);
+    setStatus({ phase: "idle", seconds: 0 }); setKept([]); touched.current = false;
   }, [thread]);
+
+  // A different station is a different default and a different list of forms.
+  useEffect(() => { setMenu(null); }, [station, thread]);
+
+  const reloadKept = useCallback(() => {
+    threadNotes(thread).then(setKept).catch(() => {});
+  }, [thread]);
+
+  // The notes already written on this visit, by whoever wrote them, when the
+  // tab is first looked at and again whenever a recording hands one in.
+  useEffect(() => { if (open) reloadKept(); }, [open, reloadKept, session]);
 
   // What this station may fill, once the tab is first looked at.
   useEffect(() => {
@@ -79,6 +100,16 @@ export function usePane({ thread, station, open, asked }: {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [menu, asked]);
 
+  // THE STATION'S NOTE, UNLESS THE PERSON HAS SAID OTHERWISE. Choosing a
+  // template is not required, so this only ever fills in a choice that was
+  // not made: the nurse and the doctor both arrive with the default
+  // prescription note already picked, and either can turn it off.
+  useEffect(() => {
+    const id = menu?.note?.id;
+    if (!id || touched.current) return;
+    setLib((now) => (now.includes(id) ? now : [...now, id].slice(-MOST_NOTES)));
+  }, [menu, thread]);
+
   const chooseOp = (id: string) => {
     setOp(id);
     rememberTemplate(currentRole(), station, id);
@@ -87,8 +118,13 @@ export function usePane({ thread, station, open, asked }: {
   /** Ask for a library template, or take it back. Past the most one recording
    *  may carry, the oldest choice makes way rather than the click doing
    *  nothing. */
-  const toggleLib = (id: string) =>
+  const toggleLib = (id: string) => {
+    touched.current = true;
     setLib((now) => (now.includes(id) ? now.filter((x) => x !== id) : [...now, id].slice(-MOST_NOTES)));
+  };
 
-  return { sub, setSub, menu, library, op, chooseOp, lib, toggleLib, session, setSession, phase, setPhase };
+  return {
+    sub, setSub, menu, library, op, chooseOp, lib, toggleLib, session, setSession,
+    status, setStatus, phase: status.phase, kept,
+  };
 }

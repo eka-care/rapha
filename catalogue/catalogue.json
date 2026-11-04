@@ -3643,6 +3643,7 @@
         "phc.op.rx-prescribe"
       ],
       "default": "phc.op.consult-document",
+      "note": "Default Prescription Print",
       "nudges": [
         {
           "field": "Symptoms",
@@ -3687,6 +3688,7 @@
         "phc.op.vitals-record"
       ],
       "default": "phc.op.vitals-record",
+      "note": "Default Prescription Print",
       "nudges": [
         {
           "field": "Vitals",

@@ -194,7 +194,21 @@ def note(session, template, title=""):
     text = reshape(session, template)
     if text:
         session["notes"][template] = {"title": title or template, "text": text}
+        _kept(session, template, title or template, text)
     return text
+
+
+# Where a note goes once it exists. Set by the route layer, which knows where
+# the visit's notes live; this module has no store and keeps it that way. A
+# note that arrives with the recording and one asked for afterwards both pass
+# through here, so neither can be forgotten.
+KEEP = None
+
+
+def _kept(session, template, title, text):
+    if KEEP and text:
+        KEEP(thread=session["thread"], template=template, title=title,
+             actor=session["actor"], session=session["id"], text=text)
 
 
 # What Eka is told was spoken. Hinglish is two languages at once, which is
@@ -515,11 +529,11 @@ def refill(session, operations, *, notes=None, today=None, reader=None):
     if session["status"] == "withdrawn":
         return session
     session.update(operations=operations, drafts=drafts, status="ready",
-                   reason=_why(drafts, unshaped))
+                   reason=_why(drafts, unshaped, operations))
     return session
 
 
-def _why(drafts, unshaped):
+def _why(drafts, unshaped, operations):
     """Why there are no drafts, in the words that tell a doctor what to do.
 
     "The service never shaped this form" and "the consultation did not state
@@ -528,6 +542,10 @@ def _why(drafts, unshaped):
     already. See the 2026-11-01 commit that split them.
     """
     if drafts:
+        return ""
+    if not operations:
+        # Nothing was asked to be filled: a recording with no form chosen is
+        # a transcript, and a transcript is a whole answer.
         return ""
     if unshaped:
         return ("%s The transcript is below, and the note has to be typed."
@@ -593,6 +611,7 @@ def collect(session, *, reader=None):
     for template, title in session["want"].items():
         if came.get(template):
             session["notes"][template] = {"title": title, "text": came[template]}
+            _kept(session, template, title, came[template])
     return refill(session, session["operations"], notes=came, reader=reader)
 
 

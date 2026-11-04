@@ -82,8 +82,54 @@ try:
     assert [n["template"] for n in api.get("%s/sessions/%s" % (BASE, s["id"]),
                                            headers=ROLE).json()["notes"]] == ["t-soap"], \
         "the failed note left nothing half written on the session"
+
+    # -- the note outlives the recording and the person -----------------------
+    # A nurse's recording and a doctor's, in the same template, are ONE note
+    # with two sections. Seen from the visit, not from either session.
+    # A visit of its own, so what the section above wrote is not in it.
+    thread = "enc-002"
+    import base64
+
+    def came(text):
+        enc = lambda t: base64.b64encode(t.encode()).decode()
+        return {"data": {"output": [{"template_id": "t-soap", "status": "success",
+                                     "value": enc(text)}],
+                         "template_results": {"transcript": [
+                             {"template_id": "transcript", "status": "success",
+                              "value": enc("said")}]}}}
+
+    def record(actor, txn, text):
+        one = scribe.begin(thread, actor, txn, {}, instrument="", want={"t-soap": "SOAP Notes"})
+        was = scribe.poll
+        scribe.poll = lambda t: came(text)
+        try:
+            scribe.collect(one)
+            scribe.collect(one)          # a poll and a webhook both collect: still one section
+        finally:
+            scribe.poll = was
+        return one
+
+    got = api.get(BASE + "/notes?thread=" + thread, headers=ROLE)
+    assert got.status_code == 200, "the visit this check records into does not exist: " + got.text
+    record("user:nurse", "phc-n1", "BP 150/95. Pulse 88.")
+    record("user:mo", "phc-n2", "Start amlodipine 5 mg.")
+    notes = api.get(BASE + "/notes?thread=" + thread, headers=ROLE).json()["notes"]
+    assert len(notes) == 1 and notes[0]["title"] == "SOAP Notes", notes
+    assert [(x["actor"], x["text"]) for x in notes[0]["sections"]] == [
+        ("user:nurse", "BP 150/95. Pulse 88."), ("user:mo", "Start amlodipine 5 mg.")], \
+        "one note, the nurse's part then the doctor's, each kept once: %r" % notes
+    # a transcript-only recording is a whole answer, not an unfilled form
+    bare = scribe.begin(thread, "user:mo", "phc-n3", {}, instrument="")
+    was = scribe.poll
+    scribe.poll = lambda t: came("")
+    try:
+        done = scribe.collect(bare)
+    finally:
+        scribe.poll = was
+    assert done["status"] == "ready" and done["reason"] == "", done
+
 finally:
     scribe.library, scribe.reshape = real
     scribe.SESSIONS.clear()
 
-print("ok   scribe library: listed, refused before any call, held once, and a late note is a sentence")
+print("ok   scribe library and notes: listed, refused before any call, held once, and a late note is a sentence")

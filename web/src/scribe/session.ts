@@ -172,10 +172,11 @@ function typed(value: unknown): boolean {
  *  promise anything. Every one of them ends the same way on purpose: the
  *  keyboard is always the answer and it is never a downgrade.
  */
-export function sentence(status: ScribeStatus | "idle" | "recording" | "uploading",
+export function sentence(status: ScribeStatus | "idle" | "recording" | "paused" | "uploading",
                          reason = ""): string {
   switch (status) {
     case "recording":
+    case "paused":
     case "uploading":
       // The live indicator and the spinner above already say this in a word.
       return "";

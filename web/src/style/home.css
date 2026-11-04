@@ -166,7 +166,7 @@
 .fl-jam { font-size: 9.5px; font-weight: 700; color: var(--color-warning);
   margin-top: 7px; display: flex; align-items: center; gap: 4px; }
 
-.hgrid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 16px; align-items: start; }
+.hgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 
 .att { padding: 6px 0; }
 .at {

@@ -460,6 +460,11 @@ def _lint_scribe(manifest, instruments):
                            "instrument's operations")
         if cfg.get("default") and cfg["default"] not in choose:
             bad.append(f"bundle.yaml scribe.{station}: default must be one of choose")
+        # A note is the TITLE of a template in Eka's library, which this
+        # bundle cannot check from here: only that it is a name.
+        if "note" in cfg and not (isinstance(cfg["note"], str) and cfg["note"].strip()):
+            bad.append(f"bundle.yaml scribe.{station}: note is the title of an Eka "
+                       "library template, a non-empty string")
         # The nudges: what this station may be told, said in the words a
         # person would use. They are NOT a form and must not read as one --
         # each is an example sentence, so the screen can show what the

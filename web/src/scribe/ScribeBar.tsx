@@ -31,20 +31,29 @@ import "./scribe.css";
 
 const POLL_MS = 3000;
 
-export type Phase = "idle" | "recording" | "uploading" | "waiting" | "ready" | "failed" | "withdrawn";
+export type Phase = "idle" | "recording" | "paused" | "uploading" | "waiting" | "ready" | "failed" | "withdrawn";
 
-export function ScribeBar({ thread, op, lib, onPhase, onDrafts, onClose }: {
+export type Status = { phase: Phase; seconds: number };
+
+export function ScribeBar({ thread, op, lib, full, children, onStatus, onByHand, onDrafts, onClose }: {
   thread: string;
-  /** The form the recording will fill, chosen on the Templates tab. It is the
-   *  tab's to choose and the bar's only to obey: changing it on a transcribed
-   *  recording refills from the same transcript, and on a failed or idle one
-   *  starts the next recording. Empty means nothing is chosen yet. */
+  /** The form the recording will fill, or "" for none. Choosing one is not
+   *  required: a recording with nothing chosen is a transcript. Changing it on
+   *  a transcribed recording refills from the same transcript. */
   op: string;
-  /** Library templates to have a note written in, also chosen on the tab. They
-   *  go up with the recording, or are asked for once it is transcribed. */
+  /** Library templates to have a note written in. They go up with the
+   *  recording, or are asked for once it is transcribed. */
   lib: string[];
-  /** Where the recording is, for the tabs beside this bar to say. */
-  onPhase?: (phase: Phase) => void;
+  /** Drawn as the Transcript tab's own panel -- the daffodil, the controls and
+   *  whatever `children` is -- rather than as a bar above another view. The
+   *  recorder is mounted either way, so changing tab never stops a recording. */
+  full?: boolean;
+  /** The transcript, drawn under the controls in the full view. */
+  children?: React.ReactNode;
+  /** Where the recording is, for the call to action and the tabs to say. */
+  onStatus?: (s: Status) => void;
+  /** Offered when recording failed or was withdrawn: the form, by hand. */
+  onByHand?: () => void;
   /** Called with every ready session, including after a template switch. */
   onDrafts: (s: ScribeSession) => void;
   onClose: () => void;
@@ -62,7 +71,7 @@ export function ScribeBar({ thread, op, lib, onPhase, onDrafts, onClose }: {
 
   const phaseRef = useRef<Phase>("idle");
   phaseRef.current = phase;
-  useEffect(() => { onPhase?.(phase); }, [phase]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { onStatus?.({ phase, seconds }); }, [phase, seconds]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   /** One outcome per recording. Two polls can be in flight at once, and both
    *  can come back ready: seen in a browser, where the second one reported a
@@ -106,24 +115,31 @@ export function ScribeBar({ thread, op, lib, onPhase, onDrafts, onClose }: {
     setNote(`${(e as ApiError).message} ${(e as ApiError).next ?? ""}`.trim());
   };
 
-  /** THE FORM CHANGED, on the Templates tab. What that means depends on
-   *  where the recording is: nothing yet, so start one; a recording that
-   *  failed or was withdrawn is over, so start the next; a transcript in
-   *  hand, so refill it; mid recording, only what the upload will name. */
-  const lastOp = useRef("");
+  /** THE RECORDING STARTS WHEN THIS MOUNTS. Pressing the call to action is
+   *  the whole of the asking: nothing is chosen first, because choosing a
+   *  template is not required, and a screen that waits for a choice before it
+   *  listens has made the person do something they did not need to. */
+  const started = useRef(false);
   useEffect(() => {
-    if (!op || op === lastOp.current) return;
-    const first = lastOp.current === "";
+    if (started.current) return;
+    started.current = true;
+    void begin();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** THE FORM CHANGED, on the Templates tab. With a transcript in hand that
+   *  refills it from the same words. At any other point it only changes what
+   *  the upload will name: a template choice never starts the microphone. */
+  const lastOp = useRef(op);
+  useEffect(() => {
+    if (op === lastOp.current) return;
     lastOp.current = op;
-    const now = phaseRef.current;
-    if (first || now === "idle" || now === "failed" || now === "withdrawn") return void begin();
-    if (session && now === "ready") {
-      void refill(session.session, [op]).then((next) => {
-        if (!alive.current) return;
-        setSession(next);
-        onDrafts(next);
-      }).catch(fail);
-    }
+    if (!op || !session || phaseRef.current !== "ready") return;
+    void refill(session.session, [op]).then((next) => {
+      if (!alive.current) return;
+      setSession(next);
+      onDrafts(next);
+    }).catch(fail);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [op]);
 
@@ -226,6 +242,19 @@ export function ScribeBar({ thread, op, lib, onPhase, onDrafts, onClose }: {
     timers.current.push(setInterval(() => setSeconds((s) => s + 1), 1000) as unknown as number);
   };
 
+  /** Pausing keeps the recording and stops the clock: what is said while it
+   *  is paused is not captured, and the seconds do not run. */
+  const pause = () => {
+    try { rec.current?.pause(); } catch { return; }
+    clear();
+    setPhase("paused");
+  };
+  const resume = () => {
+    try { rec.current?.resume(); } catch { return; }
+    setPhase("recording");
+    timers.current.push(setInterval(() => setSeconds((s) => s + 1), 1000) as unknown as number);
+  };
+
   const stop = () => {
     clear();
     setPhase("uploading");
@@ -240,7 +269,7 @@ export function ScribeBar({ thread, op, lib, onPhase, onDrafts, onClose }: {
   const upload = async (blob: Blob) => {
     try {
       const { template: op, lib } = chosen.current;
-      const s = await startSession(thread, blob, [op], lib);
+      const s = await startSession(thread, blob, op ? [op] : [], lib);
       // Discarded or closed while the upload was in the air: the kernel has
       // it now, so tell it to keep nothing rather than poll for a draft.
       if (!keep.current || !alive.current) return void dropSession(s.session).catch(() => {});
@@ -282,14 +311,53 @@ export function ScribeBar({ thread, op, lib, onPhase, onDrafts, onClose }: {
 
   const said =
     phase === "recording" ? `Recording ${mmss(seconds)}`
+    : phase === "paused" ? `Paused ${mmss(seconds)}`
     : phase === "uploading" || phase === "waiting" ? "Transcribing"
     : phase === "ready" ? "Ready"
-    : phase === "idle" && !op ? "Choose a template to record"
     : "";
   const hint = sentence(phase === "waiting" ? "running" : phase, note);
 
   const live = phase === "recording";
+  const paused = phase === "paused";
   const busy = phase === "uploading" || phase === "waiting";
+
+  const controls = (
+    <span className="sc-rec-do">
+      {live && <button className="sc-quiet" onClick={pause}>Pause</button>}
+      {paused && <button className="sc-quiet" onClick={resume}>Continue</button>}
+      {(live || paused) && <button className="sc-stop" onClick={stop}>Stop</button>}
+      {over && <button className="sc-quiet" onClick={() => void begin()}>Record again</button>}
+      {over && onByHand && <button className="sc-quiet" onClick={onByHand}>Fill it in by hand</button>}
+      {(live || busy || paused || phase === "ready") && (
+        <button className="sc-quiet" onClick={() => void withdraw()}>Discard</button>
+      )}
+      <button className="sc-quiet icon" onClick={close} aria-label="Close">
+        <Icon name="plus" className="i sm" />
+      </button>
+    </span>
+  );
+
+  if (full) {
+    // THE DAFFODIL IS THE LISTENING. It turns while the microphone is open and
+    // while the words are being written down, and it holds still -- breathing,
+    // not frozen -- while paused, so a pause reads as a pause and not as a
+    // hang. The same mark the dictation strip uses, larger.
+    const turning = live || busy;
+    return (
+      <div className={`sc-full${live ? " on" : ""}`} role="status" aria-live="polite">
+        <div className="sc-daff">
+          <span className={`dict-bloom big${turning ? "" : " still"}${paused ? " paused" : ""}`}
+                aria-hidden="true">
+            <Icon name="mark" className="i" />
+          </span>
+          <div className="sc-daff-said">{said || "Ready to record"}</div>
+          {hint && <div className="sc-daff-hint">{hint}</div>}
+          {controls}
+        </div>
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className={`sc-rec${live ? " on" : ""}`} role="status" aria-live="polite">
@@ -303,23 +371,7 @@ export function ScribeBar({ thread, op, lib, onPhase, onDrafts, onClose }: {
         )}
         {said && <span className="sc-rec-said">{said}</span>}
       </span>
-
-      <span className="sc-rec-do">
-        {live && <button className="sc-stop" onClick={stop}>Stop</button>}
-        {over && op && <button className="sc-quiet" onClick={() => void begin()}>Record again</button>}
-        {(live || busy || phase === "ready") && (
-          <button className="sc-quiet" onClick={() => void withdraw()}>Discard</button>
-        )}
-        <button className="sc-quiet icon" onClick={close} aria-label="Close">
-          <Icon name="plus" className="i sm" />
-        </button>
-      </span>
-
-      {phase === "ready" && session && session.drafts.length === 0 && (
-        <details className="sc-rec-note">
-          <summary>Nothing to fill. Transcript</summary><p>{session.transcript}</p>
-        </details>
-      )}
+      {controls}
       {hint && <span className="sc-rec-note">{hint}</span>}
     </div>
   );

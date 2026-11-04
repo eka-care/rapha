@@ -387,3 +387,52 @@
 .tp-card[aria-pressed="true"] { border-color: var(--color-cta); background: var(--color-accent-soft); }
 .tp-name { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: var(--space-2); }
 .tp-state { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--color-text-tertiary); }
+
+/* ---- recording, on the Transcript view ---------------------------------- */
+.sc-full { display: grid; gap: var(--space-5); }
+.sc-daff {
+  display: grid; justify-items: center; gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-xl);
+  background: var(--color-bg-surface); text-align: center;
+}
+.sc-full.on .sc-daff { border-color: var(--color-critical-border); }
+.dict-bloom.big, .dict-bloom.big .i { width: 72px; height: 72px; }
+/* Paused is a held breath, not a stopped clock: the same mark, still, and
+   slowly breathing, so it reads as waiting for you rather than as broken. */
+.dict-bloom.big.paused .i { animation: bloombreathe 2.4s ease-in-out infinite; }
+@keyframes bloombreathe { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+.sc-daff-said { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sc-daff-hint { font-size: 12.5px; color: var(--color-text-secondary); max-width: 52ch; }
+.sc-daff .sc-rec-do { margin-left: 0; flex-wrap: wrap; justify-content: center; }
+
+.sc-nudges ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.sc-nudges li { font-size: 13px; color: var(--color-text-secondary); line-height: 1.5; }
+.sc-nudge-f {
+  display: inline-block; min-width: 7.5em; margin-right: var(--space-2);
+  font: 600 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--color-eyebrow);
+}
+
+/* One note, a section per recording under whoever made it. */
+.nt-s { padding: 0; }
+.nt-s + .nt-s { border-top: 1px dashed var(--color-border-subtle); }
+.nt-by {
+  padding: var(--space-3) var(--space-4) 0;
+  font: 600 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--color-eyebrow);
+}
+
+/* The call to action while its own recording is going on. */
+.prop.rec { border-color: var(--color-critical-border); }
+.prop.rec .p-l { font-variant-numeric: tabular-nums; }
+.prop.rec .p-b::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; align-self: center;
+  background: var(--color-critical); animation: scpulse 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .prop.rec .p-b::before { animation: none; } }
+@keyframes scpulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+/* The Scribe tab stays mounted while another tab is open, so a recording
+   survives looking at the conversation. `hidden` has to actually hide. */
+.vbody[hidden] { display: none; }

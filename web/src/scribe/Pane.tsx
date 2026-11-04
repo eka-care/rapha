@@ -15,7 +15,8 @@
  */
 import { Icon } from "../icons";
 import { Loading } from "../parts";
-import type { Templates } from "./client";
+import { actorOf, clock } from "../messages";
+import type { Templates, ThreadNote } from "./client";
 import { MOST_NOTES, type Library, type Sub } from "./usePane";
 import type { Phase } from "./ScribeBar";
 import type { ScribeSession } from "./session";
@@ -24,8 +25,8 @@ export function SubTabs({ open, notes, onPick }: {
   open: Sub; notes: number; onPick: (s: Sub) => void;
 }) {
   const tabs: { id: Sub; title: string; n?: number }[] = [
-    { id: "notes", title: "Notes", n: notes },
     { id: "transcript", title: "Transcript" },
+    { id: "notes", title: "Notes", n: notes },
     { id: "templates", title: "Templates" },
   ];
   return (
@@ -41,60 +42,109 @@ export function SubTabs({ open, notes, onPick }: {
   );
 }
 
-/** What was said. Words a service wrote down, so it says where they are in
- *  their life: not yet recorded, still being transcribed, or here. */
-export function Transcript({ session, phase }: { session: ScribeSession | null; phase: Phase }) {
-  if (session?.transcript) {
-    return (
-      <div className="tx">
-        {session.transcript.split(/\n{2,}/).map((p, i) => <p key={i}>{p}</p>)}
-      </div>
-    );
-  }
-  const busy = phase === "recording" || phase === "uploading" || phase === "waiting";
+/** What was said, once it is transcribed. */
+export function TranscriptText({ session }: { session: ScribeSession | null }) {
+  if (!session?.transcript) return null;
   return (
-    <p className="tx-empty">
-      {phase === "recording" ? "Recording. The words appear here once it is transcribed."
-        : busy ? "Transcribing."
-        : "Nothing recorded yet. Start a session and the words appear here."}
-    </p>
+    <div className="tx">
+      {session.transcript.split(/\n{2,}/).map((p, i) => <p key={i}>{p}</p>)}
+    </div>
   );
 }
 
-/** What the recording became, as words: one card per library template asked
- *  for, with a line saying so while one is still being written. The forms it
- *  filled are drawn by the encounter, below this, because those are forms. */
-export function WrittenNotes({ session, lib, titles, phase }: {
-  session: ScribeSession | null;
+/** The Transcript view when nothing is recording: one button, in the middle.
+ *  Recording happens on this view, so this is where it starts from when a
+ *  person came to the tab by hand rather than through a button on the visit. */
+export function StartHere({ onStart, reason, session }: {
+  onStart: () => void; reason?: string; session: ScribeSession | null;
+}) {
+  return (
+    <>
+      <div className="scribe-off">
+        <button type="button" className="btn btn-b scribe-go" onClick={onStart}
+                disabled={!!reason} title={reason}>
+          <Icon name="mic" className="i" />
+          Start session
+        </button>
+        {reason && <p className="scribe-why">{reason}</p>}
+      </div>
+      <TranscriptText session={session} />
+    </>
+  );
+}
+
+/** What people say at this station, as examples. They are the bundle's own
+ *  and they are examples, not a form and not a limit: the microphone takes
+ *  whatever is said. Shown under the daffodil until there are words of its own. */
+export function Nudges({ nudges }: { nudges: { field: string; say: string }[] }) {
+  if (!nudges.length) return null;
+  return (
+    <div className="sc-nudges">
+      <h3 className="tp-h">Things people say here</h3>
+      <ul>
+        {nudges.map((n, i) => (
+          <li key={i}><span className="sc-nudge-f">{n.field}</span>{n.say}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** What this visit has had written, in the templates chosen, by anybody.
+ *
+ *  ONE NOTE PER TEMPLATE, WITH A SECTION PER RECORDING. The nurse records the
+ *  vitals and the doctor records the consultation, and what the doctor opens
+ *  is a single note with the nurse's part already in it, each under their own
+ *  name and time. The kernel keeps it (api/notes.py); this only draws it.
+ *
+ *  A template chosen and not yet written shows as a card saying so, so the
+ *  note a recording is about to produce is visible before it exists. */
+export function KeptNotes({ kept, lib, titles, phase, pending }: {
+  kept: ThreadNote[];
   lib: string[];
   titles: Record<string, string>;
   phase: Phase;
+  /** Library templates of the recording in hand that have not come back yet. */
+  pending: string[];
 }) {
-  const written = session?.notes ?? [];
-  const have = new Set(written.map((n) => n.template));
-  const waiting = lib.filter((id) => !have.has(id));
+  const have = new Set(kept.map((n) => n.template));
+  const empty = lib.filter((id) => !have.has(id));
+  const busy = phase === "recording" || phase === "paused" || phase === "uploading" || phase === "waiting";
   return (
     <>
-      {written.map((n) => (
+      {kept.map((n) => (
         <section className="nt" key={n.template}>
           <div className="nt-h">
             <Icon name="doc" className="i sm" />
             <span className="nt-t">{n.title}</span>
             <button type="button" className="cq ml-auto"
-                    onClick={() => void navigator.clipboard?.writeText(n.text).catch(() => {})}>
+                    onClick={() => void navigator.clipboard?.writeText(
+                      n.sections.map((x) => `${actorOf(x.actor)} · ${clock(x.at)}\n${x.text}`).join("\n\n"))
+                      .catch(() => {})}>
               Copy
             </button>
           </div>
-          <div className="nt-b">{n.text}</div>
+          {n.sections.map((x) => (
+            <div className="nt-s" key={x.id}>
+              <div className="nt-by">{actorOf(x.actor)} · {clock(x.at)}</div>
+              <div className="nt-b">{x.text}</div>
+            </div>
+          ))}
+          {pending.includes(n.template) && (
+            <div className="nt-wait"><span className="sc-spin" aria-hidden="true" />
+              {phase === "ready" ? "Adding this recording." : "This recording is added once it is transcribed."}
+            </div>
+          )}
         </section>
       ))}
-      {waiting.map((id) => (
+      {empty.map((id) => (
         <section className="nt" key={id}>
+          <div className="nt-h"><Icon name="doc" className="i sm" />
+            <span className="nt-t">{titles[id] ?? "Note"}</span></div>
           <div className="nt-wait">
-            <span className="sc-spin" aria-hidden="true" />
-            {phase === "ready"
-              ? `Writing the ${titles[id] ?? "note"}.`
-              : `The ${titles[id] ?? "note"} is written once the recording is transcribed.`}
+            {busy ? <span className="sc-spin" aria-hidden="true" /> : null}
+            {busy ? "Written once the recording is transcribed."
+                  : "Nothing written yet. Recording adds the first part."}
           </div>
         </section>
       ))}

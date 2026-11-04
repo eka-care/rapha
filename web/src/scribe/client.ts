@@ -41,6 +41,10 @@ async function ask(path: string, init: RequestInit): Promise<ScribeSession> {
 export type Templates = {
   default: string | null;
   choose: { operation: string; title: string }[];
+  /** The Eka library template this station is written up in unless the person
+   *  turns it off, by the title the bundle declares. Null when the station
+   *  declares none or the library has no such template. */
+  note?: { id: string; title: string } | null;
 };
 
 /** What this station may be recorded into, ahead of the microphone being
@@ -99,3 +103,20 @@ export async function library(): Promise<LibraryItem[]> {
  *  No audio moves: the service shapes the transcript it holds. */
 export const writeNote = (id: string, template: string) =>
   ask(`${ROUTE}/${encodeURIComponent(id)}/note?template=${encodeURIComponent(template)}`, { method: "POST" });
+
+
+/** One template's note for a visit: a section per recording, oldest first,
+ *  each under the name of whoever made it. */
+export type ThreadNote = {
+  template: string;
+  title: string;
+  sections: { id: string; actor: string; at: string; text: string }[];
+};
+
+/** The notes this visit has had written, whoever wrote them. */
+export async function threadNotes(thread: string): Promise<ThreadNote[]> {
+  const res = await fetch(`${API_BASE}${ROUTE.replace("/sessions", "/notes")}?thread=${encodeURIComponent(thread)}`,
+                          { headers: { "X-PHC-Role": currentRole() } });
+  if (!res.ok) throw new ApiError(`The kernel answered ${res.status}.`, "", res.status);
+  return (await res.json()).notes;
+}

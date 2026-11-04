@@ -33,6 +33,7 @@ import { clampWidth, readWidth, saveWidth } from "./width";
 import { Sidebar, panelFor } from "./Sidebar";
 import { Rail } from "./Rail";
 import { PARTS } from "../screens/Control";
+import { NAME } from "../brand";
 import { AssistantOverlay } from "../assistant/Overlay";
 import type { Question } from "../assistant/Lazy";
 import { Topbar } from "./Topbar";
@@ -181,6 +182,16 @@ export function App() {
   const [assistOpen, setAssistOpen] = useState(false);
   const [assistSeen, setAssistSeen] = useState(false);
   const [assistQuestion, setAssistQuestion] = useState<Question | null>(null);
+  // Where it comes forward: in the middle of the page when asked from the
+  // command bar, at the side when asked about a patient with `@rapha`, so the
+  // visit stays in view while it answers.
+  const [assistSide, setAssistSide] = useState(false);
+  const askAssistant = (text: string, where: "side" | "centre") => {
+    setAssistQuestion({ text, n: Date.now() });
+    setAssistSide(where === "side");
+    setAssistSeen(true);
+    setAssistOpen(true);
+  };
   const [drawer, setDrawer] = useState(false);
   const [said, setSaid] = useState<Record<string, Said[]>>(() => read(SAID_KEY, {}));
   const [recents, setRecents] = useState<Recent[]>(() => read(RECENT_KEY, []));
@@ -496,9 +507,8 @@ export function App() {
         {/* NO BAR INSIDE A VISIT. It carried one word, "Encounter", above a
             card already headed with the patient's name: two headings, one of
             which said nothing. Its three controls each went somewhere else
-            or nowhere -- the question box into the composer, where a person
-            is already typing; the assistant was already a tab of the visit;
-            and registering a new patient has no business on the screen of a
+            or nowhere -- the assistant is `@rapha` in the composer, where a
+            person is already typing; and registering a new patient has no business on the screen of a
             patient who is sitting there. The heading moved with the bar: the
             patient's name is the visit's h1 (screens/Encounter.tsx). */}
         {route.kind !== "thread" && (
@@ -506,7 +516,6 @@ export function App() {
             title={title}
             deskLabel={createLabel(catalogue, facility.data?.bundle.workflow)}
             onSearch={() => setKhojOpen(true)}
-            onAssist={() => { setAssistSeen(true); setAssistOpen(true); }}
             onMenu={() => setDrawer((d) => !d)}
             onDesk={() => go("#/desk")}
             bell={
@@ -538,7 +547,7 @@ export function App() {
                 onSay={(t) => onSay(route.id, t)}
                 onChanged={reload}
                 onOpenSubject={(sid) => go(`#/patients/${sid}`)}
-                onAsk={() => setKhojOpen(true)}
+                onAskRapha={(q) => askAssistant(q, "side")}
                 onRemember={remember}
                 catchment={facility.data?.catchment}
               />
@@ -616,7 +625,7 @@ export function App() {
         </main>
       </div>
 
-      {assistSeen && <AssistantOverlay open={assistOpen} question={assistQuestion} onClose={() => setAssistOpen(false)} />}
+      {assistSeen && <AssistantOverlay open={assistOpen} question={assistQuestion} side={assistSide} onClose={() => setAssistOpen(false)} />}
 
       {khojOpen && (
         <Khoj
@@ -627,7 +636,7 @@ export function App() {
           onClose={() => setKhojOpen(false)}
           onOpenThread={(t) => go(`#/threads/${t}`)}
           onGoView={(v) => go(v ? `#/views/${v}` : "#/")}
-          onAsk={(question) => { setAssistQuestion({ text: question, n: Date.now() }); setAssistSeen(true); setAssistOpen(true); }}
+          onAsk={(question) => askAssistant(question, "centre")}
           /* A search miss goes to the desk, not straight to an empty visit.
              The palette searches today's line; the desk searches the whole
              register and the patient directory, so "no matching patient" in
@@ -640,7 +649,7 @@ export function App() {
 }
 
 function titleFor(route: Route, views: ViewDecl[]): string {
-  if (route.kind === "today") return "Today";
+  if (route.kind === "today") return NAME.toUpperCase();
   if (route.kind === "settings") return "Control panel";
   if (route.kind === "view") return views.find((v) => v.id === route.id)?.title ?? "List";
   if (route.kind === "thread") return "Encounter";
@@ -665,13 +674,13 @@ function ViewScreen({ id, decl, workflow, nonce, narrow }: {
   );
 }
 
-function ThreadScreen({ id, cat, ctx, said, asking, nonce, catchment, onSay, onChanged, onRemember, onOpenSubject, onAsk }: {
+function ThreadScreen({ id, cat, ctx, said, asking, nonce, catchment, onSay, onChanged, onRemember, onOpenSubject, onAskRapha }: {
   id: string; cat: ReturnType<typeof Object>; ctx: Ctx; said: Said[];
   asking: boolean; nonce: number;
   catchment?: Facility["catchment"];
   onSay: (t: string) => void; onChanged: () => void; onRemember: (r: Recent) => void;
   onOpenSubject: (subjectId: string) => void;
-  onAsk: () => void;
+  onAskRapha: (question: string) => void;
 }) {
   const { data, error, loading, reload } = useAsync(() => api.thread(id), [id, nonce]);
   // header() already answers "what is this thread called", using the queue
@@ -698,7 +707,7 @@ function ThreadScreen({ id, cat, ctx, said, asking, nonce, catchment, onSay, onC
       onSay={onSay}
       onChanged={() => { reload(); onChanged(); }}
       onOpenSubject={onOpenSubject}
-      onAsk={onAsk}
+      onAskRapha={onAskRapha}
     />
   );
 }
