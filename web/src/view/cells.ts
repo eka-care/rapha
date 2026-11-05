@@ -18,7 +18,7 @@
  */
 import type { CalendarRow, Episode } from "../types";
 import { human, title } from "../words.ts";
-import { dayOf } from "./day.ts";
+import { dateOf, dayOf } from "./day.ts";
 
 export type Scale = "week" | "month" | "year";
 
@@ -155,9 +155,12 @@ export function todayOf(stamp: unknown, browser: string): string {
  *  list on her page.
  *
  *  Her page reads her episodes, not the centre's range answer, so her contacts
- *  have no `cell`; this gives each the one the kernel gives: its due day. A
- *  late contact keeps its due day here, because her record is the place to see
- *  when each was due. With more than one episode on the page, each title says
+ *  have no `cell`; this gives each one a day. A visit that HAPPENED sits on
+ *  the day it happened, because her page is a history and a check-up recorded
+ *  on 26 September drawn under 22 October, with "Recorded 26 Sep" written
+ *  inside it, is a square saying two different things. Everything not yet
+ *  done sits on its due day, late ones included, because that is the day it
+ *  was wanted. With more than one episode on the page, each title says
  *  which episode it belongs to, so two on one day are two and can be told
  *  apart. A new array each call; the episodes are not touched and nothing is
  *  kept. */
@@ -167,7 +170,11 @@ export function ownRows(episodes: Episode[], subject: string, subjectRow: Record
     ...c,
     episode: c.episode || e.id,
     title: tag ? `${c.title} \u00b7 ${title(human(e.type))}` : c.title,
-    subject, subject_row: subjectRow, cell: c.due,
+    subject, subject_row: subjectRow,
+    // The day it HAPPENED when the kernel recorded one, its due day
+    // otherwise. Read off `done_at` rather than off the state, because no
+    // file here may spell a state.
+    cell: dateOf(c.done_at ?? "") || c.due,
   })));
 }
 

@@ -5,8 +5,9 @@
  *  THE PLACEMENT RULE these pin: a contact sits in the one cell the kernel
  *  names (its due day, or today when missed and due before the range), and in no
  *  other. That is the FACILITY page's rule. One woman's own page differs on
- *  purpose: ownRows keeps a missed contact on the day it was due, because her
- *  record is a history and the point is to see when things slipped. Two right
+ *  purpose: ownRows keeps a missed contact on the day it was due, and puts a
+ *  recorded one on the day it was recorded, because her record is a history
+ *  and the point is to see when each thing was wanted and when it happened. Two right
  *  answers to two questions; do not make either match the other. The day list answers "what is owed today" by window; the grid
  *  answers "when is each one due". Both are right, and this file is where the
  *  grid's half is held, so nobody unifies them.
@@ -239,9 +240,9 @@ const DEC = "2026-12-09";
 
 // ------------------------------------------------- one woman's own episodes
 {
-  const contact = (n: string, due: string, state = "due") => ({
+  const contact = (n: string, due: string, state = "due", done_at = "") => ({
     contact: n, title: "Visit " + n, schedule: "s", episode: "", opens: due, due, closes: due, state,
-    owner: "r", operation: "", authority: "", reports_as: "", done_at: "", basis: "",
+    owner: "r", operation: "", authority: "", reports_as: "", done_at, basis: "",
   });
   const ep = (id: string, type: string, cs: ReturnType<typeof contact>[]) =>
     ({ id, type, status: "open", opened_at: "", ended_at: "", outcome: "", anchor_date: "", anchor_basis: "",
@@ -257,6 +258,15 @@ const DEC = "2026-12-09";
   assert.equal(g.find((c) => c.key === "2026-09-09")?.rows.length, 1);
   assert.equal(g.find((c) => c.key === "2026-11-20"), undefined, "November's visit is not in September's grid");
   // Nothing at all is nothing, not an error.
+  // A VISIT THAT HAPPENED SITS ON THE DAY IT HAPPENED. Her page is a
+  // history: a check-up recorded on 26 September was drawn under 22
+  // October, its due day, with "Recorded 26 Sep" written inside it.
+  const did = ownRows([ep("e1", "pregnancy", [
+    contact("c", "2026-10-22", "done", "2026-09-26"),
+    contact("d", "2026-10-22", "done", "2026-10-22T09:15:00Z"),
+  ])], "p1", she);
+  assert.deepEqual(did.map((r) => r.cell), ["2026-09-26", "2026-10-22"],
+    "a recorded visit is placed on the day it was recorded, timestamp or date");
   assert.deepEqual(ownRows([], "p1", she), []);
   assert.deepEqual(ownRows([ep("e1", "pregnancy", [])], "p1", she), []);
   // Two episodes stay two: same day, two rows, told apart by the episode's name.
@@ -281,7 +291,7 @@ const DEC = "2026-12-09";
   assert.match(arcSrc, /episode\.contacts\.map\(/, "the list draws every contact, unfiltered");
   assert.match(arcSrc, /<span className="arc-t" title=\{c\.programme_title \|\| undefined\}>/,
     "her plain list carries the programme's words on hover, and nothing when there are none");
-  ok("her own episodes: placed on their due days, two stay two, none is a sentence's business");
+  ok("her own episodes: a recorded one on the day it happened, the rest on their due days, two stay two, none is a sentence's business");
 }
 
 console.log(`\n${checks} checks passed`);
