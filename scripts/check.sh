@@ -108,6 +108,10 @@ python3 scripts/check_antenatal.py
 # postnatal care in one commit, and a pregnancy that ended any other way
 # opens nothing. The second half is the one that matters.
 python3 scripts/check_postnatal.py
+# High-risk pregnancy: three extra doctor visits beside the ordinary four, and
+# every way a pregnancy ends must stop both arcs and open the right tail. A
+# delivery or loss that leaves one arc owing, or a loss that opens care, fails here.
+python3 scripts/check_high_risk.py
 # The facility calendar over women whose pregnancies ended, were lost or were
 # never seen: an ended episode owed on any day, or a miscarriage given a
 # home visit, fails here, as does a window off by a day or an ungated route.
