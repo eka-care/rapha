@@ -10,7 +10,7 @@ import { owedLine, pageBy } from "./day";
 /** How many cards show at once: the front one and two behind it. */
 const DEPTH = 3;
 
-export function Cards({ rows, now, nameOf, metaOf, roleName, onOpen }: {
+export function Cards({ rows, now, nameOf, metaOf, roleName, scope, onOpen }: {
   /** Already ordered by `stack`. */
   rows: CalendarRow[];
   now: string;
@@ -18,6 +18,11 @@ export function Cards({ rows, now, nameOf, metaOf, roleName, onOpen }: {
   /** What the register holds about her, already joined; "" when nothing. */
   metaOf: (subjectRow: Record<string, unknown>) => string;
   roleName: (role: string) => string;
+  /** WHOSE VISITS THESE ARE, in words. "1 of 24" over a card, with "14 more
+   *  for others" under it, is three numbers a reader cannot add up: the 24
+   *  was already only the viewer's own. The count says which list it is
+   *  counting. */
+  scope: string;
   onOpen: (row: CalendarRow) => void;
 }) {
   const [at, setAt] = useState(0);
@@ -56,7 +61,7 @@ export function Cards({ rows, now, nameOf, metaOf, roleName, onOpen }: {
                 onClick={() => setAt(pageBy(here, -1, rows.length))}>
           <Icon name="chev" className="i sm stk-flip" />
         </button>
-        <span className="stk-count" aria-live="polite">{here + 1} of {rows.length}</span>
+        <span className="stk-count" aria-live="polite">{here + 1} of {rows.length} {scope}</span>
         <button type="button" className="stk-arrow" aria-label="Later visit" disabled={here >= last}
                 onClick={() => setAt(pageBy(here, 1, rows.length))}>
           <Icon name="chev" className="i sm" />
