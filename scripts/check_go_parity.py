@@ -1310,6 +1310,25 @@ def s_the_calendar_with_women_in_it(walk, codes):
     walk.commit("the miscarriage is recorded", "phc.op.pregnancy-close",
                 {"outcome": "miscarriage"}, "anm")
     walk.panel("the panel once the miscarriage is recorded")
+    # THE HIGH-RISK WOMAN. A second episode beside her pregnancy, three extra
+    # visits, and the two ways it ends: a delivery, which opens TWO postnatal
+    # episodes in one commit (four rows), and a loss, which ends both and opens
+    # none. "No parity work" was true of the Go engine and was never run; these
+    # three are what make it a checked claim.
+    def marked(label, lmp_days_ago, marked_days_ago):
+        woman(label, lmp_days_ago)
+        walk.commit("%s: marked high risk, recorded" % label, "phc.op.risk-mark",
+                    {"risk_factor": "severe_anaemia", "marked_date": day(marked_days_ago)},
+                    "anm")
+
+    marked("a high-risk pregnancy", 120, 5)
+    marked("a high-risk delivery", 270, 20)
+    walk.commit("the high-risk delivery is recorded", "phc.op.delivery-record-high-risk",
+                {"delivery_date": day(3), "outcome": "live_birth"}, "anm")
+    marked("a high-risk loss", 100, 20)
+    walk.commit("the high-risk loss is recorded", "phc.op.pregnancy-close-high-risk",
+                {"outcome": "miscarriage"}, "anm")
+    walk.panel("the panel once the high-risk loss is recorded")
     # An agreement between two refusals would prove nothing, so every write
     # above must have landed.
     writes = [status for label, status, _ in walk.raw if "pregnancy" in label
@@ -1400,6 +1419,12 @@ def s_the_calendar_with_women_in_it(walk, codes):
     assert status == 200
     ids = [(r["subject"], r["contact"]) for r in body["rows"]]
     assert len(ids) == len(set(ids)), "a visit was drawn twice"
+    drawn = {r["contact"] for r in body["rows"]}
+    # The extra visits and the day-45 check are on the calendar, and are the
+    # high-risk woman's only: three women were marked and one is still pregnant.
+    assert {"hrp1", "hrp2", "hrp3", "hbnc45"} <= drawn, sorted(drawn)
+    assert sum(1 for r in body["rows"] if r["contact"] == "hrp2") == 1, \
+        "the extra visit of a woman who delivered or lost her baby is still drawn"
     assert any(r["state"] == "due" and r["due"] < today.isoformat()
                and r["cell"] == today.isoformat() for r in body["rows"]), \
         "a woman past her due date is missing from the home page's range"
@@ -1439,13 +1464,14 @@ def s_the_calendar_with_women_in_it(walk, codes):
     # registered are the ones it named "parity".
     ours = {r["subject"] for r in body["rows"]
             if r["subject_row"].get("name") == "parity"}
-    assert len(ours) == 4, \
-        "four of this walk's women are owed and the fifth miscarried: %d" % len(ours)
+    assert len(ours) == 6, \
+        "six of this walk's women are owed and two lost their pregnancies, one of " \
+        "them high risk: %d" % len(ours)
     for label in ("a day that does not exist", "an empty value", "a timestamp",
                   "a month that does not exist",
                   "29 February in a year that has none", "a compact date"):
         assert answers[label][0] == 400, (label, answers[label])
-    return ("the calendar over open, unseen, delivered and miscarried women, "
+    return ("the calendar over open, unseen, delivered and miscarried women, and the same three kinds of high-risk woman, "
             "on month ends, leap days and impossible dates, and over weeks, a month with "
             "its spill days, a year boundary, a single day and each refusal of a range")
 
