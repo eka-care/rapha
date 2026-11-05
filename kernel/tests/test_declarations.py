@@ -192,6 +192,12 @@ def test_a_mark_made_in_error_is_undone_at_the_same_bench_by_its_own_operation()
     assert f["type"] == {"const": "pregnancy_high_risk"}
     assert f["status"] == {"const": "ended"}
     assert f["outcome"] == {"const": "marked_in_error"}
+    # The row's exact fields: nothing else may ride on it (an anchor date,
+    # say, would date an episode that is only ending).
+    assert sorted(f) == ["created_by", "outcome", "status", "type"], sorted(f)
+    # `ignored` is not compiled into the catalogue, so read it from the atom.
+    fm, _ = parse(ROOT / "catalogue" / "ops" / "phc.op.risk-unmark.md")
+    assert fm["mapping"]["ignored"] == ["reason", "note"], fm["mapping"]
     wf = CAT["workflows"]["phc.wf.outpatient"]
     nurse = [s for s in wf["steps"] if s["station"] == "nurse"][0]
     assert "phc.op.risk-unmark" in nurse["operations"]

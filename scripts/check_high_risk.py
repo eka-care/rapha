@@ -412,10 +412,13 @@ ok("no way of ending postnatal care on a death or a lost mother leaves a visit o
 import time                                                   # noqa: E402
 
 
-def unmark(store, thread, reason="wrong_patient", actor=USER):
+def unmark(store, thread, reason="wrong_patient", actor=USER, note=None):
+    payload = {"reason": reason}
+    if note:
+        payload["note"] = note
     return proposals.commit(
         store, BUNDLE, "phc.op.risk-unmark", thread=thread,
-        payload={"reason": reason}, caps=ANM, actor=actor)
+        payload=payload, caps=ANM, actor=actor)
 
 
 def every_episode(store, thread):
@@ -493,7 +496,8 @@ ok("marked, undone and marked again, her three visits count from the new date an
 # 13. Nothing is erased: both the mark and the undo stay, with who and when.
 store, thread = fresh(weeks=20)
 mark(store, thread, days_ago=3)
-assert unmark(store, thread, reason="wrong_date", actor="user:meena")
+assert unmark(store, thread, reason="wrong_date", actor="user:meena",
+              note="Typed the wrong day")
 (patient,) = store.select("patient", thread=thread, where={}, fields=["id"], limit=2)
 rows = [r for r in store.select("episode_of_care", thread=None,
                                 where={"patient": patient["id"]}, fields=(), limit=50)
@@ -509,6 +513,10 @@ assert [a.operation for a in trail] == ["phc.op.risk-mark", "phc.op.risk-unmark"
 assert [a.actor for a in trail] == [USER, "user:meena"], trail
 assert trail[0].payload.get("risk_factor") == RISK, trail[0].payload
 assert trail[1].payload.get("reason") == "wrong_date", trail[1].payload
+assert trail[1].payload.get("note") == "Typed the wrong day", trail[1].payload
+# The ending row carries exactly what an ending carries, and nothing dated.
+assert ended["anchor_date"] in (None, ""), ended
+assert ended["anchor_basis"] in (None, ""), ended
 shown = high_risk_ones(store, thread)
 assert len(shown) == 1 and shown[0]["status"] == "ended" and shown[0]["outcome"] == "marked_in_error", shown
 ok("after the undo both the mark and the undo are still in her record, each with who did it and when")

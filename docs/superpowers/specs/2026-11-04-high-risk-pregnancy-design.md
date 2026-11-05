@@ -191,7 +191,12 @@ before choosing, because it changes what an ordinary woman is chased for.
    calendars. My proposal is monthly from the marking date, because a woman
    marked at 30 weeks cannot retrospectively attend her second visit.
 2. **Day 45 for everybody, or two delivery paths?** Section 4.
-3. **Can a woman be unmarked?** If a condition resolves — anaemia treated, a
+3. **Can a woman be unmarked?** *Answered for a mistake, still open for
+   recovery.* The owner has decided a mark made in error (wrong patient,
+   wrong date) can be undone: `phc.op.risk-unmark` ends the high-risk
+   episode as "marked in error" and the three extra visits stop, with both
+   the mark and the undo kept in her record. That is a correction of the
+   record, not a clinical reversal. **Still open:** if a condition resolves — anaemia treated, a
    fever gone — does her high-risk episode end, and do the remaining extra
    visits stop? The machinery allows it; the clinical answer is yours. My
    instinct is no: the programme treats the category as sticky for the

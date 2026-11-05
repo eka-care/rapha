@@ -74,11 +74,18 @@ clinical assertion. The extra check-ups do not depend on which is chosen.
 
 ## When it goes wrong
 
-- **The date or factor was wrong.** While this same visit is still open,
-  amend it and the three extra check-ups move with the date, because they
-  are worked out when asked. After the visit closes, no correction path has
-  been built for this operation. NEEDS DECISION from the owner.
-- **She cannot be unmarked.** There is no operation for it, by decision.
+- **The date or factor was wrong, in the same visit.** While this same visit
+  is still open, amend it and the three extra check-ups move with the date,
+  because they are worked out when asked.
+- **The mark was a mistake, after the visit closed.** The wrong patient or
+  the wrong date: use `phc.op.risk-unmark`, which ends the high-risk episode
+  with the outcome "marked in error" and stops the three extra check-ups.
+  Then mark her again with the right date if she is high risk. Both the
+  mark and the undo stay in her record.
+- **She has got better.** Not covered, on purpose. The undo is for a wrong
+  record, not a clinical change of mind. Whether a woman whose anaemia has
+  been treated should stop receiving high-risk care is still an open
+  question for the owner and clinical staff.
 
 ## Verification
 
