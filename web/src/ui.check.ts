@@ -1343,10 +1343,13 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   // unexpected is not an empty day.
   assert.ok(inPiles(forRole([row("u", "upcoming", "r.x")], "r.x")).length > 0);
   // THE HEADING IS TRUE OF THE DAY SHOWN: "Owed today" only on today.
-  assert.equal(inPiles(rows).find((p) => p.pile === "owed")?.label, "Today");
-  assert.equal(inPiles(rows, false).find((p) => p.pile === "owed")?.label, "Due",
+  // THE HEADING MUST AGREE WITH THE ROWS UNDER IT. The kernel calls a
+  // contact `due` for as long as its window is open, which is weeks, so this
+  // pile holds visits due on many different days. It was headed "Today".
+  assert.equal(inPiles(rows).find((p) => p.pile === "owed")?.label, "Open today");
+  assert.equal(inPiles(rows, false).find((p) => p.pile === "owed")?.label, "Open that day",
     "a day that is not today must not say 'today'");
-  assert.deepEqual(inPiles(rows, false).map((p) => p.label), ["Late", "Due", "Done"]);
+  assert.deepEqual(inPiles(rows, false).map((p) => p.label), ["Late", "Open that day", "Done"]);
   // Chips are ordered by what is displayed, not by id.
   assert.deepEqual(roleChips(rows, "", (r) => (r === "r.anm" ? "Zed" : "Alpha")).roles, ["r.mo", "r.anm"]);
 
@@ -1473,19 +1476,19 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   const gone = row({ contact: "e", state: "done", due: "2026-10-01" });
 
   // Late contacts lead, then the soonest owed, whatever order the kernel sent.
-  assert.deepEqual(stack([later, soon, today, late], NOW, "").map((r) => r.contact), ["a", "b", "c", "d"]);
-  assert.deepEqual(stack([soon, late, row({ contact: "z", state: "missed", due: "2026-08-01" })], NOW, "").map((r) => r.contact), ["z", "a", "c"],
+  assert.deepEqual(stack([later, soon, today, late], "").map((r) => r.contact), ["a", "b", "c", "d"]);
+  assert.deepEqual(stack([soon, late, row({ contact: "z", state: "missed", due: "2026-08-01" })], "").map((r) => r.contact), ["z", "a", "c"],
     "the longest-late leads the late ones");
   // One card per contact: a woman owed two appears twice.
-  assert.equal(stack([late, today], NOW, "").filter((r) => r.subject === "p1").length, 2);
+  assert.equal(stack([late, today], "").filter((r) => r.subject === "p1").length, 2);
   // Work already done is not coming up.
-  assert.ok(!stack([gone, soon], NOW, "").some((r) => r.contact === "e"));
+  assert.ok(!stack([gone, soon], "").some((r) => r.contact === "e"));
   // The stack opens on the viewer's role, and on everyone's when they own nothing.
-  assert.deepEqual(stack([later, soon, late], NOW, "doctor").map((r) => r.contact), ["d"]);
-  assert.deepEqual(stack([later, soon, late], NOW, "pharmacist").map((r) => r.contact), ["a", "c", "d"], "owning nothing falls back to everyone");
-  assert.deepEqual(stack([], NOW, "nurse"), []);
+  assert.deepEqual(stack([later, soon, late], "doctor").map((r) => r.contact), ["d"]);
+  assert.deepEqual(stack([later, soon, late], "pharmacist").map((r) => r.contact), ["a", "c", "d"], "owning nothing falls back to everyone");
+  assert.deepEqual(stack([], "nurse"), []);
   // The input is not reordered in place.
-  const input = [later, late]; stack(input, NOW, ""); assert.equal(input[0], later);
+  const input = [later, late]; stack(input, ""); assert.equal(input[0], later);
 
   // The arrows page to later cards and cannot page past the end.
   assert.equal(pageBy(0, 1, 2), 1);
@@ -1504,6 +1507,12 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.equal(owedLine(today, NOW), "Due today");
   assert.equal(owedLine(soon, NOW), "Due Fri 6 Nov");
   assert.equal(owedLine(row({ due: "2026-11-05" }), NOW), "Due tomorrow");
+  // ONLY THE KERNEL SAYS LATE. A visit whose due date has passed while its
+  // window is still open is waiting, not missed, and the card said "Late
+  // since Fri 30 Oct" over a window that runs to 27 November.
+  assert.equal(owedLine(row({ state: "due", due: "2026-10-30" }), NOW), "Due since Fri 30 Oct");
+  assert.ok(!/Late/.test(owedLine(row({ state: "due", due: "2026-10-30" }), NOW)),
+    "a visit inside its window is not late, whatever its due date");
 
   const src = code(readFileSync(join(SRC, "view", "Cards.tsx"), "utf8"));
   const home = code(readFileSync(join(SRC, "screens", "Today.tsx"), "utf8"));
@@ -1558,21 +1567,28 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
     "an empty handler (arrow with or without a parameter, or function) hides a failed read");
   assert.match(home, /Could not load visits/, "the failure is shown");
   // The stack opens on the viewer's role and says what else exists.
-  assert.match(home, /more for others/, "the stack says how much belongs to others");
+  assert.match(home, /for other roles/, "the stack says how much belongs to others");
+  // AND THE TWO NUMBERS CAN BE ADDED UP. The count over the deck is the
+  // length of the list being paged through, so it says which list that is;
+  // without it "1 of 24" sat above "14 more for others" and the reader had
+  // no way to tell whether 24 already included the 14.
+  assert.match(home, /scope=\{everyone \|\| noneMine \? "for everyone" : "for you"\}/,
+    "the card count says whose visits it is counting");
+  assert.match(src, /\{scope\}/, "and the deck draws it");
   // A viewer who owns nothing while others are owed: told so, shown the others' cards, never "nobody".
   const stk = between(home, "const all =", "if (loading");
   assert.match(stk, /noneMine = all\.length > 0 && mine\.length === 0/, "owning nothing while others are owed is its own case");
   assert.match(stk, /everyone \|\| noneMine \? all/, "that viewer is shown the others' cards");
-  assert.match(home, /No visits for you\. Showing \$\{others\} for others/, "and told how many");
+  assert.match(home, /No visits are yours\. Showing all \$\{all\.length\}/, "and told how many");
   assert.match(home, /cards\.length === 0 \? \(\s*owed && <div[^>]*>No visits coming up/, '"no visits" is only for an empty stack');
   const endOfBranch = home.indexOf("</>\n          )}"), control = home.indexOf('className="stk-more"');
   assert.ok(endOfBranch >= 0 && control > endOfBranch, "the control sits after, so outside, the empty-or-cards branch");
   assert.match(home, /!noneMine && others > 0/, "and is hidden for a viewer who already sees everything");
   // The role filter the home page uses agrees with the one stack() applies.
   const mixed = [later, soon, late, today];
-  assert.deepEqual(forRole(stack(mixed, NOW, ""), "nurse").map((r) => r.contact), stack(mixed, NOW, "nurse").map((r) => r.contact),
+  assert.deepEqual(forRole(stack(mixed, ""), "nurse").map((r) => r.contact), stack(mixed, "nurse").map((r) => r.contact),
     "forRole over the whole stack is the role's stack, in the same order");
-  assert.deepEqual(stack([soon, later], NOW, "pharmacist").map((r) => r.contact), ["c", "d"], "owning nothing shows everyone's, never none");
+  assert.deepEqual(stack([soon, later], "pharmacist").map((r) => r.contact), ["c", "d"], "owning nothing shows everyone's, never none");
   assert.match(home, /setEveryone\(/, "and offers a way to see it");
   assert.ok(!/split\(" · "\)/.test(home), "a value containing the separator is not cut: facts are taken before they are joined");
   assert.ok(!/as unknown as QueueRow/.test(home.split("<Cards")[1] ?? ""), "no cast to get a subject through the types");

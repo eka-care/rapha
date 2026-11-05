@@ -13,7 +13,7 @@ import { Icon } from "../icons";
 import { Loading } from "../parts";
 import { MARK, TONE } from "../thread/Arc";
 import type { CalendarRow, ViewResult } from "../types";
-import { dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView, atOf } from "./day";
+import { dateOf, dateWords, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView, atOf } from "./day";
 import { Grid } from "./Grid";
 import { span, spanTitle, step, type Scale } from "./cells";
 
@@ -125,8 +125,17 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
                         <Icon name={(MARK[r.state] ?? "clock") as never} className="i sm" />
                         <span title={r.programme_title || undefined}>{r.title}</span> for {nameOf(r.subject_row)}
                       </span>
+                      {/* The big numeral beside this is the DUE day, so the
+                          line under it says so in words and says when the
+                          window shuts. It said only "Closes 2026-11-27",
+                          which is an ISO date in front of a health worker
+                          and left the numeral unexplained. */}
                       <span className="cal-when">
-                        {r.state === "done" && r.done_at ? <>Recorded {r.done_at}</> : <>Closes {r.closes}</>}
+                        {r.state === "done" && r.done_at
+                          ? <>Recorded {dateWords(r.done_at)}</>
+                          : r.state === "missed"
+                            ? <>Due {dateWords(r.due)} · window shut {dateWords(r.closes)}</>
+                            : <>Due {dateWords(r.due)} · open until {dateWords(r.closes)}</>}
                       </span>
                     </span>
                     <span className="cal-role">{roleName(r.owner)}</span>
