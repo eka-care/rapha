@@ -13,6 +13,7 @@
  */
 import { Icon } from "../icons";
 import type { Contact, Episode } from "../types";
+import { dateWords, dayMonth } from "../view/day";
 import { human, title } from "../words";
 
 /** The four states a contact comes back in, and how each one is drawn.
@@ -36,21 +37,28 @@ export const MARK: Record<string, string> = {
   upcoming: "clock",
 };
 
-export function Arc({ episodes, onAct }: {
+/** What a role is CALLED is the bundle's to say, never this file's. Without
+ *  one the raw id shows, which is plain, where a word we made up would be a
+ *  word nobody declared. */
+type RoleName = (role: string) => string;
+
+export function Arc({ episodes, onAct, roleName = (r) => r }: {
   episodes: Episode[];
   /** Open the operation that would close a contact. Absent where this
    *  screen cannot act, which is every screen that is not a visit. */
   onAct?: (operation: string) => void;
+  /** The declared title of a role, from the catalogue's own vocabulary. */
+  roleName?: RoleName;
 }) {
   if (!episodes.length) return null;
   return (
     <>
-      {episodes.map((e) => <OneArc key={e.id} episode={e} onAct={onAct} />)}
+      {episodes.map((e) => <OneArc key={e.id} episode={e} onAct={onAct} roleName={roleName} />)}
     </>
   );
 }
 
-function OneArc({ episode, onAct }: { episode: Episode; onAct?: (op: string) => void }) {
+function OneArc({ episode, onAct, roleName }: { episode: Episode; onAct?: (op: string) => void; roleName: RoleName }) {
   const over = episode.status === "ended";
   return (
     <section className="card arc">
@@ -71,7 +79,7 @@ function OneArc({ episode, onAct }: { episode: Episode; onAct?: (op: string) => 
           teaches people to ignore the whole tracker. */}
       {episode.anchor_date && (
         <p className="arc-basis">
-          Dated {episode.anchor_date}
+          Dated {dateWords(episode.anchor_date)}
           {episode.anchor_basis && <> from {human(episode.anchor_basis).toLowerCase()}</>}
         </p>
       )}
@@ -85,7 +93,7 @@ function OneArc({ episode, onAct }: { episode: Episode; onAct?: (op: string) => 
       ) : (
         <ol className="arc-list">
           {episode.contacts.map((c) => (
-            <Step key={c.contact} contact={c} onAct={onAct} />
+            <Step key={c.contact} contact={c} onAct={onAct} roleName={roleName} />
           ))}
         </ol>
       )}
@@ -93,7 +101,7 @@ function OneArc({ episode, onAct }: { episode: Episode; onAct?: (op: string) => 
   );
 }
 
-function Step({ contact, onAct }: { contact: Contact; onAct?: (op: string) => void }) {
+function Step({ contact, onAct, roleName }: { contact: Contact; onAct?: (op: string) => void; roleName: RoleName }) {
   const c = contact;
   return (
     <li className={`arc-step s-${c.state}`}>
@@ -109,11 +117,15 @@ function Step({ contact, onAct }: { contact: Contact; onAct?: (op: string) => vo
               which line each one fills in. */}
           {c.reports_as && <span className="badge b-mute">{c.reports_as}</span>}
         </span>
+        {/* A DATE A PERSON CAN READ, AND A ROLE IN WORDS. This line read
+            "Due 2026-11-15 · open 2026-11-01 to 2026-11-29 · MO": an ISO
+            date and a bare code, on the record a health worker with little
+            English reads. The role's name is the bundle's own. */}
         <span className="arc-when">
           {c.state === "done" && c.done_at
-            ? <>Recorded {c.done_at}</>
-            : <>Due {c.due} · open {c.opens} to {c.closes}</>}
-          {c.state !== "done" && <> · {human(c.owner)}</>}
+            ? <>Recorded {dateWords(c.done_at)}</>
+            : <>Due {dateWords(c.due)} · open {dayMonth(c.opens)} to {dayMonth(c.closes)}</>}
+          {c.state !== "done" && <> · {roleName(c.owner)}</>}
         </span>
       </span>
       {onAct && c.state !== "done" && c.state !== "upcoming" && (

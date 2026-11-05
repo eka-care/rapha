@@ -90,17 +90,23 @@ export function Patient({ id, cat, onOpenThread }: {
             </div>
           </div>
         </div>
-        <div className="qtabs" style={{ margin: "12px 14px 14px" }} role="tablist">
-          {tabs.map((t) => (
-            <button key={t} role="tab" aria-selected={open_tab === t}
-              className={`qtab${open_tab === t ? " on" : ""}`} onClick={() => setTab(t)}>
-              {t === "care" ? "Care" : title(t)}
-            </button>
-          ))}
+        {/* THE STRIP THE VISIT ALREADY USES. This was `qtab`, whose
+            stylesheet was deleted when the control it belonged to was
+            removed, so four tabs drew as the browser's own buttons and ran
+            together into "CareEncountersOverviewTimeline". */}
+        <div className="vtabs">
+          <div className="vtabs-l" role="tablist">
+            {tabs.map((t) => (
+              <button key={t} role="tab" aria-selected={open_tab === t}
+                className={`vtab${open_tab === t ? " on" : ""}`} onClick={() => setTab(t)}>
+                {t === "care" ? "Care" : title(t)}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
-      {open_tab === "care" && <Care view={view} id={id} name={name} />}
+      {open_tab === "care" && <Care view={view} id={id} name={name} cat={cat} />}
       {open_tab === "encounters" && <Encounters view={view} cat={cat} onOpenThread={onOpenThread} />}
       {open_tab === "overview" && <Overview view={view} />}
       {open_tab === "timeline" && <Timeline view={view} onOpenThread={onOpenThread} />}
@@ -113,7 +119,7 @@ export function Patient({ id, cat, onOpenThread }: {
  *  record already loaded; nothing is asked of the centre and nothing is kept.
  *  The scale and the date are in the address, so a card from the home page
  *  (`?at=`) lands on the month it names, and back and reload keep the place. */
-function Care({ view, id, name }: { view: SubjectView; id: string; name: string }) {
+function Care({ view, id, name, cat }: { view: SubjectView; id: string; name: string; cat: Catalogue }) {
   const [hash, setHash] = useState(() => location.hash);
   useEffect(() => {
     const on = () => setHash(location.hash);
@@ -160,7 +166,7 @@ function Care({ view, id, name }: { view: SubjectView; id: string; name: string 
           onPickDay={(d) => goTo({ at: d })} onAnchor={(d) => goTo({ at: d })}
         />
       </section>
-      <Arc episodes={view.episodes} />
+      <Arc episodes={view.episodes} roleName={(r) => cat.vocabulary?.role_titles?.[r] ?? r} />
     </>
   );
 }
