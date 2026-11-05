@@ -23,7 +23,7 @@ steps:
     # bench whose job is to take a reading.
     operations: [phc.op.vitals-record, phc.op.antenatal-measure,
                  phc.op.context-add,
-                 phc.op.pregnancy-open, phc.op.risk-mark,
+                 phc.op.pregnancy-open, phc.op.risk-mark, phc.op.risk-unmark,
                  phc.op.delivery-record, phc.op.delivery-record-high-risk,
                  phc.op.pregnancy-close, phc.op.pregnancy-close-high-risk,
                  phc.op.postnatal-close, phc.op.postnatal-close-high-risk,

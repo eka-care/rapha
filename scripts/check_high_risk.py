@@ -401,4 +401,116 @@ for outcome in ("both_well", "mother_unwell", "baby_unwell", "both_unwell", "bab
     assert owes_nothing(store, thread), outcome
 ok("no way of ending postnatal care on a death or a lost mother leaves a visit owed on either episode: %d accepted paths tried, ordinary mother and high-risk mother" % (len(high) + len(ordinary)))
 
+# ---------------------------------------------------------------------------
+# 10-13. A MARK MADE IN ERROR CAN BE UNDONE, and only that: the extra visits
+#        stop, everything else about her carries on, and nothing is erased.
+# ---------------------------------------------------------------------------
+# This is not a clinical reversal. The reasons on the form are about the
+# record being wrong. Whether a woman who has recovered stops receiving
+# high-risk care is a question nobody has answered, so nothing here answers it.
+
+import time                                                   # noqa: E402
+
+
+def unmark(store, thread, reason="wrong_patient", actor=USER):
+    return proposals.commit(
+        store, BUNDLE, "phc.op.risk-unmark", thread=thread,
+        payload={"reason": reason}, caps=ANM, actor=actor)
+
+
+def every_episode(store, thread):
+    """All her episodes, ended ones too, a type possibly more than once."""
+    (patient,) = store.select("patient", thread=thread, where={},
+                              fields=["id"], limit=2)
+    return spine.of(BUNDLE, store, WF, patient["id"])["episodes"]
+
+
+def high_risk_ones(store, thread):
+    return [e for e in every_episode(store, thread) if e["type"] == "pregnancy_high_risk"]
+
+
+# 10. Undoing stops all three extra visits and moves no ordinary one.
+store, thread = fresh(weeks=20)
+mark(store, thread, days_ago=30)
+record(store, thread, ORDINARY_OP)                    # one ordinary visit done
+ordinary_before = owed(store, thread)["pregnancy"]
+assert any(c["state"] == schedule.DONE for c in ordinary_before), ordinary_before
+assert len(owed(store, thread)["pregnancy_high_risk"]) == 3
+undone = unmark(store, thread)
+assert undone, undone.reason
+now_owed = owed(store, thread)
+assert now_owed["pregnancy_high_risk"] == [], now_owed["pregnancy_high_risk"]
+assert schedule.why(BUNDLE, store, WF, episodes_of(store, thread)["pregnancy_high_risk"]) == "this is over"
+assert now_owed["pregnancy"] == ordinary_before, \
+    "undoing the mark changed her ordinary check-ups:\n%s\n%s" % (ordinary_before, now_owed["pregnancy"])
+assert [(c["contact"], c["due"], c["owner"], c["state"]) for c in now_owed["pregnancy"]] \
+    == [(c["contact"], c["due"], c["owner"], c["state"]) for c in ordinary_before]
+flags = state.flags(store, thread, WF)
+assert "pregnancy.open" in flags and "pregnancy_high_risk.open" not in flags, sorted(flags)
+assert "pregnancy.ordinary" in flags, sorted(flags)
+ok("undoing a mark leaves her owing none of the three extra visits and her ordinary four exactly as they were")
+
+
+# 11. Not offered to a woman who was never marked, and not offered twice.
+store, thread = fresh(weeks=20)
+never = unmark(store, thread)
+assert not never, "a woman who was never marked can be unmarked"
+mark(store, thread, days_ago=1)
+assert unmark(store, thread)
+twice = unmark(store, thread)
+assert not twice, "the same mark was undone twice"
+assert len(high_risk_ones(store, thread)) == 1
+ok("the undo is refused for a woman never marked and refused a second time")
+
+
+# 12. Marked, undone, marked again: the new marking date counts.
+store, thread = fresh(weeks=20)
+mark(store, thread, days_ago=20)                      # the mistyped date
+assert unmark(store, thread, reason="wrong_date")
+time.sleep(1.1)       # episodes pair by the second; see the report on this
+mark(store, thread, days_ago=0)                       # the right one
+again = high_risk_ones(store, thread)
+assert len(again) == 2, [(e["opened_at"], e["status"]) for e in again]
+live = [e for e in again if e["status"] == "active"]
+dead = [e for e in again if e["status"] == "ended"]
+assert len(live) == 1 and len(dead) == 1, again
+assert dead[0]["contacts"] == [] and dead[0]["outcome"] == "marked_in_error", dead[0]
+assert ids(live[0]["contacts"]) == EXTRA_IDS, live[0]["contacts"]
+for contact in live[0]["contacts"]:
+    declared = next(c for c in EXTRA.contacts if c.id == contact["contact"])
+    assert contact["due"] == (TODAY + timedelta(days=declared.due)).isoformat(), \
+        "counted from the old marking date: %s" % contact
+flags = state.flags(store, thread, WF)
+assert "pregnancy_high_risk.open" in flags and "pregnancy.open" in flags, sorted(flags)
+assert sum(len(e["contacts"]) for e in every_episode(store, thread)
+           if e["type"] == "pregnancy_high_risk") == 3
+# And the second mark can itself be undone.
+assert unmark(store, thread)
+assert all(e["contacts"] == [] for e in high_risk_ones(store, thread))
+ok("marked, undone and marked again, her three visits count from the new date and the old mark owes nothing")
+
+
+# 13. Nothing is erased: both the mark and the undo stay, with who and when.
+store, thread = fresh(weeks=20)
+mark(store, thread, days_ago=3)
+assert unmark(store, thread, reason="wrong_date", actor="user:meena")
+(patient,) = store.select("patient", thread=thread, where={}, fields=["id"], limit=2)
+rows = [r for r in store.select("episode_of_care", thread=None,
+                                where={"patient": patient["id"]}, fields=(), limit=50)
+        if r["type"] == "pregnancy_high_risk"]
+assert sorted(r["status"] for r in rows) == ["active", "ended"], rows
+opened = next(r for r in rows if r["status"] == "active")
+ended = next(r for r in rows if r["status"] == "ended")
+assert opened["created_by"] == USER and ended["created_by"] == "user:meena", (opened, ended)
+assert opened["created_date"] and ended["created_date"], (opened, ended)
+assert ended["outcome"] == "marked_in_error", ended
+trail = [a for a in store.audit(thread) if a.operation in ("phc.op.risk-mark", "phc.op.risk-unmark")]
+assert [a.operation for a in trail] == ["phc.op.risk-mark", "phc.op.risk-unmark"], trail
+assert [a.actor for a in trail] == [USER, "user:meena"], trail
+assert trail[0].payload.get("risk_factor") == RISK, trail[0].payload
+assert trail[1].payload.get("reason") == "wrong_date", trail[1].payload
+shown = high_risk_ones(store, thread)
+assert len(shown) == 1 and shown[0]["status"] == "ended" and shown[0]["outcome"] == "marked_in_error", shown
+ok("after the undo both the mark and the undo are still in her record, each with who did it and when")
+
 print("\nok   high-risk pregnancy: %d checks" % checks)

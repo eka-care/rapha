@@ -170,8 +170,7 @@ def test_marking_needs_an_open_pregnancy_and_refuses_a_second_mark():
     assert f["status"] == {"const": "active"}
     assert f["anchor_basis"] == {"const": "marked"}
     assert "anchor_date" in f
-    # She cannot be unmarked: no operation closes it.
-    assert "phc.op.risk-unmark" not in CAT["operations"]
+    # A mark made in error is undone by its own operation; see below.
     wf = CAT["workflows"]["phc.wf.outpatient"]
     nurse = [s for s in wf["steps"] if s["station"] == "nurse"][0]
     assert "phc.op.risk-mark" in nurse["operations"]
@@ -180,6 +179,31 @@ def test_marking_needs_an_open_pregnancy_and_refuses_a_second_mark():
     assert not any("phc.op.risk-mark" in s["operations"] for s in others)
     for st in ("open", "ended"):
         assert f"pregnancy_high_risk.{st}" in wf["states"]
+
+
+def test_a_mark_made_in_error_is_undone_at_the_same_bench_by_its_own_operation():
+    mark, undo = CAT["operations"]["phc.op.risk-mark"], CAT["operations"]["phc.op.risk-unmark"]
+    assert undo["capability"] == mark["capability"] and undo["station"] == mark["station"]
+    assert undo["preconditions"] == ["pregnancy_high_risk.open"]
+    recs = CAT["mapping"]["phc.op.risk-unmark"]
+    assert len(recs) == 1 and recs[0]["resource"] == "episode_of_care"
+    f = recs[0]["fields"]
+    # It ends the high-risk episode and nothing else: never the pregnancy.
+    assert f["type"] == {"const": "pregnancy_high_risk"}
+    assert f["status"] == {"const": "ended"}
+    assert f["outcome"] == {"const": "marked_in_error"}
+    wf = CAT["workflows"]["phc.wf.outpatient"]
+    nurse = [s for s in wf["steps"] if s["station"] == "nurse"][0]
+    assert "phc.op.risk-unmark" in nurse["operations"]
+    assert not any("phc.op.risk-unmark" in s["operations"]
+                   for s in wf["steps"] if s["station"] != "nurse")
+    assert "phc.op.risk-unmark" in _reachable("pregnancy_high_risk")
+    assert "phc.op.risk-unmark" not in _reachable("pregnancy")
+    # The reasons are about the record being wrong, never about her recovering.
+    form = json.loads((ROOT / "questionnaires" / "phc.schema.risk-unmark-v1.json").read_text())
+    reasons = {o["value"] for q in form["questions"] if q["link_id"] == "reason"
+               for o in q["answer_option"]}
+    assert reasons == {"wrong_patient", "wrong_date", "other_mistake"}
 
 
 def test_the_calendar_sweeps_the_high_risk_type_too():

@@ -1,0 +1,43 @@
+{
+    "version": "1.0",
+    "slug": "phc-risk-unmark-v1",
+    "title": "Undo a high-risk mark made in error",
+    "status": "active",
+    "subject_type": "encounter",
+    "styling_metadata": {
+        "phc": {
+            "operation": "phc.op.risk-unmark"
+        }
+    },
+    "questions": [
+        {
+            "link_id": "reason",
+            "text": "Why was the mark wrong?",
+            "type": "choice",
+            "required": true,
+            "answer_option": [
+                {"value": "wrong_patient"},
+                {"value": "wrong_date"},
+                {"value": "other_mistake"}
+            ],
+            "styling_metadata": {
+                "phc": {
+                    "short": "Why wrong",
+                    "help": "Use this only when the mark was a mistake. It does not mean she is better. Her three extra check-ups stop."
+                }
+            }
+        },
+        {
+            "link_id": "note",
+            "text": "Anything to add?",
+            "type": "text",
+            "required": false,
+            "styling_metadata": {
+                "phc": {
+                    "short": "Note",
+                    "help": "For example, which woman it should have been, or the right date. If the date was wrong, mark her again with the right one."
+                }
+            }
+        }
+    ]
+}

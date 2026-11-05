@@ -27,6 +27,7 @@ operations:
   - phc.op.pregnancy-open
   - phc.op.pregnancy-close
   - phc.op.risk-mark
+  - phc.op.risk-unmark
   - phc.op.delivery-record
   - phc.op.delivery-record-high-risk
   - phc.op.pregnancy-close-high-risk

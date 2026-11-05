@@ -470,6 +470,7 @@
       "phc.op.pregnancy-open",
       "phc.op.pregnancy-close",
       "phc.op.risk-mark",
+      "phc.op.risk-unmark",
       "phc.op.delivery-record",
       "phc.op.delivery-record-high-risk",
       "phc.op.pregnancy-close-high-risk",
@@ -1676,6 +1677,29 @@
           },
           "status": {
             "const": "active"
+          },
+          "type": {
+            "const": "pregnancy_high_risk"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "episode_of_care"
+      }
+    ],
+    "phc.op.risk-unmark": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "outcome": {
+            "const": "marked_in_error"
+          },
+          "status": {
+            "const": "ended"
           },
           "type": {
             "const": "pregnancy_high_risk"
@@ -3939,6 +3963,55 @@
         "episode_of_care"
       ]
     },
+    "phc.op.risk-unmark": {
+      "capability": "episode.manage",
+      "description": "A high-risk mark was put on the wrong woman, or with the wrong date. This\ntakes it back. The three extra check-ups stop, and she goes on with her\nordinary pregnancy care exactly as before.",
+      "emits": [],
+      "fields": [
+        {
+          "link_id": "reason",
+          "options": [
+            "wrong_patient",
+            "wrong_date",
+            "other_mistake"
+          ],
+          "required": true,
+          "text": "Why was the mark wrong?",
+          "type": "choice"
+        },
+        {
+          "link_id": "note",
+          "options": null,
+          "required": false,
+          "text": "Anything to add?",
+          "type": "text"
+        }
+      ],
+      "id": "phc.op.risk-unmark",
+      "input": "phc.schema.risk-unmark-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "pregnancy_high_risk.open"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "Undo mark",
+      "station": "nurse",
+      "summary": "Take back a high-risk mark that was made on the wrong woman or with the wrong date, and stop the extra check-ups.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Undo a high-risk mark made in error",
+      "tool": "propose_risk_unmark",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "episode_of_care"
+      ]
+    },
     "phc.op.rx-prescribe": {
       "capability": "rx.prescribe",
       "description": "The doctor prescribes. Confirming the prescription is what makes the\npharmacist's dispense action exist at all.",
@@ -5330,6 +5403,7 @@
             "phc.op.context-add",
             "phc.op.pregnancy-open",
             "phc.op.risk-mark",
+            "phc.op.risk-unmark",
             "phc.op.delivery-record",
             "phc.op.delivery-record-high-risk",
             "phc.op.pregnancy-close",
