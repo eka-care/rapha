@@ -82,6 +82,8 @@ def episodes_of(store, thread):
     (patient,) = store.select("patient", thread=thread, where={},
                               fields=["id"], limit=2)
     whole = spine.of(BUNDLE, store, WF, patient["id"])
+    types = [e["type"] for e in whole["episodes"]]
+    assert len(types) == len(set(types)), "an episode type appears twice: %s" % types
     return {e["type"]: e for e in whole["episodes"]}
 
 
@@ -223,17 +225,25 @@ ok("after a high-risk delivery: seven home visits and one day-45 check; after an
 
 
 # ---------------------------------------------------------------------------
-# 7. Marked late, she still gets all three, and they stop when she delivers.
+# 7. Marked late, her extra visits run past her due date and stop at delivery.
 # ---------------------------------------------------------------------------
+# The extra visits count from the day she is marked, not from how far along she
+# is. So a woman marked at thirty-four weeks owes visits after her expected
+# delivery date, which she will only reach if she goes overdue, and a schedule
+# counted back from the due date would have dropped or squeezed them. 280 days
+# is the dating convention in the antenatal schedule, a literal on purpose.
 
 store, thread = fresh(weeks=34)
 mark(store, thread)
+episodes = episodes_of(store, thread)
+edd = schedule.start_of(ANTENATAL, episodes["pregnancy"]) + timedelta(days=280)
 rows = owed(store, thread)["pregnancy_high_risk"]
 assert ids(rows) == EXTRA_IDS, ids(rows)
-assert all(c["state"] == schedule.UPCOMING for c in rows), rows
-assert all(c["due"] > TODAY.isoformat() for c in rows), rows
+beyond = [c for c in rows if c["due"] > edd.isoformat()]
+assert beyond, "no extra visit falls after her due date %s: %s" % (edd, rows)
+assert all(c["state"] == schedule.UPCOMING for c in beyond), beyond
 deliver(store, thread)
 assert owed(store, thread)["pregnancy_high_risk"] == []
-ok("marked at thirty-four weeks she still owes all three, and none once she delivers")
+ok("marked at thirty-four weeks, visits fall after her due date and are owed until she delivers")
 
 print("\nok   high-risk pregnancy: %d checks" % checks)

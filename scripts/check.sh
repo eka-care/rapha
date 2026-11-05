@@ -110,7 +110,8 @@ python3 scripts/check_antenatal.py
 python3 scripts/check_postnatal.py
 # High-risk pregnancy: three extra doctor visits beside the ordinary four, and
 # every way a pregnancy ends must stop both arcs and open the right tail. A
-# delivery or loss that leaves one arc owing, or a loss that opens care, fails here.
+# delivery or loss that leaves one arc owing, a loss that opens care, or a day-45
+# check opened for an ordinary mother, fails here.
 python3 scripts/check_high_risk.py
 # The facility calendar over women whose pregnancies ended, were lost or were
 # never seen: an ended episode owed on any day, or a miscarriage given a
