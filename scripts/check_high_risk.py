@@ -207,6 +207,47 @@ ok("a high-risk loss ends both arcs and opens no postnatal care of either kind: 
 
 
 # ---------------------------------------------------------------------------
+# 5b. A WOMAN WHO DIES WHILE STILL PREGNANT can be recorded, and it is a loss
+#     in the one way that matters: it ends everything and opens nothing.
+# ---------------------------------------------------------------------------
+# Every answer either pregnancy-close form offers is committed for real, for an
+# ordinary woman and for one marked high risk. After each she owes no
+# antenatal visit of either kind and has no postnatal care of either kind.
+
+import json                                                   # noqa: E402
+
+_form = json.loads((ROOT / "questionnaires" / "phc.schema.pregnancy-close-v1.json").read_text())
+CLOSE_OUTCOMES = [o["value"] for q in _form["questions"] if q["link_id"] == "outcome"
+                  for o in q["answer_option"]]
+assert "mother_died" in CLOSE_OUTCOMES, \
+    "a woman who dies while pregnant cannot be recorded: %s" % CLOSE_OUTCOMES
+
+tried = 0
+for risky in (False, True):
+    for answer in CLOSE_OUTCOMES:
+        store, thread = fresh(weeks=30)
+        if risky:
+            mark(store, thread, days_ago=2)
+        op = "phc.op.pregnancy-close-high-risk" if risky else "phc.op.pregnancy-close"
+        done = proposals.commit(store, BUNDLE, op, thread=thread,
+                                payload={"outcome": answer}, caps=ANM, actor=USER)
+        assert done, "%s refuses %r: %s" % (op, answer, done.reason)
+        tried += 1
+        flags = state.flags(store, thread, WF)
+        for flag in ("pregnancy.open", "pregnancy_high_risk.open",
+                     "postnatal.open", "postnatal_high_risk.open"):
+            assert flag not in flags, "%s after %r: %s" % (flag, answer, sorted(flags))
+        kinds = episodes_of(store, thread)
+        assert not [k for k in kinds if k.startswith("postnatal")], (answer, sorted(kinds))
+        assert all(schedule.contacts(BUNDLE, store, WF, e) == [] for e in kinds.values()), \
+            (op, answer)
+        if risky:
+            assert kinds["pregnancy_high_risk"]["status"] == "ended", (answer, kinds)
+ok("a woman who dies while pregnant is recorded, owes nothing and opens no postnatal care: "
+   "all %d answers on both close forms tried" % tried)
+
+
+# ---------------------------------------------------------------------------
 # 6. The day-45 check is hers alone, and the seven home visits are the usual.
 # ---------------------------------------------------------------------------
 

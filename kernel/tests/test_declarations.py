@@ -571,6 +571,88 @@ def _high_risk_mother():
     return t, store, bundle, bundle.workflow(), state
 
 
+def _pregnant_woman(high_risk):
+    from datetime import datetime, timedelta, timezone
+    from adapters.local.store import SqliteStore
+    from catalogue import vocab
+    from kernel import proposals, state
+
+    bundle = declarations.load("phc")
+    caps = set(vocab.for_bundle("phc").roles["anm"])
+    today = datetime.now(timezone.utc).date()
+    store = SqliteStore(":memory:")
+    t = store.open_thread(token="1", actor="user:jyothi")
+    steps = [
+        ("phc.op.patient-register", {"name": "Lakshmi Devi", "age": 27, "sex": "female",
+         "phone": "9876500001", "village": "Yadiki", "category": "general"}),
+        ("phc.op.pregnancy-open", {"dating_basis": "last_menstrual_period",
+         "dating_date": (today - timedelta(weeks=30)).isoformat()})]
+    if high_risk:
+        steps.append(("phc.op.risk-mark", {"risk_factor": "severe_anaemia",
+                                           "marked_date": today.isoformat()}))
+    for op, payload in steps:
+        r = proposals.commit(store, bundle, op, thread=t, payload=payload,
+                             caps=caps, actor="user:jyothi")
+        assert r, (op, r.reason)
+    return t, store, bundle, bundle.workflow(), state, caps
+
+
+def _end_pregnancy(high_risk, outcome):
+    from kernel import proposals
+    t, store, bundle, wf, state, caps = _pregnant_woman(high_risk)
+    op = "phc.op.pregnancy-close-high-risk" if high_risk else "phc.op.pregnancy-close"
+    r = proposals.commit(store, bundle, op, thread=t, payload={"outcome": outcome},
+                         caps=caps, actor="user:jyothi")
+    assert r, (op, outcome, r.reason)
+    return t, store, bundle, wf, state
+
+
+def _owes_nothing_and_opens_nothing(t, store, bundle, wf, state, why):
+    from kernel import schedule, spine
+    flags = state.flags(store, t, wf)
+    for f in ("pregnancy.open", "pregnancy_high_risk.open",
+              "postnatal.open", "postnatal_high_risk.open"):
+        assert f not in flags, (why, f, sorted(flags))
+    (patient,) = store.select("patient", thread=t, where={}, fields=["id"], limit=2)
+    eps = spine.of(bundle, store, wf, patient["id"])["episodes"]
+    assert not [e for e in eps if e["type"].startswith("postnatal")], (why, eps)
+    for e in eps:
+        assert schedule.contacts(bundle, store, wf, e) == [], (why, e["type"])
+
+
+def _form_outcomes():
+    form = json.loads((ROOT / "questionnaires" / "phc.schema.pregnancy-close-v1.json").read_text())
+    (q,) = [q for q in form["questions"] if q["link_id"] == "outcome"]
+    return [o["value"] for o in q["answer_option"]]
+
+
+def test_a_woman_who_dies_while_pregnant_can_be_recorded_and_is_owed_nothing():
+    assert "mother_died" in _form_outcomes()
+    for high_risk in (False, True):
+        done = _end_pregnancy(high_risk, "mother_died")
+        _owes_nothing_and_opens_nothing(*done, "died, high_risk=%s" % high_risk)
+
+
+def test_a_high_risk_woman_who_dies_while_pregnant_has_both_episodes_ended():
+    t, store, bundle, wf, state = _end_pregnancy(True, "mother_died")
+    rows = store.select("episode_of_care", thread=t, where={}, fields=(), limit=50)
+    ended = sorted(r["type"] for r in rows if r["status"] == "ended")
+    assert ended == ["pregnancy", "pregnancy_high_risk"], rows
+    assert all(r["outcome"] == "mother_died" for r in rows if r["status"] == "ended"), rows
+
+
+def test_every_pregnancy_close_outcome_really_ends_the_pregnancy_when_committed():
+    # Not inferred from the mapping: commit each answer the form offers, on
+    # both forms, through the real path. An outcome the store rejects leaves a
+    # woman owing visits for ever.
+    outcomes = _form_outcomes()
+    assert len(outcomes) == len(set(outcomes)) and outcomes, outcomes
+    for high_risk in (False, True):
+        for outcome in outcomes:
+            done = _end_pregnancy(high_risk, outcome)
+            _owes_nothing_and_opens_nothing(*done, "%s, high_risk=%s" % (outcome, high_risk))
+
+
 def test_closing_a_high_risk_mothers_two_episodes_leaves_her_owed_nothing():
     from datetime import datetime, timedelta, timezone
     from adapters.local.store import SqliteStore

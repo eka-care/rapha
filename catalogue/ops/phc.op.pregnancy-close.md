@@ -76,12 +76,23 @@ is required.
 
 ## The outcomes, and why `not_pregnant` is one of them
 
-Six: a live birth, a stillbirth, a miscarriage, a termination, that she has
-moved away, and that she turned out not to be pregnant. The last two are
-not clinical outcomes and they are on the list anyway, because the
-alternative is a record that stays open forever on a woman this centre will
-never see again, which is exactly the thing that fills an overdue list with
-noise until nobody reads it.
+Seven: a live birth, a stillbirth, a miscarriage, a termination, that she
+has moved away, that she turned out not to be pregnant, and that she died.
+The two before the last are not clinical outcomes and they are on the list
+anyway, because the alternative is a record that stays open forever on a
+woman this centre will never see again, which is exactly the thing that fills
+an overdue list with noise until nobody reads it.
+
+"Mother died" is there because a woman can die while still pregnant, and
+without it the nurse had two bad choices: the nearest wrong answer, which
+falsifies the most serious outcome this centre records, or leaving the
+pregnancy open so that a dead woman is chased for her antenatal visits. It
+ends the pregnancy exactly as the others do, ends the high-risk episode too
+when there is one, and opens nothing: no postnatal care of any kind. The words
+are the same as on the postnatal close form, `mother_died`. Whether the
+programme has its own term for a death in pregnancy, and whether it is
+reported on a separate return, has not been confirmed, so no such term is on
+the form. For the owner to settle.
 
 The list is this bundle's and carries no code. It is not bound to a value
 set because none of the three value sets this build has verified holds an

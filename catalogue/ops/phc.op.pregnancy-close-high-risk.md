@@ -71,7 +71,9 @@ Two rows in one commit: the pregnancy ends and the high-risk episode ends.
 Both stop being owed on the next read, because contacts are derived.
 
 It opens no postnatal care of either kind. A pregnancy that ended without a
-birth is not followed by home visits, and that absence is deliberate.
+birth is not followed by home visits, and that absence is deliberate. This
+holds for every answer on the form, including that the woman has died: a
+death in pregnancy ends both episodes and opens nothing.
 
 ## How you know it worked
 

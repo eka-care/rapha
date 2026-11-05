@@ -21,12 +21,13 @@
                 {"value": "miscarriage"},
                 {"value": "termination"},
                 {"value": "moved_away"},
-                {"value": "not_pregnant"}
+                {"value": "not_pregnant"},
+                {"value": "mother_died"}
             ],
             "styling_metadata": {
                 "phc": {
                     "short": "Outcome",
-                    "help": "Everything still scheduled for this pregnancy stops the moment you record this."
+                    "help": "Everything still scheduled for this pregnancy stops the moment you record this. If the woman has died, choose Mother died: nobody will be asked to visit her."
                 }
             }
         }

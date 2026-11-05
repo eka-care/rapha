@@ -3668,7 +3668,8 @@
             "miscarriage",
             "termination",
             "moved_away",
-            "not_pregnant"
+            "not_pregnant",
+            "mother_died"
           ],
           "required": true,
           "text": "How did this pregnancy end?",
@@ -3713,7 +3714,8 @@
             "miscarriage",
             "termination",
             "moved_away",
-            "not_pregnant"
+            "not_pregnant",
+            "mother_died"
           ],
           "required": true,
           "text": "How did this pregnancy end?",
