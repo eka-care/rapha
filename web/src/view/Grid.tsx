@@ -120,7 +120,15 @@ function Month(p: GridProps) {
 /** The all-day band and the hour grid, for the seven days or for one. */
 function Days({ all, p, single }: { all: Cell[]; p: GridProps; single: boolean }) {
   const scroller = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (scroller.current) scroller.current.scrollTop = FIRST_HOUR * HOUR_PX - 12; }, []);
+  // After layout, not during it: the band above grows with the chips in it,
+  // and a scrollTop set before the browser has sized this box is clamped to
+  // a smaller one, which opened the grid at one in the morning.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      if (scroller.current) scroller.current.scrollTop = FIRST_HOUR * HOUR_PX - 12;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [all.length]);
   const cols = { gridTemplateColumns: `56px repeat(${all.length}, minmax(0, 1fr))` };
   return (
     <div className="gr gr-week" role="group" aria-label={single ? "Day" : "Week"}>
@@ -144,6 +152,17 @@ function Days({ all, p, single }: { all: Cell[]; p: GridProps; single: boolean }
           </div>
         ))}
       </div>
+      {/* AN EMPTY GRID THAT SAYS WHY IT IS EMPTY. Nothing is ever drawn in
+          the hours yet: a contact is owed over a window of days and carries
+          no time of day, so every one of them is a chip in the band above.
+          The hours stay because appointments will be booked into them, and
+          until then a ruled rectangle with nothing in it reads as a screen
+          that failed to load. The line is OUTSIDE the scroller, which opens
+          at seven in the morning and would carry it off the top. */}
+      <p className="gr-hours-note">
+        No appointment times yet. A visit is owed over a span of days rather than at
+        an hour, so they are all in the all-day row above.
+      </p>
       <div className="gr-hours" ref={scroller} tabIndex={0} aria-label="Hours">
         <div className="gr-hours-in" style={{ ...cols, height: 24 * HOUR_PX }}>
           <div className="gr-hourcol">

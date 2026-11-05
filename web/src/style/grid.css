@@ -6,7 +6,7 @@
 /* A contact: a chip in the state's tone. Colour is never the only sign; the
    mark and the words are there too. */
 .gr-chip {
-  display: flex; align-items: center; gap: var(--space-1); width: 100%; min-width: 0; min-height: 22px;
+  display: flex; flex-wrap: wrap; row-gap: 0; overflow: hidden; align-items: center; gap: var(--space-1); width: 100%; min-width: 0; min-height: 22px;
   padding: 1px var(--space-2); border: 0; border-left: 3px solid var(--color-border-strong); border-radius: var(--radius-sm);
   background: var(--color-bg-subtle); color: var(--color-text-primary); font: inherit; font-size: 12px; text-align: left; cursor: pointer;
 }
@@ -15,8 +15,13 @@
 .gr-chip[data-tone="b-ok"] { border-left-color: var(--color-success); background: var(--color-success-soft); }
 .gr-chip[data-tone="b-ink"] { border-left-color: var(--color-text-primary); }
 .gr-chip .i { flex: none; }
-.gr-chip-t { color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 100 auto; min-width: 0; }
-.gr-chip-who { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 4.5em; }
+.gr-chip-t { color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 100 auto; min-width: 0; order: 3; }
+/* THE CHIP WRAPS RATHER THAN OVERFLOWING. A chip in a 130px week column
+   carrying a name, "due 30 Oct" and a title could not fit on one line: it
+   ran over its own edge and its words sat on top of one another and on the
+   next day's column. It now wraps, in the order it can afford to lose: the
+   name first and whole, then when it was due, then what the visit is. */
+.gr-chip-who { font-weight: 600; min-width: 5.5em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .gr-more { border: 0; background: none; font: inherit; font-size: 12px; color: var(--color-text-secondary); text-align: left; padding: 0 var(--space-2); cursor: pointer; }
 .gr-more:hover { text-decoration: underline; }
 
@@ -91,5 +96,18 @@
   .gr-month .gr-chip { width: auto; justify-self: start; min-height: 26px; }
   .gr-month .gr-chip-t { display: none; }
 }
-.gr-chip-was { flex: none; font-size: 11px; font-weight: 600; color: var(--color-critical); white-space: nowrap; }
+/* When a chip is not on the day it was due. Quiet by default, because a
+   recorded visit on her own record is drawn on the day it happened and the
+   due day beside it is a fact, not an alarm; it takes the critical ink only
+   on a chip that is already critical. */
+.gr-chip-was { flex: none; order: 2; font-size: 11px; font-weight: 600; color: var(--color-text-secondary); white-space: nowrap; }
+.gr-chip[data-tone="b-crit"] .gr-chip-was { color: var(--color-critical); }
 @media (max-width: 600px) { .gr-month .gr-chip-was { display: none; } }
+
+/* The empty hour grid says what it is waiting for, rather than drawing a
+   ruled rectangle with nothing in it. */
+.gr-hours-note {
+  margin: 0; padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 12px; line-height: 17px; color: var(--color-text-tertiary);
+}
