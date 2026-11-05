@@ -140,6 +140,14 @@ for tid in ANTENATAL:
             assert OPS[tid][key] == OPS[BASE][key] + ["pregnancy_high_risk.open"], key
             continue
         assert OPS[tid][key] == OPS[BASE][key], (tid, key)
+# The pair is held to ONE mapping, not just the same facts. The encounter row
+# a visit writes is what a visit IS; if the extra visit's differed (a status,
+# a column) the two would stop being the same act and nothing else here would
+# notice. Read from both the bundle's operations and the compiled catalogue.
+_A, _B = ANTENATAL
+assert OPS[_A]["mapping"] == OPS[_B]["mapping"], \
+    "the antenatal pair writes different rows: %s vs %s" % (OPS[_A]["mapping"], OPS[_B]["mapping"])
+assert ALL_OPS[_A].get("writes") == ALL_OPS[_B].get("writes")
 ok("and it is reachable: loaded by the bundle, on the scribe's list, drawn at "
    "the doctor's step, and offered by the station's own switcher")
 

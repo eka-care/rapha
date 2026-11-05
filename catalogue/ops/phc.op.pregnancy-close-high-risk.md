@@ -58,7 +58,12 @@ pregnancy leaves the extra visits running.
 
 ## Before you start
 
-A high-risk pregnancy is open for her. Nothing else.
+A high-risk pregnancy is open for her. If she has none, this form is not
+offered to her, and she is given End pregnancy for an ordinary woman instead
+(`phc.op.pregnancy-close`). A form cannot choose between one ending row and
+two, so the choice is made by state: this one ends both episodes, and using
+it for an ordinary woman would have nothing to end on the second. You need
+`episode.manage`.
 
 ## What happens
 
