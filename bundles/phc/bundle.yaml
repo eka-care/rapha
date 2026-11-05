@@ -31,14 +31,18 @@ operations:
   - phc.op.delivery-record-high-risk
   - phc.op.pregnancy-close-high-risk
   - phc.op.postnatal-close
+  - phc.op.postnatal-close-high-risk
   - phc.op.postnatal-visit
   - phc.op.postnatal-outcome
   - phc.op.referral-raise
   - phc.op.referral-close
   - phc.op.context-add
-  # Generated from the `templates` declaration below.
+  # Two of these are generated from the `templates` declaration below. The
+  # antenatal visits are written by hand because two operations share one
+  # form, and a generated form can name only one.
   - phc.op.ncd-review
   - phc.op.antenatal-visit
+  - phc.op.antenatal-visit-high-risk
   - phc.op.antenatal-measure
   - phc.op.followup
 workflows:
@@ -118,8 +122,8 @@ scribe:
   doctor:
     default: phc.op.consult-document
     choose: [phc.op.consult-document, phc.op.ncd-review,
-             phc.op.antenatal-visit, phc.op.followup,
-             phc.op.rx-prescribe]
+             phc.op.antenatal-visit, phc.op.antenatal-visit-high-risk,
+             phc.op.followup, phc.op.rx-prescribe]
     note: Default Prescription Print
     nudges:
       - {field: Symptoms,        say: "Burning when she passes urine, four days now."}
@@ -203,9 +207,12 @@ documents:
 # decision that has not been made. The narrowings below are provisional and
 # each one carries its own `sign_off` sentence saying so, for the same reason
 # terminology/condition-code.json carries a banner: content without a named
-# clinician's sign-off must not be read as clinical guidance. The one
-# narrowing that is NOT a clinical judgement is the antenatal visit's, and it
-# is a fact about this build's vocabulary rather than about obstetrics.
+# clinician's sign-off must not be read as clinical guidance.
+#
+# The antenatal visit is not declared here although it is the same kind of
+# narrowing. It is written by hand in catalogue/ops/phc.op.antenatal-visit.md
+# because a high-risk woman's extra visits are a second operation that must
+# share its form, and a generated form names exactly one operation.
 templates:
   phc.op.ncd-review:
     of: phc.op.consult-document
@@ -225,27 +232,6 @@ templates:
       without a clinician. It states no interval, no target and no threshold,
       and it must not be read as a review protocol. A named clinical officer
       has to confirm it before this template is offered to anybody.
-  phc.op.antenatal-visit:
-    of: phc.op.consult-document
-    short: Antenatal
-    title: Antenatal visit
-    summary: An antenatal visit, recorded as narrative.
-    asks: [history, examination, assessment, plan]
-    plain: |
-      An antenatal visit. It asks for the history, what you found, your
-      assessment and the plan, and it does not offer the coded diagnosis
-      rows, because this build can code three conditions and not one of them
-      is obstetric. The whole of this visit travels as narrative text into
-      the published document, which is what that fallback was built for.
-    sign_off: |
-      This narrowing is a fact about this build's vocabulary and not a
-      clinical judgement: terminology/condition-code.json holds three
-      concepts and says it is not a diagnosis list, so there is no obstetric
-      concept for a coded row to carry. It follows that this template codes
-      NOTHING. It is not clinically useful as a coded record until a
-      published obstetric list is signed off by a named clinical officer, and
-      it should not be mistaken for one. What it does do is keep the visit as
-      text in a record that reaches ABDM.
   phc.op.followup:
     of: phc.op.consult-document
     short: Follow up
@@ -294,8 +280,10 @@ states:
   - pregnancy_high_risk.ended
   - pregnancy.ordinary
   # The six weeks after a delivery. Derived from the same pair of episode
-  # rows a pregnancy is, and opened by one operation only: recording a
-  # delivery. A pregnancy that ended any other way never acquires one.
+  # rows a pregnancy is, and opened by two operations: recording a delivery
+  # for an ordinary pregnancy, and recording one for a high-risk pregnancy.
+  # Each is offered only over its own kind of open pregnancy. A pregnancy
+  # that ended any other way never acquires one.
   - postnatal.open
   - postnatal.ended
   - postnatal_high_risk.open

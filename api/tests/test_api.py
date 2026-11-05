@@ -732,15 +732,16 @@ def test_a_session_id_nobody_started_is_a_404_that_says_so():
 def test_templates_are_the_stations_and_the_callers():
     body = client.get("/api/scribe/templates?station=doctor&role=mo").json()
     assert body["default"] == "phc.op.consult-document"
-    # The doctor's five: the general consultation, the three templates that
-    # narrow it, and the prescription. Order is the bundle's own, and the
-    # three templates are generated from one `templates` declaration rather
-    # than written here or anywhere else.
+    # The doctor's six: the general consultation, the four narrowings of it,
+    # and the prescription. Order is the bundle's own, and the
+    # narrowings are declared in the bundle rather than written here.
     assert [c["operation"] for c in body["choose"]] == \
         ["phc.op.consult-document", "phc.op.ncd-review",
-         "phc.op.antenatal-visit", "phc.op.followup", "phc.op.rx-prescribe"]
-    assert [c["title"] for c in body["choose"]][1:4] == \
-        ["Review a long term condition", "Antenatal visit", "Follow up visit"], \
+         "phc.op.antenatal-visit", "phc.op.antenatal-visit-high-risk",
+         "phc.op.followup", "phc.op.rx-prescribe"]
+    assert [c["title"] for c in body["choose"]][1:5] == \
+        ["Review a long term condition", "Antenatal visit",
+         "Extra antenatal visit for a high-risk pregnancy", "Follow up visit"], \
         "a template's title is the declaration's, not a renderer's"
     # NO LANGUAGE LIST. Nothing picks one: every recording goes up as every
     # language this facility supports and the service decides what it heard.

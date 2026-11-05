@@ -5,7 +5,8 @@ kind: scribe
 title: Scribe
 summary: Transcribes a recording into the station's template.
 operations: [phc.op.patient-register, phc.op.vitals-record, phc.op.consult-document,
-             phc.op.ncd-review, phc.op.antenatal-visit, phc.op.followup,
+             phc.op.ncd-review, phc.op.antenatal-visit, phc.op.antenatal-visit-high-risk,
+             phc.op.followup,
              phc.op.rx-prescribe, phc.op.household-visit]
 # WHERE IN EKA'S STRUCTURED NOTE EACH ANSWER LIVES. The service writes a
 # note section by section, and these name the section and how to take the

@@ -20,14 +20,12 @@
         {"value": "mother_unwell"},
         {"value": "baby_unwell"},
         {"value": "both_unwell"},
-        {"value": "baby_died"},
-        {"value": "mother_died"},
-        {"value": "not_found"}
+        {"value": "baby_died"}
       ],
       "styling_metadata": {
         "phc": {
           "short": "Outcome",
-          "help": "Record how things are, even if they are not good. Recording it ends this check for her, and you can say what needs following up below."
+          "help": "Record how things are, even if they are not good. Recording it ends this check for her, and you can say what needs following up below. If the mother has died or cannot be found, use End postnatal instead, which ends all her visits."
         }
       }
     },
@@ -49,7 +47,8 @@
       "required": false,
       "styling_metadata": {
         "phc": {
-          "short": "Follow up"
+          "short": "Follow up",
+          "help": "This is a note on her record. It does not book a visit or tell anyone, so arrange any care yourself."
         }
       }
     }

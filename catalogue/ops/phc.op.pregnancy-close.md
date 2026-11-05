@@ -32,7 +32,7 @@ verified:
   status: unverified
   against: care-local
 related:
-  operations: [phc.op.pregnancy-open]
+  operations: [phc.op.pregnancy-open, phc.op.pregnancy-close-high-risk]
   concepts: []
 ---
 
@@ -66,7 +66,13 @@ remember to cancel it, and "somebody remembered" is not a safety property.
 
 ## Before you start
 
-There is an open pregnancy. Nothing else.
+There is an open pregnancy, and it has not been marked high risk. If it has,
+this form is not offered to her and she is given End pregnancy for a
+high-risk woman instead (`phc.op.pregnancy-close-high-risk`). A form cannot
+choose between one ending row and two, so the choice is made by state: this
+one ends the pregnancy only, and using it for a high-risk woman would leave her
+three extra doctor visits owed after the pregnancy had ended. Nothing else
+is required.
 
 ## The outcomes, and why `not_pregnant` is one of them
 

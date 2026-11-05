@@ -12,6 +12,7 @@ irreversibility: correctable
 instrument: form
 preconditions:
   - postnatal.open
+  - not postnatal_high_risk.open
 input: phc.schema.postnatal-close-v1
 writes: [episode_of_care]
 mapping:
@@ -31,7 +32,7 @@ verified:
   status: unverified
   against: care-local
 related:
-  operations: [phc.op.delivery-record]
+  operations: [phc.op.delivery-record, phc.op.postnatal-close-high-risk]
   concepts: []
 ---
 
@@ -54,7 +55,8 @@ as owed to a woman who has died is worse than that.
 
 ## Before you start
 
-Postnatal care must be open for her. You need `episode.manage`.
+Postnatal care must be open for her, and she must not be a high-risk mother
+with her day 45 check still open. You need `episode.manage`.
 
 ## What happens
 
@@ -69,6 +71,9 @@ The postnatal card says this is over and asks for nothing.
 
 - **You closed it too early.** It is correctable: record the delivery again
   and the arc comes back where it was, since no visit was ever stored.
+- **She is a high-risk mother.** This form is not offered to her, because it
+  would end her home visits and leave her day 45 check owed. Use
+  Close postnatal care for a high-risk mother, which ends both.
 - **She has died.** Record it here so nobody calls her house. This operation
   records only that postnatal care has ended, and a death is a fact this
   build has nowhere else to keep yet.

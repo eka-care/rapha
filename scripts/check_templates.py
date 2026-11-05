@@ -3,6 +3,12 @@
 The doctor's three templates, and the properties that make them templates
 rather than three more hand written forms.
 
+The antenatal visit is one of the three in spirit but no longer in the
+declaration: it shares its form with a high-risk twin, and a generated form
+names exactly one operation, so the pair is written by hand. This file holds
+that pair to the same inherited facts, the same question objects and the same
+narrowed note, through ANTENATAL below.
+
 What is proved here, in order:
 
   a template is a narrowing of ONE operation and nothing else about it moves.
@@ -83,8 +89,12 @@ A_DOCTOR = "user:ravi"
 NOW = "2026-10-31T10:05:00+00:00"
 BASE = "phc.op.consult-document"
 
-assert sorted(DECLARED) == ["phc.op.antenatal-visit", "phc.op.followup",
-                            "phc.op.ncd-review"], sorted(DECLARED)
+# The antenatal visit is written by hand, with its high-risk twin, because two
+# operations share one form and a generated form names exactly one. It is
+# still held to everything below by ANTENATAL, which stands in for a template.
+assert sorted(DECLARED) == ["phc.op.followup", "phc.op.ncd-review"], sorted(DECLARED)
+ANTENATAL = ("phc.op.antenatal-visit", "phc.op.antenatal-visit-high-risk")
+ANTENATAL_ASKS = ["history", "examination", "assessment", "plan"]
 
 
 # ---------------------------------------------------------------------------
@@ -113,13 +123,23 @@ SCRIBE = {oid for inst in BUNDLE.instruments_raw if inst.get("kind") == "scribe"
           for oid in inst.get("operations") or []}
 STEP = {oid for step in BUNDLE.workflow().steps if step.station == "doctor"
         for oid in step.operations}
-for tid in DECLARED:
+for tid in list(DECLARED) + list(ANTENATAL):
     assert tid in BUNDLE.manifest.operations, tid
     assert tid in SCRIBE, tid
     assert tid in STEP, tid
 assert [c for c in BUNDLE.scribe["doctor"]["choose"]] == \
-    [BASE, "phc.op.ncd-review", "phc.op.antenatal-visit", "phc.op.followup",
+    [BASE, "phc.op.ncd-review", "phc.op.antenatal-visit",
+     "phc.op.antenatal-visit-high-risk", "phc.op.followup",
      "phc.op.rx-prescribe"], BUNDLE.scribe["doctor"]
+# The hand written antenatal pair keeps the properties a template has: the
+# base's own facts, the base's own questions, and the base's note narrowed.
+# Only the preconditions of the high-risk twin differ, and only by adding a gate.
+for tid in ANTENATAL:
+    for key in INHERITS:
+        if key == "preconditions" and tid.endswith("high-risk"):
+            assert OPS[tid][key] == OPS[BASE][key] + ["pregnancy_high_risk.open"], key
+            continue
+        assert OPS[tid][key] == OPS[BASE][key], (tid, key)
 ok("and it is reachable: loaded by the bundle, on the scribe's list, drawn at "
    "the doctor's step, and offered by the station's own switcher")
 
@@ -144,6 +164,14 @@ for tid, decl in sorted(DECLARED.items()):
 ok("every question on a template's form is the base's own question object, "
    "required flag aside: a binding, a unit, a range and a help sentence "
    "cannot be retyped and so cannot disagree")
+
+_ANC_SCHEMA = validate.load(OPS["phc.op.antenatal-visit"]["input"])
+assert OPS["phc.op.antenatal-visit-high-risk"]["input"] == OPS["phc.op.antenatal-visit"]["input"]
+assert [q["link_id"] for q in _ANC_SCHEMA["questions"]] == ANTENATAL_ASKS
+for q in _ANC_SCHEMA["questions"]:
+    assert q == BASE_BY[q["link_id"]], q["link_id"]
+assert validate._phc(_ANC_SCHEMA)["operation"] == list(ANTENATAL), _ANC_SCHEMA
+ok("the antenatal visits share one form whose questions are the base's own, and it names both")
 
 # A required answer is the base's or the template's, never less than the
 # base's for a question it still asks.
@@ -197,7 +225,7 @@ for tid in ("phc.op.ncd-review", "phc.op.followup"):
     assert "NEEDS SIGN-OFF" in (ROOT / "catalogue" / "ops" / ("%s.md" % tid)).read_text()
 # Squashed, because a YAML block scalar keeps the author's line breaks and a
 # sentence is not a line.
-antenatal = " ".join(DECLARED["phc.op.antenatal-visit"]["sign_off"].split())
+antenatal = " ".join((ROOT / "catalogue" / "ops" / "phc.op.antenatal-visit.md").read_text().split())
 assert "codes NOTHING" in antenatal and "signed off" in antenatal, antenatal
 ok("a narrowing nobody clinical signed off says so on the atom a clinician "
    "reads, and the one that codes nothing says that instead")
@@ -366,10 +394,12 @@ ok("the antenatal template codes nothing, publishes no Condition, and carries "
 # rather than written again: the note record's sources are the base's list
 # minus the questions the template does not ask.
 BASE_NOTE, = [r for r in OPS[BASE]["mapping"] if r["resource"] == "notes"]
-for tid, decl in sorted(DECLARED.items()):
+_ASKS = {tid: decl["asks"] for tid, decl in DECLARED.items()}
+_ASKS.update({tid: ANTENATAL_ASKS for tid in ANTENATAL})
+for tid, asks in sorted(_ASKS.items()):
     note, = [r for r in OPS[tid]["mapping"] if r["resource"] == "notes"]
     assert note["fields"]["text"]["note"] == \
-        [k for k in BASE_NOTE["fields"]["text"]["note"] if k in decl["asks"]], tid
+        [k for k in BASE_NOTE["fields"]["text"]["note"] if k in asks], tid
     assert note["fields"]["created_by"] == BASE_NOTE["fields"]["created_by"], tid
 ok("each template's note is the base's own note source narrowed to the "
    "questions it asks, so the narrative path is inherited and never retyped")

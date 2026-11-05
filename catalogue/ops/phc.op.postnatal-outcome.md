@@ -56,13 +56,22 @@ The unsatisfactory outcomes end it too. The check was done and a finding is a
 finding; keeping the check open would only chase the same person again.
 Her seven home visits are a different episode and are not affected.
 
+The follow-up tick triggers nothing. It is kept on the record with what was
+found, and ticking it books no visit and tells nobody. The form says so beside
+the question, so no one assumes a tick has arranged care.
+
+The form does not offer "mother died" or "not found". It ends only this
+check, so those answers would leave her seven home visits owed. Record them
+with End postnatal, which ends both.
+
 ## How you know it worked
 
 The postnatal card no longer lists a day 45 check.
 
 ## When it goes wrong
 
-- **She could not be found.** Record that. It ends the check and says why.
+- **She could not be found, or she has died.** Not this form. Use End
+  postnatal, which ends the home visits and this check together.
 - **Something is wrong with the mother or baby.** Record how things are and
   tick the follow-up question. This form does not arrange the care.
 

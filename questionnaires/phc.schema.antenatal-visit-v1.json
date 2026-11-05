@@ -6,7 +6,7 @@
   "subject_type": "encounter",
   "styling_metadata": {
     "phc": {
-      "operation": "phc.op.antenatal-visit",
+      "operation": ["phc.op.antenatal-visit", "phc.op.antenatal-visit-high-risk"],
       "scribe": true
     }
   },

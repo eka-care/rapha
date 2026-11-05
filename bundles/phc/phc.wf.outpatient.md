@@ -26,11 +26,13 @@ steps:
                  phc.op.pregnancy-open, phc.op.risk-mark,
                  phc.op.delivery-record, phc.op.delivery-record-high-risk,
                  phc.op.pregnancy-close, phc.op.pregnancy-close-high-risk,
-                 phc.op.postnatal-close, phc.op.postnatal-outcome]
+                 phc.op.postnatal-close, phc.op.postnatal-close-high-risk,
+                 phc.op.postnatal-outcome]
   - station: doctor
     done_when: consult.documented
     operations: [phc.op.consult-document, phc.op.ncd-review,
-                 phc.op.antenatal-visit, phc.op.followup,
+                 phc.op.antenatal-visit, phc.op.antenatal-visit-high-risk,
+                 phc.op.followup,
                  phc.op.rx-prescribe, phc.op.lab-order,
                  phc.op.handover, phc.op.handover-reply,
                  phc.op.referral-raise, phc.op.referral-close]

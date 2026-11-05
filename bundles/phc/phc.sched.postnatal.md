@@ -160,8 +160,15 @@ she gets back to the centre closes them in the order she made them.
 
 ## And what stops it
 
-Closing the episode, with `phc.op.postnatal-close`, or never opening it. A
-postnatal episode is opened by one operation only, `phc.op.delivery-record`,
-which cannot be reached except on an open pregnancy and has no outcome that
-means a loss. A woman who miscarried never acquires one of these, so there is
-no visit to cancel, because there was never a visit to begin with.
+Closing the episode, or never opening it. An ordinary mother's is closed with
+`phc.op.postnatal-close`. A high-risk mother has a second episode beside this
+one, and hers is closed with `phc.op.postnatal-close-high-risk`, which ends
+both together so that a mother who has died is owed no visit on either. The
+ordinary close is not offered to her while the second is open.
+
+A postnatal episode is opened by two operations, `phc.op.delivery-record` and
+`phc.op.delivery-record-high-risk`. Each is offered only over its own kind of
+open pregnancy (an ordinary one, or a high-risk one) and neither has an
+outcome that means a loss. A woman who miscarried never acquires one of these,
+so there is no visit to cancel, because there was never a visit to begin
+with.

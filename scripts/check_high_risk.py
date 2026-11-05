@@ -10,9 +10,14 @@ behind, it is that an operation which ends the pregnancy forgets to end the
 second episode, and a woman who has delivered, or lost her baby, goes on
 being asked about check-ups she can no longer attend.
 
-THE CHECKS THIS FILE EXISTS FOR are claims 4 and 5. A delivery or a loss must
+THE CHECKS THIS FILE EXISTS FOR are claims 4, 5, 8 and 9. A delivery or a loss must
 leave her owing no antenatal visit of EITHER kind, and a loss must open no
 postnatal care of EITHER kind: absent, not cancelled, not empty.
+
+Claim 8 is the reverse worry: one recorded visit must close ONE contact, not an
+ordinary one and an extra one together. Claim 9 is that no way of ending a
+mother's postnatal care, on a death or on not finding her, leaves her owing a
+visit on the other episode.
 """
 from __future__ import annotations
 
@@ -129,7 +134,8 @@ ok("marking her adds the extra visits and leaves every ordinary one exactly as i
 
 
 # ---------------------------------------------------------------------------
-# 2. The calendar: all of them, each on its own day, the new ones the doctor's.
+# 2. Her episodes together: each visit on its own day, the new ones the doctor's.
+# This reads the contacts of each episode, not the calendar view built on them.
 # ---------------------------------------------------------------------------
 
 rows = after["pregnancy"] + after["pregnancy_high_risk"]
@@ -142,7 +148,7 @@ for contact in after["pregnancy_high_risk"]:
     assert contact["due"] == (TODAY + timedelta(days=declared.due)).isoformat(), contact
 for contact in after["pregnancy"]:
     assert contact["owner"] != "mo", contact
-ok("her calendar shows every visit on its own day, with the new ones the doctor's")
+ok("across her episodes every owed visit falls on its own day, the extra ones the doctor's and the ordinary ones not")
 
 
 # ---------------------------------------------------------------------------
@@ -245,5 +251,154 @@ assert all(c["state"] == schedule.UPCOMING for c in beyond), beyond
 deliver(store, thread)
 assert owed(store, thread)["pregnancy_high_risk"] == []
 ok("marked at thirty-four weeks, visits fall after her due date and are owed until she delivers")
+
+
+# ---------------------------------------------------------------------------
+# 8. ONE RECORDED VISIT CLOSES EXACTLY ONE CONTACT, and the extra visits are
+#    the doctor's own act, not the ordinary check-up counted twice.
+# ---------------------------------------------------------------------------
+# The defect this guards: both schedules once named the same operation, and
+# contacts are discharged per schedule by the operation committed, so a single
+# recorded visit closed an ordinary contact and an extra one together. She
+# then received fewer visits than the programme requires, and an ANM's visit
+# discharged the medical officer's contact.
+
+VISIT = {"history": "Well.", "examination": "BP normal.",
+         "assessment": "Progressing.", "plan": "Review next month."}
+ORDINARY_OPS = {c.operation for c in ANTENATAL.contacts}
+EXTRA_OPS = {c.operation for c in EXTRA.contacts}
+assert len(ORDINARY_OPS) == 1 and len(EXTRA_OPS) == 1, (ORDINARY_OPS, EXTRA_OPS)
+assert not ORDINARY_OPS & EXTRA_OPS, \
+    "both schedules name %s: one visit closes a contact in each" % (ORDINARY_OPS & EXTRA_OPS)
+(ORDINARY_OP,), (EXTRA_OP,) = ORDINARY_OPS, EXTRA_OPS
+
+
+def record(store, thread, op):
+    done = proposals.commit(store, BUNDLE, op, thread=thread, payload=dict(VISIT),
+                            caps=ANM, actor=USER)
+    assert done, (op, done.reason)
+
+
+def closed(store, thread):
+    """{episode type: [contact ids done]} over everything she owes."""
+    return {kind: [c["contact"] for c in rows if c["state"] == schedule.DONE]
+            for kind, rows in owed(store, thread).items()}
+
+
+# Marked thirty days ago, twenty weeks along: a window of each kind is open.
+store, thread = fresh(weeks=20)
+mark(store, thread, days_ago=30)
+assert closed(store, thread) == {"pregnancy": [], "pregnancy_high_risk": []}, closed(store, thread)
+record(store, thread, ORDINARY_OP)
+once = closed(store, thread)
+assert len(once["pregnancy"]) == 1 and once["pregnancy_high_risk"] == [], \
+    "one ordinary visit: %s" % once
+record(store, thread, EXTRA_OP)
+twice = closed(store, thread)
+assert twice["pregnancy"] == once["pregnancy"], \
+    "the extra visit changed her ordinary contacts: %s -> %s" % (once, twice)
+assert len(twice["pregnancy_high_risk"]) == 1, "one extra visit: %s" % twice
+assert sum(len(v) for v in twice.values()) == 2, twice
+
+# And the extra visit alone, on a woman who has had no ordinary one, closes
+# nothing of her ordinary four.
+store, thread = fresh(weeks=20)
+mark(store, thread, days_ago=30)
+record(store, thread, EXTRA_OP)
+alone = closed(store, thread)
+assert alone["pregnancy"] == [] and len(alone["pregnancy_high_risk"]) == 1, alone
+ok("one recorded visit closes exactly one contact: an ordinary visit closes one ordinary contact, an extra visit one extra, neither touches the other")
+
+
+# ---------------------------------------------------------------------------
+# 9. NO PATH LEAVES A DEAD MOTHER OWING A VISIT, and none chases one who
+#    cannot be found.
+# ---------------------------------------------------------------------------
+# A high-risk mother has two postnatal episodes. Every operation that ends
+# either of them, with every answer that means she is gone, is tried against
+# the state she is in. A refusal is not a path. A commit is, and after it she
+# must owe nothing on EITHER episode. The scan is over the whole catalogue, so
+# an operation added later is covered without anybody remembering it.
+
+GONE = ("mother_died", "not_found", "unable_to_contact", "moved_away")
+POSTNATAL_KINDS = ("postnatal", "postnatal_high_risk")
+
+
+def endings_of_postnatal():
+    out = []
+    for op_id, op in BUNDLE.operations.items():
+        for record_ in op.get("mapping") or []:
+            fields = record_.get("fields") or {}
+            if (fields.get("type") == {"const": "postnatal"}
+                    or fields.get("type") == {"const": "postnatal_high_risk"}) \
+                    and fields.get("status") == {"const": "ended"}:
+                out.append(op_id)
+                break
+    return sorted(set(out))
+
+
+ENDERS = endings_of_postnatal()
+assert {"phc.op.postnatal-close", "phc.op.postnatal-outcome"} <= set(ENDERS), ENDERS
+
+
+def high_risk_mother():
+    store, thread = fresh(weeks=39)
+    mark(store, thread, days_ago=2)
+    deliver(store, thread, days_ago=2)
+    assert set(POSTNATAL_KINDS) <= set(owed(store, thread)), sorted(owed(store, thread))
+    return store, thread
+
+
+def ordinary_mother():
+    store, thread = fresh(weeks=39)
+    deliver(store, thread, days_ago=2, kind="delivery-record")
+    return store, thread
+
+
+def owes_nothing(store, thread):
+    rows = owed(store, thread)
+    return sum(len(v) for v in rows.values()) == 0 \
+        and not {"postnatal.open", "postnatal_high_risk.open"} & state.flags(store, thread, WF)
+
+
+def paths(make):
+    """[(op, answer)] that a commit accepts for the mother `make` builds."""
+    taken = []
+    for op_id in ENDERS:
+        for answer in GONE:
+            store, thread = make()
+            done = proposals.commit(store, BUNDLE, op_id, thread=thread,
+                                    payload={"outcome": answer}, caps=ANM, actor=USER)
+            if not done:
+                continue
+            taken.append((op_id, answer))
+            assert owes_nothing(store, thread), \
+                "%s with %r leaves her owing: %s" % (
+                    op_id, answer, {k: ids(v) for k, v in owed(store, thread).items() if v})
+    return taken
+
+
+high = paths(high_risk_mother)
+assert ("phc.op.postnatal-close-high-risk", "mother_died") in high, \
+    "a high-risk mother has no way of being recorded as dead: %s" % high
+assert ("phc.op.postnatal-close", "mother_died") not in high, high
+assert not [p for p in high if p[0] == "phc.op.postnatal-outcome"], \
+    "the day-45 form takes %s, which would end one episode only" % high
+
+ordinary = paths(ordinary_mother)
+assert ("phc.op.postnatal-close", "mother_died") in ordinary, ordinary
+assert not [p for p in ordinary if "high-risk" in p[0] or p[0] == "phc.op.postnatal-outcome"], ordinary
+
+# The other order: the day-45 check done first, then she is lost.
+for outcome in ("both_well", "mother_unwell", "baby_unwell", "both_unwell", "baby_died"):
+    store, thread = high_risk_mother()
+    done = proposals.commit(store, BUNDLE, "phc.op.postnatal-outcome", thread=thread,
+                            payload={"outcome": outcome}, caps=ANM, actor=USER)
+    assert done, (outcome, done.reason)
+    after = proposals.commit(store, BUNDLE, "phc.op.postnatal-close", thread=thread,
+                             payload={"outcome": "mother_died"}, caps=ANM, actor=USER)
+    assert after, (outcome, after.reason)
+    assert owes_nothing(store, thread), outcome
+ok("no way of ending postnatal care on a death or a lost mother leaves a visit owed on either episode: %d accepted paths tried, ordinary mother and high-risk mother" % (len(high) + len(ordinary)))
 
 print("\nok   high-risk pregnancy: %d checks" % checks)

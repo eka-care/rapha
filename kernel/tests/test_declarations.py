@@ -115,8 +115,38 @@ def test_a_high_risk_pregnancy_has_its_own_schedule_of_three_visits():
 def test_the_three_visits_are_owned_by_the_doctor_and_escalate():
     for c in _hrp()["contacts"]:
         assert c["owner"] == "mo" and c["escalates_to"] == "cho"
-        assert c["operation"] == "phc.op.antenatal-visit"
+        # Its OWN operation. Sharing the ordinary one lets a single recorded
+        # visit close an ordinary contact and an extra one together.
+        assert c["operation"] == "phc.op.antenatal-visit-high-risk"
         assert c["authority"] == "statutory"
+
+
+def test_the_extra_visits_have_an_operation_of_their_own_on_the_shared_form():
+    ordinary = {c["operation"] for c in CAT["schedules"]["phc.sched.antenatal"]["contacts"]}
+    extra = {c["operation"] for c in _hrp()["contacts"]}
+    assert ordinary == {"phc.op.antenatal-visit"}
+    assert extra == {"phc.op.antenatal-visit-high-risk"}
+    ops = CAT["operations"]
+    one, two = ops["phc.op.antenatal-visit"], ops["phc.op.antenatal-visit-high-risk"]
+    # A shared form, never a copy: both name it and it names both.
+    assert one["input"] == two["input"] == "phc.schema.antenatal-visit-v1"
+    form = json.loads((ROOT / "questionnaires" / "phc.schema.antenatal-visit-v1.json").read_text())
+    assert form["styling_metadata"]["phc"]["operation"] == [
+        "phc.op.antenatal-visit", "phc.op.antenatal-visit-high-risk"]
+    assert CAT["mapping"]["phc.op.antenatal-visit"] == CAT["mapping"]["phc.op.antenatal-visit-high-risk"]
+    # Gated on her high-risk episode, at the bench where the doctor works, by
+    # the capability the doctor holds. The ordinary one is unchanged.
+    assert two["preconditions"] == ["registered", "pregnancy_high_risk.open"]
+    assert two["station"] == "doctor" == one["station"]
+    assert two["capability"] == one["capability"] == "encounter.document"
+    assert one["preconditions"] == ["registered"]
+    assert len(two["short"]) <= 14 and two["short"] != one["short"]
+    # Offered to a doctor over her high-risk episode, and over nothing else.
+    assert "phc.op.antenatal-visit-high-risk" in _reachable("pregnancy_high_risk")
+    assert "phc.op.antenatal-visit-high-risk" not in _reachable("pregnancy")
+    assert "phc.op.antenatal-visit-high-risk" in {
+        o for st in CAT["workflows"]["phc.wf.outpatient"]["steps"]
+        if st["station"] == "doctor" for o in st["operations"]}
 
 
 def test_no_two_high_risk_windows_share_a_day():
@@ -229,6 +259,21 @@ def test_every_operation_that_ends_a_pregnancy_ends_the_high_risk_episode_too():
         assert pre == ["pregnancy.ordinary"], (op, pre)
 
 
+def test_no_operation_ends_the_home_visits_of_a_mother_whose_day_45_check_is_still_owed():
+    # The safety property for a mother who has died: any operation that ends
+    # `postnatal` also ends the tail, or is guarded off while the tail is open.
+    seen = 0
+    for op, rows in CAT["mapping"].items():
+        kinds = _types_of(rows)
+        if ("postnatal", "ended") not in kinds:
+            continue
+        seen += 1
+        if ("postnatal_high_risk", "ended") in kinds:
+            continue
+        assert "not postnatal_high_risk.open" in CAT["operations"][op]["preconditions"], op
+    assert seen == 2, seen
+
+
 def _types_of(rows):
     return [(r["fields"]["type"]["const"], r["fields"]["status"]["const"])
             for r in rows if r["resource"] == "episode_of_care"
@@ -338,7 +383,7 @@ def test_every_answer_to_the_day_45_check_ends_the_episode_including_a_poor_one(
     q = form["questions"][0]
     assert q["link_id"] == "outcome" and q["required"]
     values = {o["value"] for o in q["answer_option"]}
-    assert {"both_well", "mother_unwell", "baby_unwell", "both_unwell", "not_found"} <= values
+    assert values == {"both_well", "mother_unwell", "baby_unwell", "both_unwell", "baby_died"}
     # One unconditional ending row: no answer leaves the episode open.
     (row,) = CAT["mapping"]["phc.op.postnatal-outcome"]
     assert row["fields"]["status"] == {"const": "ended"}
@@ -361,13 +406,48 @@ def test_a_high_risk_mothers_home_visits_are_recorded_on_the_ordinary_episode():
 def test_the_ordinary_postnatal_path_is_unchanged():
     ops = CAT["operations"]
     assert ops["phc.op.postnatal-visit"]["preconditions"] == ["registered", "postnatal.open"]
-    assert ops["phc.op.postnatal-close"]["preconditions"] == ["postnatal.open"]
+    # Gated off for a high-risk mother, whose death must end her day 45 check too.
+    assert ops["phc.op.postnatal-close"]["preconditions"] == [
+        "postnatal.open", "not postnatal_high_risk.open"]
     assert _types("phc.op.postnatal-close") == [("postnatal", "ended")]
     assert _types("phc.op.delivery-record") == [("pregnancy", "ended"), ("postnatal", "active")]
     steps = CAT["workflows"]["phc.wf.outpatient"]["steps"]
     assert [x["station"] for x in steps].count("community") == 1
     assert steps[-1]["applies_when"] == "postnatal.open"
     assert steps[-1]["operations"] == ["phc.op.postnatal-visit"]
+
+
+def test_a_high_risk_mother_is_closed_by_one_operation_that_ends_both_episodes():
+    ops = CAT["operations"]
+    both = ops["phc.op.postnatal-close-high-risk"]
+    assert both["preconditions"] == ["postnatal.open", "postnatal_high_risk.open"]
+    assert both["station"] == "nurse" and both["capability"] == "episode.manage"
+    assert both["short"] == ops["phc.op.postnatal-close"]["short"] and len(both["short"]) <= 14
+    assert sorted(_types("phc.op.postnatal-close-high-risk")) == [
+        ("postnatal", "ended"), ("postnatal_high_risk", "ended")]
+    # One form for both, named from both ends.
+    assert both["input"] == ops["phc.op.postnatal-close"]["input"]
+    form = json.loads((ROOT / "questionnaires" / "phc.schema.postnatal-close-v1.json").read_text())
+    assert form["styling_metadata"]["phc"]["operation"] == [
+        "phc.op.postnatal-close", "phc.op.postnatal-close-high-risk"]
+    nurse = [x for x in CAT["workflows"]["phc.wf.outpatient"]["steps"]
+             if x["station"] == "nurse"][0]["operations"]
+    assert "phc.op.postnatal-close-high-risk" in nurse
+    # Never offered to an ordinary mother, whose tail does not exist; and the
+    # ordinary close is never offered while a tail is open.
+    assert "phc.op.postnatal-close-high-risk" not in _reachable("postnatal")
+    assert "phc.op.postnatal-close" in _reachable("postnatal")
+
+
+def test_the_day_45_form_cannot_record_a_death_or_a_mother_not_found():
+    # It ends only the tail, so those answers would leave her seven home
+    # visits owed. They are recorded with the closing operation that ends both.
+    form = json.loads((ROOT / "questionnaires" / "phc.schema.postnatal-outcome-v1.json").read_text())
+    values = {o["value"] for o in form["questions"][0]["answer_option"]}
+    assert not values & {"mother_died", "not_found"}, values
+    close = json.loads((ROOT / "questionnaires" / "phc.schema.postnatal-close-v1.json").read_text())
+    assert {"mother_died", "unable_to_contact"} <= {
+        o["value"] for o in close["questions"][0]["answer_option"]}
 
 
 def test_the_new_postnatal_states_have_the_same_shape_as_every_other_episode():
@@ -390,15 +470,32 @@ def test_no_engineering_words_reach_a_worker_in_the_day_45_check():
                   q["styling_metadata"]["phc"].get("help", "")]
     sched = CAT["schedules"]["phc.sched.postnatal-high-risk"]
     texts += [sched["title"], sched["summary"]] + [c["title"] for c in sched["contacts"]]
+    # The card prints these, so they are read as well as the titles.
+    texts += [c.get("reports_as") or "" for c in sched["contacts"]]
+    texts += [c.get("programme_title") or "" for c in sched["contacts"]]
     for t in texts:
         for bad in ("TODO", "FIXME", "sign-off", "SIGN-OFF", "HRP"):
             assert bad not in t, t
 
 
+def test_every_reports_as_in_every_schedule_is_a_code_the_programme_has():
+    # The nurse's card prints reports_as as a badge. An invented code there is
+    # an official looking code in front of a clinician. ANC1 to ANC4 and HBNC1
+    # to HBNC7 are the programme's; the extra visits and the day 45 check have
+    # none, and must carry none.
+    real = {"ANC1", "ANC2", "ANC3", "ANC4"} | {"HBNC%d" % i for i in range(1, 8)}
+    for sid, s in CAT["schedules"].items():
+        for c in s["contacts"]:
+            code = c.get("reports_as")
+            assert not code or code in real, (sid, c["id"], code)
+    for sid in ("phc.sched.antenatal-high-risk", "phc.sched.postnatal-high-risk"):
+        assert not any(c.get("reports_as") for c in CAT["schedules"][sid]["contacts"]), sid
+
+
 def test_every_day_45_outcome_really_ends_the_tail_when_committed():
     # Not inferred from the mapping: commit each answer through the real path.
     for outcome in ("both_well", "mother_unwell", "baby_unwell", "both_unwell",
-                    "baby_died", "mother_died", "not_found"):
+                    "baby_died"):
         t, store, bundle, wf, state = _high_risk_mother()
         assert "postnatal_high_risk.open" in state.flags(store, t, wf)
         from kernel import proposals
@@ -409,6 +506,12 @@ def test_every_day_45_outcome_really_ends_the_tail_when_committed():
                              actor="user:jyothi")
         assert r, (outcome, r.reason)
         assert "postnatal_high_risk.open" not in state.flags(store, t, wf), outcome
+        # And she owes nothing on the tail. Closed and still chased are different things.
+        from kernel import schedule, spine
+        (patient,) = store.select("patient", thread=t, where={}, fields=["id"], limit=2)
+        tail = [e for e in spine.of(bundle, store, wf, patient["id"])["episodes"]
+                if e["type"] == "postnatal_high_risk"]
+        assert tail and all(schedule.contacts(bundle, store, wf, e) == [] for e in tail), outcome
 
 
 def _high_risk_mother():

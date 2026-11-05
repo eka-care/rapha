@@ -223,6 +223,7 @@
         "phc.op.consult-document",
         "phc.op.ncd-review",
         "phc.op.antenatal-visit",
+        "phc.op.antenatal-visit-high-risk",
         "phc.op.followup",
         "phc.op.rx-prescribe",
         "phc.op.household-visit"
@@ -473,6 +474,7 @@
       "phc.op.delivery-record-high-risk",
       "phc.op.pregnancy-close-high-risk",
       "phc.op.postnatal-close",
+      "phc.op.postnatal-close-high-risk",
       "phc.op.postnatal-visit",
       "phc.op.postnatal-outcome",
       "phc.op.referral-raise",
@@ -480,6 +482,7 @@
       "phc.op.context-add",
       "phc.op.ncd-review",
       "phc.op.antenatal-visit",
+      "phc.op.antenatal-visit-high-risk",
       "phc.op.antenatal-measure",
       "phc.op.followup"
     ],
@@ -585,6 +588,43 @@
       }
     ],
     "phc.op.antenatal-visit": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "status": {
+            "const": "in_progress"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "encounter"
+      },
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "text": {
+            "note": [
+              "history",
+              "examination",
+              "assessment",
+              "plan"
+            ]
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "notes"
+      }
+    ],
+    "phc.op.antenatal-visit-high-risk": [
       {
         "fields": {
           "created_by": {
@@ -1336,6 +1376,50 @@
           },
           "type": {
             "const": "postnatal"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "episode_of_care"
+      }
+    ],
+    "phc.op.postnatal-close-high-risk": [
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "outcome": {
+            "answer": "outcome"
+          },
+          "status": {
+            "const": "ended"
+          },
+          "type": {
+            "const": "postnatal"
+          }
+        },
+        "per_item": null,
+        "per_question": null,
+        "per_row": null,
+        "questions": {},
+        "resource": "episode_of_care"
+      },
+      {
+        "fields": {
+          "created_by": {
+            "actor": "id"
+          },
+          "outcome": {
+            "answer": "outcome"
+          },
+          "status": {
+            "const": "ended"
+          },
+          "type": {
+            "const": "postnatal_high_risk"
           }
         },
         "per_item": null,
@@ -2331,7 +2415,7 @@
     },
     "phc.op.antenatal-visit": {
       "capability": "encounter.document",
-      "description": "An antenatal visit. It asks for the history, what you found, your\nassessment and the plan, and it does not offer the coded diagnosis\nrows, because this build can code three conditions and not one of them\nis obstetric. The whole of this visit travels as narrative text into\nthe published document, which is what that fallback was built for.\n\nThis narrowing is a fact about this build's vocabulary and not a\nclinical judgement: terminology/condition-code.json holds three\nconcepts and says it is not a diagnosis list, so there is no obstetric\nconcept for a coded row to carry. It follows that this template codes\nNOTHING. It is not clinically useful as a coded record until a\npublished obstetric list is signed off by a named clinical officer, and\nit should not be mistaken for one. What it does do is keep the visit as\ntext in a record that reaches ABDM.",
+      "description": "An antenatal visit. It asks for the history, what you found, your\nassessment and the plan, and it does not offer the coded diagnosis\nrows, because this build can code three conditions and not one of them\nis obstetric. The whole of this visit travels as narrative text into\nthe published document, which is what that fallback was built for.\n\nThis is one of a pair. A woman marked high risk is owed three more\nvisits, with a doctor, over and above her ordinary four. Those are\nrecorded with `phc.op.antenatal-visit-high-risk`, which asks the same\nquestions on this same form. They are two operations because a recorded\nvisit closes the contacts of the operation that was committed, and one\noperation for both would let a single visit close an ordinary contact and\nan extra one together. This one closes only an ordinary contact.\n\nThis narrowing is a fact about this build's vocabulary and not a\nclinical judgement: terminology/condition-code.json holds three\nconcepts and says it is not a diagnosis list, so there is no obstetric\nconcept for a coded row to carry. It follows that this operation codes\nNOTHING. It is not clinically useful as a coded record until a\npublished obstetric list is signed off by a named clinical officer, and\nit should not be mistaken for one. What it does do is keep the visit as\ntext in a record that reaches ABDM.",
       "emits": [
         "consult.documented"
       ],
@@ -2384,6 +2468,69 @@
       ],
       "title": "Antenatal visit",
       "tool": "propose_antenatal_visit",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "encounter",
+        "notes"
+      ]
+    },
+    "phc.op.antenatal-visit-high-risk": {
+      "capability": "encounter.document",
+      "description": "The doctor's visit for a woman marked high risk, one of the three extra ones\nover and above her ordinary four. It asks the same four things the ordinary\nantenatal visit asks, on the same form, and it travels as narrative text in\nthe same way.",
+      "emits": [
+        "consult.documented"
+      ],
+      "fields": [
+        {
+          "link_id": "history",
+          "options": null,
+          "required": false,
+          "text": "History",
+          "type": "text"
+        },
+        {
+          "link_id": "examination",
+          "options": null,
+          "required": false,
+          "text": "Examination",
+          "type": "text"
+        },
+        {
+          "link_id": "assessment",
+          "options": null,
+          "required": true,
+          "text": "Assessment",
+          "type": "text"
+        },
+        {
+          "link_id": "plan",
+          "options": null,
+          "required": false,
+          "text": "Plan",
+          "type": "text"
+        }
+      ],
+      "id": "phc.op.antenatal-visit-high-risk",
+      "input": "phc.schema.antenatal-visit-v1",
+      "instrument": "scribe",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "registered",
+        "pregnancy_high_risk.open"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "Extra visit",
+      "station": "doctor",
+      "summary": "One of the three extra doctor visits a high-risk pregnancy is owed, recorded as narrative.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Extra antenatal visit for a high-risk pregnancy",
+      "tool": "propose_antenatal_visit_high_risk",
       "type": "operation",
       "verified": "unverified",
       "writes": [
@@ -3302,7 +3449,8 @@
       "irreversibility": "correctable",
       "kind": "write",
       "preconditions": [
-        "postnatal.open"
+        "postnatal.open",
+        "not postnatal_high_risk.open"
       ],
       "presents": "event",
       "scope_qualifier": null,
@@ -3321,6 +3469,51 @@
         "episode_of_care"
       ]
     },
+    "phc.op.postnatal-close-high-risk": {
+      "capability": "episode.manage",
+      "description": "Her postnatal care is finished, or it is not going to happen, and this says\nso. It ends her seven home visits and her day 45 check together, so nobody\nis sent to a house for a mother who has moved away, cannot be reached, or\nhas died.",
+      "emits": [],
+      "fields": [
+        {
+          "link_id": "outcome",
+          "options": [
+            "completed",
+            "moved_away",
+            "mother_died",
+            "declined",
+            "unable_to_contact"
+          ],
+          "required": true,
+          "text": "Why is postnatal care ending?",
+          "type": "choice"
+        }
+      ],
+      "id": "phc.op.postnatal-close-high-risk",
+      "input": "phc.schema.postnatal-close-v1",
+      "instrument": "form",
+      "irreversibility": "correctable",
+      "kind": "write",
+      "preconditions": [
+        "postnatal.open",
+        "postnatal_high_risk.open"
+      ],
+      "presents": "event",
+      "scope_qualifier": null,
+      "short": "End postnatal",
+      "station": "nurse",
+      "summary": "Postnatal care is over, and every home visit and the day 45 check still owed stop.",
+      "surfaces": [
+        "rendered",
+        "mcp"
+      ],
+      "title": "Close postnatal care for a high-risk mother",
+      "tool": "propose_postnatal_close_high_risk",
+      "type": "operation",
+      "verified": "unverified",
+      "writes": [
+        "episode_of_care"
+      ]
+    },
     "phc.op.postnatal-outcome": {
       "capability": "episode.manage",
       "description": "The ANM's check at day 45 after a high-risk delivery. It says how the mother\nand baby are, and it ends the high-risk tail of her care.",
@@ -3333,9 +3526,7 @@
             "mother_unwell",
             "baby_unwell",
             "both_unwell",
-            "baby_died",
-            "mother_died",
-            "not_found"
+            "baby_died"
           ],
           "required": true,
           "text": "How are the mother and baby at day 45?",
@@ -4042,7 +4233,7 @@
           "escalates_to": "cho",
           "id": "hrp1",
           "opens": 16,
-          "operation": "phc.op.antenatal-visit",
+          "operation": "phc.op.antenatal-visit-high-risk",
           "owner": "mo",
           "programme_title": "First follow-up ANC for a high-risk pregnancy",
           "reports_as": null,
@@ -4055,7 +4246,7 @@
           "escalates_to": "cho",
           "id": "hrp2",
           "opens": 46,
-          "operation": "phc.op.antenatal-visit",
+          "operation": "phc.op.antenatal-visit-high-risk",
           "owner": "mo",
           "programme_title": "Second follow-up ANC for a high-risk pregnancy",
           "reports_as": null,
@@ -4068,7 +4259,7 @@
           "escalates_to": "cho",
           "id": "hrp3",
           "opens": 76,
-          "operation": "phc.op.antenatal-visit",
+          "operation": "phc.op.antenatal-visit-high-risk",
           "owner": "mo",
           "programme_title": "Third follow-up ANC for a high-risk pregnancy",
           "reports_as": null,
@@ -4201,7 +4392,7 @@
           "operation": "phc.op.postnatal-outcome",
           "owner": "anm",
           "programme_title": null,
-          "reports_as": "HRP-OUTCOME",
+          "reports_as": null,
           "title": "Day 45 check"
         }
       ],
@@ -4264,6 +4455,7 @@
         "phc.op.consult-document",
         "phc.op.ncd-review",
         "phc.op.antenatal-visit",
+        "phc.op.antenatal-visit-high-risk",
         "phc.op.followup",
         "phc.op.rx-prescribe"
       ],
@@ -5143,6 +5335,7 @@
             "phc.op.pregnancy-close",
             "phc.op.pregnancy-close-high-risk",
             "phc.op.postnatal-close",
+            "phc.op.postnatal-close-high-risk",
             "phc.op.postnatal-outcome"
           ],
           "station": "nurse"
@@ -5154,6 +5347,7 @@
             "phc.op.consult-document",
             "phc.op.ncd-review",
             "phc.op.antenatal-visit",
+            "phc.op.antenatal-visit-high-risk",
             "phc.op.followup",
             "phc.op.rx-prescribe",
             "phc.op.lab-order",

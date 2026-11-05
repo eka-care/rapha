@@ -6,7 +6,7 @@
   "subject_type": "encounter",
   "styling_metadata": {
     "phc": {
-      "operation": "phc.op.postnatal-close"
+      "operation": ["phc.op.postnatal-close", "phc.op.postnatal-close-high-risk"]
     }
   },
   "questions": [
@@ -25,7 +25,7 @@
       "styling_metadata": {
         "phc": {
           "short": "Outcome",
-          "help": "Every home visit still scheduled for her stops the moment you record this."
+          "help": "Every visit still scheduled for her stops the moment you record this."
         }
       }
     }

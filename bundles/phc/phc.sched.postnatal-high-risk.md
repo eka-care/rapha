@@ -18,7 +18,6 @@ contacts:
     escalates_to: cho
     operation: phc.op.postnatal-outcome
     authority: statutory
-    reports_as: HRP-OUTCOME
 ---
 
 ## In plain words
@@ -36,9 +35,14 @@ here, because a copied schedule is a schedule that drifts: change the visits
 in one place and they change for every mother.
 
 So a high-risk mother is visited at home exactly as any mother is, and in
-addition the ANM makes this check. The two episodes are closed separately.
-The home visits end with `phc.op.postnatal-close`; this one ends when the
-outcome is recorded with `phc.op.postnatal-outcome`.
+addition the ANM makes this check. The two episodes can end in two ways.
+Recording the day 45 outcome with `phc.op.postnatal-outcome` ends this one
+and leaves the home visits where they were. Closing her postnatal care with
+`phc.op.postnatal-close-high-risk` ends both together, and that is the only
+way to record that the mother has died or cannot be found. The day 45 form
+does not offer those two answers, because it would end this episode only and
+leave seven home visits owed to a woman who may have died. The ordinary
+`phc.op.postnatal-close` is not offered to her while this episode is open.
 
 ## NEEDS SIGN-OFF
 
@@ -59,10 +63,18 @@ upcoming, inside it is due, after it with nothing against it is missed.
 
 A committed `phc.op.postnatal-outcome` inside the window. Recording it also
 ends the episode, whatever the outcome, so a mother whose outcome was poor is
-not chased for ever. What went wrong is for the follow-up question on the
-form and for the doctor.
+not chased for ever. What went wrong is for the question on the form and
+for the doctor. The follow-up tick on that form is a note on the record and
+triggers nothing: no task, no call and no new visit is made by ticking it.
+
+## No register code, on purpose
+
+The programme tracks a high-risk woman to day 45 but gives this check no code
+the way HBNC1 to HBNC7 have. A code was invented for it in an earlier draft
+and has been removed, so nothing invented can reach a report or a card.
 
 ## And what stops it
 
-Recording the outcome, or never opening it: only a high-risk delivery opens
+Recording the outcome, closing her postnatal care with the high-risk close,
+or never opening it: only a high-risk delivery opens
 this episode, and a pregnancy that ended any other way never acquires one.

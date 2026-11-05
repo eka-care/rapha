@@ -44,7 +44,7 @@ verified:
   status: unverified
   against: care-local
 related:
-  operations: [phc.op.pregnancy-close, phc.op.postnatal-close]
+  operations: [phc.op.pregnancy-close, phc.op.postnatal-close, phc.op.delivery-record-high-risk]
   concepts: []
 ---
 
@@ -75,8 +75,15 @@ that opens anything.
 
 ## Before you start
 
-A pregnancy must be open on this centre's books. You need `episode.manage`,
-which an ANM, a community health officer and the medical officer hold.
+A pregnancy must be open on this centre's books, and it must not have been
+marked high risk. If it has, this form is not offered to her and she is given
+Record a delivery for a high-risk pregnancy instead
+(`phc.op.delivery-record-high-risk`). A form cannot choose between two sets of
+records, so the choice is made by state: this one ends the pregnancy and opens
+the home visits, and using it for a high-risk woman would leave her three
+extra doctor visits owed after she had delivered, and would never open her day
+45 check. You need `episode.manage`, which an ANM, a community health officer
+and the medical officer hold.
 
 ## What happens
 

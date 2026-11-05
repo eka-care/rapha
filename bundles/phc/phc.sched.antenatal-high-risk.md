@@ -17,7 +17,7 @@ contacts:
     closes: 44
     owner: mo
     escalates_to: cho
-    operation: phc.op.antenatal-visit
+    operation: phc.op.antenatal-visit-high-risk
     authority: statutory
   - id: hrp2
     title: Second extra check-up
@@ -27,7 +27,7 @@ contacts:
     closes: 74
     owner: mo
     escalates_to: cho
-    operation: phc.op.antenatal-visit
+    operation: phc.op.antenatal-visit-high-risk
     authority: statutory
   - id: hrp3
     title: Third extra check-up
@@ -37,7 +37,7 @@ contacts:
     closes: 104
     owner: mo
     escalates_to: cho
-    operation: phc.op.antenatal-visit
+    operation: phc.op.antenatal-visit-high-risk
     authority: statutory
 ---
 
@@ -66,8 +66,9 @@ register code exists, and whether statutory is the right word.
 ## Who owns them
 
 The medical officer, escalating to the community health officer, because
-the programme requires a doctor or obstetrician. The ASHA accompanies her.
-The system records that by who performs the visit, not by a second row.
+the programme requires a doctor or obstetrician. The ASHA may accompany her,
+but this system does not record that. It records the visit and the person who
+made it, and nothing about who came with her.
 
 ## The numbers
 
@@ -80,4 +81,11 @@ clinical sign-off.
 
 ## What closes one
 
-A committed antenatal visit inside the window, as for the ordinary four.
+A committed extra antenatal visit, `phc.op.antenatal-visit-high-risk`, inside
+the window. It is a separate operation from the ordinary antenatal visit on
+purpose. Contacts are closed by the operation that was committed, so if both
+schedules named one operation, a single recorded visit would close an ordinary
+contact and an extra one together. She would then receive fewer visits than the
+programme requires, and the ANM's visit would discharge the medical officer's.
+The two operations share one form, so the questions are the same. One visit
+closes one contact, the earliest open one whose window contains it.

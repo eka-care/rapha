@@ -50,8 +50,8 @@ is refused. You hold `episode.manage`. The ASHA reports what she finds and
 the centre decides, so she cannot mark; the nurse and the medical officer
 can. The operation is offered at the nurse's bench only, whoever decides:
 the build refuses an operation drawn at a station other than its own.
-The medical officer holds the capability but marks her at that bench.
-The design says he may mark her; that needs the owner's correction.
+The medical officer holds the capability and marks her at that bench too.
+The design first said he could not, and was corrected while this was built.
 
 ## What happens
 
