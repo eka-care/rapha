@@ -72,32 +72,59 @@ pregnancy and adds what the programme adds.
 
 ## 3. What this costs to build
 
-**No kernel code. No Go code. No parity work.** `kernel/schedule.py` matches
-a schedule to an episode purely on the episode's `type`, which is the
-bundle's own word, so a new type with a new schedule is picked up by both
-engines without either being touched.
+**No kernel code. No Go code.** `kernel/schedule.py` matches a schedule to an
+episode purely on the episode's `type`, which is the bundle's own word, so a
+new type with a new schedule is picked up by both engines without either being
+touched. The Go parity fixture gained a high-risk woman (a pregnancy, a
+delivery and a loss) so that "no parity work" is checked and not only claimed.
 
-What gets written:
+What was written, as built. It is more than the first draft of this section
+said, and the growth has two causes. A mapping cannot be conditional, so
+every place the high-risk woman needs a different set of rows is a second
+operation chosen by state. And contacts are closed by the operation that was
+committed, so the extra visits need an operation of their own.
 
-1. **`bundles/phc/phc.sched.antenatal-high-risk.md`** — a new schedule,
-   `episode: pregnancy_high_risk`, three contacts owned by `mo`, escalating
-   to the CHO, each drawing an antenatal visit. This is a copy of the
-   existing antenatal schedule with different numbers.
-2. **`catalogue/ops/phc.op.risk-mark.md`** plus a questionnaire — the
-   operation that opens the episode. It writes one `episode_of_care` row,
-   which is what `phc.op.pregnancy-open` already does; copy that, not the
-   two-row delivery operation.
-3. **Four state rules** in `bundles/phc/phc.wf.outpatient.md` —
-   `pregnancy_high_risk.open` and `.ended` as the same `gte`/`all_of` pair
-   every other episode uses, plus `pregnancy.ordinary` for section 4.
-4. **One line** in `bundles/phc/phc.view.calendar.md`, adding the new type to
-   the `episodes:` the calendar sweeps.
-5. **One line** in the workflow's nurse step, so the operation is offered.
-6. **`scripts/check_high_risk.py`**, in the style of `check_antenatal.py`.
+Two schedules:
 
-Six declaration files and a check script. Everything else — the calendar, the
-card stack, the arc, the escalation when a visit is missed, the audit, the
-FHIR projection, both engines — works on it the day it compiles.
+1. **`phc.sched.antenatal-high-risk`**: `episode: pregnancy_high_risk`, three
+   contacts owned by `mo`, escalating to the CHO, each closed by
+   `phc.op.antenatal-visit-high-risk`.
+2. **`phc.sched.postnatal-high-risk`**: `episode: postnatal_high_risk`, one
+   contact, the day-45 check, owned by the ANM.
+
+Six operations, all in `catalogue/ops`:
+
+3. **`phc.op.risk-mark`**: opens the `pregnancy_high_risk` episode with one
+   row, as `phc.op.pregnancy-open` does.
+4. **`phc.op.antenatal-visit-high-risk`**: the three extra doctor visits.
+   Gated on `pregnancy_high_risk.open`, at the doctor's bench, on the ordinary
+   antenatal form. The ordinary antenatal visit became a hand-written atom
+   instead of a generated template, because a generated form can name only
+   one operation.
+5. **`phc.op.pregnancy-close-high-risk`** and
+   **`phc.op.delivery-record-high-risk`**: the two ways a high-risk pregnancy
+   ends. Each ends the pregnancy and the high-risk episode together.
+6. **`phc.op.postnatal-outcome`**: the day-45 check; it ends only the tail.
+7. **`phc.op.postnatal-close-high-risk`**: ends the home visits and the tail
+   together, and is the only way a high-risk mother's death or loss to
+   follow-up is recorded.
+
+Four questionnaires are shared and not copied, each naming both its
+operations in `styling_metadata.phc.operation`: `delivery-record-v1`,
+`pregnancy-close-v1`, `postnatal-close-v1` and `antenatal-visit-v1`. Two are
+new: `risk-mark-v1` and `postnatal-outcome-v1`.
+
+Declarations in the bundle: state rules `pregnancy_high_risk.open`,
+`pregnancy_high_risk.ended`, `pregnancy.ordinary`, `postnatal_high_risk.open`
+and `postnatal_high_risk.ended`; the high-risk type in the calendar view; and
+the operations offered at the nurse's and doctor's steps. The ordinary
+`phc.op.postnatal-close` gained a gate, `not postnatal_high_risk.open`.
+
+The check is `scripts/check_high_risk.py`.
+
+Everything else (the calendar, the card stack, the arc, the escalation when a
+visit is missed, the audit, the FHIR projection, both engines) works on it the
+day it compiles.
 
 ## 4. The day-45 tail
 
@@ -106,19 +133,29 @@ programme tracks a high-risk woman to **day 45**, with a verified outcome.
 
 A schedule is matched to one episode type, so the high-risk tail cannot be a
 second postnatal schedule over the same type. It needs its own type, which
-means the delivery has to open a different episode for a high-risk woman —
-and a mapping cannot choose between two records conditionally. That is a
+means the delivery has to open a different episode for a high-risk woman, and
+a mapping cannot choose between two records conditionally. That is a
 deliberate limit of the grammar, not an oversight.
 
 So: **two delivery operations**, each gated by a declared state.
 `phc.op.delivery-record` keeps `preconditions: [pregnancy.ordinary]`, a new
 state meaning open and not high risk. `phc.op.delivery-record-high-risk`
-takes `[pregnancy_high_risk.open]` and opens `postnatal_high_risk`, whose
-schedule is the seven home visits plus a day-45 outcome check owned by the
-ANM. Both can share the existing questionnaire.
+takes `[pregnancy_high_risk.open]` and opens TWO postnatal episodes. The
+ordinary `postnatal` episode carries the seven home visits, exactly as for any
+mother, so they are not copied. A second, `postnatal_high_risk`, carries only
+what is extra: the day-45 outcome check owned by the ANM. Both deliveries
+share the existing questionnaire.
 
-That is two more operations' worth of declaration and one more schedule.
-Still no code.
+Two episodes means two things to close, and a mother who has died must owe
+nothing on either. So the closing operations are split by state as well. An
+ordinary mother is closed by `phc.op.postnatal-close`, now gated off while a
+tail is open. A high-risk mother is closed by `phc.op.postnatal-close-high-risk`,
+which ends both episodes. The day-45 form ends only the tail, so it does not
+offer "mother died" or "not found"; those are recorded with the closing
+operation that ends both.
+
+That is more operations' worth of declaration and one more schedule. Still no
+code.
 
 **The alternative, if you would rather not have two delivery operations:**
 move everybody to day 45. One number in one file, and every woman gets a
