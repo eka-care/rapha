@@ -114,13 +114,21 @@ export function Patient({ id, cat, onOpenThread }: {
   );
 }
 
-/** Her course of care: the shared calendar grid over HER OWN episodes, then the
- *  plain list of each episode's visits. The rows are made here from what her
- *  record already loaded; nothing is asked of the centre and nothing is kept.
- *  The scale and the date are in the address, so a card from the home page
- *  (`?at=`) lands on the month it names, and back and reload keep the place. */
+/** Her course of care: every visit the centre owes her or has recorded,
+ *  in order, from the day the episode was dated.
+ *
+ *  THE LIST IS WHAT SHE IS OPENED FOR. This screen used to lead with a month
+ *  of a calendar grid, so a card tapped on the home page landed on one
+ *  square in an otherwise empty November and the record itself was below the
+ *  fold. Her page is a history, and a history is a list. The grid is still
+ *  here, behind the switch, because seeing where visits fall against the
+ *  weeks is a real second question; it is not the first one.
+ *
+ *  The rows are made here from what her record already loaded; nothing is
+ *  asked of the centre and nothing is kept. */
 function Care({ view, id, name, cat }: { view: SubjectView; id: string; name: string; cat: Catalogue }) {
   const [hash, setHash] = useState(() => location.hash);
+  const [asGrid, setAsGrid] = useState(false);
   useEffect(() => {
     const on = () => setHash(location.hash);
     addEventListener("hashchange", on);
@@ -141,8 +149,12 @@ function Care({ view, id, name, cat }: { view: SubjectView; id: string; name: st
   ];
   return (
     <>
-      <section className="cal-main" aria-label="Her dates">
-        <div className="cal-bar-tools">
+      <div className="cal-top">
+        {/* In the list there is no title: the tab above already says Care
+            and each episode names itself. The month's name is a fact the
+            grid needs. */}
+        <h2 className="cal-title">{asGrid ? spanTitle(scale, anchor) : ""}</h2>
+        {asGrid && (
           <div className="cal-nav" data-scale={scale}>
             <button type="button" className="gr-arrow" aria-label={`Previous ${scale}`} onClick={() => goTo({ at: step(scale, anchor, -1) })}>
               <Icon name="chev" className="i" />
@@ -150,23 +162,35 @@ function Care({ view, id, name, cat }: { view: SubjectView; id: string; name: st
             <button type="button" className="gr-arrow gr-next" aria-label={`Next ${scale}`} onClick={() => goTo({ at: step(scale, anchor, 1) })}>
               <Icon name="chev" className="i" />
             </button>
-            <button type="button" className="cal-chip" onClick={() => goTo({ at: "" })}>Today</button>
+            <button type="button" className="cal-ghost" onClick={() => goTo({ at: "" })}>Today</button>
           </div>
-          <h2 className="cal-title">{spanTitle(scale, anchor)}</h2>
-          <div className="cal-scales" role="group" aria-label="Scale">
-            {SCALES.map((s) => (
-              <button key={s.scale} type="button" className="cal-chip" aria-pressed={scale === s.scale} onClick={() => goTo({ scale: s.scale })}>
-                {s.label}
-              </button>
-            ))}
+        )}
+        <div className="cal-tools">
+          {asGrid && (
+            <div className="cal-seg" role="group" aria-label="Scale">
+              {SCALES.map((s) => (
+                <button key={s.scale} type="button" className="cal-seg-b" aria-pressed={scale === s.scale} onClick={() => goTo({ scale: s.scale })}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="cal-seg" role="group" aria-label="How to show her visits">
+            <button type="button" className="cal-seg-b" aria-pressed={!asGrid} onClick={() => setAsGrid(false)}>List</button>
+            <button type="button" className="cal-seg-b" aria-pressed={asGrid} onClick={() => setAsGrid(true)}>Calendar</button>
           </div>
         </div>
-        <Grid
-          scale={scale} anchor={anchor} today={today} rows={rows} nameOf={() => name} own
-          onPickDay={(d) => goTo({ at: d })} onAnchor={(d) => goTo({ at: d })}
-        />
-      </section>
-      <Arc episodes={view.episodes} roleName={(r) => cat.vocabulary?.role_titles?.[r] ?? r} />
+      </div>
+      {asGrid ? (
+        <section className="cal-main" aria-label="Her dates">
+          <Grid
+            scale={scale} anchor={anchor} today={today} rows={rows} nameOf={() => name} own
+            onPickDay={(d) => goTo({ at: d })} onAnchor={(d) => goTo({ at: d })}
+          />
+        </section>
+      ) : (
+        <Arc episodes={view.episodes} roleName={(r) => cat.vocabulary?.role_titles?.[r] ?? r} />
+      )}
     </>
   );
 }
