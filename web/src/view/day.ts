@@ -116,6 +116,17 @@ export function dayLabel(iso: string, today: string): string {
   return `${wd} ${day} ${month}`;
 }
 
+/** THE DAY COLUMN'S OWN TITLE: which day its rows belong to, always said,
+ *  so the column is never a heap of rows with nothing above them. "Today,
+ *  Fri 6 Nov" while it is today, the plain date with its year otherwise,
+ *  because a day in another year must not read as this one. */
+export function dayHeading(day: string, today: string): string {
+  const near = dayLabel(day, today);
+  const plain = dayLabel(day, "");
+  if (near === "Today" || near === "Tomorrow") return `${near}, ${plain}`;
+  return `${plain} ${/^(\d{4})-/.exec(day ?? "")?.[1] ?? ""}`.trim();
+}
+
 /** The scale a link to the calendar carries (`scale=week|month|year`). A month
  *  when it carries none or one this screen does not draw. */
 export function scaleOf(hash: string): Scale {
