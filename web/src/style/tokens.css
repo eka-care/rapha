@@ -121,13 +121,16 @@
   --color-text-tertiary: #6C675F;
   --color-text-disabled: #93938E;
 
-  /* The one accent, and it is ink. Colour means clinical risk here, so the
-     primary action is the darkest thing on the screen rather than the
-     bluest. The system's --cta is the same value. */
-  --color-accent: #1A50E6;
-  --color-accent-hover: #1540BD;
-  --color-accent-soft: #ECF1FF;
-  --color-accent-line: #CFDDFB;
+  /* THE ONE ACCENT: Rapha's forest green, the hue of the colour the owner
+     gave (#10281F, which is the hover below). That colour itself reads as
+     black on a 70px button, which is what the accent had just stopped
+     being, so the resting value is the same green two steps up: plainly
+     green, white text on it at 7:1, and a shade deeper than the sage that
+     means a visit is owed. --cta is the same value. */
+  --color-accent: #235A49;
+  --color-accent-hover: #10281F;
+  --color-accent-soft: #EAF1ED;
+  --color-accent-line: #C9DBD1;
 
   /* THE PRIMARY IS THE ACCENT. It was near black, on the argument that a
      button pressed a hundred times a day should not spend the hue that
@@ -136,8 +139,8 @@
      current encounter" in ink, Commit and every link in blue -- and read
      as two design languages in one product. One primary colour, the
      accent, and ink goes back to being text. */
-  --color-cta: #1A50E6;
-  --color-cta-hover: #1540BD;
+  --color-cta: #235A49;
+  --color-cta-hover: #10281F;
   --color-cta-ink: #FAFAF9;
 
   /* Eyebrows and the hairline over a hero: quiet, and not a signal. */
@@ -256,13 +259,13 @@
   --color-text-tertiary: #9A9A96;
   --color-text-disabled: #6B6B68;
 
-  --color-accent: #6B93FF;
-  --color-accent-hover: #8AA9F0;
-  --color-accent-soft: #141A28;
-  --color-accent-line: #26304A;
+  --color-accent: #8FC9AE;
+  --color-accent-hover: #A8D9C2;
+  --color-accent-soft: #11201A;
+  --color-accent-line: #27392F;
 
-  --color-cta: #6B93FF;
-  --color-cta-hover: #8AA9F0;
+  --color-cta: #8FC9AE;
+  --color-cta-hover: #A8D9C2;
   --color-cta-ink: #0A0A0A;
 
   --color-eyebrow: #9A9A96;
@@ -334,13 +337,13 @@
     --color-text-tertiary: #9A9A96;
     --color-text-disabled: #6B6B68;
 
-    --color-accent: #6B93FF;
-    --color-accent-hover: #8AA9F0;
-    --color-accent-soft: #141A28;
-    --color-accent-line: #26304A;
+    --color-accent: #8FC9AE;
+    --color-accent-hover: #A8D9C2;
+    --color-accent-soft: #11201A;
+    --color-accent-line: #27392F;
 
-    --color-cta: #6B93FF;
-    --color-cta-hover: #8AA9F0;
+    --color-cta: #8FC9AE;
+    --color-cta-hover: #A8D9C2;
     --color-cta-ink: #0A0A0A;
 
     --color-eyebrow: #9A9A96;
