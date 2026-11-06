@@ -11,9 +11,8 @@
  *  for any contact. A bundle that schedules something else entirely draws
  *  through this unchanged.
  */
-import { Icon } from "../icons";
 import type { Contact, Episode } from "../types";
-import { dateWords, dayMonth } from "../view/day";
+import { dateWords, dayMonth, dayOf } from "../view/day";
 import { human, title } from "../words";
 
 /** The four states a contact comes back in, and how each one is drawn.
@@ -30,12 +29,40 @@ export const TONE: Record<string, string> = {
   upcoming: "b-mute",
 };
 
+/** How THIS card draws a state's chip. TONE above is shared -- the calendar and
+ *  the grid key their bars on its values -- so the card's own choices live here
+ *  and not there. Something owed is sage, "yours to do"; something finished is
+ *  quiet history and takes no colour, so nothing done competes with what is
+ *  still owed. Missed stays the one red. */
+const CHIP: Record<string, string> = { ...TONE, due: "b-sage", done: "b-mute" };
+
 export const MARK: Record<string, string> = {
   done: "check",
   due: "clock",
   missed: "alert",
   upcoming: "clock",
 };
+
+/** A DATE, DRAWN AS A DATE. The day is the large thing and the month sits
+ *  under it, so a column of them reads as a calendar down the left of the
+ *  card and the eye can find "which one is this month" without reading a
+ *  sentence. It used to be a phrase in small grey type under the heading,
+ *  which is where nobody looked.
+ *
+ *  It lays out the kernel's YYYY-MM-DD by position and works nothing out. A
+ *  date in any other shape is shown whole in the same tile rather than
+ *  guessed at, and the full date is always its accessible name. */
+export function DateTile({ date, tone }: { date: string; tone?: string }) {
+  const { day, month } = dayOf(date);
+  return (
+    <span className={`dtile${tone ? ` ${tone}` : ""}${day ? "" : " raw"}`}
+          role="img" aria-label={dateWords(date)}>
+      {day ? <><b>{day}</b><i>{month}</i></> : <i>{date || "—"}</i>}
+    </span>
+  );
+}
+
+const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** What a role is CALLED is the bundle's to say, never this file's. Without
  *  one the raw id shows, which is plain, where a word we made up would be a
@@ -76,11 +103,12 @@ function OneArc({ episode, onAct, roleName }: { episode: Episode; onAct?: (op: s
       {/* HOW THE DATES WERE ARRIVED AT, said on the screen rather than
           implied by it. A contact "due in nine days" computed from a half
           remembered period is a false precision, and a false precision
-          teaches people to ignore the whole tracker. */}
+          teaches people to ignore the whole tracker. One short line: what it
+          was counted from, and the date, in that order. */}
       {episode.anchor_date && (
         <p className="arc-basis">
-          Dated {dateWords(episode.anchor_date)}
-          {episode.anchor_basis && <> from {human(episode.anchor_basis).toLowerCase()}</>}
+          {episode.anchor_basis ? sentence(human(episode.anchor_basis)) : "Counted from"}
+          {" · "}<b>{dateWords(episode.anchor_date)}</b>
         </p>
       )}
 
@@ -103,32 +131,29 @@ function OneArc({ episode, onAct, roleName }: { episode: Episode; onAct?: (op: s
 
 function Step({ contact, onAct, roleName }: { contact: Contact; onAct?: (op: string) => void; roleName: RoleName }) {
   const c = contact;
+  const done = c.state === "done";
+  // The whole sentence stays reachable, for a pointer and for a screen reader,
+  // and is off the screen: the tile says when, the chip says what state, and
+  // the line says who. The window a visit may be done in is the detail.
+  const full = done && c.done_at
+    ? `Recorded ${dateWords(c.done_at)}`
+    : `Due ${dateWords(c.due)} · open ${dayMonth(c.opens)} to ${dayMonth(c.closes)}`;
   return (
-    <li className={`arc-step s-${c.state}`}>
-      <span className="arc-dot" aria-hidden="true">
-        <Icon name={(MARK[c.state] ?? "clock") as never} className="i sm" />
-      </span>
+    <li className={`arc-step s-${c.state}`} title={full}>
+      <DateTile date={done && c.done_at ? c.done_at : c.due} tone={`s-${c.state}`} />
       <span className="arc-b">
         <span className="arc-t" title={c.programme_title || undefined}>
           {c.title}
-          <span className={`badge ${TONE[c.state] ?? "b-mute"}`}>{title(c.state)}</span>
+          <span className={`badge ${CHIP[c.state] ?? "b-mute"}`}>{title(c.state)}</span>
           {/* What the programme calls this, when it calls it anything. A
               centre doing more contacts than it reports still has to know
               which line each one fills in. */}
           {c.reports_as && <span className="badge b-mute">{c.reports_as}</span>}
         </span>
-        {/* A DATE A PERSON CAN READ, AND A ROLE IN WORDS. This line read
-            "Due 2026-11-15 · open 2026-11-01 to 2026-11-29 · MO": an ISO
-            date and a bare code, on the record a health worker with little
-            English reads. The role's name is the bundle's own. */}
-        <span className="arc-when">
-          {c.state === "done" && c.done_at
-            ? <>Recorded {dateWords(c.done_at)}</>
-            : <>Due {dateWords(c.due)} · open {dayMonth(c.opens)} to {dayMonth(c.closes)}</>}
-          {c.state !== "done" && <> · {roleName(c.owner)}</>}
-        </span>
+        {!done && <span className="arc-when">{roleName(c.owner)}</span>}
+        <span className="u-sr">{full}</span>
       </span>
-      {onAct && c.state !== "done" && c.state !== "upcoming" && (
+      {onAct && !done && c.state !== "upcoming" && (
         <button type="button" className="cq" onClick={() => onAct(c.operation)}>
           Record
         </button>

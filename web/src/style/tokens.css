@@ -171,6 +171,9 @@
   --color-success: #2F7A4E;
   --color-success-soft: #EEF7F1;
   --color-success-border: #CFE6D9;
+  --color-sage: #396F5D;
+  --color-sage-soft: #E5F0EC;
+  --color-sage-line: #BCD2CB;
 
   --color-warning: #AD4B06;
   --color-warning-soft: #FDF3E7;
@@ -281,6 +284,9 @@
   --color-success: #6FBF8B;
   --color-success-soft: #112117;
   --color-success-border: #24402F;
+  --color-sage: #88BFAC;
+  --color-sage-soft: #0F3025;
+  --color-sage-line: #27493E;
 
   --color-warning: #FF9248;
   --color-warning-soft: #2A1C0E;
@@ -356,6 +362,9 @@
     --color-success: #6FBF8B;
     --color-success-soft: #112117;
     --color-success-border: #24402F;
+    --color-sage: #88BFAC;
+    --color-sage-soft: #0F3025;
+    --color-sage-line: #27493E;
 
     --color-warning: #FF9248;
     --color-warning-soft: #2A1C0E;

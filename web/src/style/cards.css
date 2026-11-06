@@ -299,27 +299,40 @@
 .arc-basis {
   margin: 0 15px 10px; font-size: 11.5px; color: var(--color-text-tertiary);
 }
+.arc-basis b { color: var(--color-text-primary); font-weight: 600; }
 .arc-list { list-style: none; margin: 0; padding: 0 15px 13px; }
 .arc-step {
-  display: flex; align-items: flex-start; gap: 11px;
+  display: flex; align-items: center; gap: 13px;
   padding: 9px 0; border-top: 1px solid var(--color-border-subtle);
 }
 .arc-step:first-child { border-top: 0; }
-.arc-dot {
-  flex-shrink: 0; margin-top: 1px;
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; border-radius: var(--radius-pill);
-  background: var(--color-bg-subtle); color: var(--color-text-tertiary);
+
+/* The date, as a component: the day large, the month beneath, and an edge on
+   the left that carries the state. */
+.dtile {
+  flex-shrink: 0; width: 52px; padding: 6px 0 7px;
+  display: grid; justify-items: center; line-height: 1;
+  border-radius: var(--radius-md); border-left: 3px solid var(--color-border-strong);
+  background: var(--color-bg-subtle); color: var(--color-text-secondary);
 }
-.arc-step.s-done .arc-dot { background: var(--color-success-soft); color: var(--color-success); }
-.arc-step.s-missed .arc-dot { background: var(--color-critical-soft); color: var(--color-critical); }
-.arc-step.s-due .arc-dot { background: var(--color-accent-soft); color: var(--color-accent); }
+.dtile b { font-size: 24px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.dtile i {
+  margin-top: 3px; font: 600 10px/1 var(--font-mono); font-style: normal;
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.dtile.raw { width: auto; min-width: 52px; padding: 8px 8px; }
+.dtile.s-due { border-left-color: var(--color-sage); background: var(--color-sage-soft); color: var(--color-sage); }
+.dtile.s-missed { border-left-color: var(--color-critical); background: var(--color-critical-soft); color: var(--color-critical); }
+.dtile.s-done { opacity: .75; }
+
+/* The state chip for something owed, in the colour of "yours to do". */
+.badge.b-sage { background: var(--color-sage-soft); color: var(--color-sage); border-color: var(--color-sage-line); }
 .arc-b { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
 .arc-t {
   display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
   font-size: 12.5px; font-weight: 600; color: var(--color-text-primary);
 }
-.arc-when { font-size: 11.5px; color: var(--color-text-tertiary); }
+.arc-when { font-size: 11.5px; color: var(--color-text-secondary); }
 /* A contact nobody need do anything about yet is quiet. */
 .arc-step.s-upcoming .arc-t { font-weight: 500; color: var(--color-text-secondary); }
 /* The sentence that stands where the contacts would be. It is inside the
