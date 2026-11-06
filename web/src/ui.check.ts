@@ -35,7 +35,7 @@
 import assert from "node:assert/strict";
 import { WROTE } from "./types.ts";
 import type { CalendarRow } from "./types.ts";
-import { dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView, atOf, stack, pageBy, cardHash, owedLine } from "./view/day.ts";
+import { dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView, atOf, stack, pageBy, cardHash, owedDate, owedLine, weekdayOf } from "./view/day.ts";
 import { span, cells } from "./view/cells.ts";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -1514,12 +1514,22 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.ok(!/Late/.test(owedLine(row({ state: "due", due: "2026-10-30" }), NOW)),
     "a visit inside its window is not late, whatever its due date");
 
+  // THE DATE BLOCK AND THE WORDS BESIDE IT ARE ONE DATE. The card draws the
+  // day as a calendar block; it reads it through owedDate, which is the day
+  // owedLine speaks of, so the two cannot drift apart.
+  assert.equal(owedDate(soon), "2026-11-06");
+  assert.ok(owedLine(soon, NOW).includes(dayLabel(owedDate(soon), NOW)));
+  assert.equal(weekdayOf("2026-11-06"), "Fri");
+  assert.equal(weekdayOf("not a day"), "", "anything that is not a date has no weekday");
+
   const src = code(readFileSync(join(SRC, "view", "Cards.tsx"), "utf8"));
   const home = code(readFileSync(join(SRC, "screens", "Today.tsx"), "utf8"));
   // Name, which contact, when, and the role that owns it.
   assert.match(src, /nameOf\(/, "a card carries her name");
   assert.match(src, /\.title/, "a card says which contact it is");
   assert.match(src, /owedLine\(/, "a card says when it is owed");
+  assert.match(src, /owedDate\(r\)/, "and draws its date block from that same day, never a field of its own");
+  assert.ok(!/r\.due/.test(src), "the card does not pick a date field for itself");
   assert.match(src, /roleName\(/, "a card names the owning role");
   assert.match(src, /roleName\(r\.owner\)/, "a card names the owning role");
   assert.ok(!/\.owner\b/.test(src.replace(/roleName\(r\.owner\)/g, "").replace(/r\.owner &&/g, "")) && !/assignee|worker|staff/i.test(src),

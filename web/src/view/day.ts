@@ -175,6 +175,20 @@ export function cardHash(row: CalendarRow): string {
   return `/patients/${encodeURIComponent(row.subject)}?at=${row.due}`;
 }
 
+/** THE DAY THE CARD IS ABOUT: the one `owedLine` below speaks of, so a date
+ *  block drawn beside those words cannot disagree with them. A card reads
+ *  the date through here rather than picking a field for itself. */
+export function owedDate(row: CalendarRow): string {
+  return row.due;
+}
+
+/** The weekday of a date, in three letters, worked out in UTC from the parts
+ *  so no time zone can move it a day. "" when it is not a date. */
+export function weekdayOf(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
+  return m ? (WEEKDAYS[new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()] ?? "") : "";
+}
+
 /** When a contact is owed, in words.
  *
  *  ONLY THE KERNEL SAYS SOMETHING IS LATE. This card used to call a visit
@@ -184,8 +198,9 @@ export function cardHash(row: CalendarRow): string {
  *  with its window still open has been waiting, and says so.
  */
 export function owedLine(row: CalendarRow, now: string): string {
-  if (row.state === "missed") return `Late since ${dayLabel(row.due, now)}`;
-  if (row.due && row.due < now) return `Due since ${dayLabel(row.due, now)}`;
-  const d = dayLabel(row.due, now);
+  const on = owedDate(row);
+  if (row.state === "missed") return `Late since ${dayLabel(on, now)}`;
+  if (on && on < now) return `Due since ${dayLabel(on, now)}`;
+  const d = dayLabel(on, now);
   return d === "Today" || d === "Tomorrow" ? `Due ${d.toLowerCase()}` : `Due ${d}`;
 }
