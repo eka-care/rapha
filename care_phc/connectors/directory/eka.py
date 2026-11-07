@@ -221,11 +221,18 @@ class EkaDirectory:
     """
 
     def __init__(self, *, token=None, client_id=None, base=BASE, today=None):
-        self.token = token or os.environ.get("EKA_ACCESS_TOKEN") or ""
+        # A STRING OR A WAY TO GET ONE. `EKA_ACCESS_TOKEN` is a signed-in
+        # person's token and a developer rarely has one to hand, so the
+        # facility's own token is passed as a callable instead: this process
+        # can mint one from the client id and secret it already holds. It is
+        # fetched when a call is made rather than here, so a kernel with no
+        # network still starts and simply degrades to its own register.
+        self._mint = token if callable(token) else None
+        self.token = "" if self._mint else (token or os.environ.get("EKA_ACCESS_TOKEN") or "")
         self.client_id = client_id or os.environ.get("EKA_CLIENT_ID") or ""
         self.base = base.rstrip("/")
         self._today = today
-        if not self.token or not self.client_id:
+        if not (self.token or self._mint) or not self.client_id:
             # Not a crash. api/main.py reads this and falls back to
             # AbsentDirectory, which is the designed degraded path, so a
             # developer with no Eka account gets a working clinic.
@@ -233,6 +240,20 @@ class EkaDirectory:
                 "EKA_ACCESS_TOKEN and EKA_CLIENT_ID are needed to reach the "
                 "patient directory. Without them the facility runs on its own "
                 "cache and publishes nothing.", reachable=False)
+
+    def _bearer(self):
+        """The token for this call. Minted once and held by whoever minted
+        it; a failure to mint is a directory that cannot be reached, which is
+        the degraded path this connector already has a name for."""
+        if not self._mint:
+            return self.token
+        try:
+            return self._mint()
+        except Exception as broke:
+            raise DirectoryError(
+                "Could not sign in to the patient directory (%s). The centre "
+                "runs on its own register until it can."
+                % str(broke)[:200], reachable=False) from None
 
     @property
     def today(self):
@@ -252,7 +273,7 @@ class EkaDirectory:
             url = "%s?%s" % (url, urllib.parse.urlencode(query))
         data = json.dumps(body).encode() if body is not None else None
         request = urllib.request.Request(url, data=data, method=method, headers={
-            "Authorization": "Bearer %s" % self.token,
+            "Authorization": "Bearer %s" % self._bearer(),
             "client-id": self.client_id,
             "Content-Type": "application/json",
             "Accept": "application/json",

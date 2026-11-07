@@ -468,7 +468,20 @@ else:
         os.environ.pop("PHC_DIRECTORY", None)
         os.environ.pop("EKA_ACCESS_TOKEN", None)
         os.environ.pop("EKA_CLIENT_ID", None)
-        wanted_eka = service.make_directory()
+        # CLEARING THE ENVIRONMENT IS NO LONGER THE WHOLE OF "no credential".
+        # make_directory() now reads the client id from .env as well, the
+        # same place the scribe and the records service read it, so a
+        # developer with credentials on disk gets a working directory. This
+        # check is about the deployment that has NONE, so the file is taken
+        # away too -- which is what credentials() raising means.
+        said_no = lambda *a, **k: (_ for _ in ()).throw(
+            service.scribe.ScribeError("no credentials on this machine"))
+        was = service.scribe.credentials
+        service.scribe.credentials = said_no
+        try:
+            wanted_eka = service.make_directory()
+        finally:
+            service.scribe.credentials = was
         assert isinstance(wanted_eka, directory.AbsentDirectory), type(wanted_eka)
         ok("a deployment that meant to use Eka and has no token still comes up, "
            "on the local register")

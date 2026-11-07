@@ -31,6 +31,7 @@ import { EXPANDS_TO, NAME } from "../brand";
 import { canFrameLogin, gateApplies, loginUrl, returnTo } from "./client";
 import { Bloom } from "./Bloom";
 import { CLIENT_ID, ENV, LOGIN_URL, probe, type Answer } from "./session";
+import { signedOutHere } from "./client";
 
 /** How often it asks whether the cookie has arrived. The frame's own load
  *  is the quick route; this is the net under it. */
@@ -67,16 +68,32 @@ export function SignIn({ checking, onRetry }: {
     void probe().then((answer) => {
       if (!alive.current) return;
       setHeard(answer);
-      if (answer.ok) onRetry();
+      // A session found while somebody is deliberately signed out is not a
+      // reason to let them in; it is the cookie they already knew about.
+      if (answer.ok && !signedOutHere()) onRetry();
     });
   }, [onRetry]);
 
   // While Eka's own page is on screen, ask now and then whether it worked.
+  //
+  // NOT WHEN SOMEBODY HAS JUST SIGNED OUT, and that was a real bug with a
+  // simple shape: the Eka cookie belongs to login.eka.care and this app
+  // cannot delete it, so the moment Sign out showed this screen, the very
+  // next poll found the cookie still good and let the person straight back
+  // in. The button looked broken because in effect it was.
+  //
+  // Nothing about the cookie changed -- it still cannot be deleted from
+  // here -- but a person who asked to leave is not asked to prove it twice
+  // a second. They stay out until they say otherwise, which is the button
+  // below, and the poll is for the case it was written for: somebody
+  // signing IN through Eka's page, where the cookie appears and the app
+  // should notice without being told.
+  const left = signedOutHere();
   useEffect(() => {
-    if (!framed || checking) return;
+    if (!framed || checking || left) return;
     const id = setInterval(ask, ASK_EVERY);
     return () => clearInterval(id);
-  }, [framed, checking, ask]);
+  }, [framed, checking, left, ask]);
 
   if (checking) {
     return (
@@ -103,7 +120,27 @@ export function SignIn({ checking, onRetry }: {
       </section>
 
       <section className="way-in-eka" aria-label={`Sign in to ${NAME}`}>
-        {framed ? (
+        {/* SIGNED OUT HERE, ON PURPOSE. Eka's page is not drawn: it would
+            find the cookie, this screen would let the person back in, and
+            the button they just pressed would have done nothing. The way
+            back is a sentence and a button, and the sentence is honest that
+            the Eka session is still open and where it ends. */}
+        {left ? (
+          <div className="way-in-out">
+            <p className="way-in-ob">
+              You have signed out of {NAME} on this device. You are still
+              signed in to Eka, which is a cookie this app cannot delete.
+            </p>
+            <div className="way-in-foot">
+              <button className="way-in-again" onClick={onRetry}>
+                Sign back in
+              </button>
+              <a className="way-in-tab" href={LOGIN_URL} target="_blank" rel="noreferrer">
+                End the Eka session
+              </a>
+            </div>
+          </div>
+        ) : framed ? (
           <>
             {/* No card. Eka's page IS the right hand side of this screen. */}
             <iframe

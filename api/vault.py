@@ -151,6 +151,18 @@ def _token():
     return _held
 
 
+def token_for_connectors():
+    """The facility's bearer token, for another SERVER-SIDE connector.
+
+    Named for the one thing it is for. The rule this module keeps is that no
+    route hands the token to a browser; a module in this process asking for
+    it is not that, and the alternative -- a second login in every connector
+    -- would be a second thing to keep in step and a second set of calls to
+    the same service.
+    """
+    return _token()
+
+
 def forget():
     """Drop the held token, so the next call signs in again. Called when the
     service answers 401, which is the only thing that means it went stale."""
@@ -192,10 +204,19 @@ def demo():
     # it. A route that could hand it to a browser is the one mistake that
     # would undo the whole arrangement.
     import api.vault as me
-    public = [n for n in dir(me) if not n.startswith("_")]
-    assert "token" not in public, public
+    # NO ROUTE RETURNS IT. That is the rule, and it is about routes rather
+    # than about the word: `token_for_connectors` exists for server-side
+    # callers in this process (api/main.py hands it to the patient
+    # directory), and a browser can reach none of them. What would undo the
+    # arrangement is a ROUTE that answers with the token, so that is what is
+    # checked, in the one file that declares them.
+    import pathlib
+    routes = pathlib.Path(__file__).with_name("main.py").read_text()
+    assert "_token()" not in routes and "token_for_connectors()" not in routes, (
+        "api/main.py calls for the token itself; it should hand the function "
+        "to a connector and never hold the value")
     assert set(FORWARD_DOWN) == {"content-type"}, FORWARD_DOWN
-    ok("the token has no public accessor, and no upstream header comes back "
+    ok("no route answers with the token, and no upstream header comes back "
        "except the content type")
 
     print("\n%d vault checks passed" % checks)

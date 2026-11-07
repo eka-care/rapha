@@ -504,8 +504,24 @@ def make_directory():
     try:
         from care_phc.connectors.directory.eka import EkaDirectory
 
-        return EkaDirectory()
-    except DirectoryError:
+        # THE FACILITY'S OWN TOKEN, minted from the client id and secret this
+        # process already holds for the scribe and the records service, and
+        # fetched only when a search is actually made. `EKA_ACCESS_TOKEN` is
+        # a signed-in PERSON's token and is still honoured first inside the
+        # connector; almost nobody has one to hand, which is why a centre
+        # with perfectly good credentials used to run with no directory at
+        # all and never find a patient registered anywhere else.
+        # The client id comes from the same place the scribe and the records
+        # service read it -- the environment, or the .env beside this repo --
+        # rather than from os.environ alone, which is why a machine with
+        # perfectly good credentials in .env still ran with no directory.
+        return EkaDirectory(token=vault.token_for_connectors,
+                            client_id=scribe.credentials()[0])
+    except (DirectoryError, scribe.ScribeError):
+        # No credential anywhere -- not in the environment, not in .env --
+        # is the same answer as an unreachable directory and not a reason to
+        # refuse to start. `credentials()` raises its own error for that, so
+        # it is caught here beside the connector's.
         return directory.AbsentDirectory()
 
 
