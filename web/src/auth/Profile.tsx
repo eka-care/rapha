@@ -16,7 +16,11 @@ import { currentRole, setRole } from "../api";
 import { Icon, type IconName } from "../icons";
 import type { Facility } from "../types";
 import { roleGlyph, title } from "../words";
-import { LOGIN_URL } from "./session";
+import { LOGIN_URL, workspace } from "./session";
+
+/** What to call where this person is: Eka's workspace if the session named
+ *  one, else the bundle's own title. */
+const hereFrom = (t?: string) => workspace()?.name ?? t;
 
 export function Profile({ facility, onSignOut }: {
   facility?: Facility;
@@ -66,9 +70,13 @@ export function Profile({ facility, onSignOut }: {
             </span>
             <div className="prof-hb">
               <div className="prof-n">{title(role)}</div>
+              {/* THE WORKSPACE EKA SIGNED THEM IN TO, when it told us one.
+                  The bundle's own title is the fallback, which is what every
+                  screen showed before and is still right on a build with no
+                  Eka session. */}
               <div className="prof-s">
                 {facility?.user.capabilities.length ?? 0} capabilities
-                {facility?.bundle.title ? ` · ${facility.bundle.title}` : ""}
+                {hereFrom(facility?.bundle.title) ? ` · ${hereFrom(facility?.bundle.title)}` : ""}
               </div>
             </div>
           </div>
@@ -98,7 +106,7 @@ export function Profile({ facility, onSignOut }: {
           <div className="prof-sec">
             <button className="prof-out" role="menuitem" onClick={onSignOut}>
               <Icon name="out" className="i sm" />
-              Sign out of {facility?.bundle.title ?? "this centre"}
+              Sign out of {hereFrom(facility?.bundle.title) ?? "this centre"}
             </button>
             <a className="prof-eka" href={LOGIN_URL} target="_blank" rel="noreferrer">
               End the Eka session

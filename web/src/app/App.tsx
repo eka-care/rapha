@@ -36,6 +36,7 @@ import { Rail } from "./Rail";
 import { PARTS } from "../screens/Control";
 import { NAME } from "../brand";
 import { AskAi } from "../assistant/AskAi";
+import { workspace } from "../auth/session";
 import type { Question } from "../assistant/Lazy";
 import { Topbar } from "./Topbar";
 
@@ -468,7 +469,10 @@ export function App() {
           halves of this are declarations: the screen's own name, and the
           facility's -- which is where that word earns its place, rather than
           under the title on every screen. */}
-      <PageTitle title={facility.data?.bundle.title ? `${title} · ${facility.data.bundle.title}` : title} />
+      {/* Eka's workspace when the session named one, so two tabs on two
+          workspaces are told apart by their titles. */}
+      <PageTitle title={(workspace()?.name ?? facility.data?.bundle.title)
+                  ? `${title} · ${workspace()?.name ?? facility.data?.bundle.title}` : title} />
       <Announcer />
       {/* SC 2.4.1: the rail repeats on every screen, and until now the only
           way past it was to tab through all of it. A link and not an anchor,

@@ -22,6 +22,7 @@ import { filterRows, narrowings, RISK_TONE, sameFilter, type Filter } from "../l
 import type { Facility, QueueRow, ViewDecl } from "../types";
 import { fields } from "../view/View";
 import { human, title } from "../words";
+import { workspace } from "../auth/session";
 
 /** How many of the line fit before the rail is a scroll rather than a
  *  glance. The rest is one tap away in the view the rows came from. */
@@ -150,7 +151,9 @@ export function Sidebar({
         <Garland kind="vine" />
         <div className="sb-head">
           <div className="sb-head-t">Settings</div>
-          <div className="sb-head-s">{facility?.bundle.title ?? "This centre"}</div>
+          {/* Eka's workspace when the session named one; the bundle's own
+              title otherwise. */}
+          <div className="sb-head-s">{workspace()?.name ?? facility?.bundle.title ?? "This centre"}</div>
         </div>
         <div className="sb-nav">
           {sections.map((s) => (

@@ -89,7 +89,52 @@ export interface Answer {
   ok: boolean;
   /** Eka's own status, or "no answer" when the call never arrived. */
   said: number | "no answer" | "the app";
+  /** WHO THIS SESSION BELONGS TO, when the hub told us.
+   *
+   *  The same read that proves somebody is signed in also carries the
+   *  workspace they signed in to: the clinic and the doctors on it. This
+   *  used to be thrown away and only the yes/no kept, which is why the app
+   *  showed the same centre whichever of a person's workspaces they picked.
+   *
+   *  It names the workspace. It does NOT change whose data the kernel
+   *  serves: that is one facility, loaded from its own bundle, and making
+   *  it follow the workspace is a kernel change and not this one. */
+  workspace?: Workspace;
 }
+
+/** The clinic a session is signed in to, in the few facts a screen needs. */
+export interface Workspace {
+  name: string;
+  /** Where it is, as one line, when the clinic has one. */
+  where?: string;
+  /** How many clinicians are on it, which is the only count the hub gives. */
+  doctors: number;
+}
+
+/** What the hub's configuration read says about the workspace.
+ *
+ *  Defensive on purpose: this is somebody else's response shape and a demo
+ *  must not go blank because a field moved. Anything missing simply means
+ *  the app keeps calling the centre what the bundle calls it.
+ */
+export function workspaceFrom(body: unknown): Workspace | undefined {
+  const o = body as { clinics?: unknown[]; doctors?: unknown[] } | null;
+  const first = Array.isArray(o?.clinics) ? o!.clinics[0] : null;
+  const c = first as { name?: unknown; city_name?: unknown; city?: unknown } | null;
+  const name = typeof c?.name === "string" ? c.name.trim() : "";
+  if (!name) return undefined;
+  const city = typeof c?.city_name === "string" ? c.city_name.trim()
+    : typeof c?.city === "string" ? c.city.trim() : "";
+  return {
+    name,
+    where: city || undefined,
+    doctors: Array.isArray(o?.doctors) ? o!.doctors.length : 0,
+  };
+}
+
+/** The workspace the last successful probe saw, for screens that draw it. */
+let held: Workspace | undefined;
+export function workspace(): Workspace | undefined { return held; }
 
 /** Renew the token. A RETRY, not a question.
  *
@@ -135,7 +180,13 @@ async function askTheHub(): Promise<Answer> {
       credentials: "include",
       headers: { "client-id": CLIENT_ID },
     });
-    return { ok: res.ok, said: res.status };
+    if (!res.ok) return { ok: false, said: res.status };
+    // The body is read for the workspace it carries. A body that will not
+    // parse still proves the session -- the status already did that -- so
+    // it costs the name and nothing else.
+    const seen = await res.json().then(workspaceFrom).catch(() => undefined);
+    if (seen) held = seen;
+    return { ok: true, said: res.status, workspace: seen };
   } catch {
     return { ok: false, said: "no answer" };
   }
