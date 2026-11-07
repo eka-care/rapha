@@ -132,9 +132,27 @@ export function workspaceFrom(body: unknown): Workspace | undefined {
   };
 }
 
+/** PINNED, when a build says so. `VITE_WORKSPACE` names the workspace this
+ *  build is for and wins over whatever the session reports.
+ *
+ *  It exists because a workspace and the clinic inside it are two different
+ *  names, and the session only gives the second. The Imtiyaz workspace's
+ *  clinic is called "EkaCare Clinic" -- its partner id is `imtiyaz_clinic`,
+ *  which is how we know they are the same place -- so a build that wants to
+ *  say Imtiyaz has to be told. Empty, which is the default, and the session
+ *  is believed instead.
+ *
+ *  A pin is a statement about the build, not a guess about the session, so
+ *  it is honest in a way that renaming whatever arrives would not be. */
+const PINNED = (import.meta.env.VITE_WORKSPACE as string | undefined)?.trim();
+
 /** The workspace the last successful probe saw, for screens that draw it. */
 let held: Workspace | undefined;
-export function workspace(): Workspace | undefined { return held; }
+
+export function workspace(): Workspace | undefined {
+  if (PINNED) return { name: PINNED, where: held?.where, doctors: held?.doctors ?? 0 };
+  return held;
+}
 
 /** Renew the token. A RETRY, not a question.
  *
