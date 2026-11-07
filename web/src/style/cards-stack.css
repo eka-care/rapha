@@ -6,8 +6,12 @@
   /* room under the front card for the edges of the ones behind it */
   padding-bottom: calc((var(--n, 1) - 1) * 14px);
 }
+/* A DATE BLOCK ON THE LEFT, THE VISIT ON THE RIGHT. Everything used to sit
+   in one column, so the day a visit is owed was a line of small type above
+   the name rather than the first thing the eye lands on. */
 .stk-card {
-  grid-area: 1 / 1; display: grid; gap: var(--space-1); align-content: start; text-align: left;
+  grid-area: 1 / 1; display: grid; grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-4); row-gap: var(--space-1); align-content: start; text-align: left;
   min-height: 132px; padding: var(--space-4) var(--space-5);
   font: inherit; color: var(--color-text-primary);
   background: var(--color-bg-surface); border: 1px solid var(--color-border-subtle);
@@ -21,13 +25,39 @@ button.stk-card { cursor: pointer; }
 button.stk-card:hover { background: var(--color-bg-hover); box-shadow: var(--shadow-md); }
 .stk-behind { pointer-events: none; box-shadow: none; background: var(--color-bg-subtle); border-color: var(--color-border-strong); }
 .stk-behind > * { opacity: .55; }
+/* The date, as a calendar block. Its edge is the divider between the two
+   halves of the card. A late visit takes the critical tone here as well as
+   in the words beside it, so the state is readable at a glance and still
+   carried by something other than colour. */
+.stk-date {
+  display: grid; justify-items: center; align-content: start; gap: 0;
+  width: 76px; padding-right: var(--space-4);
+  border-right: 1px solid var(--color-border-subtle);
+}
+.stk-d { font-size: 34px; font-weight: 600; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.stk-m { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-text-secondary); }
+.stk-wd { font-size: 11px; color: var(--color-text-tertiary); }
+.stk-date[data-late] { border-right-color: var(--color-critical); }
+.stk-date[data-late] .stk-d, .stk-date[data-late] .stk-m { color: var(--color-critical); }
+/* The visit itself: the column to the right of the block. */
+.stk-body { display: grid; gap: var(--space-1); align-content: start; min-width: 0; }
 .stk-when { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-eyebrow); }
 .stk-when[data-late] { color: var(--color-critical); }
 .stk-who { font-size: 22px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
 .stk-meta { font-size: 13px; color: var(--color-text-secondary); }
 .stk-what { font-size: 14px; color: var(--color-text-primary); }
 .stk-role { font-size: 12px; color: var(--color-text-tertiary); }
-.stk-go { margin-top: var(--space-2); font-size: 13px; color: var(--color-accent); }
+.stk-go { grid-column: 2; margin-top: var(--space-2); font-size: 13px; color: var(--color-accent); }
+/* A PHONE KEEPS THE TWO COLUMNS, with a narrower block: a card is about
+   343px wide there, so the name still has most of the line. */
+@media (max-width: 520px) {
+  .stk-card { column-gap: var(--space-3); padding: var(--space-4); }
+  .stk-date { width: 58px; padding-right: var(--space-3); }
+  .stk-d { font-size: 28px; }
+  /* The name has a column rather than the whole card now, so it is set a
+     size that keeps an ordinary long name on one line at 375px. */
+  .stk-who { font-size: 18px; }
+}
 .stk-nav { display: flex; align-items: center; justify-content: center; gap: var(--space-4); }
 .stk-count { font-size: 13px; color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; min-width: 6ch; text-align: center; }
 .stk-arrow {

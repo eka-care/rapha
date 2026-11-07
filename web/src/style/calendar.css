@@ -1,16 +1,6 @@
 /* The day screen. It lives in the main column and assumes nothing about the
    visit's right rail, which is absent whenever the assistant is docked. */
 .cal { display: grid; gap: var(--space-6); max-width: 760px; margin: 0 auto; padding: var(--space-4); }
-.cal-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.cal-chip {
-  min-height: 36px; padding: 0 var(--space-4); border-radius: var(--radius-pill);
-  border: 1px solid var(--color-border-strong); background: var(--color-bg-surface);
-  color: var(--color-text-secondary); font: inherit; font-size: 13px; cursor: pointer;
-}
-.cal-chip:hover { background: var(--color-bg-hover); }
-.cal-chip[aria-pressed="true"] {
-  background: var(--color-cta); border-color: var(--color-cta); color: var(--color-cta-ink);
-}
 .cal-pile { display: grid; gap: var(--space-2); }
 .cal-h { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-eyebrow); }
 .cal-n { color: var(--color-text-tertiary); font-weight: 500; margin-left: var(--space-1); }
@@ -31,7 +21,12 @@
 .cal-bar[data-tone="b-ok"] { background: var(--color-success); }
 .cal-bar[data-tone="b-ink"] { background: var(--color-text-primary); }
 .cal-what { display: grid; gap: 2px; align-content: center; min-width: 0; }
-.cal-sentence { display: flex; align-items: center; gap: var(--space-2); font-size: 14px; overflow-wrap: anywhere; }
+/* No word is ever broken across lines: it read "Second check- / up". The
+   title holds one line of its own and ellipsises; her name is the line
+   under it, where it can wrap at a space like any name. */
+.cal-sentence { display: flex; align-items: center; gap: var(--space-2); font-size: 14px; min-width: 0; }
+.cal-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+.cal-who { font-size: 13px; color: var(--color-text-secondary); }
 .cal-when { font-size: 12px; color: var(--color-text-tertiary); }
 .cal-role { align-self: center; font-size: 12px; color: var(--color-text-secondary); }
 @media (max-width: 520px) {
@@ -39,17 +34,77 @@
   .cal-role { grid-column: 3; justify-self: start; }
 }
 
-/* The page: today's cards down the side, the grid beside them. */
-.cal.cal-page { max-width: none; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); align-items: start; gap: var(--space-6); }
-.cal-side { display: grid; gap: var(--space-6); min-width: 0; }
+/* THE PAGE: one band of controls across the top, then the day down the
+   side and the grid beside it. The controls used to be in two places, the
+   roles on the left and the scales on the right, with the month's name
+   between them reading as a third control rather than the page's title. */
+.cal.cal-page {
+  max-width: none; align-items: start; gap: var(--space-5);
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+}
+.cal-top {
+  grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--space-3) var(--space-4);
+  padding-bottom: var(--space-4); border-bottom: 1px solid var(--color-border-subtle);
+}
+.cal-title { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: .01em; flex: 1 1 auto; }
+.cal-tools { display: flex; align-items: center; gap: var(--space-3); }
+.cal-side { display: grid; gap: var(--space-5); min-width: 0; align-content: start; }
 .cal-main { display: grid; gap: var(--space-4); min-width: 0; }
-.cal-bar-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
-.cal-nav, .cal-scales { display: flex; align-items: center; gap: var(--space-2); }
-.cal-title { margin: 0; font-size: 18px; font-weight: 600; flex: 1 1 auto; }
+.cal-nav { display: flex; align-items: center; gap: var(--space-2); }
 .cal-nav .gr-arrow { width: 36px; height: 36px; }
+
+/* The day column's own title, and the way back when it is not today. */
+.cal-dayhead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.cal-dayt { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: .01em; }
+/* A quiet action: a word, a hairline, no fill. There is one filled control
+   on this page and it is whichever scale is showing. */
+.cal-ghost {
+  min-height: 36px; padding: 0 var(--space-3); border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface);
+  color: var(--color-text-secondary); font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.cal-ghost:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+.state-empty .cal-ghost { margin-top: var(--space-3); }
+
+/* The scales: one segmented control, not three loose pills. */
+.cal-seg {
+  display: inline-flex; padding: 2px; gap: 2px;
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+}
+.cal-seg-b {
+  min-height: 32px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--color-text-secondary);
+  font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.cal-seg-b:hover { color: var(--color-text-primary); }
+.cal-seg-b[aria-pressed="true"] {
+  background: var(--color-accent); color: var(--color-cta-ink); font-weight: 600;
+}
+.cal-seg-b:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* The narrowing control, the sidebar's own, anchored to this toolbar. The
+   sidebar paints its chosen state in the agent's violet; here that colour
+   would say a machine chose the filter, so it takes the accent. */
+.cal-filter { position: relative; display: flex; }
+.cal-filter .sb-filter-go.on {
+  background: var(--color-accent-soft); border-color: var(--color-accent-line); color: var(--color-accent);
+}
+.cal-filter .sb-filter-item.on { color: var(--color-accent); }
+.cal-filter .sb-filter-go { min-width: 11rem; min-height: 36px; }
+.cal-filter .sb-filter-menu { top: calc(100% + 4px); left: auto; right: 0; min-width: 15rem; }
+
 @media (max-width: 900px) {
   .cal.cal-page { grid-template-columns: minmax(0, 1fr); }
+  /* The grid comes before the day here; its controls must still come
+     before IT, or the page reads calendar, then toolbar, then day. */
+  .cal-top { order: -2; }
   .cal-main { order: -1; }
+}
+@media (max-width: 560px) {
+  .cal-title { font-size: 18px; flex-basis: 100%; order: -1; }
+  .cal-tools { flex-wrap: wrap; }
 }
 /* In the side column the role drops under the sentence, as it does on a phone. */
 .cal-side .cal-row { grid-template-columns: 44px 4px minmax(0, 1fr); }

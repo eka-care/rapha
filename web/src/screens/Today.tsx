@@ -109,7 +109,7 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
   // The stack opens on the viewer's own role; the line under it says how much
   // belongs to others and is the way to see it.
   const [everyone, setEveryone] = useState(false);
-  const all = Array.isArray(owed) ? stack(owed, today, EVERYONE) : [];
+  const all = Array.isArray(owed) ? stack(owed, EVERYONE) : [];
   const mine = forRole(all, currentRole());
   // A viewer who owns nothing is shown everyone's, and told so: the stack is
   // never empty while somebody is owed, and never says nobody is. That viewer
@@ -287,8 +287,9 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
             owed && <div className="state-empty">No visits coming up</div>
           ) : (
             <>
-              {noneMine && <div className="stk-note">{`No visits for you. Showing ${others} for others.`}</div>}
+              {noneMine && <div className="stk-note">{`No visits are yours. Showing all ${all.length}.`}</div>}
               <Cards key={everyone || noneMine ? "all" : "mine"} rows={cards} now={today} roleName={(r) => cat.vocabulary?.role_titles?.[r] ?? r}
+                     scope={everyone || noneMine ? "for everyone" : "for you"}
                      nameOf={(s) => fields(cal.decl, { station: null, subject: s }).name}
                      /* The register's own declared columns, the first two values: the
                         renderer may not name a column (age, village), so it takes
@@ -301,7 +302,11 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
               the viewer owns nothing (noneMine): they already see everything. */}
           {owed !== "failed" && !noneMine && others > 0 && (
             <button type="button" className="stk-more" onClick={() => setEveryone(!everyone)}>
-              {everyone ? "Show only mine" : `${others} more for others. Show all`}
+              {/* The two numbers are the two lists, so one can be read
+                  against the other: this many in all, that many of them
+                  yours. "14 more for others" beside "1 of 24" was a third
+                  number that belonged to neither. */}
+              {everyone ? `Show only my ${mine.length}` : `Show all ${all.length}, including ${others} for other roles`}
             </button>
           )}
         </div>

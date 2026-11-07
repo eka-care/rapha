@@ -7,13 +7,14 @@
  *  here for the same reason it is red on the visit. Filtering by role happens
  *  here, on what the kernel already sent; nothing is stored.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, useAsync } from "../api";
+import { say } from "../announce";
 import { Icon } from "../icons";
 import { Loading } from "../parts";
 import { MARK, TONE } from "../thread/Arc";
 import type { CalendarRow, ViewResult } from "../types";
-import { dateOf, dayLabel, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView, atOf } from "./day";
+import { dateOf, dateWords, dayHeading, dayOn, dayOf, emptyLine, EVERYONE, forRole, inPiles, roleChips, scaleOf, withView, atOf } from "./day";
 import { Grid } from "./Grid";
 import { span, spanTitle, step, type Scale } from "./cells";
 
@@ -76,6 +77,18 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
   // A chip for every role that owns something on the day or in the grid.
   const { roles, initial } = roleChips([...rows, ...gridRows], role, roleName);
   const [picked, setPicked] = useState<string | null>(null);
+  // The narrowing menu. One control for every role, rather than a chip each:
+  // five chips wrapped to two lines above the day and still said nothing
+  // about how much each one holds.
+  const [menu, setMenu] = useState(false);
+  const filter = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const away = (e: MouseEvent) => { if (!filter.current?.contains(e.target as Node)) setMenu(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setMenu(false); };
+    addEventListener("mousedown", away); addEventListener("keydown", esc);
+    return () => { removeEventListener("mousedown", away); removeEventListener("keydown", esc); };
+  }, [menu]);
   // A picked role that owns nothing on THIS day is not honoured: the screen
   // falls back to everyone, so the chip shown pressed is always one that
   // draws rows and "nothing here" is never said while other roles have work.
@@ -86,25 +99,83 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
   // Emptiness is what the piles actually hold, not a count taken before them.
   const empty = emptyLine(rows.length, piles.reduce((n, p) => n + p.rows.length, 0));
 
+  // The day the left column is about: the one asked for, or today.
+  const onDay = other || today;
+  const pick = (r: string) => {
+    setPicked(r); setMenu(false);
+    const n = forRole(rows, r).length;
+    say(n === 1 ? "1 visit shown." : `${n} visits shown.`);
+  };
+
   return (
     <div className="cal cal-page">
-     <aside className="cal-side" aria-label="The day">
-      <div className="cal-chips" role="group" aria-label="Whose visits">
-        {[EVERYONE, ...roles].map((r) => (
-          <button
-            key={r || "everyone"} type="button" className="cal-chip"
-            aria-pressed={selected === r} onClick={() => setPicked(r)}
-          >
-            {r === EVERYONE ? "Everyone" : roleName(r)}
-          </button>
-        ))}
+     {/* ONE BAND OF CONTROLS, NOT TWO. The scales sat on the right, the
+         roles on the left as a wrapping strip of chips, and nothing on the
+         page said which of them was the heading of the page itself. */}
+     <header className="cal-top">
+      <div className="cal-nav" data-scale={scale}>
+        <button type="button" className="gr-arrow" aria-label={`Previous ${scale}`} onClick={() => goTo({ at: step(scale, anchor, -1) })}>
+          <Icon name="chev" className="i" />
+        </button>
+        <button type="button" className="gr-arrow gr-next" aria-label={`Next ${scale}`} onClick={() => goTo({ at: step(scale, anchor, 1) })}>
+          <Icon name="chev" className="i" />
+        </button>
+        <button type="button" className="cal-ghost" onClick={() => goTo({ on: "", at: "" })}>Today</button>
       </div>
-
-      {other && <h2 className="cal-h">{dayLabel(other, today)}</h2>}
+      <h2 className="cal-title">{spanTitle(scale, anchor)}</h2>
+      <div className="cal-tools">
+        <div className="cal-filter" ref={filter}>
+          <button
+            type="button" className={`sb-filter-go${selected === EVERYONE ? "" : " on"}`}
+            aria-expanded={menu} aria-haspopup="true" onClick={() => setMenu((v) => !v)}
+          >
+            <Icon name="sliders" className="i sm" />
+            <span className="sb-filter-t">{selected === EVERYONE ? "Everyone" : roleName(selected)}</span>
+            <span className="sb-filter-n">{shown.length}</span>
+          </button>
+          {menu && (
+            <div className="sb-filter-menu">
+              <button type="button" className={`sb-filter-item${selected === EVERYONE ? " on" : ""}`} onClick={() => pick(EVERYONE)}>
+                <span>Everyone</span><span className="sb-filter-c">{rows.length}</span>
+              </button>
+              {roles.map((r) => (
+                <button key={r} type="button" className={`sb-filter-item${selected === r ? " on" : ""}`} onClick={() => pick(r)}>
+                  <span>{roleName(r)}</span><span className="sb-filter-c">{forRole(rows, r).length}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="cal-seg" role="group" aria-label="Scale">
+          {SCALES.map((s) => (
+            <button key={s.scale} type="button" className="cal-seg-b" aria-pressed={scale === s.scale} onClick={() => goTo({ scale: s.scale })}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+     </header>
+     <aside className="cal-side" aria-label="The day">
+      {/* The column always says which day it is showing. It said nothing at
+          all on today, so a person who had wandered off and come back had
+          no way to tell what they were looking at. */}
+      <div className="cal-dayhead">
+        <h2 className="cal-dayt">{dayHeading(onDay, today)}</h2>
+        {other && (
+          <button type="button" className="cal-ghost" onClick={() => goTo({ on: "", at: "" })}>Back to today</button>
+        )}
+      </div>
       {waiting && <Loading what="this day" shape="rows" rows={3} />}
       {failed && <div className="state-empty">This day could not be opened.</div>}
 
-      {empty && !waiting && !failed && <div className="state-empty">{empty}</div>}
+      {empty && !waiting && !failed && (
+        <div className="state-empty">
+          {empty}
+          {rows.length > 0 && (
+            <button type="button" className="cal-ghost" onClick={() => pick(EVERYONE)}>Show everyone</button>
+          )}
+        </div>
+      )}
 
       {piles.map((g) => (
         <section key={g.pile} className="cal-pile" aria-label={g.label}>
@@ -120,13 +191,26 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
                       <span className="cal-mon">{month}</span>
                     </span>
                     <span className="cal-bar" data-tone={TONE[r.state] ?? "b-mute"} aria-hidden="true" />
+                    {/* THE TITLE KEEPS ITS OWN LINE. In one sentence with
+                        her name it wrapped inside the word: "Second check-"
+                        over "up". */}
                     <span className="cal-what">
-                      <span className="cal-sentence">
+                      <span className="cal-sentence" title={r.programme_title || undefined}>
                         <Icon name={(MARK[r.state] ?? "clock") as never} className="i sm" />
-                        <span title={r.programme_title || undefined}>{r.title}</span> for {nameOf(r.subject_row)}
+                        <span className="cal-t">{r.title}</span>
                       </span>
+                      <span className="cal-who">for {nameOf(r.subject_row)}</span>
+                      {/* The big numeral beside this is the DUE day, so the
+                          line under it says so in words and says when the
+                          window shuts. It said only "Closes 2026-11-27",
+                          which is an ISO date in front of a health worker
+                          and left the numeral unexplained. */}
                       <span className="cal-when">
-                        {r.state === "done" && r.done_at ? <>Recorded {r.done_at}</> : <>Closes {r.closes}</>}
+                        {r.state === "done" && r.done_at
+                          ? <>Recorded {dateWords(r.done_at)}</>
+                          : r.state === "missed"
+                            ? <>Due {dateWords(r.due)} · window shut {dateWords(r.closes)}</>
+                            : <>Due {dateWords(r.due)} · open until {dateWords(r.closes)}</>}
                       </span>
                     </span>
                     <span className="cal-role">{roleName(r.owner)}</span>
@@ -139,25 +223,6 @@ export function Calendar({ result, nameOf, role, onOpenPatient }: {
       ))}
      </aside>
      <section className="cal-main" aria-label="Dates">
-      <div className="cal-bar-tools">
-        <div className="cal-nav" data-scale={scale}>
-          <button type="button" className="gr-arrow" aria-label={`Previous ${scale}`} onClick={() => goTo({ at: step(scale, anchor, -1) })}>
-            <Icon name="chev" className="i" />
-          </button>
-          <button type="button" className="gr-arrow gr-next" aria-label={`Next ${scale}`} onClick={() => goTo({ at: step(scale, anchor, 1) })}>
-            <Icon name="chev" className="i" />
-          </button>
-          <button type="button" className="cal-chip" onClick={() => goTo({ on: "", at: "" })}>Today</button>
-        </div>
-        <h2 className="cal-title">{spanTitle(scale, anchor)}</h2>
-        <div className="cal-scales" role="group" aria-label="Scale">
-          {SCALES.map((s) => (
-            <button key={s.scale} type="button" className="cal-chip" aria-pressed={scale === s.scale} onClick={() => goTo({ scale: s.scale })}>
-              {s.label}
-            </button>
-          ))}
-        </div>
-      </div>
       {gridFailed && <div className="state-empty">This {scale} could not be opened.</div>}
       {!gridHave && !gridFailed && <Loading what={`this ${scale}`} shape="rows" rows={4} />}
       {gridHave && (

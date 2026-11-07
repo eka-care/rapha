@@ -61,8 +61,12 @@ export function weightFor(type: string, displays: string[] = []): number {
       return 2;
     case "boolean":
       return 3;
+    // A DATE BOX IS NOT A THREE-CHARACTER BOX. The browser's own control
+    // draws the whole of "16/10/2026" and a calendar button beside it, and
+    // at weight 3 (12 characters of ceiling, less the field's own padding)
+    // the year was cut off: the form asked for a date and showed "16/10/20".
     case "date":
-      return 3;
+      return 5;
     case "choice":
       return choiceWeight(displays.reduce((n, d) => Math.max(n, d.length), 0));
     // Prose. A note, a complaint, a reason. It is the line.

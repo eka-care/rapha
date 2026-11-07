@@ -6,10 +6,18 @@
 import type { CalendarRow } from "../types";
 import type { Scale } from "./cells.ts";
 
-/** Late first, because it is the only pile where somebody must act now. */
+/** Late first, because it is the only pile where somebody must act now.
+ *
+ *  THE OWED PILE IS NOT "TODAY". The kernel calls a contact `due` while its
+ *  window is OPEN, which for an antenatal visit is four weeks wide, so this
+ *  pile holds visits whose due dates are weeks apart. It was headed "Today",
+ *  over rows reading 7 Nov, 15 Nov and 29 Dec, and a heading that disagrees
+ *  with the rows under it is the one thing this screen must not do. What is
+ *  true of every row in it is that it can be done on the day being looked at.
+ */
 export const PILES: { pile: string; label: string; state: string }[] = [
   { pile: "late", label: "Late", state: "missed" },
-  { pile: "owed", label: "Today", state: "due" },
+  { pile: "owed", label: "Open today", state: "due" },
   { pile: "done", label: "Done", state: "done" },
 ];
 
@@ -18,11 +26,11 @@ export const PILES: { pile: string; label: string; state: string }[] = [
  *  contact the kernel says is owed vanishing from the day with no sign is the
  *  worst thing this screen could do. It gets a pile of its own, last, named by
  *  the state value itself, which is the kernel's word and not ours.
- *  "Today" is only true of today; on any other day the pile is "Due",
- *  because the day's own heading already says which day. */
+ *  "Open today" is only true of today; on any other day the pile is "Open
+ *  that day", because the day's own heading already says which day. */
 export function inPiles(rows: CalendarRow[], isToday = true): { pile: string; label: string; rows: CalendarRow[] }[] {
   const known = new Set(PILES.map((p) => p.state));
-  const piles = PILES.map((p) => ({ pile: p.pile, label: p.pile === "owed" && !isToday ? "Due" : p.label, rows: rows.filter((r) => r.state === p.state) }));
+  const piles = PILES.map((p) => ({ pile: p.pile, label: p.pile === "owed" && !isToday ? "Open that day" : p.label, rows: rows.filter((r) => r.state === p.state) }));
   const strange = [...new Set(rows.map((r) => r.state).filter((s) => !known.has(s)))].sort();
   for (const s of strange) piles.push({ pile: s, label: s, rows: rows.filter((r) => r.state === s) });
   return piles.filter((p) => p.rows.length > 0);
@@ -64,6 +72,22 @@ export function dayOf(iso: string): { day: string; month: string } {
   return m ? { day: String(Number(m[3])), month: MONTHS[Number(m[2]) - 1] ?? "" } : { day: "", month: "" };
 }
 
+/** A date as a person says it: "15 Nov". Read by position, never through
+ *  Date, so no time zone can move it a day. "" when it is not a date. */
+export function dayMonth(iso: string): string {
+  const { day, month } = dayOf(iso);
+  return day ? `${day} ${month}` : "";
+}
+
+/** The same with the year, for a record that spans one: "15 Nov 2026". A
+ *  health worker should never be shown 2026-11-15; the year is kept because
+ *  a course of care runs across one. */
+export function dateWords(iso: string): string {
+  const d = dayMonth(iso);
+  const y = /^(\d{4})-/.exec(iso ?? "")?.[1] ?? "";
+  return d ? `${d} ${y}` : (iso ?? "");
+}
+
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** The date part of a kernel timestamp, or "" when it is not one. */
@@ -90,6 +114,17 @@ export function dayLabel(iso: string, today: string): string {
   const wd = WEEKDAYS[new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()];
   const { day, month } = dayOf(iso);
   return `${wd} ${day} ${month}`;
+}
+
+/** THE DAY COLUMN'S OWN TITLE: which day its rows belong to, always said,
+ *  so the column is never a heap of rows with nothing above them. "Today,
+ *  Fri 6 Nov" while it is today, the plain date with its year otherwise,
+ *  because a day in another year must not read as this one. */
+export function dayHeading(day: string, today: string): string {
+  const near = dayLabel(day, today);
+  const plain = dayLabel(day, "");
+  if (near === "Today" || near === "Tomorrow") return `${near}, ${plain}`;
+  return `${plain} ${/^(\d{4})-/.exec(day ?? "")?.[1] ?? ""}`.trim();
 }
 
 /** The scale a link to the calendar carries (`scale=week|month|year`). A month
@@ -122,13 +157,17 @@ export function atOf(hash: string): string {
 /** The cards on the home page, in the order they stack. One per contact, so a
  *  woman owed two visits has two cards: each is a separate piece of work.
  *  Late leads (longest-late first), then the soonest owed; the day screen's
- *  rule. Work already done is not coming up. The stack is the viewer's own
+ *  rule. Late is the kernel's word, never a date compared against today. Work already done is not coming up. The stack is the viewer's own
  *  role's, or everyone's when they own nothing. A new array; `rows` is not
  *  touched, and nothing is kept. */
-export function stack(rows: CalendarRow[], now: string, role: string): CalendarRow[] {
+export function stack(rows: CalendarRow[], role: string): CalendarRow[] {
   const open = rows.filter((r) => r.state !== "done");
   const mine = forRole(open, role);
-  const late = (r: CalendarRow) => r.state === "missed" || (!!r.due && r.due < now);
+  // WHETHER SOMETHING IS LATE IS THE KERNEL'S TO SAY, not a date comparison
+  // here: a visit whose window is still open is not late, however long ago
+  // it was due. Past-due open visits still lead the rest, because the sort
+  // below is by due date.
+  const late = (r: CalendarRow) => r.state === "missed";
   return (mine.length ? mine : open).slice().sort((a, b) => {
     const la = late(a), lb = late(b);
     if (la !== lb) return la ? -1 : 1;
@@ -147,9 +186,32 @@ export function cardHash(row: CalendarRow): string {
   return `/patients/${encodeURIComponent(row.subject)}?at=${row.due}`;
 }
 
-/** When a contact is owed, in words. A late one says since when. */
+/** THE DAY THE CARD IS ABOUT: the one `owedLine` below speaks of, so a date
+ *  block drawn beside those words cannot disagree with them. A card reads
+ *  the date through here rather than picking a field for itself. */
+export function owedDate(row: CalendarRow): string {
+  return row.due;
+}
+
+/** The weekday of a date, in three letters, worked out in UTC from the parts
+ *  so no time zone can move it a day. "" when it is not a date. */
+export function weekdayOf(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
+  return m ? (WEEKDAYS[new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()] ?? "") : "";
+}
+
+/** When a contact is owed, in words.
+ *
+ *  ONLY THE KERNEL SAYS SOMETHING IS LATE. This card used to call a visit
+ *  late whenever its due date had passed, which put "Late since Fri 30 Oct"
+ *  on a visit whose window runs to 27 November: a judgement the kernel never
+ *  made, in red, on the first thing a nurse reads. A visit past its due date
+ *  with its window still open has been waiting, and says so.
+ */
 export function owedLine(row: CalendarRow, now: string): string {
-  if (row.state === "missed" || (row.due && row.due < now)) return `Late since ${dayLabel(row.due, now)}`;
-  const d = dayLabel(row.due, now);
+  const on = owedDate(row);
+  if (row.state === "missed") return `Late since ${dayLabel(on, now)}`;
+  if (on && on < now) return `Due since ${dayLabel(on, now)}`;
+  const d = dayLabel(on, now);
   return d === "Today" || d === "Tomorrow" ? `Due ${d.toLowerCase()}` : `Due ${d}`;
 }
