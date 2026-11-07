@@ -268,7 +268,7 @@ ok(!/mic-live/.test(rec) && !/Microphone live/.test(rec),
   // Anchored, not a substring: /composer__mic/ alone still matched after the
   // class was renamed to composer__micro, so this assertion passed under an
   // implementation with no microphone in it at all.
-  ok(/className="btn btn-g mic"/.test(composer) && /onClick=\{onStartScribe\}/.test(composer),
+  ok(/className="scribe-btn"/.test(composer) && /onClick=\{onStartScribe\}/.test(composer),
     "the microphone that starts a consultation lives in the composer, and starts it");
   ok(/aria-label=\{micReason \|\| "Dictate"\}/.test(composer),
     "and names itself, or names why it is unavailable, for a screen reader");

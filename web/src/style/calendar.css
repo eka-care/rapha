@@ -3,13 +3,13 @@
 .cal { display: grid; gap: var(--space-6); max-width: 760px; margin: 0 auto; padding: var(--space-4); }
 .cal-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .cal-chip {
-  min-height: 36px; padding: 0 var(--space-4); border-radius: var(--radius-pill);
+  min-height: 36px; padding: 0 var(--space-4); border-radius: var(--radius-md);
   border: 1px solid var(--color-border-strong); background: var(--color-bg-surface);
   color: var(--color-text-secondary); font: inherit; font-size: 13px; cursor: pointer;
 }
 .cal-chip:hover { background: var(--color-bg-hover); }
 .cal-chip[aria-pressed="true"] {
-  background: var(--color-cta); border-color: var(--color-cta); color: var(--color-cta-ink);
+  background: var(--color-primary); border-color: var(--color-primary); color: var(--color-primary-ink);
 }
 .cal-pile { display: grid; gap: var(--space-2); }
 .cal-h { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-eyebrow); }

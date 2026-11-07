@@ -8,6 +8,7 @@
  *  So a visit is a closed card, and opening one reads that thread rather than
  *  pre-loading every visit a person has ever had.
  */
+import { Lotus } from "../abha/Lotus";
 import { useEffect, useState } from "react";
 import { initialsOf } from "../agent";
 import { api, useAsync } from "../api";
@@ -70,10 +71,11 @@ export function Patient({ id, cat, onOpenThread }: {
           <span className="avatar">{initialsOf(name)}</span>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div className="pt-name" style={{ fontSize: 18 }}>{name}</div>
-            <div className="pt-meta">{meta.join(" · ")}</div>
+            <div className="pt-meta">{meta.join(", ")}</div>
             <div className="pt-chips">
               {identity && (
                 <span className="id-badge">
+                  <Lotus className="id-lotus" />
                   <span className="id-lab">{identity.label}</span>
                   <span className="id-val">{identity.value}</span>
                 </span>

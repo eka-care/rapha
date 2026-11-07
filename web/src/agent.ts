@@ -9,7 +9,7 @@
  *  here names a station, a flag or a view: the words come from the bundle.
  */
 import type { QueueRow, TaskRow, ViewDecl, ViewResult } from "./types";
-import { human } from "./words.ts";
+import { human, NO_NAME } from "./words.ts";
 
 export type Loaded = { decl: ViewDecl; result: ViewResult };
 
@@ -151,7 +151,10 @@ export type Column = {
    *  person whose state is carried by colour alone, which is no state at all
    *  to anybody who cannot see it or cannot tell that red from this grey. The
    *  words are the flags the kernel sent; this file does not read them. */
-  people: { thread: string; name: string; initials: string; alert: boolean; alerts: string[] }[];
+  people: { thread: string; name: string; initials: string; token?: string; alert: boolean; alerts: string[]; opened_at?: string }[];
+  /** The earliest arrival among the people here, so the screen can say how long
+   *  the longest wait is without a second pass over the rows. */
+  oldest?: string;
   jam: boolean;
 };
 
@@ -164,11 +167,18 @@ export function line(loaded: Loaded[], stations: string[], badges: Record<string
       const cols = (l.decl.columns ?? []).length
         ? (l.decl.columns as string[]).map((c) => r.subject?.[c])
         : Object.values(r.subject ?? {});
-      const name = String(cols.find((v) => typeof v === "string" && String(v).trim()) ?? r.thread);
+      // The first declared column is the name. Taking the next column that has a
+      // value drew an unnamed patient as their token number, twice.
+      const first = cols[0];
+      const tokenCol = (l.decl.columns ?? []).find((c) => /token/i.test(c) && r.subject?.[c] != null && r.subject?.[c] !== "")
+        ?? Object.keys(r.subject ?? {}).find((k) => /token/i.test(k) && r.subject?.[k] != null && r.subject?.[k] !== "");
+      const tokenVal = tokenCol ? r.subject?.[tokenCol] : undefined;
+      const token = tokenVal === undefined || tokenVal === null || tokenVal === "" ? undefined : String(tokenVal);
+      const name = typeof first === "string" && first.trim() ? first : NO_NAME;
       const list = at.get(r.station) ?? [];
       const alerts = (r.flags ?? []).filter((f) => called.has(f));
       list.push({
-        thread: r.thread, name, initials: initialsOf(name),
+        thread: r.thread, name, initials: name === NO_NAME ? "?" : initialsOf(name), token, opened_at: r.opened_at,
         alert: alerts.length > 0, alerts,
       });
       at.set(r.station, list);
@@ -177,7 +187,8 @@ export function line(loaded: Loaded[], stations: string[], badges: Record<string
   const most = Math.max(0, ...[...at.values()].map((p) => p.length));
   return stations.map((station) => {
     const people = at.get(station) ?? [];
-    return { station, people, jam: people.length > 1 && people.length === most };
+    const oldest = people.map((p) => p.opened_at).filter((t): t is string => !!t).sort()[0];
+    return { station, people, oldest, jam: people.length > 1 && people.length === most };
   });
 }
 

@@ -651,13 +651,10 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
     .map((r) => r.selector);
   assert.deepEqual(hidden, [],
     "the number, the name or the risk label is hidden at some width: " + hidden.join(", "));
-  // The line is read across: a name and its own labels have to stay within a
-  // measure a person can take in. Unbounded, a 1440px window put most of a
-  // screen between them.
-  const measure = /max-width:\s*(\d+)px/.exec(base(".qlist"));
-  assert.ok(measure, ".qlist runs to the full width of whatever window it is in");
-  assert.ok(Number(measure![1]) <= 1100,
-    `.qlist is capped at ${measure![1]}px, which is wider than a row can be read across`);
+  // The table runs the full width of the page on purpose: its columns carry the
+  // measure, so a name and its own labels stay in one row without a width cap.
+  assert.ok(!/\.qlist\s*\{[^}]*max-width:\s*\d+px/.test(queueCss),
+    ".qlist is capped at a pixel width again, so the table stops short of the page");
   // Every target in the narrowing menu is a tap target too, and these are
   // in the OTHER stylesheet, so they are measured against the same floor.
   for (const selector of [".sb-filter-go", ".sb-filter-item", ".sb-filter-x"]) {
@@ -744,20 +741,25 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
     "and so does a programme narrowing, off the rows in hand and not off a kernel grouping");
   assert.ok(!/result\.groups/.test(loops),
     "the narrowings read the kernel's groups, which are one grouping and not these");
-  // ONE CONTROL, NOT TWO. The list screen is handed the narrowing; it does
-  // not keep one of its own, which is how the strip and the menu came to
-  // disagree about the same question on the same screen.
-  assert.match(list, /filter: Filter;/,
-    "the list screen holds its own filter again, so there are two controls "
-    + "over one question and neither moves the other");
-  assert.ok(!/setFilter|filter: null as Filter/.test(list),
-    "the list screen sets a narrowing of its own rather than obeying the shell's");
-  // And a list that is showing part of the day says so on the list, because
-  // on a phone the control that narrowed it is behind a drawer.
-  assert.match(list, /narrowedBy && \(/,
-    "a narrowed list draws nothing to say it is narrowed, so two thirds of "
-    + "the day are missing with no explanation on screen");
-  ok("queue: one narrowing control, every option counted off the rows in hand, "
+  // ONE LIST, ONE SET OF CONTROLS. The Lines table is the whole list: it owns its
+  // tabs, search, filter menu and column sorts, and the shell draws no second
+  // panel of the same names beside it. The panel remains only on a visit.
+  assert.ok(!/filter: Filter;/.test(list),
+    "the list screen is being handed a narrowing by the shell again, which "
+    + "is how a second control over the same question comes back");
+  assert.match(side, /if \(route\.startsWith\("views\/"\)\) return null;/,
+    "a queue view draws a second panel beside its own list");
+  assert.match(list, /narrowings\(/,
+    "the list builds its filter menu from the one list of narrowings");
+  assert.match(list, /!\(i\.filter && "station" in i\.filter\)/,
+    "the stations are offered both as tabs and in the menu");
+  // A list that is showing part of the day says so on the list: the tab that is
+  // on, the filter button naming what it is filtered by, and a way to clear it.
+  assert.match(list, /chosen \? chosen\.label : "Filters"/,
+    "a filtered list does not name its filter on the button");
+  assert.match(list, /onClick=\{\(\) => set\(\{ q: "", extra: null, tab: ALL \}\)\}/,
+    "a narrowed list has no way to clear it");
+  ok("queue: one list with its own controls, every option counted off the rows in hand, "
      + "and a narrowed list says so");
 
   // -- and the screen is actually asking -----------------------------------
@@ -850,13 +852,16 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.deepEqual(h1s, ["app/Topbar.tsx", "auth/SignIn.tsx", "screens/Encounter.tsx"],
     "the page has more than one top-level heading, or none: " + h1s.join(", "));
   const appSrc = code(readFileSync(join(SRC, "app", "App.tsx"), "utf8"));
-  // The visit's heading and the shell's cannot both be on screen: the bar is
-  // rendered only off a visit, and the patient's name only on one. Without
-  // this, deleting the condition gives every visit two h1s and nothing says
-  // so -- which is the whole reason the pair above is listed exactly.
-  assert.match(appSrc, /route\.kind !== "thread" && \(\s*<Topbar/,
-    "the top bar is drawn inside a visit, where the patient's name is "
-    + "already the page's h1: that is two top-level headings on one page");
+  // The visit's heading and the shell's cannot both be on screen. The bar IS
+  // drawn inside a visit now, as a breadcrumb (Lines > the patient), and in
+  // that form it carries no heading: the patient's name stays the page's one
+  // h1. Without this, a bar that kept its title on a visit gives every visit
+  // two h1s and nothing says so -- which is why the list above is exact.
+  assert.match(appSrc, /<Topbar[\s\S]{0,200}?crumb=\{crumb\}/,
+    "the bar is drawn on a visit without the breadcrumb that replaces its title");
+  const topbarSrc = code(readFileSync(join(SRC, "app", "Topbar.tsx"), "utf8"));
+  assert.match(topbarSrc, /crumb \? \([\s\S]*?<nav[\s\S]*?\) : \([\s\S]*?<h1/,
+    "with a breadcrumb the bar must not also draw its page title as a heading");
   assert.ok(!/<Topbar[\s\S]{0,600}?onAssist=\{route\.kind === "thread"/.test(appSrc),
     "the bar still tests for a visit inside itself, which means it is still "
     + "drawn there");
@@ -1523,11 +1528,11 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.match(src, /disabled=\{/, "an arrow at the end of the stack is disabled");
   assert.match(src, /aria-label="(Earlier|Previous)/, "the arrows are named");
   assert.match(src, /aria-label="Later/, "the arrows are named");
-  // The nearest is the largest; each one behind is smaller.
+  // Each card is as wide as its words need: a grid of cards, never one stretched
+  // across the page, and no card hidden behind another.
   const css = readFileSync(join(SRC, "style", "cards-stack.css"), "utf8");
-  assert.match(css, /--depth/, "size is a function of how far back a card sits");
-  assert.match(css, /scale\(calc\(1 - /, "each card behind is scaled smaller");
-  assert.match(css, /prefers-reduced-motion/, "the shuffle respects reduced motion");
+  assert.match(css, /\.stk-grid\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fill/, "the cards sit in a grid of fixed-width columns");
+  assert.ok(!/--depth|\.stk-behind|\.stk-deck/.test(css), "no card is tucked behind another");
   assert.match(readFileSync(join(SRC, "main.tsx"), "utf8"), /cards-stack\.css/, "the stylesheet is loaded");
   // The home page: the stack replaces the day counts, and opens her calendar.
   assert.match(home, /stack\(/, "the home page builds the stack through day.ts");
@@ -1579,7 +1584,7 @@ const decomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.ok(!/Open her/.test(src), "the button does not assume the subject's sex");
   // Nothing derived is kept.
   assert.ok(!/useMemo|localStorage|sessionStorage|new Map\(/.test(src), "no cache of derived rows");
-  ok("the card stack: late first, one per contact, role first, paged without overshoot, opens her calendar on the due date");
+  ok("the visit cards: late first, one per contact, role first, paged without overshoot, opens her calendar on the due date");
 }
 
 console.log(`\n${checks} checks passed`);

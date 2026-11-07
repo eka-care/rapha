@@ -17,21 +17,11 @@ body {
   /* The paper. A dot grid at the grid unit, and a vignette that lifts the
      middle of the screen off it, exactly as the prototype draws them. Both
      are quiet enough to be felt rather than seen. */
-  background-image: radial-gradient(circle at 1px 1px, var(--color-dot) 1px, transparent 0);
-  background-size: var(--grid) var(--grid);
 }
 /* The grid is a texture, not a pattern to be read: this fades it out under
    the middle of the screen, where the work is. Pointer events off, because
    it covers everything. */
-body::after {
-  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
-  background: radial-gradient(ellipse 60% 70% at 50% 45%,
-    var(--color-bg-canvas) 35%, transparent 100%);
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-  transition: background var(--duration-slow) var(--ease-out),
-              color var(--duration-slow) var(--ease-out);
-}
+
 
 button, input, textarea, select { font: inherit; }
 button { color: inherit; }
@@ -79,3 +69,18 @@ svg.i.lg { width: 19px; height: 19px; }
     scroll-behavior: auto !important;
   }
 }
+
+/* One scrollbar, everywhere something scrolls: thin, quiet, and only as dark as
+   it needs to be. Firefox reads the first two lines; the rest are for WebKit. */
+* { scrollbar-width: thin; scrollbar-color: var(--color-border-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong); border-radius: 8px;
+  border: 3px solid transparent; background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--color-border-control); background-clip: content-box; }
+*::-webkit-scrollbar-corner { background: transparent; }
+
+/* No rubber-band bounce when something is scrolled past its end, anywhere. */
+html, body, * { overscroll-behavior: none; }

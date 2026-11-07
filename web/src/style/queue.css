@@ -28,7 +28,12 @@
    column you can read across; on a 1440px screen the same rule put a name at
    the far left and its own programme pill most of a screen away, which is two
    things on one line pretending to be one. */
-.qlist { display: grid; gap: 2px; max-width: 940px; }
+.qlist { display: grid; gap: 0; max-width: none;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
 
 /* Phone first: the number and the time hold the top line with the name, and
    the labels take the line underneath. The name therefore never competes with
@@ -37,10 +42,11 @@
   display: grid; width: 100%; text-align: left; cursor: pointer;
   grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas: "tk bd at" "tk tags tags";
-  align-items: center; column-gap: 11px; row-gap: 5px;
-  min-height: 56px; padding: 9px 10px;
-  background: none; border: 1px solid transparent; border-radius: var(--radius-lg);
+  align-items: center; column-gap: 11px; row-gap: 4px;
+  min-height: 56px; padding: 7px 10px;
+  background: none; border: 0; border-radius: 0;
   transition: background var(--duration-fast) var(--ease-out);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 /* --color-bg-subtle, and not --color-bg-hover, which is what this rule said
    first. The row's quiet second line is --color-text-tertiary, and that ink
@@ -50,12 +56,15 @@
 .qr:hover { background: var(--color-bg-subtle); }
 
 .qr-tk {
-  grid-area: tk; width: 38px; height: 38px; flex: 0 0 auto;
-  display: grid; place-items: center; border-radius: var(--radius-md);
-  font-family: var(--font-mono); font-size: 14px; font-weight: 500;
+  grid-area: tk; width: auto; height: auto; flex: 0 0 auto;
+  display: flex; place-items: center; border-radius: 0;
+  font-family: var(--font-sans); font-size: 13px; font-weight: 650;
   color: var(--color-text-primary);
-  background: var(--color-bg-subtle); border: 1px solid var(--color-border-strong);
+  background: none; border: 0;
   position: relative;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* How this row got into the queue, as a dot on the corner of the number.
@@ -71,7 +80,7 @@
    the number's accessible name says it in the declaration's own word, a
    filter chip above counts it, and a legend under the list decodes it. */
 .qr-tk-mark::after {
-  content: ""; position: absolute; right: -2px; bottom: -2px;
+  content: ""; position: static; right: auto; bottom: auto;
   width: 8px; height: 8px; border-radius: var(--radius-pill);
   /* Ink, not the accent. The accent is now the system's blue, and blue on
      this screen already means national identity: a lotus and an ABHA chip.
@@ -79,7 +88,8 @@
   background: var(--color-text-secondary);
   /* A ring in the row's own ground, so the dot reads as sitting on the corner
      rather than as part of the box's edge. */
-  border: 1.5px solid var(--color-bg-canvas);
+  border: 0;
+  flex: 0 0 auto;
 }
 
 /* The legend. One line, under the list, and only while some row wears a mark.
@@ -100,23 +110,23 @@
 .qr-bd { grid-area: bd; min-width: 0; }
 .qr-l1 { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .qr-nm {
-  font-size: 14px; font-weight: 500;
+  font-size: 13px; font-weight: 500;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* National identity, and the only other coloured thing on the row. */
 /* The emblem carries its own colours; nothing here tints it. */
 .qr-lotus { flex: 0 0 auto; }
 .qr-sb {
-  display: block; margin-top: 1px; font-size: 11.5px; color: var(--color-text-tertiary);
+  display: block; margin-top: 0; font-size: 12px; color: var(--color-text-tertiary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .qr-tags { grid-area: tags; display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
 
 .qr-pg {
-  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .07em;
-  text-transform: uppercase; white-space: nowrap; padding: 3px 9px;
-  border: 1px solid var(--color-border-control); border-radius: var(--radius-pill);
+  font-family: var(--font-sans); font-size: 11px; letter-spacing: 0;
+  text-transform: none; white-space: nowrap; padding: 2px 8px;
+  border: 1px solid var(--color-border-control); border-radius: var(--radius-md);
   color: var(--color-text-secondary); background: var(--color-bg-surface);
 }
 /* A declared display name is a word a person says out loud, so it is set in
@@ -139,19 +149,23 @@
 
 .qr-at {
   grid-area: at; align-self: center; justify-self: end;
-  font-family: var(--font-mono); font-size: 10.5px; white-space: nowrap;
+  font-family: var(--font-sans); font-size: 11px; white-space: nowrap;
   color: var(--color-text-tertiary);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.3;
 }
 
 /* Wide enough for one line: the labels move to the right of the row, which is
    where the mockup draws them, and the time goes last. */
 @media (min-width: 560px) {
   .qr {
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
-    grid-template-areas: "tk bd tags at";
+    grid-template-columns: 64px minmax(0, 1.5fr) 110px minmax(0, 1.1fr) 104px;
+    grid-template-areas: "tk bd st tags at";
     row-gap: 0;
   }
-  .qr-tags { justify-content: flex-end; }
+  .qr-tags { justify-content: flex-start; }
 }
 
 /* Room enough that the chips need not scroll. */
@@ -181,3 +195,110 @@
   background: var(--color-bg-subtle); color: var(--color-text-secondary);
   font-size: 12.5px;
 }
+
+/* The station, as its own column. Hidden on a phone, where the row has two lines
+   and the station is in the quiet line instead. */
+.qr-st { grid-area: st; font-size: 12px; color: var(--color-text-secondary); white-space: nowrap; }
+@media (max-width: 559px) { .qr-st { display: none; } }
+@media (min-width: 560px) { .qr-sb-st { display: none; } }
+/* How long, then when. The wait is what a person triages by. */
+.qr-w { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
+.qr-ar { font-family: var(--font-sans); font-size: 11px; color: var(--color-text-tertiary); }
+/* Clinical risk: red, and a bar on the edge so it is found without reading. */
+/* Flagged rows carry the flag tag, not a wash of red across the row. */
+.qr.risk { background: none; }
+.qr-lotus { width: 18px; height: 16px; }
+.qkey { gap: 18px; }
+.qkey > span { display: flex; align-items: center; gap: 8px; }
+.qkey-dash { width: 22px; height: 12px; border-radius: 4px; border: 1px dashed var(--color-border-control); flex: 0 0 auto; }
+
+/* The header of the table: each column name sorts by that column. */
+.qh { display: none; }
+.qr:last-of-type { border-bottom: 0; }
+.qr-bd { display: flex; align-items: center; gap: 12px; }
+.qr-tx { min-width: 0; display: grid; }
+.qr-av {
+  width: 36px; height: 36px; flex: 0 0 auto; border-radius: 10px; display: grid; place-items: center;
+  background: var(--color-bg-subtle); border: 1px solid var(--color-border-subtle);
+  font-size: 12px; font-weight: 650; color: var(--color-text-secondary);
+}
+.qr-av.none { color: var(--color-text-tertiary); }
+.qr-at.over .qr-w { color: var(--color-warning); }
+.qkey { padding: 10px 16px; margin-top: 0; }
+@media (min-width: 560px) {
+  .qh {
+    display: grid; grid-template-columns: 64px minmax(0, 1.5fr) 110px minmax(0, 1.1fr) 104px; column-gap: 11px;
+    padding: 0 10px; height: 36px; align-items: center;
+    background: var(--color-bg-subtle); border-bottom: 1px solid var(--color-border-subtle);
+  }
+  .qh-c.end { text-align: right; }
+  .qr { padding: 7px 10px; }
+}
+.qh-b {
+  display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 11px; font-weight: 600; color: var(--color-text-tertiary);
+  min-height: 32px; padding: 0; border-radius: var(--radius-sm);
+}
+.qh-b:hover { color: var(--color-text-primary); }
+.qh-ar { opacity: .4; transition: opacity var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out); }
+.qh-ar.on { opacity: 1; color: var(--color-text-primary); }
+.qh-ar.up { transform: rotate(180deg); }
+
+/* ---- the bar above the table: search, filters, and the place tabs ---- */
+.ls { display: grid; gap: 12px; padding-bottom: 20px; }
+.ls-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ls-search { position: relative; width: 340px; max-width: 100%; }
+.ls-search .i { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--color-text-tertiary); pointer-events: none; }
+.ls-search input { padding-left: 34px; width: 100%; }
+.lf { position: relative; }
+.lf-btn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong); background: var(--color-bg-surface); color: var(--color-text-primary);
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.lf-btn.on { background: var(--color-bg-selected); }
+.lf-clear { min-height: 44px; border: 0; background: none; color: var(--color-text-secondary); font: inherit; font-size: 12px; cursor: pointer; padding: 0 8px; }
+.lf-clear:hover { color: var(--color-text-primary); }
+.lf-menu {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; width: 240px; padding: 4px; display: grid; gap: 1px;
+  background: var(--color-bg-surface); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+  max-height: 420px; overflow-y: auto;
+}
+.lf-h { padding: 6px 9px 2px; font-size: 11px; font-weight: 600; color: var(--color-text-tertiary); }
+.lf-grp + .lf-grp { border-top: 1px solid var(--color-border-subtle); margin-top: 4px; padding-top: 2px; }
+.lf-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; min-height: 44px; padding: 0 9px;
+  border: 0; background: none; border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-size: 12px; color: var(--color-text-secondary);
+}
+.lf-item:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+.lf-item.on { background: var(--color-bg-selected); color: var(--color-text-primary); font-weight: 650; }
+.lf-item.risk.on, .lf-item.risk .lf-c { color: var(--color-critical); }
+.lf-c { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--color-text-tertiary); }
+
+/* Tabs, drawn as tabs: a line under the one you are on. The same tab the visit uses. */
+.ltabs { display: flex; gap: 2px; border-bottom: 1px solid var(--color-border-subtle); overflow-x: visible;
+  overflow-y: visible;
+  flex-wrap: wrap;
+}
+.ltab {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 500; color: var(--color-text-tertiary);
+  border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+}
+.ltab:hover { color: var(--color-text-primary); }
+.ltab.on { color: var(--color-text-primary); font-weight: 650; border-bottom-color: var(--color-text-primary); }
+.ltab-n { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 1px 6px; border-radius: var(--radius-sm); background: var(--color-bg-subtle); color: var(--color-text-tertiary); }
+.ltab.on .ltab-n { background: var(--color-bg-selected); color: var(--color-text-primary); }
+@media (min-width: 901px) {
+  .lf-btn, .lf-clear { min-height: 32px; }
+  .lf-item { min-height: 34px; }
+  .ltab { min-height: 38px; }
+}
+
+.qr-tkw { grid-area: tk; display: flex; align-items: center; gap: 6px; }
+.qr-tkw .qr-tk { grid-area: auto; }
+.qr-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-secondary); flex: 0 0 auto; }
+
+/* Lines page: the Filters button and the search box are one height. */
+.ls-bar .ls-search input { height: 34px; }
+.ls-bar .lf-btn { height: 34px; min-height: 34px; }

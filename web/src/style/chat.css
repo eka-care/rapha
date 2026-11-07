@@ -19,7 +19,7 @@
 .chatcard { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 
 .pt-head {
-  padding: 13px 15px; display: flex; align-items: flex-start; gap: 11px;
+  padding: 12px 16px; display: flex; align-items: flex-start; gap: 11px;
   border-bottom: 1px solid var(--color-border-subtle); flex-shrink: 0;
 }
 /* A person's name is the display type on this screen, and since the visit
@@ -27,10 +27,10 @@
    own h1 metrics would make the card's header taller than the bar it
    replaced, which is the opposite of the point. */
 .pt-name {
-  font-family: var(--font-serif); font-size: 19px; font-weight: 420;
+  font-family: var(--font-serif); font-size: 18px; font-weight: 420;
   letter-spacing: .012em; line-height: 1.15; margin: 0;
 }
-.pt-meta { font-size: 10.5px; color: var(--color-text-tertiary); margin-top: 2px; }
+.pt-meta { font-size: 12px; color: var(--color-text-tertiary); margin-top: 2px; }
 .pt-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
 
 .thread { flex: 1; min-height: 0; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 15px;
@@ -72,8 +72,9 @@
 }
 .ev-h[aria-expanded="true"] .chev { transform: rotate(0deg); }
 .ev-st {
-  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--color-eyebrow); white-space: nowrap;
+  font-family: var(--font-sans); font-size: 11px; letter-spacing: 0;
+  text-transform: none; color: var(--color-text-secondary); white-space: nowrap;
+  font-weight: 600;
 }
 .ev-t { font-size: 13px; font-weight: 550; color: var(--color-text-primary); white-space: nowrap; }
 .ev-sum {
@@ -81,7 +82,7 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .ev-time {
-  font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-tertiary);
+  font-family: var(--font-mono); font-size: 11px; color: var(--color-text-tertiary);
   margin-left: auto; white-space: nowrap;
 }
 .ev .bubble { margin-top: 7px; }
@@ -118,7 +119,7 @@
 .m-av.node.handed::before { background: var(--color-warning); border-color: var(--color-warning); }
 .m-b { min-width: 0; }
 .m-meta {
-  font-size: 9.5px; color: var(--color-text-tertiary); font-weight: 600;
+  font-size: 11px; color: var(--color-text-tertiary); font-weight: 600;
   margin-bottom: 5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
 }
 /* A MEASURE, because a line of prose the width of a 1440px screen is not
@@ -199,7 +200,7 @@
   display: inline-flex; align-items: center; gap: 7px; width: auto;
   text-align: left; max-width: 100%;
   border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface);
-  border-radius: var(--radius-pill); padding: 7px 13px 7px 10px; cursor: pointer;
+  border-radius: var(--radius-md); padding: 7px 13px 7px 10px; cursor: pointer;
   color: var(--color-text-primary);
   transition: border-color var(--duration-fast) var(--ease-out),
               background var(--duration-fast) var(--ease-out);
@@ -213,13 +214,13 @@
    agent's violet is a TINT token (--color-agent-hover is lighter, not
    darker) so filling with it leaves no hover state to go to. */
 .prop.primary {
-  border-color: var(--color-cta); background: var(--color-cta);
-  color: var(--color-cta-ink);
+  border-color: var(--color-primary-line); background: var(--color-primary);
+  color: var(--color-primary-ink);
 }
 .prop.primary:hover:not(:disabled) {
-  border-color: var(--color-cta-hover); background: var(--color-cta-hover);
+  border-color: var(--color-primary-hover); background: var(--color-primary-hover);
 }
-.prop.primary .p-i { color: var(--color-cta-ink); }
+.prop.primary .p-i { color: var(--color-primary-ink); }
 
 /* An inline glyph, not a tile. */
 .p-i { flex-shrink: 0; display: inline-flex; color: var(--color-text-tertiary); }
@@ -232,7 +233,7 @@
 
 .p-tag {
   flex-shrink: 0; font-size: 10px; font-weight: 600; padding: 2px 7px;
-  border-radius: var(--radius-pill); white-space: nowrap;
+  border-radius: var(--radius-md); white-space: nowrap;
   background: var(--color-critical-soft); color: var(--color-critical);
   border: 1px solid var(--color-critical-border);
 }
@@ -243,7 +244,7 @@
 }
 .composer textarea {
   flex: 1; border: 1px solid var(--color-border-subtle); background: var(--color-bg-hover);
-  color: var(--color-text-primary); border-radius: var(--radius-pill);
+  color: var(--color-text-primary); border-radius: var(--radius-md);
   padding: 10px 15px; font-size: 12.5px; outline: none; resize: none;
   max-height: 120px; line-height: 1.5; font-family: inherit;
 }
@@ -254,14 +255,14 @@
 .composer textarea:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 .composer textarea::placeholder { color: var(--color-text-tertiary); }
 .mic {
-  width: 36px; height: 36px; padding: 0; border-radius: 50%; justify-content: center;
+  width: 36px; height: 36px; padding: 0; border-radius: var(--radius-md); justify-content: center;
   background: var(--color-agent-tint); border-color: var(--color-agent-line);
   color: var(--color-agent);
 }
 .mic:hover:not(:disabled) { background: var(--color-agent-tint-hover); }
 /* The bar's last control, rehoused. Pill rather than circle, because unlike
    the microphone it carries a shortcut worth reading. */
-.askbtn { height: 36px; padding: 0 10px; gap: 6px; border-radius: var(--radius-pill); }
+.askbtn { height: 36px; padding: 0 10px; gap: 6px; border-radius: var(--radius-md); }
 .askbtn .kbd { pointer-events: none; }
 @media (max-width: 640px) { .askbtn .kbd { display: none; } }
 .mic.rec { animation: micpulse 1.1s infinite; }
@@ -327,12 +328,15 @@
    panel's switch moved into it -- a control that scrolls off the end of the
    row is a control a phone cannot reach. */
 .vtabs {
-  display: flex; align-items: center; flex-shrink: 0; padding: 0 9px;
+  display: flex; align-items: center; flex-shrink: 0; padding: 0 12px;
   border-bottom: 1px solid var(--color-border-subtle);
 }
 .vtabs-l {
   display: flex; gap: 2px; min-width: 0; flex: 1;
-  overflow-x: auto; scrollbar-width: none;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+  /* The tabs' underline hangs 1px below the row (margin-bottom: -1px on .vtab).
+     Without room for it the row scrolled vertically by that pixel. */
+  padding-bottom: 1px; margin-bottom: -1px;
 }
 .vtabs-l::-webkit-scrollbar { display: none; }
 /* The switch for the column beside this one. Quiet when that column is
@@ -351,21 +355,17 @@
 .vtabs::-webkit-scrollbar { display: none; }
 /* Underlined by what it selects, not boxed: a row of filled pills reads as
    a row of buttons, and these are places, not actions. */
+/* THE TAB, ONE DESIGN EVERYWHERE: the Lines page's. A line under the one you are on. */
 .vtab {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 9px 10px 10px; border: 0; background: none; cursor: pointer;
-  font: inherit; font-size: 11.5px; font-weight: 500;
-  color: var(--color-text-tertiary);
-  border-bottom: 2px solid transparent; margin-bottom: -1px;
-  white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 500; color: var(--color-text-tertiary);
+  border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
 }
 .vtab:hover { color: var(--color-text-primary); }
-.vtab.on { color: var(--color-text-primary); border-bottom-color: var(--color-accent); }
-.vtab-n {
-  font-size: 9.5px; font-weight: 600; line-height: 1;
-  padding: 3px 5px; border-radius: var(--radius-sm);
-  background: var(--color-bg-subtle); color: var(--color-text-tertiary);
-}
+.vtab.on { color: var(--color-text-primary); font-weight: 650; border-bottom-color: var(--color-text-primary); }
+.vtab-n { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 1px 6px; border-radius: var(--radius-sm); background: var(--color-bg-subtle); color: var(--color-text-tertiary); }
+.vtab.on .vtab-n { background: var(--color-bg-selected); color: var(--color-text-primary); }
+@media (min-width: 901px) { .vtab { min-height: 38px; } }
 
 /* Any tab that is not the conversation. The conversation brings its own
    scrolling and its own footer; these are a page of things to read. */
@@ -432,3 +432,52 @@
   border-left: 1px solid var(--color-border-subtle);
   background: var(--color-bg-surface);
 }
+
+/* ---- the visit's log: two columns, who and when, then what ---- */
+.main--flat { background: var(--color-bg-surface); }
+.main--flat .topbar { background: var(--color-bg-surface); }
+.main--flat .view { padding: 0; }
+.main--flat .chatgrid { gap: 0; }
+.main--flat .chatgrid .card, .chatcard {
+  border: 0; box-shadow: none; border-radius: 0; background: transparent;
+}
+.main--flat .chatgrid > :not(.chatcard) { border-left: 1px solid var(--color-border-subtle); padding: 12px 16px; }
+.main--flat .chatgrid > :not(.chatcard) .card { border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 8px; margin-bottom: 8px; }
+.thread { display: block; padding: 4px 24px 12px; }
+.lg2 { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 20px; padding: 14px 0; border-top: 1px solid var(--color-border-subtle); }
+.lg2:first-child { border-top: 0; }
+.lg2-who { display: flex; flex-direction: column; gap: 2px; font-size: 13px; font-weight: 700; line-height: 1.3; padding-top: 2px; min-width: 0; overflow-wrap: anywhere; }
+.lg2-who time { font-size: 11px; font-weight: 500; color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; }
+.lg2-body { display: grid; gap: 4px; min-width: 0; align-content: start; }
+.lg2-h { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 0; cursor: pointer; padding: 0; font: inherit; min-height: 24px; }
+.lg2-i { color: var(--color-text-tertiary); }
+.lg2-t { font-size: 13px; font-weight: 600; color: var(--color-text-primary); display: flex; align-items: center; gap: 8px; }
+.lg2-c { margin-left: auto; color: var(--color-text-tertiary); transform: rotate(-90deg); transition: transform var(--duration-fast) var(--ease-out); }
+.lg2-c.open { transform: none; }
+.lg2-line { font-size: 12px; color: var(--color-text-secondary); line-height: 1.5; }
+.lg2-line b { color: var(--color-text-tertiary); font-weight: 500; margin-right: 8px; }
+.lg2-txt { font-size: 13px; color: var(--color-text-secondary); line-height: 1.55; margin: 0; max-width: 74ch; }
+.lg2-to { font-size: 12px; color: var(--color-text-tertiary); }
+.lg2 .bubble { background: none; border: 0; padding: 0; }
+.lg2 .props { margin-top: 4px; }
+.lg2.refused .lg2-i { color: var(--color-critical); }
+.pt-token {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; margin-left: 10px; vertical-align: middle;
+  border: 1.5px solid var(--color-text-primary); border-radius: var(--radius-md);
+  font: 700 13px var(--font-sans); letter-spacing: 0; font-variant-numeric: tabular-nums;
+}
+.pt-token small { font-size: 11px; font-weight: 600; color: var(--color-text-tertiary); }
+
+.pt-line { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; }
+.pt-line .pt-meta, .pt-line .pt-chips { margin-top: 0; }
+
+/* Scribe's own message in the log: recording, writing, draft waiting. */
+.scribe-live .lg2-t { font-size: 13px; }
+.scribe-live .rec-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--color-critical); animation: micpulse 1.1s infinite; }
+.sl-clock { font-variant-numeric: tabular-nums; font-weight: 700; }
+.sl-do { display: flex; gap: 8px; margin-top: 6px; }
+.sl-sk { display: grid; gap: 7px; margin-top: 4px; }
+.sl-sk i { display: block; height: 9px; border-radius: 5px; background: var(--color-bg-selected); animation: slpulse 1.4s ease-in-out infinite; }
+@keyframes slpulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .sl-sk i, .scribe-live .rec-dot { animation: none; } }
+.scribe-live .rec-dot.held { animation: none; opacity: .5; }

@@ -167,7 +167,7 @@ export function derivedStates(wf: Pick<Workflow, "states"> | undefined): Set<str
  *  labelled with that column's own word. */
 export function sortOptions(decl: Pick<ViewDecl, "columns"> | undefined): { key: SortKey; label: string }[] {
   const opts: { key: SortKey; label: string }[] = [{ key: "recent", label: "Recent" }];
-  if (decl?.columns?.length) opts.push({ key: "name", label: decl.columns[0] });
+  if (decl?.columns?.length) opts.push({ key: "name", label: decl.columns[0].charAt(0).toUpperCase() + decl.columns[0].slice(1) });
   opts.push({ key: "station", label: "Station" });
   return opts;
 }
@@ -460,4 +460,45 @@ export function filterRows(rows: QueueRow[], filter: Filter): QueueRow[] {
     return rows.filter((r) => String(r.subject?.[filter.column] ?? "") === filter.value);
   }
   return rows.filter((r) => r.station === filter.station);
+}
+
+/** The columns of the Lines table, each of which can be sorted. */
+export type ColumnKey = "number" | "name" | "station" | "label" | "wait";
+export type Sort = { key: ColumnKey; dir: "asc" | "desc" };
+
+/** Sorts a copy of `rows` by one column, ascending or descending.
+ *
+ *  Token sorts as a number when both tokens are numbers, because "10" comes
+ *  after "9". Name is the declared first column; programme is the first
+ *  declared label column; a row with no station (it is done) sorts after every
+ *  station going up. Waiting sorts by arrival, so ascending is the longest
+ *  wait first. A tie falls back to arrival so the order never flickers. */
+export function sortByColumn(
+  rows: QueueRow[],
+  key: ColumnKey,
+  dir: "asc" | "desc",
+  decl: Pick<ViewDecl, "columns" | "labels"> | undefined,
+): QueueRow[] {
+  const columns = decl?.columns ?? [];
+  const tokenCol = columns.find((c) => /token/i.test(c));
+  const nameCol = columns[0];
+  const labelCol = (decl?.labels ?? []).find((l) => columns.includes(l));
+  const text = (r: QueueRow, col: string | undefined) => String(col ? r.subject?.[col] ?? "" : "");
+  const compare = (a: QueueRow, b: QueueRow): number => {
+    switch (key) {
+      case "number": {
+        const x = text(a, tokenCol), y = text(b, tokenCol);
+        const nx = Number(x), ny = Number(y);
+        return x !== "" && y !== "" && Number.isFinite(nx) && Number.isFinite(ny)
+          ? nx - ny : x.localeCompare(y);
+      }
+      case "name": return text(a, nameCol).localeCompare(text(b, nameCol));
+      case "station": return (a.station ?? "\uffff").localeCompare(b.station ?? "\uffff");
+      case "label": return text(a, labelCol).localeCompare(text(b, labelCol));
+      default: return (a.opened_at ?? "").localeCompare(b.opened_at ?? "");
+    }
+  };
+  const sign = dir === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) =>
+    sign * compare(a, b) || (a.opened_at ?? "").localeCompare(b.opened_at ?? ""));
 }

@@ -23,11 +23,11 @@
 /* The date numeral. Today's is filled. */
 .gr-num {
   display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 var(--space-1);
-  border: 0; border-radius: var(--radius-pill); background: none; color: var(--color-text-primary);
+  border: 0; border-radius: var(--radius-md); background: none; color: var(--color-text-primary);
   font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer;
 }
 .gr-num:hover { background: var(--color-bg-hover); }
-.gr-num[aria-current="date"] { background: var(--color-cta); color: var(--color-cta-ink); }
+.gr-num[aria-current="date"] { background: var(--color-primary); color: var(--color-primary-ink); }
 
 /* Month: seven columns, six rows. Spill days are quieter, not hidden. */
 .gr-month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
@@ -65,7 +65,7 @@
 .gr-mini-g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
 .gr-mini-wd { font-size: 10px; text-align: center; color: var(--color-text-tertiary); }
 .gr-dot {
-  aspect-ratio: 1; display: grid; place-items: center; border: 0; border-radius: var(--radius-pill); background: none;
+  aspect-ratio: 1; display: grid; place-items: center; border: 0; border-radius: var(--radius-md); background: none;
   color: var(--color-text-secondary); font: inherit; font-size: 11px; font-variant-numeric: tabular-nums; cursor: pointer;
 }
 .gr-dot:hover { background: var(--color-bg-hover); }
@@ -73,13 +73,13 @@
 .gr-dot[data-tone="b-ink"] { background: var(--color-text-primary); color: var(--color-bg-surface); }
 .gr-dot[data-tone="b-crit"] { background: var(--color-critical-soft); color: var(--color-critical); }
 .gr-dot[data-tone="b-ok"] { background: var(--color-success-soft); }
-.gr-dot[aria-current="date"] { outline: 2px solid var(--color-cta); outline-offset: 1px; }
+.gr-dot[aria-current="date"] { outline: 2px solid var(--color-primary); outline-offset: 1px; }
 
 /* A phone: one day with arrows, and the year as a single scrolling column. */
 .gr-one { display: grid; gap: var(--space-2); }
 .gr-nav { display: flex; align-items: center; justify-content: space-between; }
 .gr-nav-t { font-weight: 600; }
-.gr-arrow { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--color-border-strong); border-radius: var(--radius-pill); background: var(--color-bg-surface); color: var(--color-text-primary); cursor: pointer; }
+.gr-arrow { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-bg-surface); color: var(--color-text-primary); cursor: pointer; }
 .gr-arrow .i { transform: rotate(90deg); }
 .gr-next .i { transform: rotate(-90deg); }
 @media (max-width: 600px) {

@@ -1,105 +1,162 @@
-/** §6.2: a declared view as a working surface. §88 asks that returning to a
- *  list restores it, so the sort and the search are held per view for the
- *  session.
- *
- *  THE FILTER IS NOT HELD HERE ANY MORE. It used to be, as a strip of chips
- *  across the top: one per station, one per programme, one for how somebody
- *  arrived, and the flags behind a button. The second panel beside this one
- *  drew its own menu over the programmes and the flags at the same time, so
- *  one screen had two controls over one question, offering different
- *  narrowings and unable to move each other -- and this strip was taller
- *  than the list under it. The question has one home now, in the panel
- *  beside the people, and this screen is handed the answer.
- */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { displayFor } from "../declarations";
+import { Icon } from "../icons";
 import {
-  filterRows, narrowings, sameFilter, sortOptions, sortRows,
-  type Filter, type SortKey,
+  filterOptions, filterRows, labelColumns, narrowings, sameFilter, sortByColumn,
+  type ColumnKey, type Filter, type Sort,
 } from "../loops";
 import type { QueueRow, ViewDecl, ViewResult, Workflow } from "../types";
 import { View } from "../view/View";
 import { human, title } from "../words";
 
-const memory: Record<string, { q: string; sort: SortKey }> = {};
+/** What a person had set on a list when they went to a patient and came back. */
+type State = { q: string; sort: Sort; tab: string; extra: Filter };
+const memory: Record<string, State> = {};
 
-export function ListScreen({ result, decl, workflow, filter, onOpenThread }: {
+/** The tab for people with no station: they have finished. The word is the
+ *  renderer's, like "Everyone". */
+const DONE = "\u0000done";
+const ALL = "\u0000all";
+
+/** The Lines screen: every patient at the centre today, in one table.
+ *
+ *  Tabs say where they are, a search finds a name or a token, a filter menu
+ *  narrows by programme and by flag, and every column header sorts. Nothing
+ *  here knows the order a patient moves through the centre, because there is
+ *  none: the tabs are places, not steps. */
+export function ListScreen({ result, decl, workflow, onOpenThread }: {
   result: ViewResult;
   decl?: ViewDecl;
-  /** How the shell's one narrowing control has narrowed today's line. Set in
-   *  the second panel, obeyed here. */
-  filter: Filter;
-  /** The workflow these rows walk, so the row labels can tell a state the
-   *  kernel worked out from one a person asserted. */
   workflow?: Pick<Workflow, "states">;
   onOpenThread?: (thread: string) => void;
 }) {
   const key = result.view;
-  const [state, setState] = useState(() => memory[key] ?? { q: "", sort: "recent" as SortKey });
-  const set = (next: Partial<typeof state>) => {
+  const [state, setState] = useState<State>(
+    () => memory[key] ?? { q: "", sort: { key: "number", dir: "asc" }, tab: ALL, extra: null },
+  );
+  const set = (next: Partial<State>) => {
     const merged = { ...state, ...next };
     memory[key] = merged;
     setState(merged);
   };
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", esc); };
+  }, [open]);
 
   const isQueue = result.kind === "queue";
   const rows = (result.rows ?? []) as QueueRow[];
-  const sorts = useMemo(() => sortOptions(decl), [decl]);
 
-  /** WHAT THIS LIST IS NOT SHOWING, and said so on the list.
-   *
-   *  The control is in the panel beside this one, and on a phone that panel
-   *  is a drawer -- so without this a person arrives at a list that is
-   *  quietly missing two thirds of the day with nothing on screen saying
-   *  why. The word is the same declared one the control used, read the same
-   *  way, so the two can never disagree about what the narrowing is called.
-   */
-  const narrowedBy = useMemo(() => {
-    if (!filter) return null;
+  const tabs = useMemo(() => {
+    if (!isQueue) return [];
+    const stations = filterOptions(decl, rows, labelColumns(decl)).stations;
+    const out = stations.map((s) => ({
+      id: s, label: title(human(s)), n: rows.filter((r) => r.station === s).length,
+    }));
+    const done = rows.filter((r) => !r.station).length;
+    if (out.length && done) out.push({ id: DONE, label: "Done", n: done });
+    return out;
+  }, [decl, rows, isQueue]);
+
+  // Everything that is not a station: programmes, how somebody arrived, flags.
+  // Stations are the tabs, so they are not offered twice.
+  const menu = useMemo(() => {
+    if (!isQueue) return [];
     return narrowings(decl, rows, displayFor, (w) => title(human(w)))
-      .flatMap((g) => g.items)
-      .find((i) => sameFilter(i.filter, filter)) ?? null;
-  }, [decl, rows, filter]);
+      .map((g) => ({ ...g, items: g.items.filter((i) => !(i.filter && "station" in i.filter)) }))
+      .filter((g) => g.items.length);
+  }, [decl, rows, isQueue]);
+  const chosen = menu.flatMap((g) => g.items).find((i) => sameFilter(i.filter, state.extra));
 
   const shown = useMemo(() => {
-    if (!isQueue) return result;
-    let out = filterRows(rows, filter);
+    let out = rows;
+    if (state.tab === DONE) out = out.filter((r) => !r.station);
+    else if (state.tab !== ALL) out = out.filter((r) => r.station === state.tab);
+    out = filterRows(out, state.extra);
     const q = state.q.trim().toLowerCase();
     if (q) {
       out = out.filter((r) => Object.values(r.subject ?? {}).some((v) => String(v ?? "").toLowerCase().includes(q)));
     }
-    return { ...result, rows: sortRows(out, state.sort, decl) };
-  }, [result, rows, state, filter, decl, isQueue]);
+    return sortByColumn(out, state.sort.key, state.sort.dir, decl);
+  }, [rows, state, decl]);
 
+  const onSort = (k: ColumnKey) =>
+    set({ sort: state.sort.key === k ? { key: k, dir: state.sort.dir === "asc" ? "desc" : "asc" } : { key: k, dir: "asc" } });
+
+  if (!isQueue) {
+    return <div style={{ paddingBottom: 20 }}><View result={result} decl={decl} workflow={workflow} onOpenThread={onOpenThread} /></div>;
+  }
   return (
-    <div style={{ paddingBottom: 20 }}>
-      {isQueue && rows.length > 0 && (
+    <div className="ls">
+      {rows.length > 0 && (
         <>
-          {narrowedBy && (
-            <div className="narrowed" role="status">
-              Showing {narrowedBy.label} only.
+          <div className="ls-bar">
+            <div className="ls-search">
+              <Icon name="search" className="i sm" />
+              <input
+                className="input" type="search" value={state.q}
+                placeholder="Find a patient or token…" aria-label="Find a patient or token"
+                onChange={(e) => set({ q: e.target.value })}
+                // A token typed and Enter opens that person, which is what "call a
+                // token" was for. Only when the search has narrowed to one.
+                onKeyDown={(e) => { if (e.key === "Enter" && shown.length === 1) onOpenThread?.(shown[0].thread); }}
+              />
             </div>
-          )}
-          <div className="tabs">
-            <input
-              className="input" type="search" value={state.q}
-              placeholder="Search this list" aria-label="Search this list"
-              style={{ maxWidth: 280 }}
-              onChange={(e) => set({ q: e.target.value })}
-            />
-            {sorts.length > 1 && (
-              <select
-                className="input" style={{ width: "auto" }}
-                value={state.sort} aria-label="Sort"
-                onChange={(e) => set({ sort: e.target.value as SortKey })}
-              >
-                {sorts.map((s) => <option value={s.key} key={s.key}>{s.label}</option>)}
-              </select>
+            {menu.length > 0 && (
+              <div className="lf" ref={box}>
+                <button type="button" className={`lf-btn${chosen ? " on" : ""}`} aria-haspopup="true" aria-expanded={open}
+                        onClick={() => setOpen((v) => !v)}>
+                  <Icon name="sliders" className="i sm" />
+                  {chosen ? chosen.label : "Filters"}
+                </button>
+                {open && (
+                  <div className="lf-menu">
+                    {menu.map((g) => (
+                      <div className="lf-grp" key={g.title}>
+                        <div className="lf-h">{g.title}</div>
+                        {g.items.map((i) => (
+                          <button type="button" key={i.key}
+                                  className={`lf-item${sameFilter(i.filter, state.extra) ? " on" : ""}${i.risk ? " risk" : ""}`}
+                                  onClick={() => { set({ extra: sameFilter(i.filter, state.extra) ? null : i.filter }); setOpen(false); }}>
+                            <span>{i.label}</span><span className="lf-c">{i.n}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {(state.extra || state.q || state.tab !== ALL) && (
+              <button type="button" className="lf-clear" onClick={() => set({ q: "", extra: null, tab: ALL })}>
+                Clear
+              </button>
             )}
           </div>
+          {tabs.length > 0 && (
+            <div className="ltabs" role="tablist" aria-label="Where they are">
+              {[{ id: ALL, label: "Everyone", n: rows.length }, ...tabs].map((t) => (
+                <button type="button" role="tab" key={t.id} aria-selected={state.tab === t.id}
+                        className={`ltab${state.tab === t.id ? " on" : ""}`} onClick={() => set({ tab: t.id })}>
+                  {t.label}<span className="ltab-n">{t.n}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </>
       )}
-      <View result={shown} decl={decl} workflow={workflow} onOpenThread={onOpenThread} />
+      {shown.length === 0 && rows.length > 0 ? (
+        <div className="state-empty">Nobody matches. <button type="button" className="lf-clear" onClick={() => set({ q: "", extra: null, tab: ALL })}>Clear the search and filters</button></div>
+      ) : (
+        <View result={{ ...result, rows: shown }} decl={decl} workflow={workflow} onOpenThread={onOpenThread}
+              sort={state.sort} onSort={onSort} />
+      )}
     </div>
   );
 }

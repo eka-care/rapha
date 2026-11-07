@@ -53,9 +53,10 @@ export function Profile({ facility, onSignOut }: {
         onClick={() => setOpen((v) => !v)}
       >
         <span className="prof-av">
-          <Icon name={roleGlyph(role) as IconName} className="i sm" />
+          <Icon name="user" className="i" />
         </span>
         <span className="prof-r">{title(role)}</span>
+        <Icon name="chev" className="i sm" />
       </button>
 
       {open && (

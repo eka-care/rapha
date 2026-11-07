@@ -15,6 +15,7 @@ import type { Operation } from "../types";
 import type { Verb } from "./commands";
 import { raphaQuestion } from "./mention";
 import { Menu, atItems, slashItems, type Item } from "./Menu";
+import { canRecord, recordReading, type Reading } from "../scribe/reading";
 
 /* No cap. The menu is 360px tall and scrolls, and typing narrows it, so a
    slice here only hides the last item without saying it did -- which is how a
@@ -27,11 +28,13 @@ const clamp = (n: number, len: number) => ((n % len) + len) % len;
 const strip = (text: string) =>
   /^\//.test(text) ? "" : text.replace(/(^|\s)[/][^\s]*$/, "$1");
 
-export type Recording = { seconds: number; onStop: () => void } | null;
+export type Recording = {
+  seconds: number; paused: boolean; onStop: () => void; onPause: () => void; onResume: () => void;
+} | null;
 
 export function Composer({
-  about, actions, roles, verbs, asking, recording, quick,
-  onSay, onAction, onStartScribe, onAskRapha, micReason,
+  about, actions, roles, verbs, asking, recording, working, quick,
+  onSay, onAction, onStartScribe, onAskRapha, micReason, dictate, onAttach, attachReason,
 }: {
   about: string;
   actions: Operation[];
@@ -42,6 +45,8 @@ export function Composer({
   verbs?: Verb[];
   asking?: boolean;
   recording?: Recording;
+  /** Scribe has stopped listening and is writing the notes. Shown on its own button. */
+  working?: string;
   onSay: (text: string) => void;
   onAction: (op: Operation, mention?: string) => void;
   onStartScribe?: () => void;
@@ -55,11 +60,42 @@ export function Composer({
   /** Why the microphone is unavailable, if it is. An icon that does nothing
    *  and says nothing is worse than one that is absent. */
   micReason?: string;
+  /** Speak a message into the box. The words are transcribed by the same
+   *  service that writes the notes, and land in the box to be read and sent. */
+  dictate?: { thread: string; operation: string; reason?: string };
+  /** The plus: attach a file or photo. Absent when the station cannot file one. */
+  onAttach?: () => void;
+  attachReason?: string;
 }) {
   const [text, setText] = useState("");
   const [pick, setPick] = useState(0);
   const box = useRef<HTMLTextAreaElement>(null);
   const listId = "composer-menu";
+
+  // DICTATION INTO THE BOX. One press starts, the next ends and sends the
+  // audio to be written down; the words are added where the cursor was.
+  const [dict, setDict] = useState<"idle" | "listening" | "thinking">("idle");
+  const [dictWhy, setDictWhy] = useState("");
+  const reading = useRef<Reading | null>(null);
+  const toggleDictate = async () => {
+    if (!dictate) return;
+    if (dict === "listening" && reading.current) {
+      const r = reading.current; reading.current = null;
+      setDict("thinking"); r.stop();
+      const heard = await r.heard;
+      const said = heard.transcript.trim();
+      setDict("idle");
+      if (!said) { setDictWhy(heard.reason || ""); return; }
+      setText((t) => (t && !/\s$/.test(t) ? t + " " : t) + said);
+      box.current?.focus();
+      return;
+    }
+    if (dict !== "idle") return;
+    setDictWhy("");
+    reading.current = recordReading(dictate.thread, dictate.operation);
+    setDict("listening");
+  };
+  useEffect(() => () => reading.current?.abandon(), []);
 
   // grow with the content, to a ceiling, per §16's single-line default
   useEffect(() => {
@@ -126,20 +162,6 @@ export function Composer({
     if (q) onAskRapha!(q); else onSay(t);
   };
 
-  if (recording) {
-    return (
-      <div className="composer composer-wrap">
-        <div className="rec-bar">
-          <span className="rec-dot" aria-hidden="true" />
-          Listening
-          <span className="rec-t">{mmss(recording.seconds)}</span>
-          <span className="ml-auto" style={{ fontWeight: 500 }}>The consultation is being captured.</span>
-        </div>
-        <button className="btn btn-b" onClick={recording.onStop}>Stop</button>
-      </div>
-    );
-  }
-
   return (
     <div className="composer-wrap">
       {/* The questions worth asking sit in their own row above the box they
@@ -148,6 +170,13 @@ export function Composer({
       {quick && <div className="composer-quick">{quick}</div>}
       <div className="composer">
       <Menu items={items} pick={pick} onChoose={choose} id={listId} />
+      <div className={`composer-bar${dict === "listening" ? " listening" : ""}`}>
+      {onAttach && (
+        <button type="button" className="cb-i" onClick={onAttach} disabled={!!attachReason}
+                aria-label={attachReason || "Attach a file or photo"} title={attachReason || "Attach a file or photo"}>
+          <Icon name="plus" className="i sm" />
+        </button>
+      )}
       <textarea
             ref={box}
             rows={1}
@@ -156,7 +185,7 @@ export function Composer({
             aria-autocomplete="list"
             aria-controls={items.length ? listId : undefined}
             aria-activedescendant={items.length ? `${listId}-${pick}` : undefined}
-            placeholder="Ask, type @someone, or /command..."
+            placeholder={dict === "listening" ? "Listening… press the microphone again when you are done" : dict === "thinking" ? "Writing down what you said…" : dictWhy || "Ask, type @someone, or /command…"}
             onChange={(e) => { setText(e.target.value); setPick(0); }}
             onKeyDown={(e) => {
               if (items.length) {
@@ -174,15 +203,11 @@ export function Composer({
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
             }}
           />
-      {onStartScribe && (
-        <button
-          type="button"
-          className="btn btn-g mic"
-          onClick={onStartScribe}
-          disabled={!!micReason}
-          title={micReason || "Dictate"}
-          aria-label={micReason || "Dictate"}
-        >
+      {dictate && canRecord() && (
+        <button type="button" className={`cb-i${dict === "listening" ? " rec" : ""}`} onClick={() => void toggleDictate()}
+                disabled={!!dictate.reason || dict === "thinking"}
+                aria-label={dictate.reason || (dict === "listening" ? "Stop dictating" : "Dictate a message")}
+                title={dictate.reason || (dict === "listening" ? "Stop dictating" : "Dictate a message")}>
           <Icon name="mic" className="i sm" />
         </button>
       )}
@@ -196,6 +221,40 @@ export function Composer({
       >
         <Icon name={asking ? "spark" : "send"} className="i sm" />
       </button>
+      </div>
+      {/* Scribe lives outside the bar and keeps its own state, so a recording carries
+          on while the rest of this box is used. */}
+      {working ? (
+        <button type="button" className="scribe-btn busy" disabled aria-label={working} title={working}>
+          <span className="rec-dot calm" aria-hidden="true" />
+          {working}
+        </button>
+      ) : recording ? (
+        <div className="scribe-grp">
+          <button type="button" className="scribe-btn" onClick={recording.paused ? recording.onResume : recording.onPause}
+                  aria-label={recording.paused ? "Continue recording" : "Pause recording"}>
+            {recording.paused ? "Continue" : "Pause"}
+          </button>
+          <button type="button" className={`scribe-btn rec${recording.paused ? " held" : ""}`} onClick={recording.onStop}
+                  aria-label="Stop recording" title="Stop recording">
+            <span className="rec-dot" aria-hidden="true" />
+            <span className="rec-t">{mmss(recording.seconds)}</span>
+            Stop
+          </button>
+        </div>
+      ) : onStartScribe && (
+        <button
+          type="button"
+          className="scribe-btn"
+          onClick={onStartScribe}
+          disabled={!!micReason}
+          title={micReason || "Record the consultation with Scribe"}
+          aria-label={micReason || "Dictate"}
+        >
+          <Icon name="mic" className="i sm" />
+          Scribe
+        </button>
+      )}
       </div>
     </div>
   );

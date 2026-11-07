@@ -376,7 +376,7 @@ function Day({ decl, rows, loading, first, onOpenThread }: {
       <button className="desk-wr" key={row.thread} onClick={() => onOpenThread(row.thread)}>
         {f.token && (
           <span
-            className={`desk-wr-tk${wears ? " mark" : ""}`}
+            className={`ticket desk-wr-tk${wears ? " mark" : ""}`}
             aria-label={wears ? `${f.token}, ${provenance!.label}` : undefined}
           >
             {f.token}

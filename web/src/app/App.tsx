@@ -14,6 +14,7 @@ import { header, mentionsOf, queueViewFor, type Ctx, type Said } from "../messag
 import { say } from "../announce";
 import { Announcer, Boundary, Failed, Loading, PageTitle } from "../parts";
 import { Encounter } from "../screens/Encounter";
+import { useLiveScribe } from "../scribe/live";
 import { Desk } from "../screens/Desk";
 import { ListScreen } from "../screens/ListScreen";
 import { Patient } from "../screens/Patient";
@@ -25,7 +26,7 @@ import { signedIn } from "../auth/session";
 import { Control } from "../screens/Control";
 import { Today } from "../screens/Today";
 import type { Facility, QueueRow, TaskRow, ViewDecl, ViewResult, Workflow } from "../types";
-import { Icon, IconSheet } from "../icons";
+import { IconSheet } from "../icons";
 import { Khoj } from "./Khoj";
 import { Bell } from "./Bell";
 import { Grip } from "./Grip";
@@ -38,6 +39,8 @@ import { NAME } from "../brand";
 import { AskAi } from "../assistant/AskAi";
 import type { Question } from "../assistant/Lazy";
 import { Topbar } from "./Topbar";
+import { Profile } from "../auth/Profile";
+import { fields } from "../view/View";
 
 type Route =
   | { kind: "today" }
@@ -135,6 +138,7 @@ function useTheme() {
 
 export function App() {
   const [route, setRoute] = useState<Route>(() => parse(location.hash));
+  const liveScribe = useLiveScribe();
   useEffect(() => {
     const on = () => setRoute(parse(location.hash));
     addEventListener("hashchange", on);
@@ -337,6 +341,14 @@ export function App() {
    *  reading long consultation notes wants it out of the way. The rule and
    *  its limits are in width.ts, checked under plain node. */
   const [panelW, setPanelW] = useState(readWidth);
+  /** Whether the line beside a visit is tucked away. The person's own choice, remembered. */
+  const [lineFolded, setLineFolded] = useState(() => {
+    try { return localStorage.getItem("rapha.line.folded") === "1"; } catch { return false; }
+  });
+  const foldLine = (v: boolean) => {
+    setLineFolded(v);
+    try { localStorage.setItem("rapha.line.folded", v ? "1" : "0"); } catch { /* private window */ }
+  };
   const tasks = useMemo<TaskRow[]>(
     () => loaded.filter((l) => l.decl.kind === "tasklist")
       .flatMap((l) => (l.result.rows ?? []) as TaskRow[]),
@@ -352,6 +364,20 @@ export function App() {
   }, []);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
+
+  // The main panel is a card standing on the rail's colour. When the place
+  // changes it comes out of the rail: a short slide and fade from the left,
+  // so what moved is the thing you chose. Skipped for anyone who has asked for
+  // less motion.
+  const mainRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    el.animate(
+      [{ opacity: 0, transform: "translateX(-16px) scale(0.985)" }, { opacity: 1, transform: "none" }],
+      { duration: 240, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+    );
+  }, [route.kind]);
 
   if (facility.loading || cat.loading || decls.loading) {
     return <main className="view scroll"><div className="wrap"><Loading what="the workspace" shape="blocks" rows={3} /></div></main>;
@@ -452,6 +478,14 @@ export function App() {
   const here = location.hash.replace(/^#\/?/, "");
   const panel = panelFor(here, navViews);
 
+  // The way back from a visit: the line's own title, and the patient's name
+  // read the same way the line reads it.
+  const lineHead = line[0]?.decl;
+  const visit = route.kind === "thread" ? line.find(({ row }) => row.thread === route.id) : undefined;
+  const crumb = lineHead && visit
+    ? { back: lineHead.title ?? title, onBack: () => go(`#/views/${lineHead.id}`), here: fields(visit.decl, visit.row).name }
+    : undefined;
+
   return (
     <div className="app" data-panel={panel ?? "none"}
          /* THE RIGHT RAIL STANDS DOWN WHILE THE ASSISTANT IS AT THE SIDE.
@@ -483,14 +517,23 @@ export function App() {
       <Rail
         route={here}
         views={navViews}
-        facility={facility.data}
         theme={theme}
         onGo={go}
         onTheme={flipTheme}
-        onSignOut={leave}
+        scribe={liveScribe}
+        bell={
+              <Bell
+                rows={tasks}
+                open={bellOpen}
+                onOpen={setBellOpen}
+                cat={catalogue}
+                onGo={(thread) => { setBellOpen(false); go(`#/threads/${thread}`); }}
+              />
+        }
       />
-      {panel && (
+      {panel && !(lineFolded && panel === "line") && (
         <Sidebar
+          onFold={panel === "line" ? () => foldLine(true) : undefined}
           facility={facility.data}
           route={here}
           panel={panel}
@@ -504,7 +547,7 @@ export function App() {
           onCloseDrawer={() => setDrawer(false)}
         />
       )}
-      {panel && (
+      {panel && !(lineFolded && panel === "line") && (
         <Grip
           width={panelW}
           label="Width of this panel"
@@ -514,61 +557,54 @@ export function App() {
       )}
       {tour && <Tour onClose={() => setTour(false)} />}
       {drawer && <div className="drawer-scrim" onClick={() => setDrawer(false)} />}
-      <div className="main">
+      <div className={`main${route.kind === "thread" ? " main--flat" : ""}`} ref={mainRef}>
         {/* The screens with no second panel carry the spray instead, so the
             flowers are not only on the screens a person moves between
             people from. Home is busy enough with its own day; the desk and
             the settings are forms. */}
         {!panel && (route.kind === "view" || route.kind === "patients" || route.kind === "patient")
           && <Garland kind="spray" />}
-        {/* NO BAR INSIDE A VISIT. It carried one word, "Encounter", above a
-            card already headed with the patient's name: two headings, one of
-            which said nothing. Its three controls each went somewhere else
-            or nowhere -- the assistant is `@rapha` in the composer, where a
-            person is already typing; and registering a new patient has no business on the screen of a
-            patient who is sitting there. The heading moved with the bar: the
-            patient's name is the visit's h1 (screens/Encounter.tsx). */}
-        {route.kind !== "thread" && (
+        {/* A BAR INSIDE A VISIT, WITH A WAY BACK. It used to be left out: it carried
+            one word, "Encounter", above a card already headed with the patient's
+            name, and its controls went elsewhere. The word is now the way back
+            and where you are (Lines > Lakshmi Devi), which is the one thing a
+            person on a visit cannot otherwise see. The visit's own h1 stays the
+            patient's name (screens/Encounter.tsx); the breadcrumb is a nav
+            landmark, not a second heading. Register and Ask stay because the
+            desk and the command bar are one press away from any screen. */}
+        {(
           <Topbar
             title={title}
+            crumb={crumb}
+            onShowLine={panel === "line" && lineFolded ? () => foldLine(false) : undefined}
+            profile={<Profile facility={facility.data} onSignOut={leave} />}
             deskLabel={createLabel(catalogue, facility.data?.bundle.workflow)}
             onSearch={() => setKhojOpen(true)}
             onMenu={() => setDrawer((d) => !d)}
             onDesk={() => go("#/desk")}
-            bell={
-              <Bell
-                rows={tasks}
-                open={bellOpen}
-                onOpen={setBellOpen}
-                cat={catalogue}
-                onGo={(thread) => { setBellOpen(false); go(`#/threads/${thread}`); }}
-              />
-            }
           />
-        )}
-        {/* The bar was also the only way back to the line on a narrow
-            screen, where the line is a drawer. The way back outlives it. */}
-        {route.kind === "thread" && (
-          <button className="icon-btn thread-menu" onClick={() => setDrawer((d) => !d)}
-                  aria-label="Open navigation">
-            <Icon name="list" className="i sm" />
-          </button>
         )}
         <main id="workspace" tabIndex={-1} className={route.kind === "thread" ? "view" : "view scroll"}>
           <div className="wrap">
           <Boundary>
-            {route.kind === "thread" ? (
-              <ThreadScreen
-                id={route.id} cat={catalogue} ctx={ctx} nonce={nonce}
-                said={said[route.id] ?? []} asking={asking}
-                onSay={(t) => onSay(route.id, t)}
-                onChanged={reload}
-                onOpenSubject={(sid) => go(`#/patients/${sid}`)}
-                onAskRapha={(q, c) => askAssistant(q, "side", c)}
-                onRemember={remember}
-                catchment={facility.data?.catchment}
-              />
-            ) : (
+            {/* THE SCRIBED VISIT STAYS MOUNTED while somebody is elsewhere:
+                unmounting its screen would stop the microphone. Same key,
+                same instance, so coming back finds the recording running. */}
+            {[...new Set([route.kind === "thread" ? route.id : "", liveScribe?.thread ?? ""].filter(Boolean))].map((tid) => (
+              <div key={tid} style={{ display: route.kind === "thread" && route.id === tid ? "contents" : "none" }}>
+                <ThreadScreen
+                  id={tid} cat={catalogue} ctx={ctx} nonce={nonce}
+                  said={said[tid] ?? []} asking={asking}
+                  onSay={(t) => onSay(tid, t)}
+                  onChanged={reload}
+                  onOpenSubject={(sid) => go(`#/patients/${sid}`)}
+                  onAskRapha={(q, c) => askAssistant(q, "side", c)}
+                  onRemember={remember}
+                  catchment={facility.data?.catchment}
+                />
+              </div>
+            ))}
+            {route.kind !== "thread" && (
               <div>
                 {route.kind === "today" && (
                   <Today
@@ -587,7 +623,7 @@ export function App() {
                 )}
                 {route.kind === "view" && (
                   <ViewScreen
-                    id={route.id} nonce={nonce} narrow={narrow}
+                    id={route.id} nonce={nonce}
                     decl={catalogue.views?.[route.id]}
                     workflow={catalogue.workflows?.[catalogue.views?.[route.id]?.workflow ?? ""]}
                   />
@@ -684,17 +720,15 @@ function titleFor(route: Route, views: ViewDecl[]): string {
   return "Not found";
 }
 
-function ViewScreen({ id, decl, workflow, nonce, narrow }: {
+function ViewScreen({ id, decl, workflow, nonce }: {
   id: string; decl?: ViewDecl; workflow?: Workflow; nonce: number;
-  /** The shell's narrowing, set in the second panel. */
-  narrow: Filter;
 }) {
   const { data, error, loading, reload } = useAsync(() => api.view(id), [id, nonce]);
   if (loading) return <Loading what="this list" shape="rows" rows={5} />;
   if (error) return <Failed error={error} what="load this list" onRetry={reload} />;
   return (
     <ListScreen
-      result={data!} decl={decl} workflow={workflow} filter={narrow}
+      result={data!} decl={decl} workflow={workflow}
       onOpenThread={(t) => go(`#/threads/${t}`)}
     />
   );

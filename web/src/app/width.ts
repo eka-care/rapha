@@ -18,7 +18,7 @@ export const MIN = 200;
  *  screen, which is the laptop a primary health centre actually has. */
 export const MAX = 480;
 
-export const DEFAULT = 248;
+export const DEFAULT = 280;
 
 export function clampWidth(px: number): number {
   if (!Number.isFinite(px)) return DEFAULT;
