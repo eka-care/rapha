@@ -301,7 +301,7 @@ export function Sidebar({
                   <span className="th-b">
                     <span className="th-l1">
                       <span className={`th-n${f.named ? "" : " u-mute"}`}>{f.name}</span>
-                      {f.token && <span className="ticket th-tok" title="Token">{f.token}</span>}
+                      {f.token && <span className="ticket th-tok" title="Token" aria-label={`Token ${f.token}`}><Icon name="ticket" className="i tk-i" />{f.token}</span>}
                     </span>
                     {row.station && waited(row.opened_at) && <span className="th-s">Waiting {waited(row.opened_at)}</span>}
                   </span>

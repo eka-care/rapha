@@ -212,6 +212,7 @@ function Queue({ rows, decl, derived, labelCols, provenance, onOpenThread, sort,
                   className="ticket qr-tk"
                   aria-label={wears ? `${f.token}, ${provenance!.label}` : undefined}
                 >
+                  <Icon name="ticket" className="i tk-i" />
                   {f.token}
                 </span>
                 {/* The mark rides beside the ticket, never on it: the ticket's

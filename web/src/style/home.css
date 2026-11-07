@@ -234,7 +234,7 @@
 /* The suggested questions under the Ask bar are plain secondary buttons: white fill, no gradient. */
 
 /* The token sits at the right end of a person in the flow: the name takes the slack. */
-.fl-p .fl-tk { --tk: 24px; }
+.fl-p .fl-tk { font-size: 12px; }
 
 /* A person in the flow: the ticket first, then the name, a dot when flagged. No tile, no fill. */
 .fl-p { background: none; padding: 0 4px; height: 34px; gap: 10px; border-radius: var(--radius-md); margin-bottom: 0; }

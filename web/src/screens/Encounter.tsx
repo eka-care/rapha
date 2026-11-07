@@ -362,7 +362,7 @@ export function Encounter({
             <h1 className="pt-name">
               {head.name}
               {head.token && (
-                <span className="ticket pt-token"><small>{title(head.tokenWord)}</small>{head.token}</span>
+                <span className="ticket pt-token" aria-label={`${title(head.tokenWord)} ${head.token}`}><Icon name="ticket" className="i tk-i" />{head.token}</span>
               )}
             </h1>
             <div className="pt-line">

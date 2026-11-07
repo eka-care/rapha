@@ -15,7 +15,7 @@ import type { Operation } from "./types";
 
 export type IconName =
   "sliders" | "mark" | "mark-lg" | "search" | "home" | "moon" | "sun" | "vitals" | "mic" | "box" | "clip" | "eye" | "plus" | "folder" | "chat" | "spark" | "check" | "alert" | "lock" | "send" | "user" | "users" | "list" | "cog" | "refer" | "chev" | "id" | "doc" |
-  "handle" | "out" | "clock" | "bell" | "sidebar";
+  "handle" | "out" | "clock" | "bell" | "sidebar" | "ticket";
 
 export function Icon({ name, size, className }: {
   name: IconName; size?: "sm" | "lg"; className?: string;
@@ -91,6 +91,8 @@ const SHEET = `
   <!-- A panel beside the page, shown as the page with one edge filled. The
        control that opens and closes a column should look like the column,
        not like an arrow: an arrow says "go", and this goes nowhere. -->
+  <!-- The token: an admission ticket, outlined, with a notch cut into each end and a dotted perforation. -->
+  <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M4 6h16a2 2 0 0 1 2 2v2.1a1.9 1.9 0 0 0 0 3.8V16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-2.1a1.9 1.9 0 0 0 0-3.8V8a2 2 0 0 1 2-2z"/><path d="M9 7.5v9" stroke-dasharray="1.4 2.1"/></symbol>
   <symbol id="i-sidebar" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M15 4.5v15"/></symbol>
   <!-- What is waiting for somebody, in the one place a person already looks
        for that. Drawn rather than borrowed so its stroke matches the sheet:

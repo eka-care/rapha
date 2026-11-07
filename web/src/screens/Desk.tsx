@@ -44,6 +44,7 @@
  *  columns.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Icon } from "../icons";
 import { ABHA_LINKED, identified, mobileHint } from "../abha/sdk";
 import { Lotus } from "../abha/Lotus";
 import { ApiError, type Client } from "../api";
@@ -379,6 +380,7 @@ function Day({ decl, rows, loading, first, onOpenThread }: {
             className={`ticket desk-wr-tk${wears ? " mark" : ""}`}
             aria-label={wears ? `${f.token}, ${provenance!.label}` : undefined}
           >
+            <Icon name="ticket" className="i tk-i" />
             {f.token}
           </span>
         )}

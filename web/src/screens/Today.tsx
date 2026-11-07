@@ -212,7 +212,7 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
                         key={p.thread}
                         onClick={() => onOpenThread(p.thread)}
                       >
-                        {p.token && <span className="ticket fl-tk" title="Token" aria-label={`Token ${p.token}`}>{p.token}</span>}
+                        {p.token && <span className="ticket fl-tk" title="Token" aria-label={`Token ${p.token}`}><Icon name="ticket" className="i tk-i" />{p.token}</span>}
                         <span className="fl-nm">{p.name}</span>
                         {/* SC 1.4.1: the mark is the second carrier of the flag
                             and the declared flag is its name. */}
