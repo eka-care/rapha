@@ -22,9 +22,10 @@
  *  This file names no view. A view's icon comes from its declared `kind`,
  *  which is the same property that decides how the kernel evaluates it.
  */
+import { useEffect, useState } from "react";
 import { Icon, type IconName } from "../icons";
-import type { Facility, ViewDecl } from "../types";
-import { Profile } from "../auth/Profile";
+import type { ViewDecl } from "../types";
+import type { LiveScribe } from "../scribe/live";
 
 /** A view's glyph, from the kind it declares. Four kinds, four glyphs: a
  *  queue is a line of people, a dashboard is a reading, a tasklist is work
@@ -61,19 +62,42 @@ export function places(views: ViewDecl[]): Place[] {
   ];
 }
 
+/** The time, at the foot of the rail where it is always in view. */
+function RailClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 15_000);
+    return () => clearInterval(t);
+  }, []);
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  return (
+    <time className="rail-clock" dateTime={`${hh}:${mm}`}
+          title={now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}>
+      {hh}<span>:</span>{mm}
+    </time>
+  );
+}
+
 export function Rail({
-  route, views, facility, theme, onGo, onTheme, onSignOut,
+  route, views, theme, onGo, onTheme, bell, scribe,
 }: {
   route: string;
   views: ViewDecl[];
-  facility?: Facility;
   theme: "light" | "dark";
   onGo: (hash: string) => void;
   onTheme: () => void;
-  onSignOut: () => void;
+  /** What needs you, as a bell. It sits in the rail, like Slack's Activity: it is a
+   *  place to look, not an action on the page, so it is one press from every screen. */
+  bell?: React.ReactNode;
+  /** A visit being scribed. Shown as a way back to it from anywhere in the app. */
+  scribe?: LiveScribe;
 }) {
+  // A visit is opened from the line, so the line's own place stays selected while one is open.
+  const lineId = views.find((v) => v.kind === "queue")?.id;
   const here = (id: string) =>
-    id === "home" ? route === "" || route === "today" : route.startsWith(id);
+    id === "home" ? route === "" || route === "today"
+    : route.startsWith(id) || (!!lineId && id === `views/${lineId}` && route.startsWith("threads/"));
 
   return (
     <nav className="rail" aria-label="Places">
@@ -88,7 +112,7 @@ export function Rail({
             aria-current={here(p.id) ? "page" : undefined}
             onClick={() => onGo(p.hash)}
           >
-            <Icon name={p.icon} className="i" />
+            <span className="rail-ic"><Icon name={p.icon} className="i" /></span>
             {/* The label is not a tooltip. A tooltip is invisible on a
                 touchscreen and late on a mouse, and this is the word that
                 tells two similar glyphs apart. */}
@@ -98,25 +122,39 @@ export function Rail({
       </div>
 
       <div className="rail-foot">
+        {scribe && (
+          <button
+            type="button"
+            className={`rail-i rail-scribe${route === `threads/${scribe.thread}` ? " on" : ""}${scribe.phase === "paused" ? " held" : ""}`}
+            onClick={() => onGo(`#/threads/${scribe.thread}`)}
+            title={`Scribe is ${scribe.phase === "paused" ? "paused" : "recording"} for ${scribe.name}. Go back to this visit.`}
+            aria-label={`Scribe ${scribe.phase === "paused" ? "paused" : "recording"} for ${scribe.name}. Go to this visit.`}
+          >
+            <span className="rail-ic"><Icon name="mic" className="i" /><span className="rail-sdot" aria-hidden="true" /></span>
+            <span className="rail-l">{Math.floor(scribe.seconds / 60)}:{String(scribe.seconds % 60).padStart(2, "0")}</span>
+          </button>
+        )}
+        {bell}
         <button
           type="button"
-          className={`rail-i${route === "settings" ? " on" : ""}`}
+          className={`rail-i bare${route === "settings" ? " on" : ""}`}
+          aria-label="Settings"
+          title="Settings"
           aria-current={route === "settings" ? "page" : undefined}
           onClick={() => onGo("#/settings")}
         >
-          <Icon name="cog" className="i" />
-          <span className="rail-l">Settings</span>
+          <span className="rail-ic"><Icon name="cog" className="i" /></span>
         </button>
         <button
           type="button"
-          className="rail-i"
+          className="rail-i bare"
+          title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
           onClick={onTheme}
           aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
         >
-          <Icon name={theme === "dark" ? "sun" : "moon"} className="i" />
-          <span className="rail-l">{theme === "dark" ? "Light" : "Dark"}</span>
+          <span className="rail-ic"><Icon name={theme === "dark" ? "sun" : "moon"} className="i" /></span>
         </button>
-        <Profile facility={facility} onSignOut={onSignOut} />
+        <RailClock />
       </div>
     </nav>
   );

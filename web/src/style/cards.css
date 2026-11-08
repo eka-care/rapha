@@ -11,10 +11,10 @@
               border-color var(--duration-slow) var(--ease-out);
 }
 .card-h {
-  padding: 12px 14px; border-bottom: 1px solid var(--color-border-subtle);
+  padding: 9px 14px; border-bottom: 1px solid var(--color-border-subtle);
   display: flex; align-items: center; gap: 9px;
 }
-.card-t { font-size: 12.5px; font-weight: 700; }
+.card-t { font-size: 12px; font-weight: 700; }
 .eyebrow {
   font-size: 10px; font-weight: 700; color: var(--color-eyebrow);
   text-transform: uppercase; letter-spacing: .09em;
@@ -23,7 +23,7 @@
 .badge {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 10px; font-weight: 700; padding: 3px 8px;
-  border-radius: var(--radius-pill); border: 1px solid transparent;
+  border-radius: var(--radius-md); border: 1px solid transparent;
   background: var(--color-bg-subtle); color: var(--color-text-tertiary);
   border-color: var(--color-border-subtle);
   white-space: nowrap;
@@ -32,18 +32,17 @@
 .b-warn { background: var(--color-warning-soft);  color: var(--color-warning);  border-color: var(--color-warning-border); }
 .b-crit { background: var(--color-critical-soft); color: var(--color-critical); border-color: var(--color-critical-border); }
 .b-mute { background: var(--color-bg-subtle);     color: var(--color-text-tertiary); border-color: var(--color-border-subtle); }
-.b-ink  { background: var(--color-accent-soft);   color: var(--color-accent);   border-color: var(--color-accent-line); }
+.b-ink  { background: var(--color-bg-subtle);   color: var(--color-text-primary);   border-color: var(--color-border-strong); }
 
 /* ABDM is the one place a real blue appears, and it means national identity
    and nothing else. */
 .id-badge {
-  display: inline-flex; align-items: center; gap: 5px;
-  background: var(--color-abdm-soft); border: 1.5px solid var(--color-abdm-border);
-  border-radius: var(--radius-pill); padding: 3px 9px;
+  display: inline-flex; align-items: center; gap: 6px; padding: 0;
+  background: none; border: 0; border-radius: 0;
 }
-.id-lab { color: var(--color-abdm); font-weight: 700; font-size: 8.5px;
-  text-transform: uppercase; letter-spacing: .06em; }
-.id-val { color: var(--color-abdm); font-weight: 700; font-size: 10px; }
+/* Plain text, not a pill: the lotus carries the national-identity blue and the rest stays quiet. */
+.id-lab { color: var(--color-text-tertiary); font-weight: 500; font-size: 12px; }
+.id-val { color: var(--color-text-secondary); font-weight: 500; font-size: 12px; font-variant-numeric: tabular-nums; }
 
 .btn {
   border: none; border-radius: var(--radius-md); padding: 9px 14px;
@@ -53,24 +52,25 @@
 }
 /* The dark primary, which is ink rather than a hue: the button a person
    presses all day may not spend the blue that means national identity. */
-.btn-b { background: var(--color-cta); color: var(--color-cta-ink); }
-.btn-b:hover:not(:disabled) { background: var(--color-cta-hover); }
+.btn-b { background: var(--color-primary); color: var(--color-primary-ink); }
+.btn-b:hover:not(:disabled) { background: var(--color-primary-hover); }
 .btn-g {
   background: var(--color-bg-surface); color: var(--color-text-secondary);
   border: 1px solid var(--color-border-subtle);
 }
 .btn-g:hover:not(:disabled) { background: var(--color-bg-subtle); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
-.send { width: 36px; height: 36px; padding: 0; border-radius: 50%; justify-content: center; }
+.send { width: 36px; height: 36px; padding: 0; border-radius: var(--radius-md); justify-content: center; }
 
 .chip {
   border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface);
-  color: var(--color-text-secondary); border-radius: var(--radius-pill);
-  padding: 6px 13px; font-size: 11.5px; font-weight: 500; cursor: pointer;
+  color: var(--color-text-secondary); border-radius: var(--radius-md);
+  padding: 0 12px; font-size: 12px; font-weight: 500; cursor: pointer;
   display: inline-flex; align-items: center; gap: 6px;
   transition: var(--duration-fast) var(--ease-out);
+  height: 28px;
 }
-.chip:hover { border-color: var(--color-accent); color: var(--color-accent); background: var(--color-accent-soft); }
+.chip:hover { border-color: var(--color-border-control); color: var(--color-text-primary); background: var(--color-bg-subtle); }
 /* Selected wears the violet tint the prototype gives every chosen control. */
 .chip[data-selected="true"] {
   background: var(--color-agent-soft); border-color: var(--color-agent-line);
@@ -308,7 +308,7 @@
 .arc-dot {
   flex-shrink: 0; margin-top: 1px;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; border-radius: var(--radius-pill);
+  width: 22px; height: 22px; border-radius: var(--radius-md);
   background: var(--color-bg-subtle); color: var(--color-text-tertiary);
 }
 .arc-step.s-done .arc-dot { background: var(--color-success-soft); color: var(--color-success); }
@@ -326,3 +326,21 @@
    card and has to be padded like them; `rail-none` is shaped for a rail. */
 .arc .rail-none { padding: 2px 15px 14px; }
 
+/* The primary button, beige. The same colours as .pill.primary. */
+.btn-p { background: var(--color-primary); color: var(--color-primary-ink); border: 1px solid var(--color-primary-line); }
+.btn-p:hover:not(:disabled) { background: var(--color-primary-hover); }
+
+/* THE TOKEN, ONE MARK EVERYWHERE: a small outlined admission ticket, then the number. No chip
+   and no fill; the icon alone says "ticket". Same in the line, the rail, the table, the
+   Home flow and the thread header. */
+span.ticket.ticket {
+  display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; justify-self: start; align-self: center;
+  height: auto; width: auto; min-width: 0; padding: 0; margin: 0; border: 0; border-radius: 0; background: none;
+  color: var(--color-text-primary); font: 700 12px var(--font-sans); letter-spacing: 0; font-variant-numeric: tabular-nums;
+}
+span.ticket .tk-i { width: 17px; height: 17px; color: var(--color-text-tertiary); flex: 0 0 auto; }
+span.ticket.pt-token { font-size: 15px; margin-left: 10px; vertical-align: middle; }
+span.ticket.pt-token .tk-i { width: 20px; height: 20px; }
+span.ticket.th-tok { font-size: 11px; }
+span.ticket.th-tok .tk-i { width: 15px; height: 15px; }
+span.ticket.qr-tk, span.ticket.desk-wr-tk { font-size: 12px; }

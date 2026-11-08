@@ -103,7 +103,7 @@
 }
 .khoj__go {
   border: 1px solid var(--color-agent-line); background: var(--color-agent-tint);
-  color: var(--color-agent); border-radius: var(--radius-pill);
+  color: var(--color-agent); border-radius: var(--radius-md);
   padding: 5px 12px; font: inherit; font-size: 12px; cursor: pointer;
 }
 .khoj__go:hover { background: var(--color-agent-tint-hover); }
@@ -149,7 +149,7 @@
 }
 .tour-skip:hover { color: var(--color-text-secondary); }
 .tour-back, .tour-next {
-  border-radius: var(--radius-pill); padding: 6px 15px; font: inherit;
+  border-radius: var(--radius-md); padding: 6px 15px; font: inherit;
   font-size: 12.5px; font-weight: 500; cursor: pointer;
 }
 .tour-back {
@@ -169,7 +169,7 @@
 .tour-again {
   position: absolute; top: 14px; right: 16px; z-index: 1;
   background: none; border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-pill); padding: 5px 13px; cursor: pointer;
+  border-radius: var(--radius-md); padding: 5px 13px; cursor: pointer;
   font: inherit; font-size: 12px; color: var(--color-text-secondary);
 }
 .tour-again:hover { border-color: var(--color-border-strong); color: var(--color-text-primary); }
@@ -267,13 +267,13 @@
 }
 .way-in-ob { margin: 0; font-size: 14px; color: var(--color-text-secondary); }
 .way-in-go {
-  border-radius: var(--radius-pill); padding: 9px 20px; font-size: 13.5px;
+  border-radius: var(--radius-md); padding: 9px 20px; font-size: 13.5px;
   font-weight: 500; text-decoration: none;
-  background: var(--color-cta); color: var(--color-cta-ink);
+  background: var(--color-primary); color: var(--color-primary-ink);
 }
-.way-in-go:hover { background: var(--color-cta-hover); }
+.way-in-go:hover { background: var(--color-primary-hover); }
 .way-in-again {
-  border-radius: var(--radius-pill); padding: 8px 16px; font-size: 13px;
+  border-radius: var(--radius-md); padding: 8px 16px; font-size: 13px;
   background: none; border: 1px solid var(--color-border-subtle);
   color: var(--color-text-secondary); cursor: pointer; font-family: inherit;
 }
@@ -447,7 +447,7 @@
 .cp-acts-end { display: flex; align-items: center; gap: 9px; margin-left: auto; }
 .cp-quiet, .cp-go {
   display: inline-flex; align-items: center; gap: 7px;
-  padding: 8px 15px; border-radius: var(--radius-pill); cursor: pointer;
+  padding: 8px 15px; border-radius: var(--radius-md); cursor: pointer;
   font: inherit; font-size: 13px; font-weight: 550;
 }
 .cp-quiet {

@@ -15,7 +15,7 @@ import type { Operation } from "./types";
 
 export type IconName =
   "sliders" | "mark" | "mark-lg" | "search" | "home" | "moon" | "sun" | "vitals" | "mic" | "box" | "clip" | "eye" | "plus" | "folder" | "chat" | "spark" | "check" | "alert" | "lock" | "send" | "user" | "users" | "list" | "cog" | "refer" | "chev" | "id" | "doc" |
-  "handle" | "out" | "clock" | "bell" | "sidebar";
+  "handle" | "out" | "clock" | "bell" | "sidebar" | "ticket";
 
 export function Icon({ name, size, className }: {
   name: IconName; size?: "sm" | "lg"; className?: string;
@@ -73,7 +73,7 @@ const SHEET = `
   <symbol id="i-check" viewBox="0 0 24 24"><path d="m4 12.5 5 5L20 6.5"/></symbol>
   <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5 22 20H2z"/><path d="M12 10v4M12 17h.01"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10" width="15" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
-  <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 10.5 13.5M21 3l-6.8 18-3.7-7.5L3 9.8z"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19.5V5M5.5 11.5 12 5l6.5 6.5"/></symbol>
   <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.5a3.2 3.2 0 0 1 0 6M17.5 14.5a6 6 0 0 1 4 5.5"/></symbol>
   <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
@@ -91,6 +91,8 @@ const SHEET = `
   <!-- A panel beside the page, shown as the page with one edge filled. The
        control that opens and closes a column should look like the column,
        not like an arrow: an arrow says "go", and this goes nowhere. -->
+  <!-- The token: an admission ticket, outlined, with a notch cut into each end and a dotted perforation. -->
+  <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M4 6h16a2 2 0 0 1 2 2v2.1a1.9 1.9 0 0 0 0 3.8V16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-2.1a1.9 1.9 0 0 0 0-3.8V8a2 2 0 0 1 2-2z"/><path d="M9 7.5v9" stroke-dasharray="1.4 2.1"/></symbol>
   <symbol id="i-sidebar" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M15 4.5v15"/></symbol>
   <!-- What is waiting for somebody, in the one place a person already looks
        for that. Drawn rather than borrowed so its stroke matches the sheet:

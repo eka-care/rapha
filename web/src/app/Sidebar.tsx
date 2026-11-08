@@ -14,11 +14,12 @@
  */
 import { useState } from "react";
 
-import { Garland } from "../auth/Bloom";
 import { Icon, type IconName } from "../icons";
 import { say } from "../announce";
 import { displayFor } from "../declarations";
-import { filterRows, narrowings, RISK_TONE, sameFilter, type Filter } from "../loops";
+import { filterRows, narrowings, sameFilter, type Filter } from "../loops";
+import { initialsOf } from "../agent";
+import { waited } from "../messages";
 import type { Facility, QueueRow, ViewDecl } from "../types";
 import { fields } from "../view/View";
 import { human, title } from "../words";
@@ -26,7 +27,7 @@ import { workspace } from "../auth/session";
 
 /** How many of the line fit before the rail is a scroll rather than a
  *  glance. The rest is one tap away in the view the rows came from. */
-const LINE = 9;
+
 
 /** WHICH SECOND PANEL THIS ROUTE WANTS, or none at all.
  *
@@ -38,17 +39,17 @@ const LINE = 9;
  */
 export type Panel = "line" | "settings" | null;
 
-export function panelFor(route: string, views: ViewDecl[]): Panel {
+export function panelFor(route: string, _views: ViewDecl[]): Panel {
   // THE LINE BESIDE THE LINE, not beside every view. A calendar or a
   // dashboard is somewhere a person reads, not somewhere they move between
   // people from, and the queue down its side was a second screen's worth of
   // names next to a screen about something else. Only a view whose declared
   // kind is a queue gets it -- the same property the shell reads to decide
   // which rows the line is made of.
-  if (route.startsWith("views/")) {
-    const id = route.slice("views/".length).split(/[/?]/)[0];
-    return views.find((v) => v.id === id)?.kind === "queue" ? "line" : null;
-  }
+  // The Lines table is the whole list: search, tabs, filters and every patient
+  // are on the page, so it draws no second panel of the same names. The panel
+  // stays on a patient's visit, where it is the way to the next person.
+  if (route.startsWith("views/")) return null;
   if (route.startsWith("threads/")) return "line";
   if (route.startsWith("settings")) return "settings";
   return null;
@@ -56,7 +57,7 @@ export function panelFor(route: string, views: ViewDecl[]): Panel {
 
 export function Sidebar({
   facility, route, line, narrow, open, panel, sections,
-  onGo, onNarrow, onCall, onCloseDrawer,
+  onGo, onNarrow, onCall, onCloseDrawer, onFold,
 }: {
   facility?: Facility;
   route: string;
@@ -80,6 +81,8 @@ export function Sidebar({
    *  this is that search with the box already filled. */
   onCall: (token: string) => void;
   onCloseDrawer: () => void;
+  /** Tuck the line away. Absent where the panel is not the line. */
+  onFold?: () => void;
 }) {
   const goTo = (hash: string) => { onGo(hash); onCloseDrawer(); };
   // The queue this centre calls its line, in its own words. A facility with
@@ -87,37 +90,15 @@ export function Sidebar({
   const lineTitle = line[0]?.decl.title ?? "";
   const [call, setCall] = useState("");
   const [filters, setFilters] = useState(false);
-  /** What this bundle calls the number on a row, off the declared columns,
-   *  so the box is labelled in the centre's own word and this file types none
-   *  of them. A bundle whose queue declares no such column has no number to
-   *  call, and the box is absent rather than asking for one by a name the
-   *  renderer made up. */
-  const tokenWord = (line[0]?.decl.columns ?? []).find((c) => /token/i.test(c)) ?? "";
-  /** CALLING A NUMBER IS CALLING A PERSON, not searching for digits.
-   *
-   *  This column already holds the line and every row's number, so the
-   *  number resolves here: the thread whose token matches opens, which is
-   *  the patient walking up to the counter. It went to the front desk with
-   *  the digits in the search box instead, which is a different act -- that
-   *  is what you do when you do not know who someone is, and a token is the
-   *  one thing that says exactly who they are.
-   *
-   *  Loose on the comparison, because the board outside says 7 and the row
-   *  may carry "007" or "A-7", and a clerk retyping a number to make it
-   *  match is a clerk doing the computer's job.
-   */
+  const [closed, setClosed] = useState<Set<string>>(new Set());
+  const toggle = (k: string) => setClosed((was) => {
+    const next = new Set(was);
+    if (next.has(k)) next.delete(k); else next.add(k);
+    return next;
+  });
+  /** A number typed is a person asked for. Loose on the comparison, because the
+   *  board outside says 7 and the row may carry "007" or "A-7". */
   const loose = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/^0+(?=\d)/, "");
-  const callOut = () => {
-    const want = loose(call.trim());
-    if (!want) return;
-    const hit = line.find(({ decl, row }) => loose(fields(decl, row).token) === want);
-    setCall("");
-    // NOT IN THE LINE IS NOT AN ERROR. A number nobody here holds is most
-    // often somebody who has not been registered yet, so it falls through
-    // to the desk with what was typed, which is where that is put right.
-    if (hit) goTo(`#/threads/${hit.row.thread}`);
-    else onCall(call.trim());
-  };
 
   // THE ONE CONTROL OVER TODAY'S LINE. Where they are, what they are on and
   // what is flagged, every option off the declaration, grouped under the
@@ -141,6 +122,32 @@ export function Sidebar({
     return line.filter(({ row }) => keepers.has(row.thread));
   })();
 
+  // The search: a name, a village, a programme or a token, any of them.
+  const q = call.trim();
+  const visible = shown.filter(({ decl, row }) => {
+    if (!q) return true;
+    const lq = q.toLowerCase();
+    return Object.values(row.subject ?? {}).some((v) => String(v ?? "").toLowerCase().includes(lq))
+      || loose(fields(decl, row).token) === loose(q);
+  });
+  // Grouped by where they are, longest wait first, and finished patients last.
+  // The groups are places, not steps: a patient can be anywhere in any order.
+  const DONE = "\u0000done";
+  const places = new Map<string, typeof visible>();
+  for (const item of visible) {
+    const k = item.row.station ?? DONE;
+    places.set(k, [...(places.get(k) ?? []), item]);
+  }
+  const oldest = (items: typeof visible) =>
+    items.map((i) => i.row.opened_at).filter(Boolean).sort()[0] ?? "~";
+  const grouped = [...places.entries()]
+    .map(([k, items]) => ({ k, items, label: k === DONE ? "Done" : title(human(k)), oldest: oldest(items) }))
+    .sort((a, b) => (a.k === DONE ? 1 : b.k === DONE ? -1 : a.oldest.localeCompare(b.oldest)));
+  const openFirst = (list: typeof visible) => {
+    if (list.length === 1) goTo(`#/threads/${list[0].row.thread}`);
+    else if (list.length === 0 && q) onCall(q);
+  };
+
   if (panel === "settings") {
     // `#/settings` with no section shows the first one, so that is the row
     // that has to look selected. Without this the page showed Appearance
@@ -148,8 +155,7 @@ export function Sidebar({
     const part = route.split("/")[1] || sections[0]?.id;
     return (
       <nav className="sb" data-open={open} aria-label="Settings sections">
-        <Garland kind="vine" />
-        <div className="sb-head">
+                <div className="sb-head">
           <div className="sb-head-t">Settings</div>
           {/* Eka's workspace when the session named one; the bundle's own
               title otherwise. */}
@@ -175,16 +181,21 @@ export function Sidebar({
 
   return (
     <nav className="sb" data-open={open} aria-label="The line">
-      <Garland kind="vine" />
-      {/* The brand moved to the icon rail, where it is the one mark at the
+            {/* The brand moved to the icon rail, where it is the one mark at the
           top of the one column that is always there. It was repeated here
           over a list of patients, which is the second place a person looks
           and the last place that needs telling them which product this is. */}
       <div className="sb-head">
         <div className="sb-head-t">{lineTitle || "Today"}</div>
         <div className="sb-head-s">
-          {shown.length === 1 ? "1 patient" : `${shown.length} patients`}
+          {`${line.length} today, ${line.filter(({ row }) => row.station).length} here`}
         </div>
+        {onFold && (
+          <button type="button" className="sb-fold" onClick={onFold}
+                  aria-label="Hide the line" title="Hide the line" aria-expanded="true">
+            <Icon name="sidebar" className="i sm" />
+          </button>
+        )}
       </div>
 
       {/* THE LINE AND NOTHING ELSE. A Register button, a search row, six
@@ -193,18 +204,16 @@ export function Sidebar({
           All of them are in the top bar now, which is where the artifact
           keeps them, and this column is the line: call a number, narrow by
           programme, and the people. */}
-      {tokenWord && (
-      <form className="sb-call" onSubmit={(e) => { e.preventDefault(); callOut(); }}>
+      <div className="sb-find">
+        <Icon name="search" className="i sm" />
         <input
-          className="sb-call-in"
           value={call}
           onChange={(e) => setCall(e.target.value)}
-          placeholder={`Call a ${human(tokenWord).toLowerCase()}`}
-          aria-label={`Call a ${human(tokenWord).toLowerCase()}`}
+          onKeyDown={(e) => { if (e.key === "Enter") openFirst(visible); }}
+          placeholder="Find a patient or token…"
+          aria-label="Find a patient or token"
         />
-        <button className="sb-call-go" type="submit">Call</button>
-      </form>
-      )}
+      </div>
 
       {/* ONE CONTROL OVER THE DAY, AND ONLY ONE.
           There were two. A strip of chips above the list screen -- a chip
@@ -226,9 +235,9 @@ export function Sidebar({
                   onClick={() => setFilters((v) => !v)}>
             <Icon name="sliders" className="i sm" />
             <span className="sb-filter-t">
-              {chosen ? chosen.label : "Narrow the line"}
+              {chosen ? chosen.label : "Filters"}
             </span>
-            <span className="sb-filter-n">{shown.length}</span>
+            <span className="sb-filter-n">{visible.length}</span>
           </button>
           {narrow && (
             <button type="button" className="sb-filter-x" aria-label="Show everybody"
@@ -274,39 +283,36 @@ export function Sidebar({
       )}
 
       <div className="sb-list">
-        {shown.length === 0 ? (
-          <div className="sb-empty">Nobody is waiting.</div>
-        ) : shown.slice(0, LINE).map(({ decl, row }) => {
-          const f = fields(decl, row);
-          return (
-            <button
-              key={row.thread}
-              className={`th-row${route === `threads/${row.thread}` ? " on" : ""}`}
-              onClick={() => goTo(`#/threads/${row.thread}`)}
-            >
-              {f.token && <span className="th-tok">{f.token}</span>}
-              <span className="th-b">
-                <span className={`th-n${f.named ? "" : " u-mute"}`}>{f.name}</span>
-                {row.station && <span className="th-s">{title(row.station)}</span>}
-              </span>
-              {/* The one coloured mark in this column, and it asks the view
-                  which of its own tones means clinical risk rather than
-                  spelling that tone here. It was spelled here, which is
-                  exactly the defect RISK_TONE exists to prevent: a bundle
-                  that renames its tone would have left the dot red for
-                  something that is not a risk. The class says `risk` too,
-                  because ui.check allows the critical ink on nothing else. */}
-              {row.flags?.some((x) => row.badges?.[x] === RISK_TONE) && (
-                <span className="th-risk" aria-label="needs attention" />
-              )}
+        {visible.length === 0 ? (
+          <div className="sb-empty">{q ? "Nobody matches." : "Nobody is waiting."}</div>
+        ) : grouped.map((g) => (
+          <div className="sb-g" key={g.k}>
+            <button type="button" className="sb-gh" aria-expanded={!closed.has(g.k)} onClick={() => toggle(g.k)}>
+              <Icon name="chev" className={`i sm sb-gc${closed.has(g.k) ? " shut" : ""}`} />
+              <span className="sb-gl">{g.label}</span>
+              <span className="sb-gn">{g.items.length}</span>
             </button>
-          );
-        })}
-        {shown.length > LINE && (
-          <button className="sb-more" onClick={() => goTo(`#/views/${line[0].decl.id}`)}>
-            {shown.length - LINE} more
-          </button>
-        )}
+            {!closed.has(g.k) && g.items.map(({ decl, row }) => {
+              const f = fields(decl, row);
+              return (
+                <button
+                  key={row.thread}
+                  className={`th-row${route === `threads/${row.thread}` ? " on" : ""}`}
+                  onClick={() => goTo(`#/threads/${row.thread}`)}
+                >
+                  <span className={`th-av${f.named ? "" : " none"}`} aria-hidden="true">{f.named ? initialsOf(f.name) : "?"}</span>
+                  <span className="th-b">
+                    <span className="th-l1">
+                      <span className={`th-n${f.named ? "" : " u-mute"}`}>{f.name}</span>
+                      {f.token && <span className="ticket th-tok" title="Token" aria-label={`Token ${f.token}`}><Icon name="ticket" className="i tk-i" />{f.token}</span>}
+                    </span>
+                    {row.station && waited(row.opened_at) && <span className="th-s">Waiting {waited(row.opened_at)}</span>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
     </nav>

@@ -342,6 +342,20 @@ const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 export const clock = (at: string | undefined): string =>
   at && /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(at) ? at.slice(11, 16) : (at ?? "");
 
+/** How long ago, in the words a person says it: "42 min", "2 h 5 min". Empty
+ *  when there is no time to measure from, so a row without one draws nothing
+ *  rather than a wrong number. `now` is a parameter so a check can pin it. */
+export function waited(at: string | undefined, now: number = Date.now()): string {
+  if (!at) return "";
+  const from = Date.parse(at);
+  if (!Number.isFinite(from)) return "";
+  const mins = Math.max(0, Math.floor((now - from) / 60000));
+  if (mins < 1) return "just now";
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h === 0 ? `${m} min` : m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
 /** The flag every scribe declaration gates on. It is a product rule and not a
 
 /** A summary view belongs to a thread, not to the nav. One that names a
@@ -367,6 +381,9 @@ export type Header = {
   meta: string[];
   identity?: { label: string; value: string };
   badges: Tag[];
+  /** The token and the declared word for it, so a screen can put it right after the name. */
+  token: string;
+  tokenWord: string;
 };
 
 const IDENTITY = /abha|abdm/i;
@@ -442,5 +459,8 @@ export function header(
       ? { label: human(identityEntry[0]), value: String(identityEntry[1]) }
       : undefined,
     badges,
+    // The token, on its own, so a screen can put it right after the name.
+    token: token && has(token) ? String(subject[token]) : "",
+    tokenWord: token ? human(token) : "",
   };
 }

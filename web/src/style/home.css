@@ -2,7 +2,7 @@
  * a brief the agent wrote, the line in motion, and two columns under it.
  * The thing that stops this reading as a slide is that none of it is a list. */
 
-.home { display: flex; flex-direction: column; gap: 16px; padding-bottom: 20px; }
+.home { display: flex; flex-direction: column; gap: 12px; padding-bottom: 12px; }
 
 /* The prototype's own wash: surface at the near corner, the canvas through
    the middle, and the agent's violet tint off the far corner, which is the
@@ -12,9 +12,12 @@
 .hero {
   position: relative; overflow: hidden;
   border-radius: var(--radius-xl); border: 1px solid var(--color-border-subtle);
-  background: linear-gradient(122deg,
-    var(--color-bg-surface) 0%, var(--color-bg-canvas) 58%, var(--color-agent-tint) 165%);
-  padding: 30px 26px 26px; box-shadow: var(--shadow-sm);
+  /* A very mild warmth rising from the bottom edge; the flowers do the rest. */
+  background:
+    radial-gradient(110% 60% at 50% 145%, var(--color-sand-to) 0%, transparent 60%),
+    linear-gradient(180deg, var(--color-bg-surface) 0%, var(--color-bg-canvas) 100%);
+  isolation: isolate;
+  padding: 48px 40px 40px; min-height: 340px; justify-content: center; box-shadow: var(--shadow-sm);
   /* The owner's call: the hero's own text is centred. Everything in this
      card centres on its axis -- eyebrow, statement, the line under it and the
      ask -- so the card reads as one block rather than a left edge with a
@@ -31,7 +34,7 @@
    something that text had to be read through. Bottom left is the corner the
    hero's own wash comes from and the only thing over it is the card's edge. */
 .hero-mark {
-  position: absolute; bottom: -78px; left: -58px; width: 300px; height: 300px;
+  position: absolute; bottom: -70px; left: -50px; width: 240px; height: 240px;
   color: var(--color-agent); opacity: .22; pointer-events: none;
   stroke-width: .5; fill: none; stroke: currentColor;
   stroke-linecap: round; stroke-linejoin: round;
@@ -45,11 +48,11 @@
    prototype's hero is Newsreader at 420, which is lighter than the body it
    sits above and reads as a greeting rather than as a banner. */
 .hero-h {
-  font-family: var(--font-serif); font-size: 34px; font-weight: 420;
+  font-family: var(--font-serif); font-size: 46px; font-weight: 420;
   letter-spacing: .012em; margin-top: 0; line-height: 1.12;
   /* Balanced rather than ragged: the second line of a greeting breaking
      after the comma is the kind of thing nobody names and everybody feels. */
-  max-width: 30ch; text-wrap: balance;
+  max-width: 28ch; text-wrap: balance;
 }
 .hero-h span { color: var(--color-text-tertiary); font-weight: 420; }
 .hero-sub { font-size: 12.5px; color: var(--color-text-tertiary); margin-top: 7px; line-height: 1.55; max-width: 560px; }
@@ -59,33 +62,35 @@
 .hero-ask {
   display: flex; align-items: center; gap: 12px;
   background: var(--color-bg-surface); border: 1.5px solid var(--color-border-subtle);
-  border-radius: var(--radius-pill); padding: 15px 22px; margin: 24px auto 0;
-  max-width: 680px; cursor: text; position: relative; z-index: 1; width: 100%;
+  border-radius: var(--radius-lg); padding: 0 22px; margin: 26px auto 0;
+  max-width: 760px; cursor: text; position: relative; z-index: 1; width: 100%;
   box-shadow: var(--shadow-sm);
   transition: var(--duration-normal) var(--ease-out);
+  height: 68px; font-size: 16px; border-color: var(--color-border-strong);
 }
+.hero-ask .i { width: 22px; height: 22px; }
 .hero-ask:hover { border-color: var(--color-accent); box-shadow: var(--shadow-md); }
-.hero-ask-l { flex: 1; min-width: 0; font-size: 15px; text-align: left;
+.hero-ask-l { flex: 1; min-width: 0; font-size: 16px; text-align: left;
   color: var(--color-text-tertiary); }
 .hero-ask:focus-visible {
   outline: 2px solid var(--color-accent); outline-offset: 2px;
 }
-.chips { display: flex; gap: 7px; margin-top: 15px; flex-wrap: wrap; position: relative;
+.chips { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; position: relative;
   z-index: 1; justify-content: center; }
 
 /* The clock. The time, large and set in tabular numerals so the digits do
    not shuffle sideways on every tick, and the day under it. The colon is
    its own span only so it can be held at a lighter weight: at this size a
    full-strength colon reads as a third digit. */
-.clock { position: absolute; top: 22px; right: 26px; text-align: right; z-index: 1; }
+.clock { position: absolute; top: 16px; right: 22px; text-align: right; z-index: 1; }
 .clock-t {
-  display: block; font-size: 30px; font-weight: 700; line-height: 1;
+  display: block; font-size: 22px; font-weight: 700; line-height: 1;
   letter-spacing: -.03em; font-variant-numeric: tabular-nums;
   color: var(--color-text-primary);
 }
 .clock-c { color: var(--color-text-tertiary); font-weight: 400; margin: 0 1px; }
 .clock-d {
-  font-size: 11.5px; color: var(--color-text-tertiary); margin-top: 6px;
+  font-size: 11px; color: var(--color-text-tertiary); margin-top: 6px;
 }
 
 .brief { display: flex; gap: 12px; padding: 15px 16px; }
@@ -105,16 +110,16 @@
 
 /* The line, in motion. One column per declared station, a rail that animates
    while anybody is standing in it, and the people themselves as chips. */
-.flow { display: flex; gap: 0; padding: 16px 14px; overflow-x: auto; }
-.fl-col { min-width: 132px; flex: 1; position: relative; padding: 0 7px; }
-.fl-h { display: flex; align-items: center; gap: 6px; margin-bottom: 9px; }
-.fl-n { font-size: 10.5px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: var(--color-text-tertiary); }
-.fl-c { margin-left: auto; font-size: 11px; font-weight: 800;
+.flow { display: flex; gap: 0; padding: 12px 8px; overflow-x: auto; }
+.fl-col { min-width: 120px; flex: 1; position: relative; padding: 0 6px; }
+.fl-h { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+.fl-n { font-size: 12px; font-weight: 600; text-transform: none;
+  letter-spacing: 0; color: var(--color-text-secondary); }
+.fl-c { margin-left: auto; font-size: 12px; font-weight: 800;
   color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
 .fl-rail {
   height: 4px; border-radius: 999px; background: var(--color-border-subtle);
-  margin-bottom: 11px; overflow: hidden; position: relative;
+  margin-bottom: 9px; overflow: hidden; position: relative;
 }
 /* The bar is a share of a heavy queue, standing still.
 
@@ -144,17 +149,18 @@
 }
 .fl-col.jam .fl-rail { background: var(--color-warning-border); }
 .fl-p {
-  display: flex; align-items: center; gap: 7px; padding: 7px 8px;
-  border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface);
-  border-radius: var(--radius-sm); margin-bottom: 5px; cursor: pointer;
-  font-size: 11px; width: 100%; text-align: left;
+  display: flex; align-items: center; gap: 7px; padding: 0 8px;
+  border: 0; background: var(--color-bg-subtle);
+  border-radius: var(--radius-sm); margin-bottom: 4px; cursor: pointer;
+  font-size: 12px; width: 100%; text-align: left;
   transition: var(--duration-fast) var(--ease-out);
+  height: 32px;
 }
-.fl-p:hover { border-color: var(--color-accent); background: var(--color-accent-soft); transform: translateX(2px); }
+.fl-p:hover { border-color: transparent; background: var(--color-bg-selected); transform: translateX(2px); }
 .fl-av {
-  width: 20px; height: 20px; border-radius: 4px;
+  width: 22px; height: 22px; border-radius: 4px;
   background: var(--color-ghost); color: var(--color-text-secondary);
-  display: grid; place-items: center; font-size: 8.5px; font-weight: 700; flex-shrink: 0;
+  display: grid; place-items: center; font-size: 11px; font-weight: 700; flex-shrink: 0;
 }
 .fl-p.alert { border-color: var(--color-critical-border); background: var(--color-critical-soft); }
 .fl-p.alert .fl-av { background: var(--color-critical); color: var(--color-bg-surface); }
@@ -162,15 +168,15 @@
 /* SC 1.4.1: the mark beside a flagged name, so the tone is the second
    carrier of that state and not the only one. */
 .fl-p.alert > .i { color: var(--color-critical); }
-.fl-e { font-size: 10.5px; color: var(--color-text-tertiary); padding: 6px 2px; }
-.fl-jam { font-size: 9.5px; font-weight: 700; color: var(--color-warning);
+.fl-e { font-size: 11px; color: var(--color-text-tertiary); padding: 6px 2px; }
+.fl-jam { font-size: 11px; font-weight: 700; color: var(--color-warning);
   margin-top: 7px; display: flex; align-items: center; gap: 4px; }
 
-.hgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.hgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
 
 .att { padding: 6px 0; }
 .at {
-  display: flex; align-items: center; gap: 11px; padding: 11px 15px;
+  display: flex; align-items: center; gap: 11px; padding: 9px 14px;
   border: 0; border-bottom: 1px solid var(--color-border-subtle);
   background: none; width: 100%; text-align: left; cursor: pointer;
   transition: var(--duration-fast) var(--ease-out);
@@ -183,24 +189,24 @@
   background: var(--color-bg-subtle); color: var(--color-text-tertiary);
 }
 .at-ic.amb { background: var(--color-warning-soft); color: var(--color-warning); }
-.at-ic.ink { background: var(--color-accent-soft); color: var(--color-accent); }
+.at-ic.ink { background: var(--color-bg-subtle); color: var(--color-text-secondary); }
 .at-b { min-width: 0; flex: 1; display: grid; }
-.at-t { font-size: 12.5px; font-weight: 600; }
-.at-s { font-size: 10.5px; color: var(--color-text-tertiary); margin-top: 2px; }
-.at-go { font-size: 10.5px; font-weight: 700; color: var(--color-accent);
-  opacity: 0; transition: var(--duration-fast) var(--ease-out); }
-.at:hover .at-go { opacity: 1; }
+.at-t { font-size: 13px; font-weight: 600; }
+.at-s { font-size: 11px; color: var(--color-text-tertiary); margin-top: 2px; }
+.at-go { font-size: 12px; font-weight: 600; color: var(--color-text-secondary);
+  opacity: 1; transition: var(--duration-fast) var(--ease-out); }
 
-.pulse { padding: 14px 15px; display: flex; flex-direction: column; gap: 15px; }
+
+.pulse { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
 .pu-r { display: flex; justify-content: space-between; align-items: baseline;
-  font-size: 11.5px; color: var(--color-text-tertiary); }
-.pu-v { font-size: 22px; font-weight: 800; letter-spacing: -.025em;
+  font-size: 12px; color: var(--color-text-tertiary); }
+.pu-v { font-size: 20px; font-weight: 800; letter-spacing: -.025em;
   color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
 .pu-v small { font-size: 11px; font-weight: 600; color: var(--color-text-tertiary); margin-left: 3px; }
 .split { display: flex; height: 7px; border-radius: 999px; overflow: hidden;
   margin-top: 7px; background: var(--color-border-subtle); }
 .split i { display: block; height: 100%; }
-.leg { display: flex; gap: 14px; margin-top: 7px; font-size: 10.5px; color: var(--color-text-tertiary); }
+.leg { display: flex; gap: 14px; margin-top: 7px; font-size: 11px; color: var(--color-text-tertiary); }
 .leg span { display: flex; align-items: center; gap: 5px; }
 .dt { width: 7px; height: 7px; border-radius: 50%; }
 
@@ -222,3 +228,23 @@
   padding: 4px 2px; color: var(--color-text-tertiary);
 }
 .fl-more:hover { color: var(--color-text-secondary); }
+
+.fl-p.none .fl-nm { color: var(--color-text-tertiary); }
+
+/* The suggested questions under the Ask bar are plain secondary buttons: white fill, no gradient. */
+
+/* The token sits at the right end of a person in the flow: the name takes the slack. */
+.fl-p .fl-tk { font-size: 12px; }
+
+/* A person in the flow: the ticket first, then the name, a dot when flagged. No tile, no fill. */
+.fl-p { background: none; padding: 0 4px; height: 34px; gap: 10px; border-radius: var(--radius-md); margin-bottom: 0; }
+.fl-p:hover { background: var(--color-bg-subtle); transform: none; }
+.fl-p.alert { background: none; border-color: transparent; }
+.fl-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-text-tertiary); flex: 0 0 auto; }
+.fl-p.alert .fl-dot { background: var(--color-critical); }
+
+/* The garland on the hero: vine at the left edge, spray at the bottom right, both in the violet ink. */
+.hero .garland-plot { opacity: .3; }
+.hero .garland.vine .garland-plot { left: 0; bottom: -40px; width: 120px; height: 450px; }
+.hero .garland.spray .garland-plot { right: 0; bottom: 0; width: 462px; height: 242px; }
+@media (max-width: 900px) { .hero .garland.spray .garland-plot { width: 300px; height: 157px; } }

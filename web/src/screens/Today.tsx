@@ -1,7 +1,7 @@
 /** §5, rebuilt to the prototype.
  *
  *  A hero that says what kind of shift this is and offers the questions worth
- *  asking; the brief the agent wrote; the line in motion; then attention and
+ *  asking; the line in motion; then attention and
  *  the facility's pulse side by side. None of it is a list of nouns, which is
  *  what the first two attempts at this screen were.
  *
@@ -10,17 +10,19 @@
  */
 import { useEffect, useState, type CSSProperties } from "react";
 import { api, currentRole } from "../api";
-import { brief, facilityAsks, initialsOf, line, type Loaded } from "../agent";
+import { facilityAsks, initialsOf, line, type Loaded } from "../agent";
 import { NAME } from "../brand";
 import { Icon } from "../icons";
+import { Garland } from "../auth/Bloom";
 import type { Recent } from "../loops";
+import { waited } from "../messages";
 import { Loading } from "../parts";
 import type { CalendarRow, Catalogue, QueueRow, TaskRow } from "../types";
 import { Cards } from "../view/Cards";
 import { step } from "../view/cells";
 import { cardHash, dateOf, EVERYONE, forRole, stack } from "../view/day";
 import { fields } from "../view/View";
-import { human, title } from "../words";
+import { human, title, NO_NAME } from "../words";
 
 /** How many names a flow column shows before it says how many more. */
 const SHOWN = 4;
@@ -59,26 +61,6 @@ const fill = (n: number, busiest: number): number =>
  *  corner of a workspace is worse than an empty corner. Once a minute is
  *  enough for a wall clock and costs nothing.
  */
-function Clock() {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(t);
-  }, []);
-  const hh = String(now.getHours()).padStart(2, "0");
-  const mm = String(now.getMinutes()).padStart(2, "0");
-  return (
-    <div className="clock">
-      <time className="clock-t" dateTime={`${hh}:${mm}`}>
-        {hh}<span className="clock-c">:</span>{mm}
-      </time>
-      <div className="clock-d">
-        {now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
-      </div>
-    </div>
-  );
-}
-
 export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, onAsk }: {
   loaded: Loaded[];
   /** Whether the four view reads are still running. Without it this screen
@@ -147,15 +129,16 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
   return (
     <div className="home">
       <section className="hero">
-        <svg className="hero-mark" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mark-lg" /></svg>
+        {/* The owner's flower tracing, the garland, framing the card: the vine up the
+            left edge and the spray in the bottom right. Still, and behind everything. */}
+        <Garland kind="vine" />
+        <Garland kind="spray" />
         {/* WHAT WAS HERE: "Session", a time, a progress bar and "2.4 h
             left" -- a countdown through a 9-to-2 window this product never
             declared anywhere. It invented a fact, and when the invented
             window ran out the corner of the home screen said "session
             closed" over a centre with eight people still in it. A clock
             cannot be wrong about what it is for. */}
-        <Clock />
-
         <h2 className="hero-h">
           {rows.length === 1 ? "1 patient is here." : `${rows.length} patients are here.`}<br />
           <span>
@@ -193,23 +176,6 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
         </div>
       </section>
 
-      <div className="card">
-        <div className="brief">
-          <span className="brief-av"><Icon name="spark" className="i sm" /></span>
-          <div>
-            {/* The time was here too, a second clock three inches under the
-                first one, and both said the same thing. */}
-            <div className="m-meta">Shift brief</div>
-            <p className="brief-t">
-              {brief(loaded).map((s, i) =>
-                s.go
-                  ? <button className="go" key={i} onClick={() => onGoView(s.go!.replace("#/views/", ""))}>{s.text}</button>
-                  : <span key={i}>{s.text}</span>)}
-            </p>
-          </div>
-        </div>
-      </div>
-
       {columns.length > 0 && (
         <div className="card">
           <div className="card-h">
@@ -242,16 +208,14 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
                   ? <div className="fl-e">Clear</div>
                   : c.people.slice(0, SHOWN).map((p) => (
                       <button
-                        className={`fl-p${p.alert ? " alert" : ""}`}
+                        className={`fl-p${p.alert ? " alert" : ""}${p.name === NO_NAME ? " none" : ""}`}
                         key={p.thread}
                         onClick={() => onOpenThread(p.thread)}
                       >
-                        <span className="fl-av">{p.initials}</span>
+                        {p.token && <span className="ticket fl-tk" title="Token" aria-label={`Token ${p.token}`}><Icon name="ticket" className="i tk-i" />{p.token}</span>}
                         <span className="fl-nm">{p.name}</span>
-                        {/* SC 1.4.1: the tone alone carried this, so a person
-                            who cannot see that red saw an ordinary row. The
-                            mark is the second carrier and the declared flag
-                            is its name. */}
+                        {/* SC 1.4.1: the mark is the second carrier of the flag
+                            and the declared flag is its name. */}
                         {p.alert && (
                           <>
                             <Icon name="alert" className="i sm" />
@@ -269,7 +233,7 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
                 {c.jam && (
                   <div className="fl-jam">
                     <Icon name="alert" className="i sm" />
-                    Longest wait
+                    Longest wait{c.oldest && waited(c.oldest) ? ` · ${waited(c.oldest)}` : ""}
                   </div>
                 )}
               </div>
@@ -293,7 +257,7 @@ export function Today({ loaded, loading, recents, cat, onOpenThread, onGoView, o
                      /* The register's own declared columns, the first two values: the
                         renderer may not name a column (age, village), so it takes
                         what the declaration offers. Taken before they are joined. */
-                     metaOf={(s) => fields(cal.decl, { station: null, subject: s }).facts.slice(0, 2).join(" · ")}
+                     metaOf={(s) => fields(cal.decl, { station: null, subject: s }).facts.slice(0, 2).join(", ")}
                      onOpen={(r) => { location.hash = cardHash(r); }} />
             </>
           )}

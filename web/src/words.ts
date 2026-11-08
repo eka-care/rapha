@@ -121,3 +121,7 @@ const ROLE_GLYPH: Record<string, string> = {
  *  import cannot follow; the caller narrows it. */
 export const roleGlyph = (id: string | null | undefined): string =>
   ROLE_GLYPH[(id ?? "").toLowerCase().replace(/[_.]/g, "-")] ?? "user";
+
+/** What a patient is called before anybody has asked. One word for it, used by
+ *  the line, the home screen and the search, so three screens cannot disagree. */
+export const NO_NAME = "No name yet";

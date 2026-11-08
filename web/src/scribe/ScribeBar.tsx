@@ -35,7 +35,9 @@ export type Phase = "idle" | "recording" | "paused" | "uploading" | "waiting" | 
 
 export type Status = { phase: Phase; seconds: number };
 
-export function ScribeBar({ thread, op, lib, full, children, onStatus, onByHand, onDrafts, onClose }: {
+export function ScribeBar({ thread, op, lib, full, children, onStatus, onByHand, onDrafts, onClose, controls: ctl }: {
+  /** Lets the composer, the thread and the rail drive this recording from outside the tab. */
+  controls?: { current: { stop: () => void; pause: () => void; resume: () => void } | null };
   thread: string;
   /** The form the recording will fill, or "" for none. Choosing one is not
    *  required: a recording with nothing chosen is a transcript. Changing it on
@@ -306,6 +308,8 @@ export function ScribeBar({ thread, op, lib, full, children, onStatus, onByHand,
     if (id) void dropSession(id).catch(() => {});
     onClose();
   };
+
+  if (ctl) ctl.current = { stop, pause, resume };
 
   const over = phase === "failed" || phase === "withdrawn";
 

@@ -10,38 +10,22 @@
  *  no row behind either, and drawing one would be a picture of a product.
  */
 import { useState } from "react";
-import { Icon } from "../icons";
+import { Icon, type IconName } from "../icons";
 import { clock, type Msg, type Said } from "../messages";
 import type { Operation, Proposal } from "../types";
 import { human, title } from "../words";
-import { Message, Turn, withMentions } from "./Message";
+import { Message, Turn, roleVar, withMentions } from "./Message";
 import { blocks, split, type Block } from "./fold";
 
 export function Stream({ msgs, editable, onEdit, onReview, children }: {
   msgs: Msg[];
-  /** The ids of the records this person may still correct. Decided by the
-   *  screen above, from the visit's state and the operation's own
-   *  reversibility, never here: this file draws what it is given. */
   editable?: Set<string>;
   onEdit?: (m: Extract<Msg, { kind: "posted" }>) => void;
-  /** A proposal is reviewed on the Scribe tab, never drawn here: the thread
-   *  holds a line saying one is waiting, and the form is the Scribe tab's. */
   onReview?: (m: Extract<Msg, { kind: "proposal" }>) => void;
   children?: React.ReactNode;
 }) {
-  // EVERY STATION BEHIND THIS ONE IS A LINE. Not the last record open and
-  // the rest folded -- the last record is still a station somebody finished,
-  // and leaving it open put a six value card between the doctor and the one
-  // thing they are here to do. What is open is what is happening now, which
-  // is the agent's own node at the foot of this list, and nothing else.
-  //
-  // The line carries what was recorded, so folding costs nothing anybody was
-  // reading: a nurse's blood pressure is on it, in the words the kernel drew
-  // it in, and the card is one tap under it.
   return (
     <div className="thread">
-      <span className="tether-seed" aria-hidden="true"><Icon name="mark" className="i" /></span>
-      <div className="tether" aria-hidden="true" />
       {msgs.length === 0 && (
         <div className="state-empty">
           Nothing recorded for this visit yet.<br />
@@ -73,7 +57,7 @@ function Entry({ m, editable, onEdit, onReview }: {
   if (m.kind === "denied") {
     return (
       <Fold tone="refused" who={m.actor} title={m.title} at={clock(m.at)}
-            summary={m.reason}
+            icon="alert" summary={m.reason}
             badges={<span className="badge b-crit">Refused</span>}>
         <div className="bubble">
           {m.reason}
@@ -92,9 +76,9 @@ function Entry({ m, editable, onEdit, onReview }: {
  *  tap away, which is the point of the fold. */
 function brief(value: string): string {
   const text = String(value);
-  if (text.length <= 32) return text;
-  const stop = text.slice(0, 32).lastIndexOf(" ");
-  return text.slice(0, stop > 12 ? stop : 32) + "…";
+  if (text.length <= 90) return text;
+  const stop = text.slice(0, 90).lastIndexOf(" ");
+  return text.slice(0, stop > 30 ? stop : 90) + "…";
 }
 
 /** A finished station: one line, and whatever it holds when opened.
@@ -108,42 +92,43 @@ function brief(value: string): string {
  *  The line says who, what, a summary of it, and when, so folding costs
  *  nothing anybody was reading.
  */
-function Fold({ tone, who, title, summary, at, badges, children }: {
+/** One row of the log, in two columns: who posted it and when, then what they
+ *  posted. A row opens to show everything it holds; closed it shows the first lines. */
+function Fold({ tone, who, title, summary, lines, at, badges, icon = "doc", children }: {
   tone: "kept" | "refused" | "handed";
   who: string;
   title: string;
   summary?: string;
+  lines?: { k: string; v: string }[];
   at: string;
   badges?: React.ReactNode;
+  icon?: IconName;
   children: React.ReactNode;
 }) {
   const [shown, setShown] = useState(false);
   return (
-    <div className={`ev${shown ? " on" : ""}`}>
-      <div className={`m-av node ${tone}`} aria-hidden="true" />
-      <div className="m-b">
-        <button className="ev-h" aria-expanded={shown} onClick={() => setShown((v) => !v)}>
-          <span className="chev" aria-hidden="true"><Icon name="chev" className="i sm" /></span>
-          <span className="ev-st">{who}</span>
-          <span className="ev-t">{title}</span>
+    <div className={`lg2 ${tone}${shown ? " on" : ""}`}>
+      <div className="lg2-who" style={{ color: roleVar(who) }}>
+        {who}
+        <time>{at}</time>
+      </div>
+      <div className="lg2-body">
+        <button className="lg2-h" aria-expanded={shown} onClick={() => setShown((v) => !v)}>
+          <Icon name={icon} className="i sm lg2-i" />
+          <span className="lg2-t">{title}</span>
           {badges}
-          {!shown && summary && <span className="ev-sum">{summary}</span>}
-          <span className="ev-time">{at}</span>
+          <Icon name="chev" className={`i sm lg2-c${shown ? " open" : ""}`} />
         </button>
+        {!shown && summary && <div className="lg2-line">{summary}</div>}
+        {!shown && lines?.map((l) => (
+          <div className="lg2-line" key={l.k}><b>{l.k}</b>{l.v}</div>
+        ))}
         {shown && children}
       </div>
     </div>
   );
 }
 
-/** One committed record on the thread: a line, and its card when opened.
- *
- *  The line is the record -- who, what, when, and what it said -- so a visit
- *  reads as a list of stations rather than as a stack of forms. It starts
- *  closed, every one of them: a record on the thread is something somebody
- *  already finished, and the only thing that should be open on this screen is
- *  what is happening now.
- */
 function Posted({ m, onEdit }: {
   m: Extract<Msg, { kind: "posted" }>;
   /** Absent when this record can no longer be changed -- the visit is over,
@@ -153,7 +138,8 @@ function Posted({ m, onEdit }: {
 }) {
   return (
     <Fold tone="kept" who={m.actor} title={m.title} at={clock(m.at)}
-          summary={m.values.slice(0, 3).map((v) => `${v.label} ${brief(v.value)}`).join(" · ")}
+          icon={m.transcript ? "mic" : "doc"}
+          lines={m.values.slice(0, 3).map((v) => ({ k: v.label, v: brief(v.value) }))}
           badges={<>
             {m.edited && <span className="badge b-mute">Edited</span>}
             {m.tags.map((t) => (
@@ -227,17 +213,20 @@ function Body({ msgs, editable, onEdit, onReview }: {
 function Refusals({ rows, machine }: { rows: Extract<Msg, { kind: "denied" }>[]; machine: boolean }) {
   const [shown, setShown] = useState(false);
   const one = rows.length === 1;
+  const who = machine ? "" : rows[0].actor;
   return (
-    <div className={`ev${shown ? " on" : ""}`}>
-      <div className="m-av node refused" aria-hidden="true" />
-      <div className="m-b">
-        <button className="ev-h" aria-expanded={shown} onClick={() => setShown((v) => !v)}>
-          <span className="chev" aria-hidden="true"><Icon name="chev" className="i sm" /></span>
-          {!machine && <span className="ev-st">{rows[0].actor}</span>}
-          <span className="ev-t">{one ? rows[0].title : `${rows.length} refused`}</span>
-          <span className="ev-sum">{one ? rows[0].reason : "Nothing was written."}</span>
-          <span className="ev-time">{clock(rows[rows.length - 1].at)}</span>
+    <div className={`lg2 refused${shown ? " on" : ""}`}>
+      <div className="lg2-who" style={{ color: roleVar(who) }}>
+        {who}
+        <time>{clock(rows[rows.length - 1].at)}</time>
+      </div>
+      <div className="lg2-body">
+        <button className="lg2-h" aria-expanded={shown} onClick={() => setShown((v) => !v)}>
+          <Icon name="alert" className="i sm lg2-i" />
+          <span className="lg2-t">{one ? rows[0].title : `${rows.length} refused`}</span>
+          <Icon name="chev" className={`i sm lg2-c${shown ? " open" : ""}`} />
         </button>
+        {!shown && <div className="lg2-line">{one ? rows[0].reason : "Nothing was written."}</div>}
         {shown && (
           <div className="bubble">
             {rows.map((r) => (
@@ -256,7 +245,7 @@ function Refusals({ rows, machine }: { rows: Extract<Msg, { kind: "denied" }>[];
 
 function Handover({ m }: { m: Extract<Msg, { kind: "handover" }> }) {
   return (
-    <Fold tone="handed" who={m.from} title={m.title} at={clock(m.at)}
+    <Fold tone="handed" who={m.from} title={m.title} at={clock(m.at)} icon="refer"
           summary={`→ @${human(m.to)} · ${m.note}`}
           badges={<>
             <span className={`badge ${STATE[m.state] ?? "b-mute"}`}>{title(m.state)}</span>
@@ -304,25 +293,28 @@ function ProposalCard({ m, onReview }: {
   m: Extract<Msg, { kind: "proposal" }>;
   onReview?: (m: Extract<Msg, { kind: "proposal" }>) => void;
 }) {
+  const who = (
+    <div className="lg2-who" style={{ color: "var(--color-agent)" }}>
+      {m.by}
+      <time>{clock(m.at)}</time>
+    </div>
+  );
   if (m.stale) {
     return (
-      <div className="msg">
-        <div className="m-av agent" aria-hidden="true" />
-        <div className="m-b">
-          <div className="m-meta">Proposed by {m.by} · {clock(m.at)}</div>
-          <div className="bubble">
-            <div className="t">{m.title}<span className="badge b-mute">Stale</span></div>
-            The visit has moved past this. Confirming it would be refused.
-          </div>
+      <div className="lg2">
+        {who}
+        <div className="lg2-body">
+          <div className="lg2-t"><Icon name="spark" className="i sm lg2-i" />{m.title}<span className="badge b-mute">Stale</span></div>
+          <div className="lg2-line">The visit has moved past this. Confirming it would be refused.</div>
         </div>
       </div>
     );
   }
   return (
-    <div className="msg">
-      <div className="m-av agent" aria-hidden="true"><Icon name="spark" className="i sm" /></div>
-      <div className="m-b">
-        <div className="m-meta">Proposed by {m.by} · {clock(m.at)}</div>
+    <div className="lg2">
+      {who}
+      <div className="lg2-body">
+        <div className="lg2-line">Proposed for review</div>
         <div className="props">
           <button type="button" className="prop primary" onClick={() => onReview?.(m)}>
             <span className="p-b"><span className="p-l">Review {m.title}</span></span>

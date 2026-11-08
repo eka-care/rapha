@@ -262,7 +262,8 @@
   width: 26px; height: 26px; color: var(--color-agent);
 }
 .dict-bloom .i { width: 26px; height: 26px; animation: bloomturn 3.4s linear infinite; }
-.dict-bloom.still .i { animation: none; }
+/* Held, not removed: removing the animation snaps the mark back to its start, which is the jump a pause used to make. */
+.dict-bloom.still .i, .dict-bloom.paused .i { animation-play-state: paused; }
 @keyframes bloomturn { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   .dict { animation: none; }
@@ -343,18 +344,15 @@
   border-bottom: 1px solid var(--color-border-subtle);
 }
 .stab {
-  min-height: 36px; padding: 0 var(--space-3);
-  display: inline-flex; align-items: center; gap: var(--space-2);
-  border: 0; border-bottom: 2px solid transparent; background: transparent;
-  font: 600 13px/1 var(--font-sans); color: var(--color-text-secondary); cursor: pointer;
-  margin-bottom: -1px;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 500; color: var(--color-text-tertiary);
+  border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
 }
 .stab:hover { color: var(--color-text-primary); }
-.stab.on { color: var(--color-text-primary); border-bottom-color: var(--color-cta); }
-.stab-n {
-  font: 600 11px/1 var(--font-mono); color: var(--color-text-tertiary);
-  background: var(--color-bg-subtle); border-radius: var(--radius-pill); padding: 3px 6px;
-}
+.stab.on { color: var(--color-text-primary); font-weight: 650; border-bottom-color: var(--color-text-primary); }
+.stab-n { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 1px 6px; border-radius: var(--radius-sm); background: var(--color-bg-subtle); color: var(--color-text-tertiary); }
+.stab.on .stab-n { background: var(--color-bg-selected); color: var(--color-text-primary); }
+@media (min-width: 901px) { .stab { min-height: 38px; } }
 
 /* Transcript: what was said, as prose, with a measure. */
 .tx { max-width: 74ch; font-size: 14px; line-height: 1.65; color: var(--color-text-primary); }
@@ -400,7 +398,6 @@
 .dict-bloom.big, .dict-bloom.big .i { width: 72px; height: 72px; }
 /* Paused is a held breath, not a stopped clock: the same mark, still, and
    slowly breathing, so it reads as waiting for you rather than as broken. */
-.dict-bloom.big.paused .i { animation: bloombreathe 2.4s ease-in-out infinite; }
 @keyframes bloombreathe { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 .sc-daff-said { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .sc-daff-hint { font-size: 12.5px; color: var(--color-text-secondary); max-width: 52ch; }

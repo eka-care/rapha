@@ -9,6 +9,7 @@
  *  (§21), ink-filled for the one that closes this station's step. Every word
  *  on them is the operation's own declaration.
  */
+import { Lotus } from "../abha/Lotus";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { threadAsks } from "../agent";
 import type { Client } from "../api";
@@ -25,16 +26,18 @@ import { ScribeBar } from "../scribe/ScribeBar";
 import { KeptNotes, Nudges, StartHere, SubTabs, Templates as TemplatesPane, TranscriptText } from "../scribe/Pane";
 import { usePane } from "../scribe/usePane";
 import { mergeDrafts, type Opened } from "../scribe/session";
+import { ScribeLive } from "../thread/ScribeLive";
+import { clearLiveScribe, setLiveScribe } from "../scribe/live";
 import { Stream, operationFor } from "../thread/Thread";
 import { patientContext } from "../thread/mention";
 import { Carry, PastVisits, Team, Trend, usePast, visitOf } from "../thread/Past";
 import { Background } from "../thread/Background";
 import { Tabs, type Tab, type TabId } from "../thread/Tabs";
 import { Line } from "../view/View";
-import { Garland } from "../auth/Bloom";
 import { RAIL, railFolded, railShown, setRailFolded, setRailShown, type RailId } from "./rail";
 import { human, sentence, spell, title } from "../words";
 import { initialsOf } from "../agent";
+import { ABHA_PENDING } from "../abha/sdk";
 
 /** How many actions the agent's node offers.
  *
@@ -180,19 +183,14 @@ export function Encounter({
   const pane = usePane({ thread: thread.id, station: thread.station ?? "",
                          open: tab === "scribe", asked: scribing });
 
-  // THE RECORDING OPENS ITS OWN VIEW. Pressing the microphone and having
-  // nothing appear would be the same silence the old inline bar at least
-  // avoided, so starting to dictate brings the view that holds it. It is
-  // not closed again when the recording stops: the draft is still there to
-  // be read, and taking the page away from somebody mid-sentence is worse
-  // than leaving it open one beat too long.
-  useEffect(() => {
-    // `""` IS A REAL VALUE HERE, not an absence: the composer's microphone
-    // passes it to mean "open on whatever this station recorded last". A
-    // truthiness test read that as off, so the one shortcut a doctor who
-    // knows what they are doing uses silently did nothing.
-    if (scribing !== null || drafts.length > 0) setTab("scribe");
-  }, [scribing, drafts.length]);
+  // THE RECORDING DOES NOT TAKE THE SCREEN (owner, 2026-11-07). Somebody who
+  // starts Scribe still has a patient in front of them, so the thread stays
+  // where it is and Scribe reports in the log (thread/ScribeLive) and on its
+  // own button. The recorder is still mounted on the Scribe tab, hidden, so
+  // nothing here stops the microphone.
+  const ctl = useRef<{ stop: () => void; pause: () => void; resume: () => void } | null>(null);
+  const live = scribing !== null ? pane.status : null;
+
 
   // The microphone is gated on the scribe instrument's own `requires:`, not a
   // flag named here: a bundle that spells its consent differently is gated by
@@ -227,6 +225,12 @@ export function Encounter({
     carriedInto(carried, thread.id, walk(questionnaire(op.input)?.questions ?? [])) as Payload | undefined;
 
   const head = useMemo(() => header(thread, queueViewFor(cat, thread.workflow), displayFor), [thread, cat]);
+  // Tell the rail, so there is a way back from anywhere else in the app.
+  useEffect(() => {
+    if (live && live.phase !== "idle") setLiveScribe({ thread: thread.id, name: head.name, phase: live.phase, seconds: live.seconds });
+    else clearLiveScribe(thread.id);
+  }, [thread.id, head.name, live?.phase, live?.seconds]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => clearLiveScribe(thread.id), [thread.id]);
   /** What the header line already says, so the rail does not say it again. */
   const onHeader = useMemo(
     () => new Set<string>([head.name, ...head.meta].filter(Boolean)), [head]);
@@ -347,8 +351,7 @@ export function Encounter({
 
   return (
     <div className={`chatgrid${folded ? " folded" : ""}`}>
-      <div className="card chatcard">
-        <Garland kind="spray" />
+      <div className="chatcard">
         <header className="pt-head">
           <span className="avatar">{initialsOf(head.name)}</span>
           <div style={{ minWidth: 0, flex: 1 }}>
@@ -356,17 +359,23 @@ export function Encounter({
                   "Encounter", which told a person nothing they did not
                   already know, and this, the one that names whose visit it
                   is. The bar is gone and the heading stayed. */}
-            <h1 className="pt-name">{head.name}</h1>
-            <div className="pt-meta">{head.meta.join(" · ")}</div>
+            <h1 className="pt-name">
+              {head.name}
+              {head.token && (
+                <span className="ticket pt-token" aria-label={`${title(head.tokenWord)} ${head.token}`}><Icon name="ticket" className="i tk-i" />{head.token}</span>
+              )}
+            </h1>
+            <div className="pt-line">
+            <div className="pt-meta">{head.meta.join(", ")}</div>
             <div className="pt-chips">
               {head.identity && (
                 <span className="id-badge">
+                  <Lotus className="id-lotus" />
                   <span className="id-lab">{head.identity.label}</span>
                   <span className="id-val">{head.identity.value}</span>
                 </span>
               )}
-              {thread.station && <span className="badge b-ink">{title(thread.station)}</span>}
-              {head.badges.map((b) => (
+              {head.badges.filter((b) => !(head.token && b.text === head.token) && b.text !== human(ABHA_PENDING)).map((b) => (
                 <span className={`badge ${TONE[b.style] ?? "b-mute"}`} key={b.text}>{b.text}</span>
               ))}
               {/* NO CHIP FOR THE PATIENT'S RECORD. It sat here beside the
@@ -374,6 +383,7 @@ export function Encounter({
                   fact about the patient. It is a place you go, and places
                   are the rail's and the `/` menu's -- both of which still
                   offer it, on the owner's call, 2026-11-04. */}
+            </div>
             </div>
           </div>
         </header>
@@ -434,7 +444,7 @@ export function Encounter({
                 continue, stop -- when that view is open, and as a one line
                 bar above the others. Owner, 2026-11-04. */}
             {scribing !== null && (
-              <ScribeBar thread={thread.id} op={pane.op} lib={pane.lib}
+              <ScribeBar thread={thread.id} op={pane.op} lib={pane.lib} controls={ctl}
                          full={pane.sub === "transcript"}
                          onStatus={pane.setStatus}
                          onByHand={() => {
@@ -524,14 +534,18 @@ export function Encounter({
             setForm({ op: operationFor(m.proposal, cat.operations), proposal: m.proposal });
           }}
         >
+          {scribing !== null && (
+            <ScribeLive phase={pane.status.phase} seconds={pane.status.seconds} drafts={drafts.length}
+                        onStop={() => ctl.current?.stop()}
+                        onPause={() => ctl.current?.pause()} onResume={() => ctl.current?.resume()}
+                        onOpen={() => { setTab("scribe"); pane.setSub(drafts.length ? "notes" : "transcript"); }} />
+          )}
           {/* §21: the agent's own message, and the actions it is offering. */}
           {(line.sentences.length > 0 || offered.length > 0) && (
-            <div className="msg">
-              <div className="m-av agent" aria-hidden="true"><Icon name="spark" className="i sm" /></div>
-              <div className="m-b" style={{ width: "100%" }}>
-                <div className="m-meta">Agent · now</div>
-                <div className="bubble">
-                  {line.sentences.join(" ")}
+            <div className="lg2">
+              <div className="lg2-who" style={{ color: "var(--color-agent)" }}>Agent<time>now</time></div>
+              <div className="lg2-body">
+                <p className="lg2-txt">{line.sentences.join(" ")}</p>
                   {offered.length > 0 && (
                     <div className="props">
                       {offered.map((op, i) => (
@@ -564,7 +578,6 @@ export function Encounter({
                       )}
                     </div>
                   )}
-                </div>
               </div>
             </div>
           )}
@@ -591,6 +604,11 @@ export function Encounter({
              somebody who already knows what they are doing: it opens on
              whatever this station recorded last. */
           onStartScribe={() => setScribing("")}
+          recording={scribing !== null && (pane.status.phase === "recording" || pane.status.phase === "paused")
+            ? { seconds: pane.status.seconds, paused: pane.status.phase === "paused",
+              onStop: () => ctl.current?.stop(), onPause: () => ctl.current?.pause(), onResume: () => ctl.current?.resume() } : null}
+          working={scribing !== null && (pane.status.phase === "uploading" || pane.status.phase === "waiting")
+            ? "Writing notes…" : undefined}
           onAskRapha={onAskRapha && ((q) => onAskRapha(q, {
             title: head.name,
             text: patientContext(head.meta, todayVisit.values, [head.name]),
